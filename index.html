@@ -1,3 +1,4 @@
+```html
 <!doctype html>
 <html lang="ja">
 <head>
@@ -50,6 +51,11 @@
           <label>手入力・外付けスキャナ入力
             <input id="barcodeInput" autocomplete="off" placeholder="バーコードを入力またはスキャンしてEnter" />
           </label>
+
+          <div id="scanProductInfo" class="message">
+            バーコード入力後、商品名と現在庫を表示します。
+          </div>
+
           <button type="submit">登録</button>
         </form>
 
@@ -171,3 +177,4 @@
   <script src="./app.js"></script>
 </body>
 </html>
+```
