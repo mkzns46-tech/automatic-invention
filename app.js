@@ -104,57 +104,59 @@ function renderStockTable(){const stockBody=el("stockBody");if(!stockBody)return
 function logRow(l){return`<tr><td>${fmt(l.created_at)}</td><td>${esc(l.type)}</td><td>${esc(l.staff)}</td><td>${esc(l.barcode)}</td><td>${esc(l.product_name||"")}</td><td>${l.quantity}</td><td>${esc(l.memo||"")}</td></tr>`}
 
 function buildGlobalHistoryRows(){
-  const stockMap={};
-  const asc=logs.slice().sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
-
   const rows=[];
+  const byBarcode=new Map();
 
-  for(const log of asc){
-    const barcode=log.barcode;
-    const product=gp(barcode);
-
-    if(stockMap[barcode]===undefined){
-      stockMap[barcode]=Number(product?.base_stock||0);
-    }
-
-    let stockQty="";
-    let inQty="";
-    let outQty="";
-
-    const q=Number(log.quantity||0);
-
-    if(log.type==="在庫修正"){
-      stockQty=q;
-      stockMap[barcode]=q;
-    }
-
-    if(log.type==="入荷"){
-      inQty=q;
-      stockMap[barcode]+=q;
-    }
-
-    if(log.type==="出荷"){
-      outQty=q;
-      stockMap[barcode]-=q;
-    }
-
-    rows.push(`<tr>
-      <td>${fmt(log.created_at)}</td>
-      <td>${esc(log.type)}</td>
-      <td>${esc(log.staff)}</td>
-      <td>${esc(log.product_name)}</td>
-      <td>${stockQty}</td>
-      <td>${inQty}</td>
-      <td>${outQty}</td>
-      <td>${stockMap[barcode]}</td>
-      <td>${esc(log.memo||"")}</td>
-    </tr>`);
+  for(const log of logs){
+    if(!byBarcode.has(log.barcode))byBarcode.set(log.barcode,[]);
+    byBarcode.get(log.barcode).push(log);
   }
 
-  return rows.reverse().join("");
+  for(const [barcode, list] of byBarcode.entries()){
+    const product=gp(barcode);
+    let stock=Number(product?.base_stock||0);
+
+    const desc=list.slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+
+    for(const log of desc){
+      const q=Number(log.quantity||0);
+      let stockQty="";
+      let inQty="";
+      let outQty="";
+      const stockAfter=stock;
+
+      if(log.type==="入荷"){
+        inQty=q;
+        stock=stock-q;
+      }else if(log.type==="出荷"){
+        outQty=q;
+        stock=stock+q;
+      }else if(log.type==="在庫修正"){
+        stockQty=q;
+        // 在庫修正より前の在庫は履歴だけでは完全復元できないため、そのまま継続
+      }
+
+      rows.push({
+        created_at:log.created_at,
+        html:`<tr>
+          <td>${fmt(log.created_at)}</td>
+          <td>${esc(log.type)}</td>
+          <td>${esc(log.staff)}</td>
+          <td>${esc(log.product_name||product?.name||"")}</td>
+          <td>${stockQty}</td>
+          <td>${inQty}</td>
+          <td>${outQty}</td>
+          <td>${stockAfter}</td>
+          <td>${esc(log.memo||"")}</td>
+        </tr>`
+      });
+    }
+  }
+
+  return rows.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(r=>r.html).join("");
 }
 
-function renderGlobalHistory(){const historyBody=el("historyBody");if(!historyBody)return;const q=el("searchInput")?.value?.trim()?.toLowerCase()||"";historyBody.innerHTML=logs.filter(l=>!q||l.barcode.toLowerCase().includes(q)||String(l.product_name).toLowerCase().includes(q)||String(l.staff).toLowerCase().includes(q)||String(l.memo).toLowerCase().includes(q)).map(logRow).join("")}
+function renderGlobalHistory(){const historyBody=el("historyBody");if(!historyBody)return;historyBody.innerHTML=buildGlobalHistoryRows();}
 
 function selectProductHistoryByBarcode(){
   const input=el("productHistoryBarcodeInput");
@@ -186,6 +188,7 @@ function productHistoryRowHtmlForStock(log, runningStock){
     <td>${inQty}</td>
     <td>${outQty}</td>
     <td>${runningStock}</td>
+    <td>${esc(log.memo||"")}</td>
   </tr>`;
 }
 
