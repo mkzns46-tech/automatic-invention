@@ -8,10 +8,18 @@ const gp=b=>products.find(p=>p.barcode===b),gs=b=>calcStock().find(s=>s.barcode=
 function render(){renderProductCount();renderStaffOptions();renderStaffList();renderStockTable();renderGlobalHistory();renderSelectedProductHistory();renderScanPreview();renderProductStockInfo()}
 function renderStaffOptions(){
   const select=el("staff");
-  if(!select)return;
-  const current=select.value;
-  select.innerHTML='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
-  if(current)select.value=current;
+  if(select){
+    const current=select.value;
+    select.innerHTML='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
+    if(current)select.value=current;
+  }
+
+  const checker=el("checkerName");
+  if(checker){
+    const currentChecker=checker.value;
+    checker.innerHTML='<option value="">チェック者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
+    if(currentChecker)checker.value=currentChecker;
+  }
 }
 
 function renderStaffList(){
@@ -51,6 +59,27 @@ async function deleteStaff(id){
 
 function renderProductCount(){const b=el("productCountBadge");if(b)b.textContent=`登録数：${products.length}件`}
 function renderScanPreview(){const info=el("scanProductInfo"),inp=el("barcodeInput");if(!info||!inp)return;const b=inp.value.trim();if(!b){info.textContent="バーコード入力後、商品名と現在庫を表示します。";info.className="message";return}if(dataLoadError){info.textContent="商品データを取得できていません。再読み込みしてください。";info.className="message err";return}if(!dataLoaded){info.textContent="商品データ読み込み中です。少し待ってください。";info.className="message";return}const p=gp(b);if(!p){info.textContent=`未登録バーコード：${b}`;info.className="message err";return}info.textContent=`商品名：${p.name} / 現在庫：${gs(b)}`;info.className="message ok"}
+
+
+function syncHistoryFromScanBarcode(){
+  const input=el("barcodeInput");
+  if(!input)return;
+  const barcode=input.value.trim();
+  renderScanPreview();
+
+  const historyInput=el("productHistoryBarcodeInput");
+  if(historyInput)historyInput.value=barcode;
+
+  if(!barcode)return;
+  if(!dataLoaded || dataLoadError)return;
+
+  const product=gp(barcode);
+  if(product){
+    selectedBarcode=barcode;
+    selectedHistoryMode="all";
+    renderSelectedProductHistory();
+  }
+}
 
 function renderProductStockInfo(){
   const info=el("productStockInfo"),input=el("productBarcode");
@@ -113,7 +142,7 @@ if(type==="在庫修正")newStock=qty;
 if(type==="出荷"&&newStock<0){beep(false);showMessage(`在庫不足：${p.name} / 現在庫 ${currentStock} / 出荷数 ${qty}`,"err");return}
 await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type,staff,barcode,product_name:p.name,quantity:qty,memo})});
 await updateProductCurrentStock(barcode,newStock);
-beep(true);showMessage(type==="在庫修正"?`在庫修正：${p.name} / 現在庫を ${qty} に上書き / 担当者：${staff}`:`${type}登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock}`,"ok");el("barcodeInput").value="";el("qty").value="";renderScanPreview();await reloadAll();el("barcodeInput").focus()}catch(e){beep(false);showMessage("登録エラー。\n"+e.message,"err")}}
+beep(true);showMessage(type==="在庫修正"?`在庫修正：${p.name} / 現在庫を ${qty} に上書き / 担当者：${staff}`:`${type}登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock}`,"ok");el("barcodeInput").value="";el("qty").value="";renderScanPreview();await reloadAll();renderSelectedProductHistory();el("barcodeInput").focus()}catch(e){beep(false);showMessage("登録エラー。\n"+e.message,"err")}}
 async function saveStockCheck(){try{if(!selectedBarcode){showMessage("在庫確認の表から商品を選択してください。","err");return}const checked_by=el("checkerName").value.trim();if(!checked_by){showMessage("チェック者名を入力してください。","err");el("checkerName").focus();return}const p=gp(selectedBarcode),stock_at_check=gs(selectedBarcode);await sb("inventory_checks",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({barcode:selectedBarcode,product_name:p?.name||"",checked_by,stock_at_check,memo:""})});beep(true);showMessage(`在庫チェック記録：${p?.name||selectedBarcode} / ${checked_by} / 実在庫 ${stock_at_check}`,"ok");await reloadAll()}catch(e){beep(false);showMessage("チェック記録エラー。\n"+e.message,"err")}}
 function parseCsv(text){text=text.replace(/^\uFEFF/,"");const rows=[];let row=[],field="",q=false;for(let i=0;i<text.length;i++){const c=text[i],n=text[i+1];if(q){if(c=='"'&&n=='"'){field+='"';i++}else if(c=='"')q=false;else field+=c}else{if(c=='"')q=true;else if(c==","){row.push(field);field=""}else if(c=="\n"){row.push(field);rows.push(row);row=[];field=""}else if(c!="\r")field+=c}}row.push(field);rows.push(row);return rows.filter(r=>r.some(v=>String(v).trim()!==""))}
 const nh=h=>String(h||"").trim().toLowerCase().replace(/\s/g,""),gv=(o,ks)=>{for(const k of ks)if(o[k]!==undefined)return o[k];return""};
@@ -214,7 +243,7 @@ function bindEvents(){
     registerBarcode(el("barcodeInput").value);
   });
 
-  on("barcodeInput","input",renderScanPreview);on("productHistoryBarcodeInput","input",selectProductHistoryByBarcode);
+  on("barcodeInput","input",syncHistoryFromScanBarcode);on("productHistoryBarcodeInput","input",selectProductHistoryByBarcode);
   on("productBarcode","input",renderProductStockInfo);
   on("startCameraBtn","click",startCamera);
   on("stopCameraBtn","click",stopCamera);
