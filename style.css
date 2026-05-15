@@ -81,3 +81,256 @@
     line-height:1.5;
   }
 }
+
+
+/* ===== v20 final UI polish ===== */
+:root{
+  --main:#2d6a4f;
+  --main-dark:#1b4332;
+  --main-mid:#40916c;
+  --main-light:#d8f3dc;
+  --main-soft:#f1fbf4;
+  --bg:#eef7f1;
+  --text:#10251b;
+  --border:#cfe6d7;
+}
+
+body{
+  background:linear-gradient(180deg,#eef7f1 0%,#f8fbf9 100%);
+  color:var(--text);
+}
+
+.app{
+  padding:18px;
+}
+
+header{
+  border-top:none;
+  background:linear-gradient(135deg,var(--main-dark),var(--main));
+  color:#fff;
+  box-shadow:0 8px 28px #1b433226;
+}
+
+header h1{
+  color:#fff;
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 12px;
+  align-items:baseline;
+  letter-spacing:.02em;
+}
+
+header h1 span:first-child{
+  font-size:28px;
+  font-weight:900;
+}
+
+header h1 span:last-child{
+  font-size:22px;
+  font-weight:800;
+}
+
+header p{
+  color:#e8fff0;
+  margin-top:8px;
+}
+
+header button{
+  background:#ffffff;
+  color:var(--main-dark);
+  box-shadow:0 3px 12px #00000014;
+}
+
+header button:hover{
+  background:#ecfff2;
+}
+
+.card{
+  border:1px solid var(--border);
+  box-shadow:0 6px 22px #1b43320d;
+}
+
+.card.scanner{
+  border:2px solid var(--main);
+  background:linear-gradient(180deg,#ffffff 0%,#f7fff9 100%);
+}
+
+h2{
+  font-size:21px;
+  letter-spacing:.01em;
+}
+
+.section-note{
+  margin:5px 0 0;
+  font-size:13px;
+  color:#527161;
+  line-height:1.5;
+}
+
+.compact-title{
+  margin-bottom:10px;
+}
+
+label{
+  font-size:14px;
+  margin-top:12px;
+}
+
+input,select{
+  min-height:48px;
+}
+
+button,.file-button{
+  min-height:48px;
+  border-radius:14px;
+}
+
+.required{
+  vertical-align:middle;
+  background:#ffe8e8;
+  color:#b42318;
+  border:1px solid #ffc9c9;
+}
+
+.message{
+  line-height:1.55;
+  border:1px solid #d6eadc;
+}
+
+.message.ok{
+  border-color:#95d5b2;
+}
+
+.message.err{
+  border-color:#fecaca;
+}
+
+/* スキャンバーコード欄をさらに見やすく */
+#barcodeInput{
+  border:3px solid var(--main);
+  background:#ffffff;
+  font-size:24px;
+  font-weight:900;
+  padding:20px 18px;
+  letter-spacing:.04em;
+  box-shadow:0 0 0 5px var(--main-light);
+}
+
+#barcodeInput::placeholder{
+  font-size:17px;
+  letter-spacing:0;
+  font-weight:700;
+  color:#527161;
+}
+
+#scanProductInfo{
+  margin-top:14px;
+  font-size:15px;
+}
+
+#message{
+  margin-top:16px;
+}
+
+/* PCの管理画面を見やすく */
+@media(min-width:801px){
+  .grid{
+    align-items:start;
+  }
+
+  .product-admin-section,
+  .csv-admin-section,
+  .staff-admin-section{
+    min-height:100%;
+  }
+
+  .pc-only-section h2{
+    margin-bottom:4px;
+  }
+}
+
+/* スマホ最適化 */
+@media(max-width:800px){
+  .app{
+    padding:10px;
+  }
+
+  header{
+    padding:18px 16px;
+    border-radius:16px;
+    margin-bottom:12px;
+  }
+
+  header h1{
+    display:block;
+    line-height:1.25;
+  }
+
+  header h1 span{
+    display:block;
+  }
+
+  header h1 span:first-child{
+    font-size:22px;
+  }
+
+  header h1 span:last-child{
+    font-size:20px;
+    margin-top:2px;
+  }
+
+  header p{
+    font-size:13px;
+    line-height:1.5;
+  }
+
+  .card{
+    border-radius:16px;
+    padding:16px;
+  }
+
+  .card.scanner{
+    border-width:2px;
+  }
+
+  h2{
+    font-size:20px;
+  }
+
+  .row{
+    gap:8px;
+  }
+
+  label{
+    font-size:14px;
+  }
+
+  input,select,button{
+    font-size:17px;
+    min-height:52px;
+  }
+
+  #barcodeInput{
+    font-size:25px;
+    padding:20px 16px;
+  }
+
+  #barcodeInput::placeholder{
+    font-size:16px;
+  }
+
+  .button-row{
+    gap:8px;
+  }
+
+  .message{
+    font-size:15px;
+  }
+
+  .pc-only-section,
+  .product-admin-section,
+  .csv-admin-section,
+  .staff-admin-section{
+    display:none !important;
+  }
+}
