@@ -720,3 +720,48 @@ footer{
 .product-admin-section form label + label{
   margin-top:12px;
 }
+
+
+/* ===== v24 alignment fix ===== */
+
+/* 上段カード高さ揃え */
+.grid{
+  align-items:stretch !important;
+}
+
+.card.scanner,
+.staff-admin-section{
+  height:100% !important;
+  min-height:620px !important;
+}
+
+/* 担当者カード内部 */
+.staff-admin-section{
+  display:flex !important;
+  flex-direction:column !important;
+}
+
+.staff-admin-section .table-wrap{
+  margin-top:16px !important;
+}
+
+/* ヘッダー余白調整 */
+header{
+  padding-top:20px !important;
+  padding-bottom:20px !important;
+}
+
+header h1{
+  margin-bottom:0 !important;
+}
+
+/* スマホ */
+@media(max-width:800px){
+
+  .card.scanner,
+  .staff-admin-section{
+    min-height:auto !important;
+    height:auto !important;
+  }
+
+}
