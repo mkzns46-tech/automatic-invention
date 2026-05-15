@@ -781,3 +781,12 @@ header h1{
 .csv-feature-grid{
   margin-bottom:14px !important;
 }
+
+
+/* ===== v26 staff scroll plus one row ===== */
+/* 担当者一覧を1人分だけ拡張 */
+.staff-admin-section .table-wrap{
+  height:358px !important;
+  min-height:358px !important;
+  max-height:358px !important;
+}
