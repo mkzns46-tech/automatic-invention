@@ -102,6 +102,58 @@ function renderProductStockInfo(){
 
 function renderStockTable(){const stockBody=el("stockBody");if(!stockBody)return;const q=el("searchInput")?.value?.trim()?.toLowerCase()||"",rows=calcStock().filter(r=>!q||r.barcode.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||String(r.location).toLowerCase().includes(q));stockBody.innerHTML=rows.map(r=>{const lc=gc(r.barcode).sort((a,b)=>new Date(b.checked_at)-new Date(a.checked_at))[0],lt=lc?`${fmt(lc.checked_at)} / ${esc(lc.checked_by)}`:"未チェック";return`<tr class="clickable ${selectedBarcode===r.barcode?"selected-row":""}" data-barcode="${esc(r.barcode)}"><td><button type="button" class="secondary">履歴</button></td><td>${esc(r.barcode)}</td><td>${esc(r.name)}</td><td>${esc(r.location)}</td><td>${r.base_stock}</td><td>${r.inQty}</td><td>${r.outQty}</td><td>${r.adjustQty}</td><td class="${r.stock<0?"stock-minus":"stock-plus"}">${r.stock}</td><td>${lt}</td></tr>`}).join("");document.querySelectorAll("#stockBody tr[data-barcode]").forEach(tr=>tr.addEventListener("click",()=>{selectedBarcode=tr.dataset.barcode;selectedHistoryMode="all";render()}))}
 function logRow(l){return`<tr><td>${fmt(l.created_at)}</td><td>${esc(l.type)}</td><td>${esc(l.staff)}</td><td>${esc(l.barcode)}</td><td>${esc(l.product_name||"")}</td><td>${l.quantity}</td><td>${esc(l.memo||"")}</td></tr>`}
+
+function buildGlobalHistoryRows(){
+  const stockMap={};
+  const asc=logs.slice().sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+
+  const rows=[];
+
+  for(const log of asc){
+    const barcode=log.barcode;
+    const product=gp(barcode);
+
+    if(stockMap[barcode]===undefined){
+      stockMap[barcode]=Number(product?.base_stock||0);
+    }
+
+    let stockQty="";
+    let inQty="";
+    let outQty="";
+
+    const q=Number(log.quantity||0);
+
+    if(log.type==="在庫修正"){
+      stockQty=q;
+      stockMap[barcode]=q;
+    }
+
+    if(log.type==="入荷"){
+      inQty=q;
+      stockMap[barcode]+=q;
+    }
+
+    if(log.type==="出荷"){
+      outQty=q;
+      stockMap[barcode]-=q;
+    }
+
+    rows.push(`<tr>
+      <td>${fmt(log.created_at)}</td>
+      <td>${esc(log.type)}</td>
+      <td>${esc(log.staff)}</td>
+      <td>${esc(log.product_name)}</td>
+      <td>${stockQty}</td>
+      <td>${inQty}</td>
+      <td>${outQty}</td>
+      <td>${stockMap[barcode]}</td>
+      <td>${esc(log.memo||"")}</td>
+    </tr>`);
+  }
+
+  return rows.reverse().join("");
+}
+
 function renderGlobalHistory(){const historyBody=el("historyBody");if(!historyBody)return;const q=el("searchInput")?.value?.trim()?.toLowerCase()||"";historyBody.innerHTML=logs.filter(l=>!q||l.barcode.toLowerCase().includes(q)||String(l.product_name).toLowerCase().includes(q)||String(l.staff).toLowerCase().includes(q)||String(l.memo).toLowerCase().includes(q)).map(logRow).join("")}
 
 function selectProductHistoryByBarcode(){
