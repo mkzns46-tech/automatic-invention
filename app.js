@@ -349,15 +349,18 @@ async function registerBarcode(barcode) {
     const qty = Number(el("qty").value || 1);
     const memo = el("memo").value.trim();
 
+    // 担当者必須チェック
     if (!staff) {
       beep(false);
       showMessage("担当者を入力してください。", "err");
+      el("staff").focus();
       return;
     }
 
     if (!qty || (type !== "在庫修正" && qty < 1)) {
       beep(false);
       showMessage("数量を確認してください。", "err");
+      el("qty").focus();
       return;
     }
 
@@ -393,7 +396,7 @@ async function registerBarcode(barcode) {
     });
 
     beep(true);
-    showMessage(`${type}登録：${product.name} / 数量 ${qty}`, "ok");
+    showMessage(`${type}登録：${product.name} / 担当者：${staff} / 数量 ${qty}`, "ok");
     el("barcodeInput").value = "";
 
     await reloadAll();
