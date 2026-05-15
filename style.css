@@ -687,3 +687,36 @@ footer{
     display:none;
   }
 }
+
+
+/* ===== v23 staff scroll / product hint remove ===== */
+
+/* 担当者一覧は4人分だけ表示してスクロール */
+.staff-admin-section{
+  min-height:auto !important;
+  height:auto !important;
+}
+
+.staff-admin-section .table-wrap{
+  flex:none !important;
+  height:292px !important;
+  min-height:292px !important;
+  max-height:292px !important;
+  overflow-y:auto !important;
+  margin-top:16px !important;
+}
+
+/* 担当者追加ボタンとの隙間 */
+#staffForm{
+  margin-bottom:18px !important;
+}
+
+#staffForm button{
+  margin-top:14px !important;
+  margin-bottom:0 !important;
+}
+
+/* 商品登録カード内の不要なメッセージ削除後の余白調整 */
+.product-admin-section form label + label{
+  margin-top:12px;
+}
