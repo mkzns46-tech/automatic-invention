@@ -1,3 +1,18 @@
-v6 全データ上書き・カラー #2d6a4f 版
+# v7 数量毎回入力必須版
 
-Supabaseで supabase_schema_update_v6_delete_policy.sql を1回実行してください。
+## 変更内容
+- スキャン登録の数量は初期値なし
+- 登録後、数量は空白に戻る
+- 数量未入力では登録不可
+- 全データ上書き取り込みボタンは削除
+- カラーは #2d6a4f
+- Supabase APIキー反映済み
+
+## SQL操作
+不要です。
+今回の変更は画面とJavaScriptだけです。
+
+GitHubへ以下を上書きしてください。
+- index.html
+- app.js
+- style.css
