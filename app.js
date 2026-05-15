@@ -5,7 +5,7 @@ async function sb(path,opt={}){const h={apikey:SUPABASE_API_KEY,Authorization:"B
 async function reloadAll(){try{dataLoaded=false;dataLoadError=false;showMessage("商品データ読み込み中...");products=await sb("products?select=*&order=name.asc");logs=await sb("inventory_logs?select=*&order=created_at.desc&limit=2000");try{checks=await sb("inventory_checks?select=*&order=checked_at.desc&limit=2000")}catch{checks=[]}try{staffMembers=await sb("staff_members?select=*&order=name.asc")}catch{staffMembers=[]}dataLoaded=true;dataLoadError=false;render();showMessage(`準備OK。商品データ ${products.length} 件を読み込みました。`,"ok")}catch(e){dataLoaded=false;dataLoadError=true;showMessage("データ取得エラー。\n再読み込みしてください。\n"+e.message,"err")}}
 function calcStock(){const m=new Map();for(const p of products)m.set(p.barcode,{barcode:p.barcode,name:p.name,location:p.location||"",base_stock:Number(p.base_stock||0),inQty:0,outQty:0,adjustQty:"",stock:Number(p.base_stock||0)});for(const l of logs){const i=m.get(l.barcode);if(!i)continue;const q=Number(l.quantity||0);if(l.type==="入荷")i.inQty+=q;if(l.type==="出荷")i.outQty+=q;if(l.type==="在庫修正")i.adjustQty=q}return[...m.values()]}
 const gp=b=>products.find(p=>p.barcode===b),gs=b=>calcStock().find(s=>s.barcode===b)?.stock??0,gc=b=>checks.filter(c=>c.barcode===b),fmt=x=>{try{return new Date(x).toLocaleString("ja-JP")}catch{return x}},esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
-function render(){renderProductCount();renderStockTable();renderGlobalHistory();renderSelectedProductHistory();renderScanPreview();renderProductStockInfo()}
+function render(){renderProductCount();renderStaffOptions();renderStaffList();renderStockTable();renderGlobalHistory();renderSelectedProductHistory();renderScanPreview();renderProductStockInfo()}
 function renderStaffOptions(){
   const select=el("staff");
   if(!select)return;
@@ -73,8 +73,8 @@ function renderProductStockInfo(){
 
 function renderStockTable(){const stockBody=el("stockBody");if(!stockBody)return;const q=el("searchInput")?.value?.trim()?.toLowerCase()||"",rows=calcStock().filter(r=>!q||r.barcode.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||String(r.location).toLowerCase().includes(q));stockBody.innerHTML=rows.map(r=>{const lc=gc(r.barcode).sort((a,b)=>new Date(b.checked_at)-new Date(a.checked_at))[0],lt=lc?`${fmt(lc.checked_at)} / ${esc(lc.checked_by)}`:"未チェック";return`<tr class="clickable ${selectedBarcode===r.barcode?"selected-row":""}" data-barcode="${esc(r.barcode)}"><td><button type="button" class="secondary">履歴</button></td><td>${esc(r.barcode)}</td><td>${esc(r.name)}</td><td>${esc(r.location)}</td><td>${r.base_stock}</td><td>${r.inQty}</td><td>${r.outQty}</td><td>${r.adjustQty}</td><td class="${r.stock<0?"stock-minus":"stock-plus"}">${r.stock}</td><td>${lt}</td></tr>`}).join("");document.querySelectorAll("#stockBody tr[data-barcode]").forEach(tr=>tr.addEventListener("click",()=>{selectedBarcode=tr.dataset.barcode;selectedHistoryMode="all";render()}))}
 function logRow(l){return`<tr><td>${fmt(l.created_at)}</td><td>${esc(l.type)}</td><td>${esc(l.staff)}</td><td>${esc(l.barcode)}</td><td>${esc(l.product_name||"")}</td><td>${l.quantity}</td><td>${esc(l.memo||"")}</td></tr>`}
-function renderGlobalHistory(){const q=el("searchInput")?.value?.trim()?.toLowerCase()||"";el("historyBody").innerHTML=logs.filter(l=>!q||l.barcode.toLowerCase().includes(q)||String(l.product_name).toLowerCase().includes(q)||String(l.staff).toLowerCase().includes(q)||String(l.memo).toLowerCase().includes(q)).map(logRow).join("")}
-function renderSelectedProductHistory(){const badge=el("selectedProductBadge"),range=el("historyRangeBadge"),body=el("selectedHistoryBody"),cb=el("checkHistoryBody");if(!body||!cb)return;if(!selectedBarcode){if(badge)badge.textContent="商品未選択";if(range)range.textContent="商品を選択してください";if(body)body.innerHTML="";if(cb)cb.innerHTML="";return}const p=gp(selectedBarcode),stock=gs(selectedBarcode),cs=gc(selectedBarcode);if(badge)badge.textContent=`${p?.name||""} / 実在庫：${stock}`;let ls=logs.filter(l=>l.barcode===selectedBarcode);if(selectedHistoryMode==="afterOldestCheck"){const oc=cs.sort((a,b)=>new Date(a.checked_at)-new Date(b.checked_at))[0];if(oc){ls=ls.filter(l=>new Date(l.created_at)>=new Date(oc.checked_at));if(range)range.textContent=`最古チェック以降：${fmt(oc.checked_at)} 〜 現在`}else if(range)range.textContent="チェック履歴なし：全履歴を表示"}else if(range)range.textContent=`全履歴：${ls.length}件`;body.innerHTML=`<tr>
+function renderGlobalHistory(){const historyBody=el("historyBody");if(!historyBody)return;const q=el("searchInput")?.value?.trim()?.toLowerCase()||"";historyBody.innerHTML=logs.filter(l=>!q||l.barcode.toLowerCase().includes(q)||String(l.product_name).toLowerCase().includes(q)||String(l.staff).toLowerCase().includes(q)||String(l.memo).toLowerCase().includes(q)).map(logRow).join("")}
+function renderSelectedProductHistory(){const badge=el("selectedProductBadge"),range=el("historyRangeBadge"),body=el("selectedHistoryBody"),cb=el("checkHistoryBody");if(!body||!cb)return;if(!body||!cb)return;if(!selectedBarcode){if(badge)badge.textContent="商品未選択";if(range)range.textContent="商品を選択してください";if(body)body.innerHTML="";if(cb)cb.innerHTML="";return}const p=gp(selectedBarcode),stock=gs(selectedBarcode),cs=gc(selectedBarcode);if(badge)badge.textContent=`${p?.name||""} / 実在庫：${stock}`;let ls=logs.filter(l=>l.barcode===selectedBarcode);if(selectedHistoryMode==="afterOldestCheck"){const oc=cs.sort((a,b)=>new Date(a.checked_at)-new Date(b.checked_at))[0];if(oc){ls=ls.filter(l=>new Date(l.created_at)>=new Date(oc.checked_at));if(range)range.textContent=`最古チェック以降：${fmt(oc.checked_at)} 〜 現在`}else if(range)range.textContent="チェック履歴なし：全履歴を表示"}else if(range)range.textContent=`全履歴：${ls.length}件`;body.innerHTML=`<tr>
 <td>${p?.base_stock ?? 0}</td>
 <td>${calcStock().find(s=>s.barcode===selectedBarcode)?.inQty ?? 0}</td>
 <td>${calcStock().find(s=>s.barcode===selectedBarcode)?.outQty ?? 0}</td>
@@ -182,5 +182,48 @@ function exportAllDataCsv() {
 }
 
 function exportCsv(){const rows=[["日時","区分","担当者","バーコード","商品名","数量","備考"]];for(const l of logs)rows.push([fmt(l.created_at),l.type,l.staff,l.barcode,l.product_name,l.quantity,l.memo||""]);const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="inventory_history.csv";a.click();URL.revokeObjectURL(a.href)}
-function bindEvents(){el("reloadBtn").addEventListener("click",reloadAll);el("productForm").addEventListener("submit",saveProduct);el("productBarcode").addEventListener("input",renderProductStockInfo);el("manualForm").addEventListener("submit",e=>{e.preventDefault();registerBarcode(el("barcodeInput").value)});el("barcodeInput").addEventListener("input",renderScanPreview);el("startCameraBtn").addEventListener("click",startCamera);el("stopCameraBtn").addEventListener("click",stopCamera);el("searchInput").addEventListener("input",render);el("clearFilterBtn").addEventListener("click",()=>{el("searchInput").value="";render()});el("csvBtn").addEventListener("click",exportCsv);el("allDataCsvBtn").addEventListener("click",exportAllDataCsv);el("csvFile").addEventListener("change",e=>importCsvFile(e.target.files[0]));el("downloadSampleCsvBtn").addEventListener("click",downloadSampleCsv);el("stockCheckBtn").addEventListener("click",saveStockCheck);el("showAllSelectedHistoryBtn").addEventListener("click",()=>{selectedHistoryMode="all";renderSelectedProductHistory()});el("showAfterOldestCheckBtn").addEventListener("click",()=>{selectedHistoryMode="afterOldestCheck";renderSelectedProductHistory()})}
-bindEvents();reloadAll();
+function on(id,event,fn){
+  const x=el(id);
+  if(x)x.addEventListener(event,fn);
+}
+
+function bindEvents(){
+  on("reloadBtn","click",reloadAll);
+  on("productForm","submit",saveProduct);
+  on("staffForm","submit",saveStaff);
+
+  on("manualForm","submit",e=>{
+    e.preventDefault();
+    registerBarcode(el("barcodeInput").value);
+  });
+
+  on("barcodeInput","input",renderScanPreview);
+  on("productBarcode","input",renderProductStockInfo);
+  on("startCameraBtn","click",startCamera);
+  on("stopCameraBtn","click",stopCamera);
+  on("searchInput","input",render);
+
+  on("clearFilterBtn","click",()=>{
+    if(el("searchInput"))el("searchInput").value="";
+    render();
+  });
+
+  on("csvBtn","click",exportCsv);
+  on("allDataCsvBtn","click",exportAllDataCsv);
+  on("csvFile","change",e=>importCsvFile(e.target.files[0]));
+  on("overwriteCsvFile","change",e=>overwriteCsvFile(e.target.files[0]));
+  on("downloadSampleCsvBtn","click",downloadSampleCsv);
+
+  on("stockCheckBtn","click",saveStockCheck);
+  on("showAllSelectedHistoryBtn","click",()=>{
+    selectedHistoryMode="all";
+    renderSelectedProductHistory();
+  });
+  on("showAfterOldestCheckBtn","click",()=>{
+    selectedHistoryMode="afterOldestCheck";
+    renderSelectedProductHistory();
+  });
+}
+
+bindEvents();
+reloadAll();

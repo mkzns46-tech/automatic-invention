@@ -1,19 +1,19 @@
-# v16 担当者設定表示修正版
+# v17 起動中停止修正版
 
 ## 修正内容
-- PC画面に「担当者設定」セクションが確実に表示されるよう修正
-- スキャン登録の担当者をプルダウン化
-- 担当者追加・削除はPC画面のみ
-- スマホではスキャン登録だけ表示
+- 「起動中…」から動かない問題を修正
+- 削除済みの在庫確認欄/searchInputをapp.jsが読みに行って止まる問題を修正
+- 担当者設定はPC画面に表示
+- 担当者プルダウン対応
 
 ## SQL操作
-v15のSQLをすでに実行済みなら不要です。
+v15/v16の担当者SQLを実行済みなら不要です。
 まだなら `supabase_schema_update_v16_staff_members.sql` をSupabase SQL Editorで1回実行してください。
 
 ## GitHubへ上書き
-- index.html
 - app.js
+- index.html
 - style.css
 
 確認URL：
-https://automatic-invention-eight.vercel.app/?v=16
+https://automatic-invention-eight.vercel.app/?v=17
