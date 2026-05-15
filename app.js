@@ -120,13 +120,53 @@ function selectProductHistoryByBarcode(){
   showMessage(`商品別履歴を表示：${product.name}`,"ok");
 }
 
-function renderSelectedProductHistory(){const badge=el("selectedProductBadge"),range=el("historyRangeBadge"),body=el("selectedHistoryBody"),cb=el("checkHistoryBody");if(!body||!cb)return;if(!body||!cb)return;if(!selectedBarcode){if(badge)badge.textContent="商品未選択";if(range)range.textContent="商品を選択してください";if(body)body.innerHTML="";if(cb)cb.innerHTML="";return}const p=gp(selectedBarcode),stock=gs(selectedBarcode),cs=gc(selectedBarcode);if(badge)badge.textContent=`${p?.name||""} / 実在庫：${stock}`;let ls=logs.filter(l=>l.barcode===selectedBarcode);if(selectedHistoryMode==="afterOldestCheck"){const oc=cs.sort((a,b)=>new Date(a.checked_at)-new Date(b.checked_at))[0];if(oc){ls=ls.filter(l=>new Date(l.created_at)>=new Date(oc.checked_at));if(range)range.textContent=`最古チェック以降：${fmt(oc.checked_at)} 〜 現在`}else if(range)range.textContent="チェック履歴なし：全履歴を表示"}else if(range)range.textContent=`全履歴：${ls.length}件`;body.innerHTML=`<tr>
-<td>${p?.base_stock ?? 0}</td>
-<td>${calcStock().find(s=>s.barcode===selectedBarcode)?.inQty ?? 0}</td>
-<td>${calcStock().find(s=>s.barcode===selectedBarcode)?.outQty ?? 0}</td>
-<td>${calcStock().find(s=>s.barcode===selectedBarcode)?.adjustQty ?? 0}</td>
-<td>${stock}</td>
-</tr>`;cb.innerHTML=cs.map(c=>`<tr><td>${fmt(c.checked_at)}</td><td>${esc(c.checked_by)}</td><td>${Number(c.stock_at_check??0)}</td><td>${esc(c.memo||"")}</td></tr>`).join("")}
+
+function productHistoryRowHtmlForStock(log, runningStock){
+  const q=Number(log.quantity||0);
+  const stockQty = log.type==="在庫修正" ? q : "";
+  const inQty = log.type==="入荷" ? q : "";
+  const outQty = log.type==="出荷" ? q : "";
+  return `<tr>
+    <td>${fmt(log.created_at)}</td>
+    <td>${esc(log.type)}</td>
+    <td>${esc(log.staff)}</td>
+    <td>${stockQty}</td>
+    <td>${inQty}</td>
+    <td>${outQty}</td>
+    <td>${runningStock}</td>
+  </tr>`;
+}
+
+function buildProductHistoryRows(barcode, selectedLogs){
+  const p=gp(barcode);
+  let running=Number(p?.base_stock||0);
+
+  const allAsc=logs
+    .filter(l=>l.barcode===barcode)
+    .slice()
+    .sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+
+  const visibleIds=new Set(selectedLogs.map(l=>String(l.id || l.created_at + l.type + l.quantity)));
+  const rows=[];
+
+  for(const l of allAsc){
+    const q=Number(l.quantity||0);
+
+    if(l.type==="入荷") running += q;
+    if(l.type==="出荷") running -= q;
+    if(l.type==="在庫修正") running = q;
+
+    const key=String(l.id || l.created_at + l.type + l.quantity);
+    if(visibleIds.has(key)){
+      rows.push({log:l, stock:running});
+    }
+  }
+
+  return rows.reverse().map(r=>productHistoryRowHtmlForStock(r.log,r.stock)).join("");
+}
+
+
+function renderSelectedProductHistory(){const badge=el("selectedProductBadge"),range=el("historyRangeBadge"),body=el("selectedHistoryBody"),cb=el("checkHistoryBody");if(!body||!cb)return;if(!body||!cb)return;if(!selectedBarcode){if(badge)badge.textContent="商品未選択";if(range)range.textContent="商品を選択してください";if(body)body.innerHTML="";if(cb)cb.innerHTML="";return}const p=gp(selectedBarcode),stock=gs(selectedBarcode),cs=gc(selectedBarcode);if(badge)badge.textContent=`${p?.name||""} / 実在庫：${stock}`;let ls=logs.filter(l=>l.barcode===selectedBarcode);if(selectedHistoryMode==="afterOldestCheck"){const oc=cs.sort((a,b)=>new Date(a.checked_at)-new Date(b.checked_at))[0];if(oc){ls=ls.filter(l=>new Date(l.created_at)>=new Date(oc.checked_at));if(range)range.textContent=`最古チェック以降：${fmt(oc.checked_at)} 〜 現在`}else if(range)range.textContent="チェック履歴なし：全履歴を表示"}else if(range)range.textContent=`全履歴：${ls.length}件`;body.innerHTML=buildProductHistoryRows(selectedBarcode,ls);cb.innerHTML=cs.map(c=>`<tr><td>${fmt(c.checked_at)}</td><td>${esc(c.checked_by)}</td><td>${Number(c.stock_at_check??0)}</td><td>${esc(c.memo||"")}</td></tr>`).join("")}
 async function upsertProducts(rows){await sb("products?on_conflict=barcode",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(rows)})}
 async function updateProductCurrentStock(barcode,newStock){
 await sb(`products?barcode=eq.${encodeURIComponent(barcode)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({base_stock:newStock})});
