@@ -59,3 +59,25 @@
 .staff-delete-btn:hover{
   background:#fecaca;
 }
+
+
+/* PC画面整理：商品登録とCSV取り込みを横並び */
+@media(min-width:801px){
+  .csv-admin-section{
+    min-height:100%;
+  }
+
+  .csv-admin-section .button-row{
+    flex-direction:column;
+  }
+
+  .csv-admin-section .button-row button,
+  .csv-admin-section .button-row .file-button{
+    width:100%;
+  }
+
+  .csv-admin-section p{
+    font-size:14px;
+    line-height:1.5;
+  }
+}
