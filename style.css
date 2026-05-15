@@ -31,3 +31,20 @@
     display:none !important;
   }
 }
+
+
+/* スマホでは現場用のスキャン登録だけ表示 */
+@media(max-width:800px){
+  .product-admin-section,
+  .pc-only-section{
+    display:none !important;
+  }
+
+  .grid{
+    grid-template-columns:1fr !important;
+  }
+
+  .card.scanner{
+    grid-column:1 / -1;
+  }
+}
