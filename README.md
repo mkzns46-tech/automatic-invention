@@ -1,44 +1,13 @@
-# バーコード在庫管理アプリ（Vercel + Supabase）
+# バーコード在庫管理アプリ v2
 
-## できること
-- スマホでバーコード読み取り
-- 外付けバーコードスキャナ入力
-- 入荷／出荷／在庫修正
-- 担当者・備考を履歴保存
-- 原在庫＋履歴で実在庫を自動計算
-- PCで在庫確認・履歴検索
-- CSV出力
-- ピッ音・エラー音
+Supabase新APIキー / Legacy anon key 両対応の接続修正版です。
 
-## 1. Supabase準備
-1. Supabaseで新規プロジェクト作成
-2. SQL Editorを開く
-3. `supabase_schema.sql` の中身を貼り付けてRun
-4. Project Settings → API で以下を確認
-   - Project URL
-   - anon public key
+更新方法:
+1. ZIPを解凍
+2. GitHubの既存リポジトリに中身を上書き
+3. Commit changes
+4. Vercelが自動で再デプロイ
 
-## 2. Vercelで公開
-### GitHub経由
-1. このフォルダをGitHubにアップロード
-2. VercelでNew Project
-3. GitHubリポジトリを選択
-4. Deploy
-
-### CLI
-```bash
-npm i -g vercel
-vercel --prod
-```
-
-## 3. 初回利用
-1. Vercelで発行されたURLを開く
-2. Supabase URLとanon keyを入力
-3. 設定保存
-4. 商品登録
-5. スマホで同じURLを開いてスキャン
-
-## 注意
-- 試作用としてanon keyで読み書きできるRLSポリシーにしています。
-- URLとキーを知っている人は操作できるため、本運用ではログイン機能追加を推奨します。
-- iPhone/SafariではBarcodeDetectorが動かない場合があります。その場合は外付けBluetoothバーコードスキャナ、またはChrome系ブラウザを使ってください。
+Supabase URL: https://xxxxx.supabase.co
+Supabase API KEY: sb_publishable_... または eyJ... のanon public key
+Secret keyは使わないでください。
