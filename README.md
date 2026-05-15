@@ -1,16 +1,16 @@
-# バーコード在庫管理アプリ v4 初期設定なし版
+# バーコード在庫管理アプリ v5 履歴・在庫チェック強化版
 
-## 変更内容
-- 初期設定画面を削除
-- Supabase URL/APIキーを app.js に固定
-- CSV一括取り込み対応
+## 追加内容
+- 在庫確認で商品行をクリックすると、その商品の過去履歴を表示
+- チェック者名を入力して在庫チェック記録を保存
+- チェック履歴を表示
+- 「全履歴」と「最古チェック以降」の切り替え
+- 商品登録数を表示
+- 商品名必須チェックを強化
 
-## 必ずやること
-GitHubで app.js を開いて、上部のこの行を編集してください。
-
-const SUPABASE_API_KEY = "ここに_sb_publishable_で始まるキーを貼る";
-
-ここにSupabaseの Publishable key を貼ります。
-Secret key は入れないでください。
-
-SUPABASE_URL は既に設定済みです。
+## 必須作業
+1. Supabase SQL Editorで `supabase_schema_update_v5.sql` を実行
+2. GitHubへ `index.html`, `style.css`, `app.js` を上書き
+3. app.js の `SUPABASE_API_KEY` に `sb_publishable_...` を貼る
+4. Commit changes
+5. Vercel更新後、Ctrl + Shift + R
