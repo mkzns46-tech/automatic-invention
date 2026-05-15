@@ -10,7 +10,13 @@ function renderScanPreview(){const info=el("scanProductInfo"),inp=el("barcodeInp
 function renderStockTable(){const q=el("searchInput")?.value?.trim()?.toLowerCase()||"",rows=calcStock().filter(r=>!q||r.barcode.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||String(r.location).toLowerCase().includes(q));el("stockBody").innerHTML=rows.map(r=>{const lc=gc(r.barcode).sort((a,b)=>new Date(b.checked_at)-new Date(a.checked_at))[0],lt=lc?`${fmt(lc.checked_at)} / ${esc(lc.checked_by)}`:"未チェック";return`<tr class="clickable ${selectedBarcode===r.barcode?"selected-row":""}" data-barcode="${esc(r.barcode)}"><td><button type="button" class="secondary">履歴</button></td><td>${esc(r.barcode)}</td><td>${esc(r.name)}</td><td>${esc(r.location)}</td><td>${r.base_stock}</td><td>${r.inQty}</td><td>${r.outQty}</td><td>${r.adjustQty}</td><td class="${r.stock<0?"stock-minus":"stock-plus"}">${r.stock}</td><td>${lt}</td></tr>`}).join("");document.querySelectorAll("#stockBody tr[data-barcode]").forEach(tr=>tr.addEventListener("click",()=>{selectedBarcode=tr.dataset.barcode;selectedHistoryMode="all";render()}))}
 function logRow(l){return`<tr><td>${fmt(l.created_at)}</td><td>${esc(l.type)}</td><td>${esc(l.staff)}</td><td>${esc(l.barcode)}</td><td>${esc(l.product_name||"")}</td><td>${l.quantity}</td><td>${esc(l.memo||"")}</td></tr>`}
 function renderGlobalHistory(){const q=el("searchInput")?.value?.trim()?.toLowerCase()||"";el("historyBody").innerHTML=logs.filter(l=>!q||l.barcode.toLowerCase().includes(q)||String(l.product_name).toLowerCase().includes(q)||String(l.staff).toLowerCase().includes(q)||String(l.memo).toLowerCase().includes(q)).map(logRow).join("")}
-function renderSelectedProductHistory(){const badge=el("selectedProductBadge"),range=el("historyRangeBadge"),body=el("selectedHistoryBody"),cb=el("checkHistoryBody");if(!selectedBarcode){if(badge)badge.textContent="商品未選択";if(range)range.textContent="商品を選択してください";if(body)body.innerHTML="";if(cb)cb.innerHTML="";return}const p=gp(selectedBarcode),stock=gs(selectedBarcode),cs=gc(selectedBarcode);if(badge)badge.textContent=`${p?.name||""} / 実在庫：${stock}`;let ls=logs.filter(l=>l.barcode===selectedBarcode);if(selectedHistoryMode==="afterOldestCheck"){const oc=cs.sort((a,b)=>new Date(a.checked_at)-new Date(b.checked_at))[0];if(oc){ls=ls.filter(l=>new Date(l.created_at)>=new Date(oc.checked_at));if(range)range.textContent=`最古チェック以降：${fmt(oc.checked_at)} 〜 現在`}else if(range)range.textContent="チェック履歴なし：全履歴を表示"}else if(range)range.textContent=`全履歴：${ls.length}件`;body.innerHTML=ls.map(logRow).join("");cb.innerHTML=cs.map(c=>`<tr><td>${fmt(c.checked_at)}</td><td>${esc(c.checked_by)}</td><td>${Number(c.stock_at_check??0)}</td><td>${esc(c.memo||"")}</td></tr>`).join("")}
+function renderSelectedProductHistory(){const badge=el("selectedProductBadge"),range=el("historyRangeBadge"),body=el("selectedHistoryBody"),cb=el("checkHistoryBody");if(!selectedBarcode){if(badge)badge.textContent="商品未選択";if(range)range.textContent="商品を選択してください";if(body)body.innerHTML="";if(cb)cb.innerHTML="";return}const p=gp(selectedBarcode),stock=gs(selectedBarcode),cs=gc(selectedBarcode);if(badge)badge.textContent=`${p?.name||""} / 実在庫：${stock}`;let ls=logs.filter(l=>l.barcode===selectedBarcode);if(selectedHistoryMode==="afterOldestCheck"){const oc=cs.sort((a,b)=>new Date(a.checked_at)-new Date(b.checked_at))[0];if(oc){ls=ls.filter(l=>new Date(l.created_at)>=new Date(oc.checked_at));if(range)range.textContent=`最古チェック以降：${fmt(oc.checked_at)} 〜 現在`}else if(range)range.textContent="チェック履歴なし：全履歴を表示"}else if(range)range.textContent=`全履歴：${ls.length}件`;body.innerHTML=`<tr>
+<td>${p?.base_stock ?? 0}</td>
+<td>${calcStock().find(s=>s.barcode===selectedBarcode)?.inQty ?? 0}</td>
+<td>${calcStock().find(s=>s.barcode===selectedBarcode)?.outQty ?? 0}</td>
+<td>${calcStock().find(s=>s.barcode===selectedBarcode)?.adjustQty ?? 0}</td>
+<td>${stock}</td>
+</tr>`;cb.innerHTML=cs.map(c=>`<tr><td>${fmt(c.checked_at)}</td><td>${esc(c.checked_by)}</td><td>${Number(c.stock_at_check??0)}</td><td>${esc(c.memo||"")}</td></tr>`).join("")}
 async function upsertProducts(rows){await sb("products?on_conflict=barcode",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(rows)})}
 async function saveProduct(e){e.preventDefault();try{const barcode=el("productBarcode").value.trim(),name=el("productName").value.trim(),base_stock=Number(el("baseStock").value||0),location=el("location").value.trim();if(!barcode)return showMessage("バーコードは必須です。","err");if(!name){showMessage("商品名は必須です。","err");el("productName").focus();return}await upsertProducts([{barcode,name,base_stock,location}]);beep(true);showMessage(`商品登録・更新：${name}`,"ok");el("productBarcode").value="";el("productName").value="";el("baseStock").value="0";el("location").value="";await reloadAll()}catch(e){beep(false);showMessage("商品登録エラー。\n"+e.message,"err")}}
 async function clearAllData(){await sb("inventory_checks?barcode=not.is.null",{method:"DELETE",headers:{Prefer:"return=minimal"}}).catch(()=>{});await sb("inventory_logs?barcode=not.is.null",{method:"DELETE",headers:{Prefer:"return=minimal"}});await sb("products?barcode=not.is.null",{method:"DELETE",headers:{Prefer:"return=minimal"}})}
@@ -25,6 +31,80 @@ async function overwriteCsvFile(file){try{if(!file)return;const rows=csvToRows(a
 function downloadSampleCsv(){const csv="\uFEFFbarcode,name,base_stock,location\n4901234567890,サンプル商品A,10,A-01\n4909876543210,サンプル商品B,5,B-01\n",blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="product_import_sample.csv";a.click();URL.revokeObjectURL(a.href)}
 async function startCamera(){try{if(!("BarcodeDetector"in window)){showMessage("このブラウザはカメラバーコード読取に未対応です。Chrome系ブラウザか、手入力欄＋外付けスキャナを使ってください。","err");return}detector=new BarcodeDetector({formats:["ean_13","ean_8","code_128","code_39","qr_code"]});videoStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});const v=el("video");v.srcObject=videoStream;v.style.display="block";await v.play();scanning=true;scanLoop()}catch(e){showMessage("カメラ起動エラー。\n"+e.message,"err")}}
 function stopCamera(){scanning=false;if(videoStream){videoStream.getTracks().forEach(t=>t.stop());videoStream=null}el("video").style.display="none"}async function scanLoop(){if(!scanning||!detector)return;try{const codes=await detector.detect(el("video"));if(codes.length){const code=codes[0].rawValue,t=Date.now();if(code!==lastScan||t-lastScanAt>1800){lastScan=code;lastScanAt=t;await registerBarcode(code)}}}catch(_){}requestAnimationFrame(scanLoop)}
+
+function downloadCsvFile(filename, rows) {
+  const csv = rows
+    .map((r) => r.map((v) => `"${String(v ?? "").replaceAll('"', '""')}"`).join(","))
+    .join("\n");
+
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+
+  URL.revokeObjectURL(a.href);
+}
+
+function exportAllDataCsv() {
+  try {
+    const now = new Date();
+    const stamp =
+      now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, "0") +
+      String(now.getDate()).padStart(2, "0") +
+      "_" +
+      String(now.getHours()).padStart(2, "0") +
+      String(now.getMinutes()).padStart(2, "0");
+
+    const productRows = [["barcode", "name", "base_stock", "location"]];
+    for (const p of products) {
+      productRows.push([
+        p.barcode,
+        p.name,
+        p.base_stock ?? 0,
+        p.location || ""
+      ]);
+    }
+
+    const logRows = [["created_at", "type", "staff", "barcode", "product_name", "quantity", "memo"]];
+    for (const l of logs) {
+      logRows.push([
+        formatDate(l.created_at),
+        l.type,
+        l.staff,
+        l.barcode,
+        l.product_name,
+        l.quantity,
+        l.memo || ""
+      ]);
+    }
+
+    const checkRows = [["checked_at", "checked_by", "barcode", "product_name", "stock_at_check", "memo"]];
+    for (const c of checks) {
+      checkRows.push([
+        formatDate(c.checked_at),
+        c.checked_by,
+        c.barcode,
+        c.product_name,
+        c.stock_at_check ?? 0,
+        c.memo || ""
+      ]);
+    }
+
+    downloadCsvFile(`backup_products_${stamp}.csv`, productRows);
+    downloadCsvFile(`backup_inventory_logs_${stamp}.csv`, logRows);
+    downloadCsvFile(`backup_inventory_checks_${stamp}.csv`, checkRows);
+
+    beep(true);
+    showMessage("全データCSV出力完了：商品マスター・履歴・チェック履歴を出力しました。", "ok");
+  } catch (e) {
+    beep(false);
+    showMessage("全データCSV出力エラー。\n" + e.message, "err");
+  }
+}
+
 function exportCsv(){const rows=[["日時","区分","担当者","バーコード","商品名","数量","備考"]];for(const l of logs)rows.push([fmt(l.created_at),l.type,l.staff,l.barcode,l.product_name,l.quantity,l.memo||""]);const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="inventory_history.csv";a.click();URL.revokeObjectURL(a.href)}
-function bindEvents(){el("reloadBtn").addEventListener("click",reloadAll);el("productForm").addEventListener("submit",saveProduct);el("manualForm").addEventListener("submit",e=>{e.preventDefault();registerBarcode(el("barcodeInput").value)});el("barcodeInput").addEventListener("input",renderScanPreview);el("startCameraBtn").addEventListener("click",startCamera);el("stopCameraBtn").addEventListener("click",stopCamera);el("searchInput").addEventListener("input",render);el("clearFilterBtn").addEventListener("click",()=>{el("searchInput").value="";render()});el("csvBtn").addEventListener("click",exportCsv);el("csvFile").addEventListener("change",e=>importCsvFile(e.target.files[0]));el("downloadSampleCsvBtn").addEventListener("click",downloadSampleCsv);el("stockCheckBtn").addEventListener("click",saveStockCheck);el("showAllSelectedHistoryBtn").addEventListener("click",()=>{selectedHistoryMode="all";renderSelectedProductHistory()});el("showAfterOldestCheckBtn").addEventListener("click",()=>{selectedHistoryMode="afterOldestCheck";renderSelectedProductHistory()})}
+function bindEvents(){el("reloadBtn").addEventListener("click",reloadAll);el("productForm").addEventListener("submit",saveProduct);el("manualForm").addEventListener("submit",e=>{e.preventDefault();registerBarcode(el("barcodeInput").value)});el("barcodeInput").addEventListener("input",renderScanPreview);el("startCameraBtn").addEventListener("click",startCamera);el("stopCameraBtn").addEventListener("click",stopCamera);el("searchInput").addEventListener("input",render);el("clearFilterBtn").addEventListener("click",()=>{el("searchInput").value="";render()});el("csvBtn").addEventListener("click",exportCsv);el("allDataCsvBtn").addEventListener("click",exportAllDataCsv);el("csvFile").addEventListener("change",e=>importCsvFile(e.target.files[0]));el("downloadSampleCsvBtn").addEventListener("click",downloadSampleCsv);el("stockCheckBtn").addEventListener("click",saveStockCheck);el("showAllSelectedHistoryBtn").addEventListener("click",()=>{selectedHistoryMode="all";renderSelectedProductHistory()});el("showAfterOldestCheckBtn").addEventListener("click",()=>{selectedHistoryMode="afterOldestCheck";renderSelectedProductHistory()})}
 bindEvents();reloadAll();
