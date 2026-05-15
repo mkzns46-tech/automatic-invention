@@ -765,3 +765,19 @@ header h1{
   }
 
 }
+
+
+/* ===== v25 CSV card gap fix ===== */
+/* CSV取り込みカードの高さは変えず、中央の余白だけ詰める */
+.csv-admin-section{
+  justify-content:flex-start !important;
+}
+
+.csv-admin-section .button-row{
+  margin-top:18px !important;
+}
+
+/* 説明カードとボタンの間を自然な間隔に */
+.csv-feature-grid{
+  margin-bottom:14px !important;
+}
