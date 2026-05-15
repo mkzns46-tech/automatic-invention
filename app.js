@@ -439,3 +439,5 @@ el("csvFile").addEventListener("change", (e) => importCsvFile(e.target.files[0])
 el("downloadSampleCsvBtn").addEventListener("click", downloadSampleCsv);
 
 loadConfig();
+
+// update
