@@ -1,6 +1,6 @@
 // ===== 固定設定 =====
 const SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
-const SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
+const SUPABASE_API_KEY = "ここに_sb_publishable_で始まるキーを貼る";
 // ====================
 
 let products = [];
@@ -157,11 +157,38 @@ function render() {
   renderStockTable();
   renderGlobalHistory();
   renderSelectedProductHistory();
+  renderScanPreview();
 }
 
 function renderProductCount() {
   const badge = el("productCountBadge");
   if (badge) badge.textContent = `登録数：${products.length}件`;
+}
+
+function renderScanPreview() {
+  const info = el("scanProductInfo");
+  const barcodeInput = el("barcodeInput");
+  if (!info || !barcodeInput) return;
+
+  const barcode = barcodeInput.value.trim();
+
+  if (!barcode) {
+    info.innerHTML = "バーコード入力後、商品名と現在庫を表示します。";
+    info.className = "message";
+    return;
+  }
+
+  const product = getProductByBarcode(barcode);
+
+  if (!product) {
+    info.innerHTML = `未登録バーコード：${escapeHtml(barcode)}`;
+    info.className = "message err";
+    return;
+  }
+
+  const stock = getStockByBarcode(barcode);
+  info.innerHTML = `商品名：${escapeHtml(product.name)} / 現在庫：${stock}`;
+  info.className = "message ok";
 }
 
 function renderStockTable() {
@@ -398,6 +425,7 @@ async function registerBarcode(barcode) {
     beep(true);
     showMessage(`${type}登録：${product.name} / 担当者：${staff} / 数量 ${qty}`, "ok");
     el("barcodeInput").value = "";
+    renderScanPreview();
 
     await reloadAll();
     el("barcodeInput").focus();
@@ -620,6 +648,8 @@ function bindEvents() {
     e.preventDefault();
     registerBarcode(el("barcodeInput").value);
   });
+
+  el("barcodeInput").addEventListener("input", renderScanPreview);
 
   el("startCameraBtn").addEventListener("click", startCamera);
   el("stopCameraBtn").addEventListener("click", stopCamera);
