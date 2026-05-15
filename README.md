@@ -1,14 +1,14 @@
-# v15 担当者プルダウン・PC設定版
+# v16 担当者設定表示修正版
 
-## 変更内容
+## 修正内容
+- PC画面に「担当者設定」セクションが確実に表示されるよう修正
 - スキャン登録の担当者をプルダウン化
-- 担当者の追加・削除はPC画面だけ
-- 担当者リストはSupabaseに保存され、全員で共有
-- スマホではスキャン登録だけ表示のまま
+- 担当者追加・削除はPC画面のみ
+- スマホではスキャン登録だけ表示
 
 ## SQL操作
-必要です。
-Supabase SQL Editorで `supabase_schema_update_v15_staff_members.sql` を1回実行してください。
+v15のSQLをすでに実行済みなら不要です。
+まだなら `supabase_schema_update_v16_staff_members.sql` をSupabase SQL Editorで1回実行してください。
 
 ## GitHubへ上書き
 - index.html
@@ -16,4 +16,4 @@ Supabase SQL Editorで `supabase_schema_update_v15_staff_members.sql` を1回実
 - style.css
 
 確認URL：
-https://automatic-invention-eight.vercel.app/?v=15
+https://automatic-invention-eight.vercel.app/?v=16
