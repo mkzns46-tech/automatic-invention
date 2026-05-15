@@ -1,6 +1,6 @@
 // ===== 固定設定 =====
 const SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
-const SUPABASE_API_KEY = "ここに_sb_publishable_で始まるキーを貼る";
+const SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 // ====================
 
 let products = [];
