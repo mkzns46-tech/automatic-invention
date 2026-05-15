@@ -790,3 +790,33 @@ header h1{
   min-height:358px !important;
   max-height:358px !important;
 }
+
+
+/* ===== v27 hide staff settings on mobile ===== */
+/* スマホでは担当者設定カードを完全非表示 */
+@media(max-width:800px){
+  .staff-admin-section,
+  section.staff-admin-section,
+  .card.staff-admin-section,
+  .pc-only-section{
+    display:none !important;
+    visibility:hidden !important;
+    height:0 !important;
+    min-height:0 !important;
+    max-height:0 !important;
+    overflow:hidden !important;
+    padding:0 !important;
+    margin:0 !important;
+    border:0 !important;
+  }
+
+  .card.scanner{
+    display:block !important;
+    visibility:visible !important;
+    height:auto !important;
+    max-height:none !important;
+    overflow:visible !important;
+    padding:16px !important;
+    margin-bottom:14px !important;
+  }
+}
