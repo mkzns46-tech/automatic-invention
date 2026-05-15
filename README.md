@@ -1,20 +1,19 @@
-# v14 スマホ未登録対策版
+# v15 担当者プルダウン・PC設定版
 
 ## 変更内容
-- スマホではスキャン登録だけ表示
-- 商品データ読み込み前は「未登録」と出さない
-- データ取得失敗時は「再読み込みしてください」と表示
-- 登録前にも商品データ読み込み完了チェック
-- タイトルは ARICO TOKYO在庫変動確認シート
+- スキャン登録の担当者をプルダウン化
+- 担当者の追加・削除はPC画面だけ
+- 担当者リストはSupabaseに保存され、全員で共有
+- スマホではスキャン登録だけ表示のまま
 
 ## SQL操作
-不要です。
+必要です。
+Supabase SQL Editorで `supabase_schema_update_v15_staff_members.sql` を1回実行してください。
 
-GitHubへ以下を上書きしてください。
+## GitHubへ上書き
 - index.html
 - app.js
 - style.css
 
-スマホで確認するときはURL末尾に ?v=14 を付けるとキャッシュ回避できます。
-例：
-https://automatic-invention-eight.vercel.app/?v=14
+確認URL：
+https://automatic-invention-eight.vercel.app/?v=15

@@ -1,11 +1,55 @@
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
-let products=[],logs=[],checks=[],selectedBarcode="",selectedHistoryMode="all",videoStream=null,detector=null,scanning=false,lastScan="",lastScanAt=0;let dataLoaded=false;let dataLoadError=false;const el=id=>document.getElementById(id);
+let products=[],logs=[],checks=[],staffMembers=[],selectedBarcode="",selectedHistoryMode="all",videoStream=null,detector=null,scanning=false,lastScan="",lastScanAt=0;let dataLoaded=false;let dataLoadError=false;const el=id=>document.getElementById(id);
 function showMessage(t,c=""){const m=el("message");if(m){m.textContent=t;m.className="message "+c}}function beep(ok=true){try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.type="sine";o.frequency.value=ok?880:220;g.gain.value=.08;o.connect(g);g.connect(c.destination);o.start();setTimeout(()=>{o.stop();c.close()},ok?90:220)}catch(_){}}
 async function sb(path,opt={}){const h={apikey:SUPABASE_API_KEY,Authorization:"Bearer "+SUPABASE_API_KEY,"Content-Type":"application/json",Accept:"application/json",...(opt.headers||{})},r=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/"+path,{...opt,headers:h}),txt=await r.text();let b=null;try{b=txt?JSON.parse(txt):null}catch{b=txt}if(!r.ok)throw new Error(`Supabaseエラー ${r.status}\n${typeof b==="object"?JSON.stringify(b):String(b||"")}`);return b}
-async function reloadAll(){try{dataLoaded=false;dataLoadError=false;showMessage("商品データ読み込み中...");products=await sb("products?select=*&order=name.asc");logs=await sb("inventory_logs?select=*&order=created_at.desc&limit=2000");try{checks=await sb("inventory_checks?select=*&order=checked_at.desc&limit=2000")}catch{checks=[]}dataLoaded=true;dataLoadError=false;render();showMessage(`準備OK。商品データ ${products.length} 件を読み込みました。`,"ok")}catch(e){dataLoaded=false;dataLoadError=true;showMessage("データ取得エラー。\n再読み込みしてください。\n"+e.message,"err")}}
+async function reloadAll(){try{dataLoaded=false;dataLoadError=false;showMessage("商品データ読み込み中...");products=await sb("products?select=*&order=name.asc");logs=await sb("inventory_logs?select=*&order=created_at.desc&limit=2000");try{checks=await sb("inventory_checks?select=*&order=checked_at.desc&limit=2000")}catch{checks=[]}try{staffMembers=await sb("staff_members?select=*&order=name.asc")}catch{staffMembers=[]}dataLoaded=true;dataLoadError=false;render();showMessage(`準備OK。商品データ ${products.length} 件を読み込みました。`,"ok")}catch(e){dataLoaded=false;dataLoadError=true;showMessage("データ取得エラー。\n再読み込みしてください。\n"+e.message,"err")}}
 function calcStock(){const m=new Map();for(const p of products)m.set(p.barcode,{barcode:p.barcode,name:p.name,location:p.location||"",base_stock:Number(p.base_stock||0),inQty:0,outQty:0,adjustQty:"",stock:Number(p.base_stock||0)});for(const l of logs){const i=m.get(l.barcode);if(!i)continue;const q=Number(l.quantity||0);if(l.type==="入荷")i.inQty+=q;if(l.type==="出荷")i.outQty+=q;if(l.type==="在庫修正")i.adjustQty=q}return[...m.values()]}
 const gp=b=>products.find(p=>p.barcode===b),gs=b=>calcStock().find(s=>s.barcode===b)?.stock??0,gc=b=>checks.filter(c=>c.barcode===b),fmt=x=>{try{return new Date(x).toLocaleString("ja-JP")}catch{return x}},esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
-function render(){renderProductCount();renderStockTable();renderGlobalHistory();renderSelectedProductHistory();renderScanPreview();renderProductStockInfo()}function renderProductCount(){const b=el("productCountBadge");if(b)b.textContent=`登録数：${products.length}件`}
+function render(){renderProductCount();renderStockTable();renderGlobalHistory();renderSelectedProductHistory();renderScanPreview();renderProductStockInfo()}
+function renderStaffOptions(){
+  const select=el("staff");
+  if(!select)return;
+  const current=select.value;
+  select.innerHTML='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
+  if(current)select.value=current;
+}
+
+function renderStaffList(){
+  const badge=el("staffCountBadge"),body=el("staffListBody");
+  if(badge)badge.textContent=`担当者：${staffMembers.length}人`;
+  if(!body)return;
+  body.innerHTML=staffMembers.map(s=>`<tr><td>${esc(s.name)}</td><td><button type="button" class="staff-delete-btn" data-staff-id="${s.id}">削除</button></td></tr>`).join("");
+  document.querySelectorAll(".staff-delete-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>deleteStaff(btn.dataset.staffId));
+  });
+}
+
+async function saveStaff(e){
+  e.preventDefault();
+  try{
+    const name=el("staffNameInput").value.trim();
+    if(!name){showMessage("担当者名を入力してください。","err");return}
+    await sb("staff_members?on_conflict=name",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify([{name}])});
+    el("staffNameInput").value="";
+    showMessage(`担当者を追加しました：${name}`,"ok");
+    await reloadAll();
+  }catch(e){
+    showMessage("担当者追加エラー。\n"+e.message,"err");
+  }
+}
+
+async function deleteStaff(id){
+  try{
+    if(!confirm("この担当者を削除しますか？"))return;
+    await sb(`staff_members?id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+    showMessage("担当者を削除しました。","ok");
+    await reloadAll();
+  }catch(e){
+    showMessage("担当者削除エラー。\n"+e.message,"err");
+  }
+}
+
+function renderProductCount(){const b=el("productCountBadge");if(b)b.textContent=`登録数：${products.length}件`}
 function renderScanPreview(){const info=el("scanProductInfo"),inp=el("barcodeInput");if(!info||!inp)return;const b=inp.value.trim();if(!b){info.textContent="バーコード入力後、商品名と現在庫を表示します。";info.className="message";return}if(dataLoadError){info.textContent="商品データを取得できていません。再読み込みしてください。";info.className="message err";return}if(!dataLoaded){info.textContent="商品データ読み込み中です。少し待ってください。";info.className="message";return}const p=gp(b);if(!p){info.textContent=`未登録バーコード：${b}`;info.className="message err";return}info.textContent=`商品名：${p.name} / 現在庫：${gs(b)}`;info.className="message ok"}
 
 function renderProductStockInfo(){

@@ -48,3 +48,14 @@
     grid-column:1 / -1;
   }
 }
+
+.staff-delete-btn{
+  background:#fee2e2;
+  color:#991b1b;
+  margin-top:0;
+  padding:8px 10px;
+  font-size:13px;
+}
+.staff-delete-btn:hover{
+  background:#fecaca;
+}
