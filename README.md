@@ -1,19 +1,16 @@
-# バーコード在庫管理アプリ v3 CSV取り込み対応
+# バーコード在庫管理アプリ v4 初期設定なし版
 
-## 追加機能
-- CSV一括取り込み
-- barcode,name,base_stock,location 形式
-- 日本語見出し対応：バーコード,商品名,現在在庫,棚番
-- 同一バーコードは上書き更新
-- 履歴は削除しません
+## 変更内容
+- 初期設定画面を削除
+- Supabase URL/APIキーを app.js に固定
+- CSV一括取り込み対応
 
-## 更新方法
-1. ZIPを解凍
-2. GitHubの既存リポジトリに中身を上書き
-3. Commit changes
-4. Vercelが自動再デプロイ
+## 必ずやること
+GitHubで app.js を開いて、上部のこの行を編集してください。
 
-## CSV例
-barcode,name,base_stock,location
-4901234567890,商品A,12,A-01
-4909876543210,商品B,5,B-02
+const SUPABASE_API_KEY = "ここに_sb_publishable_で始まるキーを貼る";
+
+ここにSupabaseの Publishable key を貼ります。
+Secret key は入れないでください。
+
+SUPABASE_URL は既に設定済みです。

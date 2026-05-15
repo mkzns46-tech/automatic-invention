@@ -15,18 +15,6 @@
       </div>
       <button id="reloadBtn">再読み込み</button>
     </header>
-
-    <section class="setup card">
-      <h2>初期設定</h2>
-      <p>SupabaseのURLとAPIキーを入れて保存してください。</p>
-      <label>SUPABASE URL</label>
-      <input id="supabaseUrl" placeholder="https://xxxxx.supabase.co" />
-      <label>SUPABASE API KEY</label>
-      <input id="supabaseKey" placeholder="sb_publishable_... または eyJ..." />
-      <button id="saveConfigBtn">設定を保存</button>
-      <small>設定値はこの端末のブラウザに保存されます。Secret keyは入れないでください。</small>
-    </section>
-
     <main class="grid">
       <section class="card scanner">
         <h2>スキャン登録</h2>
@@ -64,7 +52,7 @@
           <button type="submit">登録</button>
         </form>
 
-        <div id="message" class="message">初期設定後、スキャンできます。</div>
+        <div id="message" class="message">起動中...</div>
       </section>
 
       <section class="card">
