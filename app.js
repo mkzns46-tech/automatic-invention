@@ -74,6 +74,23 @@ function renderProductStockInfo(){
 function renderStockTable(){const stockBody=el("stockBody");if(!stockBody)return;const q=el("searchInput")?.value?.trim()?.toLowerCase()||"",rows=calcStock().filter(r=>!q||r.barcode.toLowerCase().includes(q)||r.name.toLowerCase().includes(q)||String(r.location).toLowerCase().includes(q));stockBody.innerHTML=rows.map(r=>{const lc=gc(r.barcode).sort((a,b)=>new Date(b.checked_at)-new Date(a.checked_at))[0],lt=lc?`${fmt(lc.checked_at)} / ${esc(lc.checked_by)}`:"未チェック";return`<tr class="clickable ${selectedBarcode===r.barcode?"selected-row":""}" data-barcode="${esc(r.barcode)}"><td><button type="button" class="secondary">履歴</button></td><td>${esc(r.barcode)}</td><td>${esc(r.name)}</td><td>${esc(r.location)}</td><td>${r.base_stock}</td><td>${r.inQty}</td><td>${r.outQty}</td><td>${r.adjustQty}</td><td class="${r.stock<0?"stock-minus":"stock-plus"}">${r.stock}</td><td>${lt}</td></tr>`}).join("");document.querySelectorAll("#stockBody tr[data-barcode]").forEach(tr=>tr.addEventListener("click",()=>{selectedBarcode=tr.dataset.barcode;selectedHistoryMode="all";render()}))}
 function logRow(l){return`<tr><td>${fmt(l.created_at)}</td><td>${esc(l.type)}</td><td>${esc(l.staff)}</td><td>${esc(l.barcode)}</td><td>${esc(l.product_name||"")}</td><td>${l.quantity}</td><td>${esc(l.memo||"")}</td></tr>`}
 function renderGlobalHistory(){const historyBody=el("historyBody");if(!historyBody)return;const q=el("searchInput")?.value?.trim()?.toLowerCase()||"";historyBody.innerHTML=logs.filter(l=>!q||l.barcode.toLowerCase().includes(q)||String(l.product_name).toLowerCase().includes(q)||String(l.staff).toLowerCase().includes(q)||String(l.memo).toLowerCase().includes(q)).map(logRow).join("")}
+
+function selectProductHistoryByBarcode(){
+  const input=el("productHistoryBarcodeInput");
+  if(!input)return;
+  const barcode=input.value.trim();
+  if(!barcode)return;
+  const product=gp(barcode);
+  if(!product){
+    showMessage(`商品別履歴：未登録バーコード ${barcode}`,"err");
+    return;
+  }
+  selectedBarcode=barcode;
+  selectedHistoryMode="all";
+  renderSelectedProductHistory();
+  showMessage(`商品別履歴を表示：${product.name}`,"ok");
+}
+
 function renderSelectedProductHistory(){const badge=el("selectedProductBadge"),range=el("historyRangeBadge"),body=el("selectedHistoryBody"),cb=el("checkHistoryBody");if(!body||!cb)return;if(!body||!cb)return;if(!selectedBarcode){if(badge)badge.textContent="商品未選択";if(range)range.textContent="商品を選択してください";if(body)body.innerHTML="";if(cb)cb.innerHTML="";return}const p=gp(selectedBarcode),stock=gs(selectedBarcode),cs=gc(selectedBarcode);if(badge)badge.textContent=`${p?.name||""} / 実在庫：${stock}`;let ls=logs.filter(l=>l.barcode===selectedBarcode);if(selectedHistoryMode==="afterOldestCheck"){const oc=cs.sort((a,b)=>new Date(a.checked_at)-new Date(b.checked_at))[0];if(oc){ls=ls.filter(l=>new Date(l.created_at)>=new Date(oc.checked_at));if(range)range.textContent=`最古チェック以降：${fmt(oc.checked_at)} 〜 現在`}else if(range)range.textContent="チェック履歴なし：全履歴を表示"}else if(range)range.textContent=`全履歴：${ls.length}件`;body.innerHTML=`<tr>
 <td>${p?.base_stock ?? 0}</td>
 <td>${calcStock().find(s=>s.barcode===selectedBarcode)?.inQty ?? 0}</td>
@@ -197,7 +214,7 @@ function bindEvents(){
     registerBarcode(el("barcodeInput").value);
   });
 
-  on("barcodeInput","input",renderScanPreview);
+  on("barcodeInput","input",renderScanPreview);on("productHistoryBarcodeInput","input",selectProductHistoryByBarcode);
   on("productBarcode","input",renderProductStockInfo);
   on("startCameraBtn","click",startCamera);
   on("stopCameraBtn","click",stopCamera);

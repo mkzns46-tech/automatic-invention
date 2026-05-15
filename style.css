@@ -334,3 +334,84 @@ button,.file-button{
     display:none !important;
   }
 }
+
+
+/* ===== v21 UI fix ===== */
+
+/* ヘッダー：タイトルは改行なし、再読み込みは下段 */
+header{
+  display:block !important;
+}
+
+header h1{
+  display:block !important;
+  white-space:nowrap;
+  font-size:26px !important;
+  line-height:1.25;
+}
+
+header p{
+  font-size:15px;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+
+.header-actions{
+  margin-top:14px;
+  width:100%;
+}
+
+.header-actions button{
+  width:100%;
+}
+
+/* 担当者設定：入力欄とボタンの間に余白 */
+#staffForm label{
+  margin-bottom:12px;
+}
+
+#staffForm button{
+  margin-top:12px;
+}
+
+/* 担当者一覧スクロールをカード内の余白が少なくなる高さへ */
+.staff-admin-section{
+  display:flex;
+  flex-direction:column;
+}
+
+.staff-admin-section .table-wrap{
+  max-height:335px;
+  flex:1;
+}
+
+/* 商品別履歴検索 */
+.history-search-box{
+  background:var(--main-soft,#f1fbf4);
+  border:1px solid var(--border,#cfe6d7);
+  border-radius:14px;
+  padding:12px;
+  margin:12px 0 14px;
+}
+
+.history-search-box label{
+  margin:0;
+}
+
+#productHistoryBarcodeInput{
+  margin-top:8px;
+  font-weight:800;
+  letter-spacing:.04em;
+}
+
+/* スマホ：タイトルは1行に収め、難しければ小さく */
+@media(max-width:800px){
+  header h1{
+    white-space:normal;
+    font-size:20px !important;
+  }
+
+  header p{
+    font-size:14px;
+  }
+}
