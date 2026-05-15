@@ -13,7 +13,7 @@ const el = (id) => document.getElementById(id);
 // SUPABASE_API_KEY はSupabaseの Publishable key を貼ってください。
 // 例：const SUPABASE_API_KEY = "sb_publishable_xxxxxxxxxxxxxxxxx";
 const SUPABASE_URL = "https://ihsbkknysozkstvyqlff.supabase.co";
-const SUPABASE_API_KEY = "ここに_sb_publishable_で始まるキーを貼る";
+const SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 // ====================
 
 function getConfig() {
