@@ -184,6 +184,7 @@ function productHistoryRowHtmlForStock(log, runningStock){
     <td>${fmt(log.created_at)}</td>
     <td>${esc(log.type)}</td>
     <td>${esc(log.staff)}</td>
+    <td>${esc(log.product_name||"")}</td>
     <td>${stockQty}</td>
     <td>${inQty}</td>
     <td>${outQty}</td>
