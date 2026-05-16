@@ -1,18 +1,13 @@
-# v43 安定復旧版
+# v44 文字化け修正版
 
 ## 修正内容
-- 起動中から動かない問題を根本修正
-- app.jsを安定版として再構築
-- 起動時に商品全件を読まない高速方式
-- 商品はバーコード入力時に1件だけ取得
-- 履歴は最新50件のみ起動時取得
-- 商品別履歴は該当商品だけ取得
-- CSV取り込み復旧
-- 全データCSV出力復旧
-- iPhone向けZXingカメラ読取維持
+- CSV取り込み時の文字化けを修正
+- UTF-8 / Shift_JIS を自動判定
+- Windows Excel保存CSV対応
+- GoogleスプレッドシートCSV対応
 
 ## SQL操作
 不要です。
 
 ## 確認URL
-https://automatic-invention-eight.vercel.app/?v=43
+https://automatic-invention-eight.vercel.app/?v=44

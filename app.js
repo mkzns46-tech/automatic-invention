@@ -751,25 +751,45 @@ function csvToRows(text){
   return rows;
 }
 
+
 async function importCsvFile(file){
   try{
     if(!file)return;
+
     showMessage("CSV取り込み中...");
 
-    const rows=csvToRows(await file.text());
+    const buffer=await file.arrayBuffer();
+
+    let text="";
+
+    try{
+      text=new TextDecoder("utf-8",{fatal:true}).decode(buffer);
+
+      const brokenRate=(text.match(/�/g)||[]).length;
+      if(brokenRate>5){
+        throw new Error("utf8 broken");
+      }
+    }catch(_){
+      text=new TextDecoder("shift_jis").decode(buffer);
+    }
+
+    const rows=csvToRows(text);
 
     for(let i=0;i<rows.length;i+=500){
       await upsertProducts(rows.slice(i,i+500));
     }
 
     showMessage(`CSV取り込み完了：${rows.length}件の商品を登録・更新しました。`,"ok");
+
   }catch(e){
-    showMessage("CSV取り込みエラー。\n"+e.message,"err");
+    showMessage("CSV取り込みエラー。
+"+e.message,"err");
   }finally{
     const input=el("csvFile");
     if(input)input.value="";
   }
 }
+
 
 function downloadSampleCsv(){
   const csv="\uFEFFbarcode,name,base_stock,location\n4901234567890,サンプル商品A,10,A-01\n4909876543210,サンプル商品B,5,B-01\n";
