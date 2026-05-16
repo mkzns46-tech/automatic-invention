@@ -751,39 +751,38 @@ function csvToRows(text){
   return rows;
 }
 
-
 async function importCsvFile(file){
   try{
     if(!file)return;
-
     showMessage("CSV取り込み中...");
 
-    const buffer=await file.arrayBuffer();
+    const buffer = await file.arrayBuffer();
+    let text = "";
 
-    let text="";
-
+    // まずUTF-8で読む。失敗または文字化けが多い場合はShift_JISで読み直す
     try{
-      text=new TextDecoder("utf-8",{fatal:true}).decode(buffer);
-
-      const brokenRate=(text.match(/�/g)||[]).length;
-      if(brokenRate>5){
-        throw new Error("utf8 broken");
+      text = new TextDecoder("utf-8",{fatal:true}).decode(buffer);
+      const brokenCount = (text.match(/�/g)||[]).length;
+      if(brokenCount > 3){
+        throw new Error("UTF-8文字化け検出");
       }
     }catch(_){
-      text=new TextDecoder("shift_jis").decode(buffer);
+      try{
+        text = new TextDecoder("shift_jis").decode(buffer);
+      }catch(__){
+        text = new TextDecoder("utf-8").decode(buffer);
+      }
     }
 
-    const rows=csvToRows(text);
+    const rows = csvToRows(text);
 
     for(let i=0;i<rows.length;i+=500){
       await upsertProducts(rows.slice(i,i+500));
     }
 
     showMessage(`CSV取り込み完了：${rows.length}件の商品を登録・更新しました。`,"ok");
-
   }catch(e){
-    showMessage("CSV取り込みエラー。
-"+e.message,"err");
+    showMessage("CSV取り込みエラー。\n"+e.message,"err");
   }finally{
     const input=el("csvFile");
     if(input)input.value="";
