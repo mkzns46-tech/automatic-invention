@@ -1,13 +1,12 @@
-# v35 CSV取り込み修正版
+# v36 起動修正・CSV安全版
 
 ## 修正内容
-- CSVファイルを選択しても取り込みが走らない問題を修正
-- CSV取り込みイベントを安全に再設定
-- CSVパーサーを安定版に差し替え
-- iPhoneカメラ対応は維持
+- v35で起動中から進まない問題を回避
+- 動いていたv34をベースに戻し、CSVファイル選択イベントだけ安全に補強
+- 起動エラーがある場合、画面にエラー内容を表示
 
 ## SQL操作
 不要です。
 
 ## 確認URL
-https://automatic-invention-eight.vercel.app/?v=35
+https://automatic-invention-eight.vercel.app/?v=36
