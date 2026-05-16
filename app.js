@@ -169,6 +169,7 @@ async function reloadAll(){
       staffMembers=[];
     }
 
+    await enrichRecentLogProductNames();
     dataLoaded=true;
     dataLoadError=false;
     render();
@@ -595,7 +596,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
       <td>${fmt(r.log.created_at)}</td>
       <td>${esc(r.log.type)}</td>
       <td>${esc(r.log.staff)}</td>
-      <td>${esc(r.log.product_name||p?.name||"")}</td>
+      <td>${esc(p?.name||r.log.product_name||"")}</td>
       <td>${r.stockQty}</td>
       <td>${r.inQty}</td>
       <td>${r.outQty}</td>
@@ -621,7 +622,7 @@ function buildGlobalHistoryRows(){
       <td>${fmt(log.created_at)}</td>
       <td>${esc(log.type)}</td>
       <td>${esc(log.staff)}</td>
-      <td>${esc(log.product_name||"")}</td>
+      <td>${esc(gp(log.barcode)?.name||log.product_name||"")}</td>
       <td>${stockQty}</td>
       <td>${inQty}</td>
       <td>${outQty}</td>
@@ -666,6 +667,62 @@ async function saveStockCheck(){
   }catch(e){
     showMessage("チェック記録エラー。\n"+e.message,"err");
   }
+}
+
+
+function mojibakeScore(text){
+  text=String(text||"");
+  let score=0;
+  score += (text.match(/�/g)||[]).length * 10;
+  score += (text.match(/縺|荳|蜊|譁|繧|繝|逕|譛|髱|窶/g)||[]).length * 5;
+  score += (text.match(/ｿ|｡|｣|､|･/g)||[]).length * 3;
+  return score;
+}
+
+function decodeCsvBuffer(buffer){
+  let utf8="";
+  let sjis="";
+
+  try{
+    utf8=new TextDecoder("utf-8",{fatal:false}).decode(buffer);
+  }catch(_){
+    utf8="";
+  }
+
+  try{
+    sjis=new TextDecoder("shift_jis",{fatal:false}).decode(buffer);
+  }catch(_){
+    sjis="";
+  }
+
+  if(!sjis)return utf8;
+  if(!utf8)return sjis;
+
+  return mojibakeScore(sjis) < mojibakeScore(utf8) ? sjis : utf8;
+}
+
+async function fetchProductsByBarcodes(barcodes){
+  const unique=[...new Set((barcodes||[]).filter(Boolean).map(String))].filter(b=>!gp(b));
+  if(!unique.length)return;
+
+  for(let i=0;i<unique.length;i+=100){
+    const chunk=unique.slice(i,i+100);
+    const inList=chunk.map(b=>`"${b.replace(/"/g,'\\"')}"`).join(",");
+    try{
+      const rows=await sb(`products?select=*&barcode=in.(${encodeURIComponent(inList)})`);
+      if(Array.isArray(rows)){
+        rows.forEach(p=>{
+          if(p && !gp(p.barcode))products.push(p);
+        });
+      }
+    }catch(_){}
+  }
+}
+
+async function enrichRecentLogProductNames(){
+  try{
+    await fetchProductsByBarcodes((logs||[]).map(l=>l.barcode));
+  }catch(_){}
 }
 
 function parseCsv(text){
@@ -757,19 +814,7 @@ async function importCsvFile(file){
     showMessage("CSV取り込み中...");
 
     const buffer=await file.arrayBuffer();
-    let text="";
-
-    try{
-      text=new TextDecoder("utf-8",{fatal:true}).decode(buffer);
-      const broken=(text.match(/�/g)||[]).length;
-      if(broken>3)throw new Error("utf8 broken");
-    }catch(_){
-      try{
-        text=new TextDecoder("shift_jis").decode(buffer);
-      }catch(__){
-        text=new TextDecoder("utf-8").decode(buffer);
-      }
-    }
+    const text=decodeCsvBuffer(buffer);
 
     const rows=csvToRows(text);
 
@@ -777,7 +822,20 @@ async function importCsvFile(file){
       await upsertProducts(rows.slice(i,i+500));
     }
 
-    showMessage(`CSV取り込み完了：${rows.length}件の商品を登録・更新しました。`,"ok");
+    // 取り込み後、キャッシュを更新
+    for(const r of rows){
+      const old=gp(r.barcode);
+      if(old){
+        old.name=r.name;
+        old.base_stock=r.base_stock;
+        old.location=r.location;
+      }else{
+        products.push(r);
+      }
+    }
+
+    showMessage(`CSV取り込み完了：${rows.length}件の商品を登録・更新しました。履歴表示は商品マスター名を優先します。`,"ok");
+    render();
   }catch(e){
     showMessage("CSV取り込みエラー。\n"+e.message,"err");
   }finally{
@@ -785,6 +843,7 @@ async function importCsvFile(file){
     if(input)input.value="";
   }
 }
+
 
 
 function downloadSampleCsv(){
