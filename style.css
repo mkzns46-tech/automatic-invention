@@ -891,3 +891,14 @@ header h1{
   border-radius:10px !important;
   padding:8px 12px !important;
 }
+
+/* v34 ZXing camera scan */
+#video{
+  display:none;
+  width:100%;
+  margin:12px 0;
+  border:2px solid var(--main,#2d6a4f);
+  border-radius:16px;
+  background:#000;
+}
+#qr-reader{display:none !important;}
