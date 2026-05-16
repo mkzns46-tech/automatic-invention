@@ -1,5 +1,5 @@
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
-let products=[],logs=[],checks=[],staffMembers=[],selectedBarcode="",selectedHistoryMode="all",videoStream=null,detector=null,scanning=false,lastScan="",lastScanAt=0;let dataLoaded=false;let dataLoadError=false;const el=id=>document.getElementById(id);
+let products=[],logs=[],checks=[],staffMembers=[],selectedBarcode="",selectedHistoryMode="all",videoStream=null,detector=null,scanning=false,lastScan="",lastScanAt=0,html5Qr=null,html5Running=false;let dataLoaded=false;let dataLoadError=false;const el=id=>document.getElementById(id);
 function showMessage(t,c=""){const m=el("message");if(m){m.textContent=t;m.className="message "+c}}function beep(ok=true){try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.type="sine";o.frequency.value=ok?880:220;g.gain.value=.08;o.connect(g);g.connect(c.destination);o.start();setTimeout(()=>{o.stop();c.close()},ok?90:220)}catch(_){}}
 async function sb(path,opt={}){const h={apikey:SUPABASE_API_KEY,Authorization:"Bearer "+SUPABASE_API_KEY,"Content-Type":"application/json",Accept:"application/json",...(opt.headers||{})},r=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/"+path,{...opt,headers:h}),txt=await r.text();let b=null;try{b=txt?JSON.parse(txt):null}catch{b=txt}if(!r.ok)throw new Error(`Supabaseエラー ${r.status}\n${typeof b==="object"?JSON.stringify(b):String(b||"")}`);return b}
 async function reloadAll(){try{dataLoaded=false;dataLoadError=false;showMessage("商品データ読み込み中...");products=await sb("products?select=*&order=name.asc");logs=await sb("inventory_logs?select=*&order=created_at.desc&limit=2000");try{checks=await sb("inventory_checks?select=*&order=checked_at.desc&limit=2000")}catch{checks=[]}try{staffMembers=await sb("staff_members?select=*&order=name.asc")}catch{staffMembers=[]}dataLoaded=true;dataLoadError=false;render();showMessage(`準備OK。商品データ ${products.length} 件を読み込みました。`,"ok")}catch(e){dataLoaded=false;dataLoadError=true;showMessage("データ取得エラー。\n再読み込みしてください。\n"+e.message,"err")}}
@@ -247,81 +247,94 @@ async function importRows(rows){for(let i=0;i<rows.length;i+=500)await upsertPro
 async function importCsvFile(file){try{if(!file)return;const rows=csvToRows(await file.text());await importRows(rows);beep(true);showMessage(`CSV取り込み完了：${rows.length}件の商品を登録・更新しました。`,"ok");await reloadAll()}catch(e){beep(false);showMessage("CSV取り込みエラー。\n"+e.message,"err")}finally{el("csvFile").value=""}}
 async function overwriteCsvFile(file){try{if(!file)return;const rows=csvToRows(await file.text());if(!confirm(`全データを上書きします。\n商品・入出荷履歴・チェック履歴を削除し、CSVの${rows.length}件で作り直します。\n実行しますか？`))return;showMessage("全データを削除してCSVで上書き中...");await clearAllData();await importRows(rows);beep(true);selectedBarcode="";showMessage(`全データ上書き完了：${rows.length}件で作り直しました。`,"ok");await reloadAll()}catch(e){beep(false);showMessage("全データ上書きエラー。\n"+e.message,"err")}finally{el("overwriteCsvFile").value=""}}
 function downloadSampleCsv(){const csv="\uFEFFbarcode,name,base_stock,location\n4901234567890,サンプル商品A,10,A-01\n4909876543210,サンプル商品B,5,B-01\n",blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="product_import_sample.csv";a.click();URL.revokeObjectURL(a.href)}
-async function startCamera(){try{if(!("BarcodeDetector"in window)){showMessage("このブラウザはカメラバーコード読取に未対応です。Chrome系ブラウザか、手入力欄＋外付けスキャナを使ってください。","err");return}detector=new BarcodeDetector({formats:["ean_13","ean_8","code_128","code_39","qr_code"]});videoStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});const v=el("video");v.srcObject=videoStream;v.style.display="block";await v.play();scanning=true;scanLoop()}catch(e){showMessage("カメラ起動エラー。\n"+e.message,"err")}}
-function stopCamera(){scanning=false;if(videoStream){videoStream.getTracks().forEach(t=>t.stop());videoStream=null}el("video").style.display="none"}async function scanLoop(){if(!scanning||!detector)return;try{const codes=await detector.detect(el("video"));if(codes.length){const code=codes[0].rawValue,t=Date.now();if(code!==lastScan||t-lastScanAt>1800){lastScan=code;lastScanAt=t;await registerBarcode(code)}}}catch(_){}requestAnimationFrame(scanLoop)}
 
-function downloadCsvFile(filename, rows) {
-  const csv = rows
-    .map((r) => r.map((v) => `"${String(v ?? "").replaceAll('"', '""')}"`).join(","))
-    .join("\n");
-
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-
-  URL.revokeObjectURL(a.href);
+async function handleScannedCode(code){
+  code=String(code||"").trim();
+  if(!code)return;
+  const t=Date.now();
+  if(code===lastScan && t-lastScanAt<1800)return;
+  lastScan=code;
+  lastScanAt=t;
+  el("barcodeInput").value=code;
+  if(typeof syncHistoryFromScanBarcode==="function")syncHistoryFromScanBarcode();
+  else renderScanPreview();
+  await registerBarcode(code);
 }
 
-function exportAllDataCsv() {
-  try {
-    const now = new Date();
-    const stamp =
-      now.getFullYear().toString() +
-      String(now.getMonth() + 1).padStart(2, "0") +
-      String(now.getDate()).padStart(2, "0") +
-      "_" +
-      String(now.getHours()).padStart(2, "0") +
-      String(now.getMinutes()).padStart(2, "0");
+async function startCamera(){
+  try{
+    showMessage("カメラを起動しています...");
+    const qr=el("qr-reader");
+    const v=el("video");
+    if(qr)qr.style.display="block";
+    if(v)v.style.display="none";
 
-    const productRows = [["barcode", "name", "base_stock", "location"]];
-    for (const p of products) {
-      productRows.push([
-        p.barcode,
-        p.name,
-        p.base_stock ?? 0,
-        p.location || ""
-      ]);
+    if(window.Html5Qrcode){
+      if(!html5Qr)html5Qr=new Html5Qrcode("qr-reader");
+      if(html5Running)return;
+      html5Running=true;
+      await html5Qr.start(
+        { facingMode:"environment" },
+        {
+          fps:10,
+          qrbox:function(w,h){
+            const s=Math.floor(Math.min(w,h)*0.75);
+            return {width:s,height:s};
+          },
+          aspectRatio:1.7777778
+        },
+        async(decodedText)=>{await handleScannedCode(decodedText);},
+        ()=>{}
+      );
+      showMessage("カメラ読取中です。バーコードを枠内に合わせてください。","ok");
+      return;
     }
 
-    const logRows = [["created_at", "type", "staff", "barcode", "product_name", "quantity", "memo"]];
-    for (const l of logs) {
-      logRows.push([
-        formatDate(l.created_at),
-        l.type,
-        l.staff,
-        l.barcode,
-        l.product_name,
-        l.quantity,
-        l.memo || ""
-      ]);
+    if(!("BarcodeDetector"in window)){
+      showMessage("このブラウザはカメラバーコード読取に未対応です。手入力欄または外付けスキャナを使ってください。","err");
+      return;
     }
 
-    const checkRows = [["checked_at", "checked_by", "barcode", "product_name", "stock_at_check", "memo"]];
-    for (const c of checks) {
-      checkRows.push([
-        formatDate(c.checked_at),
-        c.checked_by,
-        c.barcode,
-        c.product_name,
-        c.stock_at_check ?? 0,
-        c.memo || ""
-      ]);
-    }
-
-    downloadCsvFile(`backup_products_${stamp}.csv`, productRows);
-    downloadCsvFile(`backup_inventory_logs_${stamp}.csv`, logRows);
-    downloadCsvFile(`backup_inventory_checks_${stamp}.csv`, checkRows);
-
-    beep(true);
-    showMessage("全データCSV出力完了：商品マスター・履歴・チェック履歴を出力しました。", "ok");
-  } catch (e) {
-    beep(false);
-    showMessage("全データCSV出力エラー。\n" + e.message, "err");
+    detector=new BarcodeDetector({formats:["ean_13","ean_8","code_128","code_39","qr_code"]});
+    videoStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    v.srcObject=videoStream;
+    v.style.display="block";
+    if(qr)qr.style.display="none";
+    await v.play();
+    scanning=true;
+    showMessage("カメラ読取中です。バーコードを写してください。","ok");
+    scanLoop();
+  }catch(e){
+    html5Running=false;
+    showMessage("カメラ起動エラー。\nカメラ許可を確認してください。\n"+e.message,"err");
   }
 }
+
+async function stopCamera(){
+  scanning=false;
+  if(html5Qr && html5Running){
+    try{await html5Qr.stop();await html5Qr.clear();}catch(_){}
+    html5Running=false;
+  }
+  if(videoStream){
+    videoStream.getTracks().forEach(t=>t.stop());
+    videoStream=null;
+  }
+  const v=el("video"),qr=el("qr-reader");
+  if(v)v.style.display="none";
+  if(qr)qr.style.display="none";
+  showMessage("カメラを停止しました。","ok");
+}
+
+async function scanLoop(){
+  if(!scanning||!detector)return;
+  try{
+    const codes=await detector.detect(el("video"));
+    if(codes.length)await handleScannedCode(codes[0].rawValue);
+  }catch(_){}
+  requestAnimationFrame(scanLoop);
+}
+
 
 function exportCsv(){const rows=[["日時","区分","担当者","バーコード","商品名","数量","備考"]];for(const l of logs)rows.push([fmt(l.created_at),l.type,l.staff,l.barcode,l.product_name,l.quantity,l.memo||""]);const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="inventory_history.csv";a.click();URL.revokeObjectURL(a.href)}
 function on(id,event,fn){

@@ -871,3 +871,23 @@ header h1{
 #checkerName{
   min-height:48px;
 }
+
+/* ===== v33 iPhone camera scan ===== */
+#qr-reader{
+  display:none;
+  width:100%;
+  margin:12px 0;
+  border:2px solid var(--main,#2d6a4f);
+  border-radius:16px;
+  overflow:hidden;
+  background:#000;
+}
+#qr-reader video{width:100% !important;border-radius:14px;}
+#qr-reader__dashboard_section,#qr-reader__scan_region{background:#fff;}
+#qr-reader__dashboard_section_csr button{
+  width:auto !important;
+  background:var(--main,#2d6a4f) !important;
+  color:#fff !important;
+  border-radius:10px !important;
+  padding:8px 12px !important;
+}
