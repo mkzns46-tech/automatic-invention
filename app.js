@@ -58,7 +58,7 @@ async function sbAll(path, pageSize=1000){
 
 
 ){const h={apikey:SUPABASE_API_KEY,Authorization:"Bearer "+SUPABASE_API_KEY,"Content-Type":"application/json",Accept:"application/json",...(opt.headers||{})},r=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/"+path,{...opt,headers:h}),txt=await r.text();let b=null;try{b=txt?JSON.parse(txt):null}catch{b=txt}if(!r.ok)throw new Error(`Supabaseエラー ${r.status}\n${typeof b==="object"?JSON.stringify(b):String(b||"")}`);return b}
-async function reloadAll(){try{dataLoaded=false;dataLoadError=false;showMessage("商品データ読み込み中...");products=await sbAll("products?select=*&order=name.asc");logs=await sbAll("inventory_logs?select=*&order=created_at.desc");try{checks=await sbAll("inventory_checks?select=*&order=checked_at.desc")}catch{checks=[]}try{staffMembers=await sbAll("staff_members?select=*&order=name.asc")}catch{staffMembers=[]}dataLoaded=true;dataLoadError=false;render();showMessage(`準備OK。商品データ ${products.length} 件を読み込みました。`,"ok")}catch(e){dataLoaded=false;dataLoadError=true;showMessage("データ取得エラー。\n再読み込みしてください。\n"+e.message,"err")}}
+async function reloadAll(){try{dataLoaded=false;dataLoadError=false;showMessage("商品データ読み込み中...");products=await sbAll("products?select=*&order=name.asc");logs=await sb("inventory_logs?select=*&order=created_at.desc&limit=100");try{checks=await sb("inventory_checks?select=*&order=checked_at.desc&limit=100")}catch{checks=[]}try{staffMembers=await sbAll("staff_members?select=*&order=name.asc")}catch{staffMembers=[]}dataLoaded=true;dataLoadError=false;render();showMessage(`準備OK。商品データ ${products.length} 件を読み込みました。履歴は最新100件のみ表示します。`,"ok")}catch(e){dataLoaded=false;dataLoadError=true;showMessage("データ取得エラー。\n再読み込みしてください。\n"+e.message,"err")}}
 function calcStock(){const m=new Map();for(const p of products)m.set(p.barcode,{barcode:p.barcode,name:p.name,location:p.location||"",base_stock:Number(p.base_stock||0),inQty:0,outQty:0,adjustQty:"",stock:Number(p.base_stock||0)});for(const l of logs){const i=m.get(l.barcode);if(!i)continue;const q=Number(l.quantity||0);if(l.type==="入荷")i.inQty+=q;if(l.type==="出荷")i.outQty+=q;if(l.type==="在庫修正")i.adjustQty=q}return[...m.values()]}
 const gp=b=>products.find(p=>p.barcode===b),gs=b=>calcStock().find(s=>s.barcode===b)?.stock??0,gc=b=>checks.filter(c=>c.barcode===b),fmt=x=>{try{return new Date(x).toLocaleString("ja-JP")}catch{return x}},esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 function render(){renderProductCount();renderStaffOptions();renderStaffList();renderStockTable();renderGlobalHistory();renderSelectedProductHistory();renderScanPreview();renderProductStockInfo()}
@@ -133,7 +133,7 @@ function syncHistoryFromScanBarcode(){
   if(product){
     selectedBarcode=barcode;
     selectedHistoryMode="all";
-    renderSelectedProductHistory();
+    showProductHistoryForBarcode(barcode);
   }
 }
 
@@ -212,22 +212,95 @@ function buildGlobalHistoryRows(){
   return rows.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(r=>r.html).join("");
 }
 
-function renderGlobalHistory(){const historyBody=el("historyBody");if(!historyBody)return;historyBody.innerHTML=buildGlobalHistoryRows();}
 
-function selectProductHistoryByBarcode(){
-  const input=el("productHistoryBarcodeInput");
-  if(!input)return;
-  const barcode=input.value.trim();
-  if(!barcode)return;
-  const product=gp(barcode);
-  if(!product){
-    showMessage(`商品別履歴：未登録バーコード ${barcode}`,"err");
+function renderSelectedProductHistoryWithData(productLogs,productChecks){
+  const badge=el("selectedProductBadge"),range=el("historyRangeBadge"),body=el("selectedHistoryBody"),cb=el("checkHistoryBody");
+  if(!body||!cb)return;
+
+  if(!selectedBarcode){
+    if(badge)badge.textContent="商品を選択してください";
+    body.innerHTML="";
+    cb.innerHTML="";
     return;
   }
-  selectedBarcode=barcode;
-  selectedHistoryMode="all";
-  renderSelectedProductHistory();
-  showMessage(`商品別履歴を表示：${product.name}`,"ok");
+
+  const p=gp(selectedBarcode);
+  if(badge)badge.textContent=p?`${p.name} / 全履歴：${productLogs.length}件`:"商品を選択してください";
+
+  let ls=productLogs.slice();
+
+  if(selectedHistoryMode==="afterOldestCheck" && productChecks.length){
+    const oldest=productChecks[productChecks.length-1];
+    const oldestTime=new Date(oldest.checked_at).getTime();
+    ls=ls.filter(l=>new Date(l.created_at).getTime()>=oldestTime);
+    if(range)range.textContent="チェック以降を表示";
+  }else{
+    if(range)range.textContent=`全履歴：${ls.length}件`;
+  }
+
+  body.innerHTML=buildProductHistoryRowsFromLogs(selectedBarcode,ls,productLogs);
+
+  cb.innerHTML=productChecks.map(c=>`<tr>
+    <td>${fmt(c.checked_at)}</td>
+    <td>${esc(c.checked_by)}</td>
+    <td>${esc(c.stock_at_check)}</td>
+    <td>${esc(c.memo||"")}</td>
+  </tr>`).join("");
+}
+
+function buildProductHistoryRowsFromLogs(barcode, selectedLogs, allLogsForBarcode){
+  const p=gp(barcode);
+  let running=Number(p?.base_stock||0);
+
+  const allDesc=allLogsForBarcode.slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const rowsByKey=new Map();
+
+  for(const log of allDesc){
+    const q=Number(log.quantity||0);
+    const stockAfter=running;
+
+    let stockQty="";
+    let inQty="";
+    let outQty="";
+
+    if(log.type==="入荷"){
+      inQty=q;
+      running-=q;
+    }else if(log.type==="出荷"){
+      outQty=q;
+      running+=q;
+    }else if(log.type==="在庫修正"){
+      stockQty=q;
+    }
+
+    const key=String(log.id || log.created_at+log.type+log.quantity+log.memo);
+    rowsByKey.set(key,{log,stockAfter,stockQty,inQty,outQty});
+  }
+
+  return selectedLogs.map(log=>{
+    const key=String(log.id || log.created_at+log.type+log.quantity+log.memo);
+    const r=rowsByKey.get(key);
+    if(!r)return "";
+    return `<tr>
+      <td>${fmt(r.log.created_at)}</td>
+      <td>${esc(r.log.type)}</td>
+      <td>${esc(r.log.staff)}</td>
+      <td>${esc(r.log.product_name||p?.name||"")}</td>
+      <td>${r.stockQty}</td>
+      <td>${r.inQty}</td>
+      <td>${r.outQty}</td>
+      <td>${r.stockAfter}</td>
+      <td>${esc(r.log.memo||"")}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderGlobalHistory(){const historyBody=el("historyBody");if(!historyBody)return;historyBody.innerHTML=buildGlobalHistoryRows();}
+
+async function selectProductHistoryByBarcode(){
+  const input=el("productHistoryBarcodeInput");
+  if(!input)return;
+  await showProductHistoryForBarcode(input.value);
 }
 
 
@@ -277,6 +350,49 @@ function buildProductHistoryRows(barcode, selectedLogs){
   return rows.reverse().map(r=>productHistoryRowHtmlForStock(r.log,r.stock)).join("");
 }
 
+
+
+async function loadProductHistoryByBarcode(barcode){
+  if(!barcode)return [];
+
+  try{
+    const rows=await sbAll(`inventory_logs?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=created_at.desc`);
+    return Array.isArray(rows)?rows:[];
+  }catch(e){
+    showMessage("商品別履歴の取得エラー。\n"+e.message,"err");
+    return [];
+  }
+}
+
+async function loadProductChecksByBarcode(barcode){
+  if(!barcode)return [];
+
+  try{
+    const rows=await sbAll(`inventory_checks?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=checked_at.desc`);
+    return Array.isArray(rows)?rows:[];
+  }catch(e){
+    return [];
+  }
+}
+
+async function showProductHistoryForBarcode(barcode){
+  barcode=String(barcode||"").trim();
+  if(!barcode)return;
+
+  const product=gp(barcode);
+  if(!product){
+    showMessage(`商品別履歴：未登録バーコード ${barcode}`,"err");
+    return;
+  }
+
+  selectedBarcode=barcode;
+  selectedHistoryMode="all";
+
+  const productLogs=await loadProductHistoryByBarcode(barcode);
+  const productChecks=await loadProductChecksByBarcode(barcode);
+
+  renderSelectedProductHistoryWithData(productLogs,productChecks);
+}
 
 function renderSelectedProductHistory(){const badge=el("selectedProductBadge"),range=el("historyRangeBadge"),body=el("selectedHistoryBody"),cb=el("checkHistoryBody");if(!body||!cb)return;if(!body||!cb)return;if(!selectedBarcode){if(badge)badge.textContent="商品未選択";if(range)range.textContent="商品を選択してください";if(body)body.innerHTML="";if(cb)cb.innerHTML="";return}const p=gp(selectedBarcode),stock=gs(selectedBarcode),cs=gc(selectedBarcode);if(badge)badge.textContent=`${p?.name||""} / 実在庫：${stock}`;let ls=logs.filter(l=>l.barcode===selectedBarcode);if(selectedHistoryMode==="afterOldestCheck"){const oc=cs.sort((a,b)=>new Date(a.checked_at)-new Date(b.checked_at))[0];if(oc){ls=ls.filter(l=>new Date(l.created_at)>=new Date(oc.checked_at));if(range)range.textContent=`最古チェック以降：${fmt(oc.checked_at)} 〜 現在`}else if(range)range.textContent="チェック履歴なし：全履歴を表示"}else if(range)range.textContent=`全履歴：${ls.length}件`;body.innerHTML=buildProductHistoryRows(selectedBarcode,ls);cb.innerHTML=cs.map(c=>`<tr><td>${fmt(c.checked_at)}</td><td>${esc(c.checked_by)}</td><td>${Number(c.stock_at_check??0)}</td><td>${esc(c.memo||"")}</td></tr>`).join("")}
 async function upsertProducts(rows){await sb("products?on_conflict=barcode",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(rows)})}
