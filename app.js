@@ -756,25 +756,22 @@ async function importCsvFile(file){
     if(!file)return;
     showMessage("CSV取り込み中...");
 
-    const buffer = await file.arrayBuffer();
-    let text = "";
+    const buffer=await file.arrayBuffer();
+    let text="";
 
-    // まずUTF-8で読む。失敗または文字化けが多い場合はShift_JISで読み直す
     try{
-      text = new TextDecoder("utf-8",{fatal:true}).decode(buffer);
-      const brokenCount = (text.match(/�/g)||[]).length;
-      if(brokenCount > 3){
-        throw new Error("UTF-8文字化け検出");
-      }
+      text=new TextDecoder("utf-8",{fatal:true}).decode(buffer);
+      const broken=(text.match(/�/g)||[]).length;
+      if(broken>3)throw new Error("utf8 broken");
     }catch(_){
       try{
-        text = new TextDecoder("shift_jis").decode(buffer);
+        text=new TextDecoder("shift_jis").decode(buffer);
       }catch(__){
-        text = new TextDecoder("utf-8").decode(buffer);
+        text=new TextDecoder("utf-8").decode(buffer);
       }
     }
 
-    const rows = csvToRows(text);
+    const rows=csvToRows(text);
 
     for(let i=0;i<rows.length;i+=500){
       await upsertProducts(rows.slice(i,i+500));
@@ -854,6 +851,35 @@ async function handleScannedCode(code){
   await stopCamera();
 }
 
+
+function loadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    const existing=[...document.scripts].find(s=>s.src===src);
+    if(existing){
+      if(existing.dataset.loaded==="true")resolve();
+      else existing.addEventListener("load",resolve,{once:true});
+      return;
+    }
+
+    const s=document.createElement("script");
+    s.src=src;
+    s.async=true;
+    s.dataset.dynamic="true";
+    s.onload=()=>{
+      s.dataset.loaded="true";
+      resolve();
+    };
+    s.onerror=()=>reject(new Error("読取ライブラリの読み込みに失敗しました。通信環境を確認してください。"));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureZXing(){
+  if(window.ZXing)return true;
+  await loadScriptOnce("https://unpkg.com/@zxing/library@latest/umd/index.min.js");
+  return !!window.ZXing;
+}
+
 async function startCamera(){
   try{
     showMessage("カメラを起動しています...");
@@ -864,6 +890,7 @@ async function startCamera(){
     if(qr)qr.style.display="none";
     if(v)v.style.display="block";
 
+    await ensureZXing();
     if(window.ZXing){
       if(!zxingReader){
         const hints=new Map();

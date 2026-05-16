@@ -1,14 +1,14 @@
-# v45 安定版・文字化け修正版
+# v46 起動優先版
 
 ## 修正内容
-- v43安定版をベースに復旧
-- CSV取り込みの文字化け対策を安全に追加
-- UTF-8 / Shift_JIS 自動判定
-- app.jsの構文チェック済み
-- 起動中から動かない問題を回避
+- 起動中から動かない原因になりやすい外部CDNの先読みを削除
+- app.jsを最優先で起動
+- カメラ読取ライブラリZXingは「カメラボタンを押した時だけ」読み込み
+- CSV文字化け対策も維持
+- app.js構文チェック済み
 
 ## SQL操作
 不要です。
 
 ## 確認URL
-https://automatic-invention-eight.vercel.app/?v=45
+https://automatic-invention-eight.vercel.app/?v=46
