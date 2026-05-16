@@ -24,17 +24,17 @@ let products=[],logs=[],checks=[],staffMembers=[],selectedBarcode="",selectedHis
 function showMessage(t,c=""){const m=el("message");if(m){m.textContent=t;m.className="message "+c}}function beep(ok=true){try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.type="sine";o.frequency.value=ok?880:220;g.gain.value=.08;o.connect(g);g.connect(c.destination);o.start();setTimeout(()=>{o.stop();c.close()},ok?90:220)}catch(_){}}
 async function sb(path,opt={}
 
+
 async function sbAll(path, pageSize=1000){
   const all=[];
   let from=0;
 
   while(true){
     const to=from+pageSize-1;
-    const rows=await sb(path,{
-      headers:{
-        Range:`${from}-${to}`
-      }
-    });
+
+    const url=path + (path.includes("?") ? "&" : "?") + `offset=${from}&limit=${pageSize}`;
+
+    const rows=await sb(url);
 
     if(!Array.isArray(rows)){
       return rows;
@@ -42,20 +42,20 @@ async function sbAll(path, pageSize=1000){
 
     all.push(...rows);
 
-    if(rows.length<pageSize){
+    if(rows.length < pageSize){
       break;
     }
 
-    from+=pageSize;
+    from += pageSize;
 
-    // safety guard
-    if(from>200000){
-      throw new Error("取得件数が多すぎます。検索条件や期間で絞ってください。");
+    if(from > 50000){
+      break;
     }
   }
 
   return all;
 }
+
 
 ){const h={apikey:SUPABASE_API_KEY,Authorization:"Bearer "+SUPABASE_API_KEY,"Content-Type":"application/json",Accept:"application/json",...(opt.headers||{})},r=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/"+path,{...opt,headers:h}),txt=await r.text();let b=null;try{b=txt?JSON.parse(txt):null}catch{b=txt}if(!r.ok)throw new Error(`Supabaseエラー ${r.status}\n${typeof b==="object"?JSON.stringify(b):String(b||"")}`);return b}
 async function reloadAll(){try{dataLoaded=false;dataLoadError=false;showMessage("商品データ読み込み中...");products=await sbAll("products?select=*&order=name.asc");logs=await sbAll("inventory_logs?select=*&order=created_at.desc");try{checks=await sbAll("inventory_checks?select=*&order=checked_at.desc")}catch{checks=[]}try{staffMembers=await sbAll("staff_members?select=*&order=name.asc")}catch{staffMembers=[]}dataLoaded=true;dataLoadError=false;render();showMessage(`準備OK。商品データ ${products.length} 件を読み込みました。`,"ok")}catch(e){dataLoaded=false;dataLoadError=true;showMessage("データ取得エラー。\n再読み込みしてください。\n"+e.message,"err")}}
@@ -515,4 +515,13 @@ window.addEventListener("DOMContentLoaded", () => {
   if (sampleBtn && typeof downloadSampleCsv === "function") {
     sampleBtn.onclick = downloadSampleCsv;
   }
+});
+
+
+window.addEventListener("load",()=>{
+  try{
+    if(typeof showMessage==="function"){
+      showMessage("準備OK","ok");
+    }
+  }catch(e){}
 });
