@@ -22,8 +22,43 @@ window.addEventListener("unhandledrejection", (e) => {
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 let products=[],logs=[],checks=[],staffMembers=[],selectedBarcode="",selectedHistoryMode="all",videoStream=null,detector=null,scanning=false,lastScan="",lastScanAt=0,html5Qr=null,html5Running=false,zxingReader=null,zxingRunning=false;let dataLoaded=false;let dataLoadError=false;const el=id=>document.getElementById(id);
 function showMessage(t,c=""){const m=el("message");if(m){m.textContent=t;m.className="message "+c}}function beep(ok=true){try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.type="sine";o.frequency.value=ok?880:220;g.gain.value=.08;o.connect(g);g.connect(c.destination);o.start();setTimeout(()=>{o.stop();c.close()},ok?90:220)}catch(_){}}
-async function sb(path,opt={}){const h={apikey:SUPABASE_API_KEY,Authorization:"Bearer "+SUPABASE_API_KEY,"Content-Type":"application/json",Accept:"application/json",...(opt.headers||{})},r=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/"+path,{...opt,headers:h}),txt=await r.text();let b=null;try{b=txt?JSON.parse(txt):null}catch{b=txt}if(!r.ok)throw new Error(`Supabaseエラー ${r.status}\n${typeof b==="object"?JSON.stringify(b):String(b||"")}`);return b}
-async function reloadAll(){try{dataLoaded=false;dataLoadError=false;showMessage("商品データ読み込み中...");products=await sb("products?select=*&order=name.asc");logs=await sb("inventory_logs?select=*&order=created_at.desc&limit=2000");try{checks=await sb("inventory_checks?select=*&order=checked_at.desc&limit=2000")}catch{checks=[]}try{staffMembers=await sb("staff_members?select=*&order=name.asc")}catch{staffMembers=[]}dataLoaded=true;dataLoadError=false;render();showMessage(`準備OK。商品データ ${products.length} 件を読み込みました。`,"ok")}catch(e){dataLoaded=false;dataLoadError=true;showMessage("データ取得エラー。\n再読み込みしてください。\n"+e.message,"err")}}
+async function sb(path,opt={}
+
+async function sbAll(path, pageSize=1000){
+  const all=[];
+  let from=0;
+
+  while(true){
+    const to=from+pageSize-1;
+    const rows=await sb(path,{
+      headers:{
+        Range:`${from}-${to}`
+      }
+    });
+
+    if(!Array.isArray(rows)){
+      return rows;
+    }
+
+    all.push(...rows);
+
+    if(rows.length<pageSize){
+      break;
+    }
+
+    from+=pageSize;
+
+    // safety guard
+    if(from>200000){
+      throw new Error("取得件数が多すぎます。検索条件や期間で絞ってください。");
+    }
+  }
+
+  return all;
+}
+
+){const h={apikey:SUPABASE_API_KEY,Authorization:"Bearer "+SUPABASE_API_KEY,"Content-Type":"application/json",Accept:"application/json",...(opt.headers||{})},r=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/"+path,{...opt,headers:h}),txt=await r.text();let b=null;try{b=txt?JSON.parse(txt):null}catch{b=txt}if(!r.ok)throw new Error(`Supabaseエラー ${r.status}\n${typeof b==="object"?JSON.stringify(b):String(b||"")}`);return b}
+async function reloadAll(){try{dataLoaded=false;dataLoadError=false;showMessage("商品データ読み込み中...");products=await sbAll("products?select=*&order=name.asc");logs=await sbAll("inventory_logs?select=*&order=created_at.desc");try{checks=await sbAll("inventory_checks?select=*&order=checked_at.desc")}catch{checks=[]}try{staffMembers=await sbAll("staff_members?select=*&order=name.asc")}catch{staffMembers=[]}dataLoaded=true;dataLoadError=false;render();showMessage(`準備OK。商品データ ${products.length} 件を読み込みました。`,"ok")}catch(e){dataLoaded=false;dataLoadError=true;showMessage("データ取得エラー。\n再読み込みしてください。\n"+e.message,"err")}}
 function calcStock(){const m=new Map();for(const p of products)m.set(p.barcode,{barcode:p.barcode,name:p.name,location:p.location||"",base_stock:Number(p.base_stock||0),inQty:0,outQty:0,adjustQty:"",stock:Number(p.base_stock||0)});for(const l of logs){const i=m.get(l.barcode);if(!i)continue;const q=Number(l.quantity||0);if(l.type==="入荷")i.inQty+=q;if(l.type==="出荷")i.outQty+=q;if(l.type==="在庫修正")i.adjustQty=q}return[...m.values()]}
 const gp=b=>products.find(p=>p.barcode===b),gs=b=>calcStock().find(s=>s.barcode===b)?.stock??0,gc=b=>checks.filter(c=>c.barcode===b),fmt=x=>{try{return new Date(x).toLocaleString("ja-JP")}catch{return x}},esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 function render(){renderProductCount();renderStaffOptions();renderStaffList();renderStockTable();renderGlobalHistory();renderSelectedProductHistory();renderScanPreview();renderProductStockInfo()}
