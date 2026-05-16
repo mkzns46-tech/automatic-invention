@@ -376,6 +376,49 @@ async function scanLoop(){
 
 
 function exportCsv(){const rows=[["日時","区分","担当者","バーコード","商品名","数量","備考"]];for(const l of logs)rows.push([fmt(l.created_at),l.type,l.staff,l.barcode,l.product_name,l.quantity,l.memo||""]);const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n"),blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="inventory_history.csv";a.click();URL.revokeObjectURL(a.href)}
+
+function exportAllDataCsv(){
+  try{
+    const headers=["入力日時","区分","担当者","バーコード","商品名","数量","備考"];
+    const rows=(logs||[]).map(log=>[
+      fmt(log.created_at),
+      log.type||"",
+      log.staff||"",
+      log.barcode||"",
+      log.product_name||"",
+      log.quantity||0,
+      log.memo||""
+    ]);
+
+    const csv=[
+      headers.join(","),
+      ...rows.map(r=>r.map(v=>{
+        const s=String(v??"").replace(/"/g,'""');
+        return `"${s}"`;
+      }).join(","))
+    ].join("\n");
+
+    const blob=new Blob(
+      ["\uFEFF"+csv],
+      {type:"text/csv;charset=utf-8;"}
+    );
+
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download="all_inventory_history.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    showMessage("全データCSVを出力しました。","ok");
+  }catch(e){
+    showMessage("CSV出力エラー: "+e.message,"err");
+  }
+}
+
+
 function on(id,event,fn){
   const x=el(id);
   if(x)x.addEventListener(event,fn);
