@@ -586,38 +586,51 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
 
   for(const log of allDesc){
     const q=Number(log.quantity||0);
-    const stockAfter=running;
-    let stockQty="";
+
+    let beforeStock="";
+    let afterStock=running;
     let inQty="";
     let outQty="";
 
     if(log.type==="入荷"){
+      beforeStock=running-q;
       inQty=q;
       running-=q;
     }else if(log.type==="出荷"){
+      beforeStock=running+q;
       outQty=q;
       running+=q;
     }else if(log.type==="在庫修正"){
-      stockQty=q;
+      beforeStock="-";
+      afterStock=q;
     }
 
     const key=String(log.id||log.created_at+log.type+log.quantity+log.memo);
-    rowsByKey.set(key,{log,stockAfter,stockQty,inQty,outQty});
+
+    rowsByKey.set(key,{
+      log,
+      beforeStock,
+      afterStock,
+      inQty,
+      outQty
+    });
   }
 
   return selectedLogs.map(log=>{
     const key=String(log.id||log.created_at+log.type+log.quantity+log.memo);
     const r=rowsByKey.get(key);
+
     if(!r)return "";
+
     return `<tr>
       <td>${fmt(r.log.created_at)}</td>
       <td>${esc(r.log.type)}</td>
       <td>${esc(r.log.staff)}</td>
       <td>${esc(p?.name||r.log.product_name||"")}</td>
-      <td>${r.stockQty}</td>
+      <td>${r.beforeStock}</td>
       <td>${r.inQty}</td>
       <td>${r.outQty}</td>
-      <td>${r.stockAfter}</td>
+      <td>${r.afterStock}</td>
       <td>${esc(r.log.memo||"")}</td>
     </tr>`;
   }).join("");
@@ -632,18 +645,36 @@ function renderGlobalHistory(){
 function buildGlobalHistoryRows(){
   return logs.map(log=>{
     const q=Number(log.quantity||0);
-    const stockQty=log.type==="在庫修正"?q:"";
-    const inQty=log.type==="入荷"?q:"";
-    const outQty=log.type==="出荷"?q:"";
+
+    let beforeStock="";
+    let afterStock="";
+    let inQty="";
+    let outQty="";
+
+    const current=Number(gp(log.barcode)?.base_stock||0);
+
+    if(log.type==="入荷"){
+      beforeStock=current-q;
+      afterStock=current;
+      inQty=q;
+    }else if(log.type==="出荷"){
+      beforeStock=current+q;
+      afterStock=current;
+      outQty=q;
+    }else if(log.type==="在庫修正"){
+      beforeStock="-";
+      afterStock=q;
+    }
+
     return `<tr>
       <td>${fmt(log.created_at)}</td>
       <td>${esc(log.type)}</td>
       <td>${esc(log.staff)}</td>
       <td>${esc(gp(log.barcode)?.name||log.product_name||"")}</td>
-      <td>${stockQty}</td>
+      <td>${beforeStock}</td>
       <td>${inQty}</td>
       <td>${outQty}</td>
-      <td></td>
+      <td>${afterStock}</td>
       <td>${esc(log.memo||"")}</td>
     </tr>`;
   }).join("");
