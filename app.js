@@ -204,6 +204,7 @@ function render(){
   renderProductCount();
   renderGlobalHistory();
   renderSelectedProductHistory();
+  if(typeof applyLang==='function')setTimeout(applyLang,0);
 }
 
 function renderProductCount(){
@@ -1124,3 +1125,205 @@ function bindEvents(){
 
 bindEvents();
 reloadAll();
+
+
+/* ===== v50 Japanese / Korean UI toggle ===== */
+const I18N = {
+  ja: {
+    "ARICO TOKYO 在庫変動確認シート":"ARICO TOKYO 在庫変動確認シート",
+    "（在庫のずれは命のずれ）":"（在庫のずれは命のずれ）",
+    "再読み込み":"再読み込み",
+    "在庫変動登録":"在庫変動登録",
+    "持ち出し・入荷・在庫修正を記録します":"持ち出し・入荷・在庫修正を記録します",
+    "区分":"区分",
+    "担当者":"担当者",
+    "数量":"数量",
+    "備考（自由入力・連続スキャン中は保持）":"備考（自由入力・連続スキャン中は保持）",
+    "📷 カメラでバーコード読み取り":"📷 カメラでバーコード読み取り",
+    "停止":"停止",
+    "バーコード入力":"バーコード入力",
+    "登録":"登録",
+    "担当者設定":"担当者設定",
+    "スマホ側の担当者プルダウンに反映されます":"スマホ側の担当者プルダウンに反映されます",
+    "担当者名":"担当者名",
+    "担当者を追加":"担当者を追加",
+    "操作":"操作",
+    "削除":"削除",
+    "商品登録":"商品登録",
+    "バーコード":"バーコード",
+    "商品名":"商品名",
+    "現在庫":"現在庫",
+    "棚番":"棚番",
+    "商品を登録 / 更新":"商品を登録 / 更新",
+    "CSV取り込み":"CSV取り込み",
+    "商品マスターをまとめて登録・更新できます":"商品マスターをまとめて登録・更新できます",
+    "簡単インポート":"簡単インポート",
+    "上書き対応":"上書き対応",
+    "サンプルあり":"サンプルあり",
+    "⬆ 追加・更新で取り込み":"⬆ 追加・更新で取り込み",
+    "サンプルCSVをダウンロード":"サンプルCSVをダウンロード",
+    "商品別履歴":"商品別履歴",
+    "商品履歴検索":"商品履歴検索",
+    "在庫チェック":"在庫チェック",
+    "チェック記録":"チェック記録",
+    "全履歴を表示":"全履歴を表示",
+    "チェック以降を表示":"チェック以降を表示",
+    "入力日時":"入力日時",
+    "在庫数":"在庫数",
+    "入荷":"入荷",
+    "出荷":"出荷",
+    "全体履歴":"全体履歴",
+    "履歴CSV":"履歴CSV",
+    "全データCSV":"全データCSV",
+    "検索をクリア":"検索をクリア"
+  },
+  ko: {
+    "ARICO TOKYO 在庫変動確認シート":"ARICO TOKYO 재고 변동 확인 시트",
+    "（在庫のずれは命のずれ）":"（재고 오차는 치명적인 오차）",
+    "再読み込み":"다시 불러오기",
+    "在庫変動登録":"재고 변동 등록",
+    "持ち出し・入荷・在庫修正を記録します":"반출・입고・재고 수정을 기록합니다",
+    "区分":"구분",
+    "担当者":"담당자",
+    "数量":"수량",
+    "備考（自由入力・連続スキャン中は保持）":"비고（자유 입력・연속 스캔 중 유지）",
+    "📷 カメラでバーコード読み取り":"📷 카메라로 바코드 읽기",
+    "停止":"정지",
+    "バーコード入力":"바코드 입력",
+    "登録":"등록",
+    "担当者設定":"담당자 설정",
+    "スマホ側の担当者プルダウンに反映されます":"스마트폰 담당자 선택 목록에 반영됩니다",
+    "担当者名":"담당자명",
+    "担当者を追加":"담당자 추가",
+    "操作":"작업",
+    "削除":"삭제",
+    "商品登録":"상품 등록",
+    "バーコード":"바코드",
+    "商品名":"상품명",
+    "現在庫":"현재 재고",
+    "棚番":"선반 번호",
+    "商品を登録 / 更新":"상품 등록 / 업데이트",
+    "CSV取り込み":"CSV 가져오기",
+    "商品マスターをまとめて登録・更新できます":"상품 마스터를 일괄 등록・업데이트합니다",
+    "簡単インポート":"간단 가져오기",
+    "上書き対応":"덮어쓰기 지원",
+    "サンプルあり":"샘플 제공",
+    "⬆ 追加・更新で取り込み":"⬆ 추가・업데이트 가져오기",
+    "サンプルCSVをダウンロード":"샘플 CSV 다운로드",
+    "商品別履歴":"상품별 이력",
+    "商品履歴検索":"상품 이력 검색",
+    "在庫チェック":"재고 확인",
+    "チェック記録":"확인 기록",
+    "全履歴を表示":"전체 이력 표시",
+    "チェック以降を表示":"확인 이후 표시",
+    "入力日時":"입력 일시",
+    "在庫数":"작업 전 재고",
+    "入荷":"입고",
+    "出荷":"출고",
+    "全体履歴":"전체 이력",
+    "履歴CSV":"이력 CSV",
+    "全データCSV":"전체 데이터 CSV",
+    "検索をクリア":"검색 초기화"
+  }
+};
+
+const I18N_REVERSE = {};
+for(const lang of Object.keys(I18N)){
+  for(const [ja,ko] of Object.entries(I18N.ko)){
+    I18N_REVERSE[ko]=ja;
+  }
+}
+
+function getLang(){return localStorage.getItem("arico_lang")||"ja";}
+
+function setLang(lang){
+  localStorage.setItem("arico_lang",lang);
+  applyLang();
+}
+
+function translateText(raw,lang){
+  const t=String(raw||"").trim();
+  const ja=I18N_REVERSE[t]||t;
+  return I18N[lang][ja]||ja;
+}
+
+function walkTextNodes(root,lang){
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{
+    acceptNode(node){
+      const parent=node.parentElement;
+      if(!parent)return NodeFilter.FILTER_REJECT;
+      if(["SCRIPT","STYLE","TEXTAREA","OPTION"].includes(parent.tagName))return NodeFilter.FILTER_REJECT;
+      if(parent.closest(".table-wrap tbody"))return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const nodes=[];
+  while(walker.nextNode())nodes.push(walker.currentNode);
+  nodes.forEach(node=>{
+    const original=node.nodeValue;
+    const trimmed=original.trim();
+    if(!trimmed)return;
+    const translated=translateText(trimmed,lang);
+    if(translated!==trimmed){
+      node.nodeValue=original.replace(trimmed,translated);
+    }
+  });
+}
+
+function applyPlaceholders(lang){
+  const map={
+    ja:{
+      staffNameInput:"例：田中",
+      barcodeInput:"バーコードをスキャン、または手入力",
+      memo:"例：棚卸差異、サンプル使用、不良返品など",
+      productBarcode:"バーコードを入力",
+      productName:"商品名を必ず入力",
+      location:"例：A-01",
+      productHistoryBarcodeInput:"バーコードを入力またはスキャン"
+    },
+    ko:{
+      staffNameInput:"예：다나카",
+      barcodeInput:"바코드를 스캔하거나 직접 입력",
+      memo:"예：재고 차이, 샘플 사용, 불량 반품 등",
+      productBarcode:"바코드를 입력",
+      productName:"상품명을 반드시 입력",
+      location:"예：A-01",
+      productHistoryBarcodeInput:"바코드를 입력 또는 스캔"
+    }
+  };
+  const m=map[lang];
+  Object.keys(m).forEach(id=>{
+    const x=document.getElementById(id);
+    if(x)x.placeholder=m[id];
+  });
+}
+
+function applySelectLabels(lang){
+  const labels=lang==="ko"
+    ?{staff:"담당자를 선택",checkerName:"확인자를 선택"}
+    :{staff:"担当者を選択",checkerName:"チェック者を選択"};
+  const staff=document.getElementById("staff");
+  if(staff&&staff.options.length)staff.options[0].textContent=labels.staff;
+  const checker=document.getElementById("checkerName");
+  if(checker&&checker.options.length)checker.options[0].textContent=labels.checkerName;
+}
+
+function applyLang(){
+  const lang=getLang();
+  walkTextNodes(document.body,lang);
+  applyPlaceholders(lang);
+  applySelectLabels(lang);
+
+  const ja=document.getElementById("langJaBtn");
+  const ko=document.getElementById("langKoBtn");
+  if(ja)ja.classList.toggle("active",lang==="ja");
+  if(ko)ko.classList.toggle("active",lang==="ko");
+}
+
+window.addEventListener("DOMContentLoaded",()=>{
+  const ja=document.getElementById("langJaBtn");
+  const ko=document.getElementById("langKoBtn");
+  if(ja)ja.onclick=()=>setLang("ja");
+  if(ko)ko.onclick=()=>setLang("ko");
+  setTimeout(applyLang,50);
+});

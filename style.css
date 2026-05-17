@@ -913,3 +913,35 @@ header h1{
   background:#000;
 }
 #qr-reader{display:none !important;}
+
+/* v50 Japanese / Korean toggle */
+.lang-toggle{
+  display:inline-flex;
+  gap:6px;
+  margin-right:8px;
+  vertical-align:middle;
+}
+.lang-toggle button{
+  min-width:auto !important;
+  min-height:36px !important;
+  padding:7px 12px !important;
+  border-radius:999px !important;
+  font-size:13px !important;
+  font-weight:900 !important;
+  border:1px solid rgba(255,255,255,.7) !important;
+  background:rgba(255,255,255,.18) !important;
+  color:#fff !important;
+}
+.lang-toggle button.active{
+  background:#fff !important;
+  color:#0b4f35 !important;
+}
+@media(max-width:800px){
+  .lang-toggle{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    width:100%;
+    margin:0 0 8px;
+  }
+  .lang-toggle button{width:100% !important;}
+}
