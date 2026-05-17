@@ -47,20 +47,37 @@ function showMessage(text,type=""){
   m.className="message "+type;
 }
 
+
 function beep(ok=true){
   try{
-    const ctx=new (window.AudioContext||window.webkitAudioContext)();
-    const osc=ctx.createOscillator();
-    const gain=ctx.createGain();
-    osc.type="sine";
-    osc.frequency.value=ok?880:220;
-    gain.gain.value=.08;
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "square";
+    osc.frequency.value = ok ? 880 : 220;
+
+    gain.gain.setValueAtTime(ok ? 0.14 : 0.08, ctx.currentTime);
+
     osc.connect(gain);
     gain.connect(ctx.destination);
+
     osc.start();
-    setTimeout(()=>{osc.stop();ctx.close();},ok?90:220);
-  }catch(_){}
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      ctx.currentTime + (ok ? 0.12 : 0.22)
+    );
+
+    setTimeout(() => {
+      try{ osc.stop(); }catch(_){}
+      try{ ctx.close(); }catch(_){}
+    }, ok ? 140 : 240);
+
+  } catch (_) {}
 }
+
 
 async function sb(path,opt={}){
   const headers={
