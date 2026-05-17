@@ -1,9 +1,9 @@
-# v56 商品履歴CSV表示修正版
+# v57 商品履歴CSV配置修正版
 
 ## 修正内容
-- 商品別履歴の見出し直下に「商品履歴CSV」を確実に表示
-- 全体履歴は「全履歴CSV」のみ
-- 商品履歴CSVは現在表示中の商品別履歴を出力
+- 商品履歴CSVの単独配置を廃止
+- 「全履歴を表示」の左に商品履歴CSVを配置
+- ボタンサイズを他の履歴操作ボタンと統一
 
 ## 確認URL
-https://automatic-invention-eight.vercel.app/?v=56
+https://automatic-invention-eight.vercel.app/?v=57

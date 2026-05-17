@@ -1012,3 +1012,13 @@ header h1{
     width:100%;
   }
 }
+
+/* v57 product csv button layout */
+.product-history-csv-row{
+  display:none !important;
+}
+
+#productHistoryCsvBtn{
+  width:100% !important;
+  min-height:48px !important;
+}
