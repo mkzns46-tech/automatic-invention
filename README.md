@@ -1,21 +1,10 @@
-# v52 履歴CSV列修正版
+# v53 CSVボタン整理版
 
-## 修正内容
-履歴CSV・全データCSVの出力列を画面表示と合わせました。
-
-出力列：
-- 入力日時
-- 区分
-- 担当者
-- 商品名
-- 在庫数
-- 入荷
-- 出荷
-- 現在庫
-- 備考
-
-## SQL操作
-不要です。
+## 変更内容
+- 「履歴CSV」→「商品履歴CSV」へ名称変更
+- 商品履歴CSVボタンを「商品別履歴」エリアへ移動
+- 「全データCSV」→「全履歴CSV」へ名称変更
+- 全体履歴エリアには「全履歴CSV」のみ表示
 
 ## 確認URL
-https://automatic-invention-eight.vercel.app/?v=52
+https://automatic-invention-eight.vercel.app/?v=53
