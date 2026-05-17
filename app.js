@@ -1433,3 +1433,14 @@ function bindLanguageButtons(){
 }
 window.addEventListener("load",bindLanguageButtons);
 setTimeout(bindLanguageButtons,300);
+
+
+/* v58 direct bind for product history csv */
+window.addEventListener("DOMContentLoaded",()=>{
+  const btn=document.getElementById("productHistoryCsvBtn");
+  if(btn)btn.onclick=exportProductHistoryCsv;
+});
+setTimeout(()=>{
+  const btn=document.getElementById("productHistoryCsvBtn");
+  if(btn)btn.onclick=exportProductHistoryCsv;
+},500);

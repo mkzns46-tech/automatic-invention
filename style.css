@@ -1022,3 +1022,17 @@ header h1{
   width:100% !important;
   min-height:48px !important;
 }
+
+/* v58 force product history csv button visible */
+#productHistoryCsvBtn{
+  width:100% !important;
+  min-height:48px !important;
+  display:block !important;
+}
+
+.history-button-row{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+  margin:12px 0;
+}
