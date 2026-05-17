@@ -1327,3 +1327,15 @@ window.addEventListener("DOMContentLoaded",()=>{
   if(ko)ko.onclick=()=>setLang("ko");
   setTimeout(applyLang,50);
 });
+
+
+/* v51 language button fallback */
+function bindLanguageButtons(){
+  const ja=document.getElementById("langJaBtn");
+  const ko=document.getElementById("langKoBtn");
+  if(ja)ja.onclick=()=>setLang("ja");
+  if(ko)ko.onclick=()=>setLang("ko");
+  if(typeof applyLang==="function")applyLang();
+}
+window.addEventListener("load",bindLanguageButtons);
+setTimeout(bindLanguageButtons,300);

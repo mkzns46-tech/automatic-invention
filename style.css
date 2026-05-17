@@ -945,3 +945,43 @@ header h1{
   }
   .lang-toggle button{width:100% !important;}
 }
+
+/* ===== v51 language bar visible fix ===== */
+.language-bar{
+  display:flex !important;
+  justify-content:flex-end;
+  gap:8px;
+  max-width:1280px;
+  margin:-8px auto 16px;
+  padding:0 6px;
+}
+
+.language-bar button{
+  min-width:100px !important;
+  min-height:40px !important;
+  padding:8px 16px !important;
+  border-radius:999px !important;
+  border:1px solid #2d6a4f !important;
+  background:#e9f5ec !important;
+  color:#1b4332 !important;
+  font-weight:900 !important;
+  cursor:pointer;
+}
+
+.language-bar button.active{
+  background:#2d6a4f !important;
+  color:#fff !important;
+}
+
+@media(max-width:800px){
+  .language-bar{
+    display:grid !important;
+    grid-template-columns:1fr 1fr;
+    margin:8px 0 12px;
+    padding:0;
+  }
+
+  .language-bar button{
+    width:100% !important;
+  }
+}
