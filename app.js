@@ -915,33 +915,96 @@ function downloadCsvFile(filename,rows){
   URL.revokeObjectURL(a.href);
 }
 
-function exportCsv(){
-  const rows=[["入力日時","区分","担当者","商品名","数量","備考"]];
 
-  for(const l of logs){
-    rows.push([fmt(l.created_at),l.type,l.staff,l.product_name,l.quantity,l.memo||""]);
+function buildHistoryExportRows(sourceLogs){
+  const rows=[["入力日時","区分","担当者","商品名","在庫数","入荷","出荷","現在庫","備考"]];
+
+  const grouped=new Map();
+
+  for(const log of sourceLogs||[]){
+    const barcode=String(log.barcode||"");
+    if(!grouped.has(barcode))grouped.set(barcode,[]);
+    grouped.get(barcode).push(log);
   }
 
+  const resultRows=[];
+
+  for(const [barcode,list] of grouped.entries()){
+    const p=gp(barcode);
+    let running=Number(p?.base_stock||0);
+
+    const desc=list.slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+
+    for(const log of desc){
+      const q=Number(log.quantity||0);
+
+      let beforeStock="";
+      let afterStock=running;
+      let inQty="";
+      let outQty="";
+
+      if(log.type==="入荷"){
+        beforeStock=running-q;
+        inQty=q;
+        running-=q;
+      }else if(log.type==="出荷"){
+        beforeStock=running+q;
+        outQty=q;
+        running+=q;
+      }else if(log.type==="在庫修正"){
+        beforeStock="-";
+        afterStock=q;
+      }
+
+      resultRows.push({
+        created_at:log.created_at,
+        row:[
+          fmt(log.created_at),
+          log.type||"",
+          log.staff||"",
+          gp(log.barcode)?.name || log.product_name || "",
+          beforeStock,
+          inQty,
+          outQty,
+          afterStock,
+          log.memo||""
+        ]
+      });
+    }
+  }
+
+  resultRows
+    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))
+    .forEach(r=>rows.push(r.row));
+
+  return rows;
+}
+
+function exportCsv(){
+  const rows=buildHistoryExportRows(logs);
   downloadCsvFile("inventory_history_latest.csv",rows);
 }
+
 
 async function exportAllDataCsv(){
   try{
     showMessage("全データCSVを作成中...");
 
     const allLogs=await sbAll("inventory_logs?select=*&order=created_at.desc",1000,50000);
-    const rows=[["入力日時","区分","担当者","バーコード","商品名","数量","備考"]];
 
-    for(const l of allLogs){
-      rows.push([fmt(l.created_at),l.type,l.staff,l.barcode,l.product_name,l.quantity,l.memo||""]);
-    }
+    try{
+      await fetchProductsByBarcodes(allLogs.map(l=>l.barcode));
+    }catch(_){}
 
+    const rows=buildHistoryExportRows(allLogs);
     downloadCsvFile("all_inventory_history.csv",rows);
+
     showMessage("全データCSVを出力しました。","ok");
   }catch(e){
     showMessage("全データCSV出力エラー。\n"+e.message,"err");
   }
 }
+
 
 async function handleScannedCode(code){
   code=String(code||"").trim();
