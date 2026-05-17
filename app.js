@@ -980,6 +980,36 @@ function buildHistoryExportRows(sourceLogs){
   return rows;
 }
 
+
+function exportProductHistoryCsv(){
+  try{
+    if(!selectedBarcode){
+      showMessage("商品を選択してください。","err");
+      return;
+    }
+
+    const table=document.getElementById("selectedHistoryBody");
+    const rows=[["入力日時","区分","担当者","商品名","在庫数","入荷","出荷","現在庫","備考"]];
+
+    if(table){
+      [...table.querySelectorAll("tr")].forEach(tr=>{
+        const cols=[...tr.querySelectorAll("td")].map(td=>td.textContent.trim());
+        if(cols.length)rows.push(cols);
+      });
+    }
+
+    if(rows.length<=1){
+      showMessage("出力する商品履歴がありません。","err");
+      return;
+    }
+
+    downloadCsvFile("product_history.csv",rows);
+    showMessage("商品履歴CSVを出力しました。","ok");
+  }catch(e){
+    showMessage("商品履歴CSV出力エラー。\n"+e.message,"err");
+  }
+}
+
 function exportCsv(){
   const rows=buildHistoryExportRows(logs);
   downloadCsvFile("inventory_history_latest.csv",rows);
@@ -1175,6 +1205,7 @@ function bindEvents(){
 
   on("csvBtn","click",exportCsv);
   on("allDataCsvBtn","click",exportAllDataCsv);
+  on("productHistoryCsvBtn","click",exportProductHistoryCsv);
   on("csvFile","change",e=>importCsvFile(e.target.files&&e.target.files[0]));
   on("downloadSampleCsvBtn","click",downloadSampleCsv);
 
