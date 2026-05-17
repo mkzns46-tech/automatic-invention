@@ -991,3 +991,24 @@ header h1{
 #productExportCsvBtn{
   width:100%;
 }
+
+/* v56 product history csv visible */
+.product-history-csv-row{
+  display:flex;
+  justify-content:flex-end;
+  margin:8px 0 14px;
+}
+
+#productHistoryCsvBtn{
+  width:220px;
+  min-height:44px;
+}
+
+@media(max-width:800px){
+  .product-history-csv-row{
+    display:block;
+  }
+  #productHistoryCsvBtn{
+    width:100%;
+  }
+}
