@@ -1090,6 +1090,7 @@ async function startCamera(){
 
     if(qr)qr.style.display="none";
     if(v)v.style.display="block";
+    showCameraGuide();
 
     await ensureZXing();
     if(window.ZXing){
@@ -1167,6 +1168,7 @@ async function stopCamera(){
 
   if(qr)qr.style.display="none";
 
+  hideCameraGuide();
   showMessage("カメラを停止しました。","ok");
 }
 
@@ -1449,11 +1451,11 @@ setTimeout(()=>{
 
 /* ===== v59 camera guide ===== */
 function showCameraGuide(){
-  const g=document.getElementById("cameraGuide");
-  if(g)g.style.display="flex";
+  const g=document.getElementById("cameraGuideOverlay");
+  if(g)g.classList.add("is-active");
 }
 
 function hideCameraGuide(){
-  const g=document.getElementById("cameraGuide");
-  if(g)g.style.display="none";
+  const g=document.getElementById("cameraGuideOverlay");
+  if(g)g.classList.remove("is-active");
 }

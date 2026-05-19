@@ -1,11 +1,10 @@
-# v59 カメラ読取強化版
+# v60 カメラ赤枠修正版
 
-## 変更内容
-- 赤いバーコード読取ガイド枠追加
-- 中央スキャンライン追加
-- ZXing読取感度向上
-- autofocus強化
-- 連続読取速度改善
+## 修正内容
+- 赤枠が表示されない問題を修正
+- カメラ映像の上に直接重なるオーバーレイ方式に変更
+- 赤い読取枠と中央ラインを表示
+- カメラ停止時に自動で赤枠を非表示
 
 ## 確認URL
-https://automatic-invention-eight.vercel.app/?v=59
+https://automatic-invention-eight.vercel.app/?v=60

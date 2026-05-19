@@ -1095,3 +1095,70 @@ header h1{
     height:34vw;
   }
 }
+
+
+/* ===== v60 camera overlay fixed ===== */
+.camera-area{
+  position:relative;
+  width:100%;
+}
+
+.camera-area #video{
+  width:100% !important;
+  display:none;
+}
+
+.camera-guide-overlay{
+  display:none;
+  position:absolute;
+  inset:0;
+  z-index:20;
+  pointer-events:none;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+}
+
+.camera-guide-overlay.is-active{
+  display:flex !important;
+}
+
+.camera-guide-overlay .camera-guide-box{
+  width:78%;
+  height:34%;
+  max-height:150px;
+  border:4px solid #ff1f1f;
+  border-radius:16px;
+  box-shadow:
+    0 0 0 9999px rgba(0,0,0,.16),
+    0 0 18px rgba(255,0,0,.75);
+  position:relative;
+  overflow:hidden;
+}
+
+.camera-guide-overlay .camera-guide-line{
+  position:absolute;
+  left:0;
+  right:0;
+  top:50%;
+  height:4px;
+  background:#ff1f1f;
+  box-shadow:0 0 12px rgba(255,0,0,1);
+  animation:scanLineMove 1.8s linear infinite;
+}
+
+.camera-guide-overlay .camera-guide-text{
+  margin-top:12px;
+  background:rgba(0,0,0,.72);
+  color:#fff;
+  padding:8px 14px;
+  border-radius:999px;
+  font-size:13px;
+  font-weight:900;
+}
+
+@keyframes scanLineMove{
+  0%{transform:translateY(-38px);}
+  50%{transform:translateY(38px);}
+  100%{transform:translateY(-38px);}
+}
