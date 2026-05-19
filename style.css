@@ -1036,3 +1036,62 @@ header h1{
   gap:10px;
   margin:12px 0;
 }
+
+
+/* ===== v59 camera scan guide ===== */
+.camera-guide-frame{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  pointer-events:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+}
+
+.camera-guide-box{
+  width:min(82vw,420px);
+  height:min(28vw,150px);
+  border:3px solid rgba(255,0,0,.92);
+  border-radius:16px;
+  box-shadow:
+    0 0 0 9999px rgba(0,0,0,.20),
+    0 0 18px rgba(255,0,0,.55);
+  position:relative;
+  overflow:hidden;
+}
+
+.camera-guide-line{
+  position:absolute;
+  left:0;
+  right:0;
+  top:50%;
+  height:3px;
+  background:#ff2a2a;
+  box-shadow:0 0 12px rgba(255,0,0,.9);
+  animation:scanLineMove 2s linear infinite;
+}
+
+@keyframes scanLineMove{
+  0%{transform:translateY(-38px);}
+  50%{transform:translateY(38px);}
+  100%{transform:translateY(-38px);}
+}
+
+.camera-guide-text{
+  margin-top:14px;
+  background:rgba(0,0,0,.72);
+  color:#fff;
+  padding:10px 18px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:800;
+}
+
+@media(max-width:800px){
+  .camera-guide-box{
+    width:88vw;
+    height:34vw;
+  }
+}

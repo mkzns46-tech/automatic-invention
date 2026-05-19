@@ -1444,3 +1444,16 @@ setTimeout(()=>{
   const btn=document.getElementById("productHistoryCsvBtn");
   if(btn)btn.onclick=exportProductHistoryCsv;
 },500);
+
+
+
+/* ===== v59 camera guide ===== */
+function showCameraGuide(){
+  const g=document.getElementById("cameraGuide");
+  if(g)g.style.display="flex";
+}
+
+function hideCameraGuide(){
+  const g=document.getElementById("cameraGuide");
+  if(g)g.style.display="none";
+}
