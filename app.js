@@ -1081,6 +1081,31 @@ async function ensureZXing(){
   return !!window.ZXing;
 }
 
+
+async function tryImproveCameraTrack(videoEl){
+  try{
+    const stream=videoEl && videoEl.srcObject;
+    const track=stream && stream.getVideoTracks && stream.getVideoTracks()[0];
+    if(!track)return;
+
+    const caps=track.getCapabilities ? track.getCapabilities() : {};
+    const constraints={advanced:[]};
+
+    if(caps.focusMode && caps.focusMode.includes("continuous")){
+      constraints.advanced.push({focusMode:"continuous"});
+    }
+
+    if(caps.zoom){
+      const z=Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1.5));
+      constraints.advanced.push({zoom:z});
+    }
+
+    if(constraints.advanced.length){
+      await track.applyConstraints(constraints);
+    }
+  }catch(_){}
+}
+
 async function startCamera(){
   try{
     showMessage("カメラを起動しています...");
@@ -1099,21 +1124,27 @@ async function startCamera(){
         const formats=[
           ZXing.BarcodeFormat.EAN_13,
           ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.UPC_A,
+          ZXing.BarcodeFormat.UPC_E,
           ZXing.BarcodeFormat.CODE_128,
           ZXing.BarcodeFormat.CODE_39,
-          ZXing.BarcodeFormat.ITF,
-          ZXing.BarcodeFormat.UPC_A,
-          ZXing.BarcodeFormat.UPC_E
+          ZXing.BarcodeFormat.ITF
         ];
         hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,formats);
         hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
-        zxingReader=new ZXing.BrowserMultiFormatReader(hints,500);
+        zxingReader=new ZXing.BrowserMultiFormatReader(hints,100);
       }
 
       zxingRunning=true;
 
       await zxingReader.decodeFromConstraints(
-        {video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}},
+        {video:{
+          facingMode:{ideal:"environment"},
+          width:{ideal:1920},
+          height:{ideal:1080},
+          focusMode:{ideal:"continuous"},
+          exposureMode:{ideal:"continuous"}
+        }},
         v,
         async(result)=>{
           if(result&&zxingRunning){
@@ -1122,7 +1153,8 @@ async function startCamera(){
         }
       );
 
-      showMessage("カメラ読取中です。バーコードを横向きに大きく写してください。","ok");
+      tryImproveCameraTrack(v);
+      showMessage("カメラ読取中です。赤枠いっぱいにバーコードを横向きで写してください。近すぎる場合は少し離してください。","ok");
       return;
     }
 

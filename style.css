@@ -1162,3 +1162,29 @@ header h1{
   50%{transform:translateY(38px);}
   100%{transform:translateY(-38px);}
 }
+
+
+/* ===== v61 camera sensitivity guide ===== */
+/* JAN/EANの横長バーコードを拾いやすくする */
+.camera-guide-overlay .camera-guide-box{
+  width:90% !important;
+  height:24% !important;
+  max-height:115px !important;
+  border-width:3px !important;
+}
+
+.camera-guide-overlay .camera-guide-line{
+  height:3px !important;
+}
+
+.camera-guide-overlay .camera-guide-text{
+  font-size:12px !important;
+  padding:7px 12px !important;
+}
+
+@media(max-width:800px){
+  .camera-guide-overlay .camera-guide-box{
+    width:92% !important;
+    height:25% !important;
+  }
+}
