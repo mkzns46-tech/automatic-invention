@@ -545,6 +545,97 @@ async function selectProductHistoryByBarcode(){
   await showProductHistoryForBarcode(input.value);
 }
 
+
+function normalizeSearchText(s){
+  return String(s||"").trim().replace(/\s+/g," ");
+}
+
+async function searchProductsByName(keyword){
+  keyword=normalizeSearchText(keyword);
+  if(!keyword || keyword.length<2)return [];
+
+  try{
+    const q=encodeURIComponent(`*${keyword}*`);
+    const rows=await sb(`products?select=*&name=ilike.${q}&order=name.asc&limit=30`);
+
+    if(Array.isArray(rows)){
+      rows.forEach(p=>{
+        if(p && !gp(p.barcode))products.push(p);
+      });
+      return rows;
+    }
+
+    return [];
+  }catch(e){
+    showMessage("商品名検索エラー。\n"+e.message,"err");
+    return [];
+  }
+}
+
+function renderProductSearchResults(rows){
+  const box=el("productSearchResults");
+  if(!box)return;
+
+  if(!rows || !rows.length){
+    box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>別のキーワードで検索してください</span></div>';
+    box.classList.add("is-active");
+    return;
+  }
+
+  box.innerHTML=rows.map(p=>`
+    <div class="product-search-item" data-barcode="${esc(p.barcode)}">
+      <div>
+        <strong>${esc(p.name)}</strong>
+        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)} / 棚番：${esc(p.location||"")}</span>
+      </div>
+      <button type="button">選択</button>
+    </div>
+  `).join("");
+
+  box.classList.add("is-active");
+
+  box.querySelectorAll(".product-search-item[data-barcode]").forEach(item=>{
+    item.onclick=async()=>{
+      const barcode=item.dataset.barcode;
+      const historyInput=el("productHistoryBarcodeInput");
+      const nameInput=el("productNameSearchInput");
+
+      if(historyInput)historyInput.value=barcode;
+      if(nameInput)nameInput.value="";
+
+      box.classList.remove("is-active");
+      box.innerHTML="";
+
+      await showProductHistoryForBarcode(barcode);
+    };
+  });
+}
+
+let productSearchTimer=null;
+
+function handleProductNameSearchInput(){
+  const input=el("productNameSearchInput");
+  if(!input)return;
+
+  clearTimeout(productSearchTimer);
+
+  const keyword=input.value.trim();
+  const box=el("productSearchResults");
+
+  if(!keyword){
+    if(box){
+      box.classList.remove("is-active");
+      box.innerHTML="";
+    }
+    return;
+  }
+
+  productSearchTimer=setTimeout(async()=>{
+    const rows=await searchProductsByName(keyword);
+    renderProductSearchResults(rows);
+  },250);
+}
+
 function renderSelectedProductHistory(){
   const body=el("selectedHistoryBody");
   const cb=el("checkHistoryBody");
@@ -1060,6 +1151,8 @@ async function handleScannedCode(code){
 
   el("barcodeInput").value=code;
   if(el("productHistoryBarcodeInput"))el("productHistoryBarcodeInput").value=code;
+  if(el("productNameSearchInput"))el("productNameSearchInput").value="";
+  if(el("productSearchResults"))el("productSearchResults").classList.remove("is-active");
   await syncHistoryFromScanBarcode();
   beep(true);
   await stopCamera();
@@ -1246,6 +1339,7 @@ function bindEvents(){
   on("barcodeInput","input",()=>syncHistoryFromScanBarcode());
   on("productBarcode","input",()=>renderProductStockInfo());
   on("productHistoryBarcodeInput","input",()=>selectProductHistoryByBarcode());
+  on("productNameSearchInput","input",handleProductNameSearchInput);
 
   on("startCameraBtn","click",startCamera);
   on("historyCameraBtn","click",startCamera);
