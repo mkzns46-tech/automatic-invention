@@ -1188,3 +1188,18 @@ header h1{
     height:25% !important;
   }
 }
+
+/* v62 header/history camera/csv fix */
+.header-copy{display:none !important;}
+.history-camera-row{
+  display:grid;
+  grid-template-columns:1fr;
+  margin:10px 0 14px;
+}
+#historyCameraBtn{
+  width:100% !important;
+  min-height:48px !important;
+  background:#2d6a4f !important;
+  color:#fff !important;
+  font-weight:900 !important;
+}

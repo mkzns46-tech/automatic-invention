@@ -906,14 +906,23 @@ function downloadSampleCsv(){
 }
 
 function downloadCsvFile(filename,rows){
-  const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");
+  const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\r\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
+  a.href=url;
   a.download=filename;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  a.style.display="none";
+  document.body.appendChild(a);
+  setTimeout(()=>{
+    a.click();
+    setTimeout(()=>{
+      try{document.body.removeChild(a);}catch(_){}
+      URL.revokeObjectURL(url);
+    },1000);
+  },0);
 }
+
 
 
 function buildHistoryExportRows(sourceLogs){
@@ -1018,22 +1027,25 @@ function exportCsv(){
 
 async function exportAllDataCsv(){
   try{
-    showMessage("全データCSVを作成中...");
-
+    showMessage("全履歴CSVを作成中...");
     const allLogs=await sbAll("inventory_logs?select=*&order=created_at.desc",1000,50000);
-
     try{
-      await fetchProductsByBarcodes(allLogs.map(l=>l.barcode));
+      if(typeof fetchProductsByBarcodes==="function"){
+        await fetchProductsByBarcodes(allLogs.map(l=>l.barcode));
+      }
     }catch(_){}
-
     const rows=buildHistoryExportRows(allLogs);
+    if(rows.length<=1){
+      showMessage("出力する履歴がありません。","err");
+      return;
+    }
     downloadCsvFile("all_inventory_history.csv",rows);
-
-    showMessage("全データCSVを出力しました。","ok");
+    showMessage(`全履歴CSVを出力しました：${rows.length-1}件`,"ok");
   }catch(e){
-    showMessage("全データCSV出力エラー。\n"+e.message,"err");
+    showMessage("全履歴CSV出力エラー。\n"+e.message,"err");
   }
 }
+
 
 
 async function handleScannedCode(code){
@@ -1047,6 +1059,7 @@ async function handleScannedCode(code){
   lastScanAt=t;
 
   el("barcodeInput").value=code;
+  if(el("productHistoryBarcodeInput"))el("productHistoryBarcodeInput").value=code;
   await syncHistoryFromScanBarcode();
   beep(true);
   await stopCamera();
@@ -1235,10 +1248,12 @@ function bindEvents(){
   on("productHistoryBarcodeInput","input",()=>selectProductHistoryByBarcode());
 
   on("startCameraBtn","click",startCamera);
+  on("historyCameraBtn","click",startCamera);
   on("stopCameraBtn","click",stopCamera);
 
   on("csvBtn","click",exportCsv);
   on("allDataCsvBtn","click",exportAllDataCsv);
+  on("exportAllCsvBtn","click",exportAllDataCsv);
   on("productHistoryCsvBtn","click",exportProductHistoryCsv);
   on("csvFile","change",e=>importCsvFile(e.target.files&&e.target.files[0]));
   on("downloadSampleCsvBtn","click",downloadSampleCsv);
@@ -1259,7 +1274,7 @@ reloadAll();
 const I18N = {
   ja: {
     "ARICO TOKYO 在庫変動確認シート":"ARICO TOKYO 在庫変動確認シート",
-    "（在庫のずれは命のずれ）":"（在庫のずれは命のずれ）",
+    
     "再読み込み":"再読み込み",
     "在庫変動登録":"在庫変動登録",
     "持ち出し・入荷・在庫修正を記録します":"持ち出し・入荷・在庫修正を記録します",
@@ -1307,7 +1322,7 @@ const I18N = {
   },
   ko: {
     "ARICO TOKYO 在庫変動確認シート":"ARICO TOKYO 재고 변동 확인 시트",
-    "（在庫のずれは命のずれ）":"（재고 오차는 치명적인 오차）",
+    
     "再読み込み":"다시 불러오기",
     "在庫変動登録":"재고 변동 등록",
     "持ち出し・入荷・在庫修正を記録します":"반출・입고・재고 수정을 기록합니다",
@@ -1491,3 +1506,13 @@ function hideCameraGuide(){
   const g=document.getElementById("cameraGuideOverlay");
   if(g)g.classList.remove("is-active");
 }
+
+/* v62 all csv fallback */
+window.addEventListener("DOMContentLoaded",()=>{
+  ["allDataCsvBtn","exportAllCsvBtn"].forEach(id=>{
+    const b=document.getElementById(id);
+    if(b)b.onclick=exportAllDataCsv;
+  });
+  const hb=document.getElementById("historyCameraBtn");
+  if(hb)hb.onclick=startCamera;
+});
