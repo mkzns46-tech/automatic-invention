@@ -1696,3 +1696,13 @@ setTimeout(()=>{
   const input=document.getElementById("productFormNameSearchInput");
   if(input)input.oninput=handleProductFormNameSearchInput;
 },500);
+
+/* v68 product form search fallback */
+window.addEventListener("DOMContentLoaded",()=>{
+  const input=document.getElementById("productFormNameSearchInput");
+  if(input)input.oninput=handleProductFormNameSearchInput;
+});
+setTimeout(()=>{
+  const input=document.getElementById("productFormNameSearchInput");
+  if(input)input.oninput=handleProductFormNameSearchInput;
+},500);
