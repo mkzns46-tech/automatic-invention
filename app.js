@@ -398,11 +398,6 @@ async function saveProduct(e){
     el("productName").value="";
     el("baseStock").value="0";
     el("location").value="";
-    if(el("productFormNameSearchInput"))el("productFormNameSearchInput").value="";
-    if(el("productFormSearchResults")){
-      el("productFormSearchResults").classList.remove("is-active");
-      el("productFormSearchResults").innerHTML="";
-    }
   }catch(e){
     showMessage("商品登録エラー。\n"+e.message,"err");
   }
@@ -1692,7 +1687,7 @@ window.addEventListener("DOMContentLoaded",()=>{
   if(hb)hb.onclick=startCamera;
 });
 
-/* v65 product form search fallback */
+/* v67 product form search fallback */
 window.addEventListener("DOMContentLoaded",()=>{
   const input=document.getElementById("productFormNameSearchInput");
   if(input)input.oninput=handleProductFormNameSearchInput;
