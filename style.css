@@ -1296,3 +1296,17 @@ header h1{
 #scanProductSearchResults{
   margin-top:10px !important;
 }
+
+/* ===== v71 staff card alignment ===== */
+@media(min-width:801px){
+  .card.scanner,
+  .staff-admin-section{
+    min-height:700px !important;
+  }
+
+  .staff-admin-section .table-wrap{
+    height:440px !important;
+    min-height:440px !important;
+    max-height:440px !important;
+  }
+}
