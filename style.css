@@ -1262,3 +1262,12 @@ header h1{
     grid-template-columns:1fr;
   }
 }
+
+/* ===== v64 product form name search ===== */
+.product-form-name-search-label{
+  display:block;
+  margin-top:12px;
+}
+#productFormNameSearchInput{
+  margin-top:8px;
+}

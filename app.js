@@ -398,6 +398,11 @@ async function saveProduct(e){
     el("productName").value="";
     el("baseStock").value="0";
     el("location").value="";
+    if(el("productFormNameSearchInput"))el("productFormNameSearchInput").value="";
+    if(el("productFormSearchResults")){
+      el("productFormSearchResults").classList.remove("is-active");
+      el("productFormSearchResults").innerHTML="";
+    }
   }catch(e){
     showMessage("商品登録エラー。\n"+e.message,"err");
   }
@@ -570,6 +575,81 @@ async function searchProductsByName(keyword){
     showMessage("商品名検索エラー。\n"+e.message,"err");
     return [];
   }
+}
+
+
+let productFormSearchTimer=null;
+
+function renderProductFormSearchResults(rows){
+  const box=el("productFormSearchResults");
+  if(!box)return;
+
+  if(!rows || !rows.length){
+    box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>新規商品として登録できます</span></div>';
+    box.classList.add("is-active");
+    return;
+  }
+
+  box.innerHTML=rows.map(p=>`
+    <div class="product-search-item" data-barcode="${esc(p.barcode)}">
+      <div>
+        <strong>${esc(p.name)}</strong>
+        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)} / 棚番：${esc(p.location||"")}</span>
+      </div>
+      <button type="button">選択</button>
+    </div>
+  `).join("");
+
+  box.classList.add("is-active");
+
+  box.querySelectorAll(".product-search-item[data-barcode]").forEach(item=>{
+    item.onclick=async()=>{
+      const barcode=item.dataset.barcode;
+      const p=await fetchProductByBarcode(barcode);
+
+      if(p){
+        if(el("productBarcode"))el("productBarcode").value=p.barcode||"";
+        if(el("productName"))el("productName").value=p.name||"";
+        if(el("baseStock"))el("baseStock").value=Number(p.base_stock||0);
+        if(el("location"))el("location").value=p.location||"";
+      }
+
+      const input=el("productFormNameSearchInput");
+      if(input)input.value="";
+
+      box.classList.remove("is-active");
+      box.innerHTML="";
+
+      if(typeof renderProductStockInfo==="function"){
+        await renderProductStockInfo();
+      }
+
+      showMessage("商品登録フォームに商品情報を反映しました。","ok");
+    };
+  });
+}
+
+function handleProductFormNameSearchInput(){
+  const input=el("productFormNameSearchInput");
+  if(!input)return;
+
+  clearTimeout(productFormSearchTimer);
+
+  const keyword=input.value.trim();
+  const box=el("productFormSearchResults");
+
+  if(!keyword){
+    if(box){
+      box.classList.remove("is-active");
+      box.innerHTML="";
+    }
+    return;
+  }
+
+  productFormSearchTimer=setTimeout(async()=>{
+    const rows=await searchProductsByName(keyword);
+    renderProductFormSearchResults(rows);
+  },250);
 }
 
 function renderProductSearchResults(rows){
@@ -1340,6 +1420,7 @@ function bindEvents(){
   on("productBarcode","input",()=>renderProductStockInfo());
   on("productHistoryBarcodeInput","input",()=>selectProductHistoryByBarcode());
   on("productNameSearchInput","input",handleProductNameSearchInput);
+  on("productFormNameSearchInput","input",handleProductFormNameSearchInput);
 
   on("startCameraBtn","click",startCamera);
   on("historyCameraBtn","click",startCamera);
