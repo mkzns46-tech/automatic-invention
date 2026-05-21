@@ -1706,3 +1706,13 @@ setTimeout(()=>{
   const input=document.getElementById("productFormNameSearchInput");
   if(input)input.oninput=handleProductFormNameSearchInput;
 },500);
+
+/* v69 product form search fallback */
+function bindProductFormSearchInput(){
+  const input=document.getElementById("productFormNameSearchInput");
+  if(input)input.oninput=handleProductFormNameSearchInput;
+}
+window.addEventListener("DOMContentLoaded",bindProductFormSearchInput);
+window.addEventListener("load",bindProductFormSearchInput);
+setTimeout(bindProductFormSearchInput,500);
+setTimeout(bindProductFormSearchInput,1500);
