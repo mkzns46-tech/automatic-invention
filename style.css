@@ -1292,3 +1292,18 @@ header h1{
 #productFormSearchResults{
   margin-top:10px;
 }
+
+
+.product-form-search-block{
+  display:block !important;
+  margin:12px 0 18px !important;
+  padding:14px !important;
+  border:2px solid #cfe6d7 !important;
+  border-radius:14px !important;
+  background:#f7fff9 !important;
+}
+
+.product-form-search-title{
+  font-weight:800;
+  margin-bottom:10px;
+}

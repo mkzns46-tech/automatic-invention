@@ -38,11 +38,12 @@
 
 <section class="card product-admin-section pc-only-section"><div class="section-title"><h2>商品登録</h2>
 <div class="product-form-search-block">
-  <label>商品名検索
-    <input id="productFormNameSearchInput" placeholder="商品名の一部を入力" />
-  </label>
+  <div class="product-form-search-title">商品名検索</div>
+  <input id="productFormNameSearchInput" placeholder="商品名の一部を入力" />
   <div id="productFormSearchResults" class="product-search-results"></div>
 </div>
+
+
 <div id="productCountBadge" class="badge">登録数：0件</div></div><form id="productForm"><label>バーコード<input id="productBarcode" required/>
 </label><label>商品名 <span class="required">必須</span><input id="productName" required placeholder="商品名を必ず入力"/></label><label>現在庫<input id="baseStock" type="number" value="0" step="1"/></label><label>棚番<input id="location" placeholder="例：A-01"/></label><button type="submit">商品を登録 / 更新</button></form></section>
 <section class="card pc-only-section csv-admin-section"><h2>CSV取り込み</h2><p class="section-note">商品マスターをまとめて登録・更新できます</p><p>対応形式：<b>barcode,name,base_stock,location</b>（locationは任意）</p><p>日本語見出しも対応：<b>バーコード,商品名,現在在庫,棚番</b></p><div class="csv-feature-grid">
