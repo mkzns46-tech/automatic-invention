@@ -573,14 +573,14 @@ async function searchProductsByName(keyword){
 }
 
 
-let productFormSearchTimer=null;
+let scanProductSearchTimer=null;
 
-function renderProductFormSearchResults(rows){
-  const box=el("productFormSearchResults");
+function renderScanProductSearchResults(rows){
+  const box=el("scanProductSearchResults");
   if(!box)return;
 
   if(!rows || !rows.length){
-    box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>新規商品として登録できます</span></div>';
+    box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>別のキーワードで検索してください</span></div>';
     box.classList.add("is-active");
     return;
   }
@@ -600,38 +600,34 @@ function renderProductFormSearchResults(rows){
   box.querySelectorAll(".product-search-item[data-barcode]").forEach(item=>{
     item.onclick=async()=>{
       const barcode=item.dataset.barcode;
-      const p=await fetchProductByBarcode(barcode);
+      const barcodeInput=el("barcodeInput");
+      const nameInput=el("scanProductNameSearchInput");
 
-      if(p){
-        if(el("productBarcode"))el("productBarcode").value=p.barcode||"";
-        if(el("productName"))el("productName").value=p.name||"";
-        if(el("baseStock"))el("baseStock").value=Number(p.base_stock||0);
-        if(el("location"))el("location").value=p.location||"";
-      }
-
-      const input=el("productFormNameSearchInput");
-      if(input)input.value="";
+      if(barcodeInput)barcodeInput.value=barcode;
+      if(nameInput)nameInput.value="";
 
       box.classList.remove("is-active");
       box.innerHTML="";
 
-      if(typeof renderProductStockInfo==="function"){
-        await renderProductStockInfo();
-      }
+      await syncHistoryFromScanBarcode();
 
-      showMessage("商品登録フォームに商品情報を反映しました。","ok");
+      const qty=el("qty");
+      if(qty && !qty.value)qty.focus();
+      else if(barcodeInput)barcodeInput.focus();
+
+      showMessage("在庫変動登録に商品を反映しました。数量と担当者を確認して登録してください。","ok");
     };
   });
 }
 
-function handleProductFormNameSearchInput(){
-  const input=el("productFormNameSearchInput");
+function handleScanProductNameSearchInput(){
+  const input=el("scanProductNameSearchInput");
   if(!input)return;
 
-  clearTimeout(productFormSearchTimer);
+  clearTimeout(scanProductSearchTimer);
 
   const keyword=input.value.trim();
-  const box=el("productFormSearchResults");
+  const box=el("scanProductSearchResults");
 
   if(!keyword){
     if(box){
@@ -641,9 +637,9 @@ function handleProductFormNameSearchInput(){
     return;
   }
 
-  productFormSearchTimer=setTimeout(async()=>{
+  scanProductSearchTimer=setTimeout(async()=>{
     const rows=await searchProductsByName(keyword);
-    renderProductFormSearchResults(rows);
+    renderScanProductSearchResults(rows);
   },250);
 }
 
@@ -1414,8 +1410,8 @@ function bindEvents(){
   on("barcodeInput","input",()=>syncHistoryFromScanBarcode());
   on("productBarcode","input",()=>renderProductStockInfo());
   on("productHistoryBarcodeInput","input",()=>selectProductHistoryByBarcode());
+  on("scanProductNameSearchInput","input",handleScanProductNameSearchInput);
   on("productNameSearchInput","input",handleProductNameSearchInput);
-  on("productFormNameSearchInput","input",handleProductFormNameSearchInput);
 
   on("startCameraBtn","click",startCamera);
   on("historyCameraBtn","click",startCamera);
@@ -1463,6 +1459,7 @@ const I18N = {
     "操作":"操作",
     "削除":"削除",
     "商品登録":"商品登録",
+    "商品名検索":"商品名検索",
     "バーコード":"バーコード",
     "商品名":"商品名",
     "現在庫":"現在庫",
@@ -1511,6 +1508,7 @@ const I18N = {
     "操作":"작업",
     "削除":"삭제",
     "商品登録":"상품 등록",
+    "商品名検索":"상품명 검색",
     "バーコード":"바코드",
     "商品名":"상품명",
     "現在庫":"현재 재고",
@@ -1588,19 +1586,23 @@ function applyPlaceholders(lang){
     ja:{
       staffNameInput:"例：田中",
       barcodeInput:"バーコードをスキャン、または手入力",
+      scanProductNameSearchInput:"商品名の一部を入力",
       memo:"例：棚卸差異、サンプル使用、不良返品など",
       productBarcode:"バーコードを入力",
       productName:"商品名を必ず入力",
       location:"例：A-01",
+      productNameSearchInput:"商品名の一部を入力",
       productHistoryBarcodeInput:"バーコードを入力またはスキャン"
     },
     ko:{
       staffNameInput:"예：다나카",
       barcodeInput:"바코드를 스캔하거나 직접 입력",
+      scanProductNameSearchInput:"상품명의 일부를 입력",
       memo:"예：재고 차이, 샘플 사용, 불량 반품 등",
       productBarcode:"바코드를 입력",
       productName:"상품명을 반드시 입력",
       location:"예：A-01",
+      productNameSearchInput:"상품명의 일부를 입력",
       productHistoryBarcodeInput:"바코드를 입력 또는 스캔"
     }
   };
@@ -1687,32 +1689,12 @@ window.addEventListener("DOMContentLoaded",()=>{
   if(hb)hb.onclick=startCamera;
 });
 
-/* v67 product form search fallback */
-window.addEventListener("DOMContentLoaded",()=>{
-  const input=document.getElementById("productFormNameSearchInput");
-  if(input)input.oninput=handleProductFormNameSearchInput;
-});
-setTimeout(()=>{
-  const input=document.getElementById("productFormNameSearchInput");
-  if(input)input.oninput=handleProductFormNameSearchInput;
-},500);
-
-/* v68 product form search fallback */
-window.addEventListener("DOMContentLoaded",()=>{
-  const input=document.getElementById("productFormNameSearchInput");
-  if(input)input.oninput=handleProductFormNameSearchInput;
-});
-setTimeout(()=>{
-  const input=document.getElementById("productFormNameSearchInput");
-  if(input)input.oninput=handleProductFormNameSearchInput;
-},500);
-
-/* v69 product form search fallback */
-function bindProductFormSearchInput(){
-  const input=document.getElementById("productFormNameSearchInput");
-  if(input)input.oninput=handleProductFormNameSearchInput;
+/* v70 scan form product name search */
+function bindScanProductSearchInput(){
+  const input=document.getElementById("scanProductNameSearchInput");
+  if(input)input.oninput=handleScanProductNameSearchInput;
 }
-window.addEventListener("DOMContentLoaded",bindProductFormSearchInput);
-window.addEventListener("load",bindProductFormSearchInput);
-setTimeout(bindProductFormSearchInput,500);
-setTimeout(bindProductFormSearchInput,1500);
+window.addEventListener("DOMContentLoaded",bindScanProductSearchInput);
+window.addEventListener("load",bindScanProductSearchInput);
+setTimeout(bindScanProductSearchInput,500);
+setTimeout(bindScanProductSearchInput,1500);

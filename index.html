@@ -9,7 +9,7 @@
     </div>
     <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
   </div>
-</div><div id="qr-reader"></div><form id="manualForm"><label>バーコード入力<input id="barcodeInput" autocomplete="off" placeholder="バーコードをスキャン、または手入力"/></label><div id="scanProductInfo" class="message">バーコード入力後、商品名と現在庫を表示します</div><button type="submit">登録</button></form><div id="message" class="message">起動中...</div></section>
+</div><div id="qr-reader"></div><form id="manualForm"><div class="scan-product-search-block"><label>商品名検索<input id="scanProductNameSearchInput" autocomplete="off" placeholder="商品名の一部を入力"/></label><div id="scanProductSearchResults" class="product-search-results"></div></div><label>バーコード入力<input id="barcodeInput" autocomplete="off" placeholder="バーコードをスキャン、または手入力"/></label><div id="scanProductInfo" class="message">バーコード入力後、商品名と現在庫を表示します</div><button type="submit">登録</button></form><div id="message" class="message">起動中...</div></section>
 <section class="card pc-only-section staff-admin-section">
   <div class="section-title">
     <h2>担当者設定</h2><p class="section-note">スマホ側の担当者プルダウンに反映されます</p>
@@ -37,12 +37,6 @@
 </section>
 
 <section class="card product-admin-section pc-only-section"><div class="section-title"><h2>商品登録</h2>
-<div class="product-form-search-block">
-  <label>商品名検索
-    <input id="productFormNameSearchInput" placeholder="商品名の一部を入力" />
-  </label>
-  <div id="productFormSearchResults" class="product-search-results"></div>
-</div>
 <div id="productCountBadge" class="badge">登録数：0件</div></div><form id="productForm">
 
 
