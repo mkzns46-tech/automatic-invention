@@ -1691,3 +1691,13 @@ window.addEventListener("DOMContentLoaded",()=>{
   const hb=document.getElementById("historyCameraBtn");
   if(hb)hb.onclick=startCamera;
 });
+
+/* v65 product form search fallback */
+window.addEventListener("DOMContentLoaded",()=>{
+  const input=document.getElementById("productFormNameSearchInput");
+  if(input)input.oninput=handleProductFormNameSearchInput;
+});
+setTimeout(()=>{
+  const input=document.getElementById("productFormNameSearchInput");
+  if(input)input.oninput=handleProductFormNameSearchInput;
+},500);

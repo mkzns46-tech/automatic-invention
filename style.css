@@ -1271,3 +1271,24 @@ header h1{
 #productFormNameSearchInput{
   margin-top:8px;
 }
+
+/* ===== v65 product registration search visible fix ===== */
+.product-form-search-block{
+  margin:12px 0 16px;
+  padding:12px;
+  border:1px solid #cfe6d7;
+  border-radius:14px;
+  background:#f7fff9;
+}
+
+.product-form-search-block label{
+  margin-top:0 !important;
+}
+
+.product-form-search-block input{
+  margin-top:8px;
+}
+
+#productFormSearchResults{
+  margin-top:10px;
+}
