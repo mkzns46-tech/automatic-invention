@@ -243,6 +243,13 @@ function renderStaffOptions(){
     checker.innerHTML='<option value="">チェック者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
     if(cur)checker.value=cur;
   }
+
+  const historyStaff=el("historyStaffFilter");
+  if(historyStaff){
+    const cur=historyStaff.value;
+    historyStaff.innerHTML='<option value="">すべての担当者</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
+    if(cur)historyStaff.value=cur;
+  }
 }
 
 function renderStaffList(){
@@ -592,80 +599,6 @@ async function searchProductsByName(keyword){
 }
 
 
-let productFormSearchTimer=null;
-
-function renderProductFormSearchResults(rows){
-  const box=el("productFormSearchResults");
-  if(!box)return;
-
-  if(!rows || !rows.length){
-    box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>新規商品として登録できます</span></div>';
-    box.classList.add("is-active");
-    return;
-  }
-
-  box.innerHTML=rows.map(p=>`
-    <div class="product-search-item" data-barcode="${esc(p.barcode)}">
-      <div>
-        <strong>${esc(p.name)}</strong>
-        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)} / 棚番：${esc(p.location||"")}</span>
-      </div>
-      <button type="button">選択</button>
-    </div>
-  `).join("");
-
-  box.classList.add("is-active");
-
-  box.querySelectorAll(".product-search-item[data-barcode]").forEach(item=>{
-    item.onclick=async()=>{
-      const barcode=item.dataset.barcode;
-      const p=await fetchProductByBarcode(barcode);
-
-      if(p){
-        if(el("productBarcode"))el("productBarcode").value=p.barcode||"";
-        if(el("productName"))el("productName").value=p.name||"";
-        if(el("baseStock"))el("baseStock").value=Number(p.base_stock||0);
-        if(el("location"))el("location").value=p.location||"";
-      }
-
-      const input=el("productFormNameSearchInput");
-      if(input)input.value="";
-
-      box.classList.remove("is-active");
-      box.innerHTML="";
-
-      if(typeof renderProductStockInfo==="function"){
-        await renderProductStockInfo();
-      }
-
-      showMessage("商品登録フォームに商品情報を反映しました。","ok");
-    };
-  });
-}
-
-function handleProductFormNameSearchInput(){
-  const input=el("productFormNameSearchInput");
-  if(!input)return;
-
-  clearTimeout(productFormSearchTimer);
-
-  const keyword=input.value.trim();
-  const box=el("productFormSearchResults");
-
-  if(!keyword){
-    if(box){
-      box.classList.remove("is-active");
-      box.innerHTML="";
-    }
-    return;
-  }
-
-  productFormSearchTimer=setTimeout(async()=>{
-    const rows=await searchProductsByName(keyword);
-    renderProductFormSearchResults(rows);
-  },250);
-}
-
 function renderProductSearchResults(rows){
   const box=el("productSearchResults");
   if(!box)return;
@@ -882,7 +815,12 @@ function renderGlobalHistory(){
 }
 
 function buildGlobalHistoryRows(){
-  return logs.map(log=>{
+  const staffFilter=el("historyStaffFilter")?.value||"";
+  const filteredLogs=staffFilter
+    ? logs.filter(log=>String(log.staff||"")===String(staffFilter))
+    : logs;
+
+  return filteredLogs.map(log=>{
     const q=Number(log.quantity||0);
 
     let beforeStock="";
@@ -1488,7 +1426,7 @@ function bindEvents(){
   on("productBarcode","input",()=>renderProductStockInfo());
   on("productHistoryBarcodeInput","input",()=>selectProductHistoryByBarcode());
   on("productNameSearchInput","input",handleProductNameSearchInput);
-  on("productFormNameSearchInput","input",handleProductFormNameSearchInput);
+  on("historyStaffFilter","change",renderGlobalHistory);
 
   on("startCameraBtn","click",startCamera);
   on("historyCameraBtn","click",startCamera);
@@ -1502,6 +1440,11 @@ function bindEvents(){
   on("downloadSampleCsvBtn","click",downloadSampleCsv);
 
   on("stockCheckBtn","click",saveStockCheck);
+  on("clearFilterBtn","click",()=>{
+    const historyStaff=el("historyStaffFilter");
+    if(historyStaff)historyStaff.value="";
+    renderGlobalHistory();
+  });
   on("showAllSelectedHistoryBtn","click",()=>showProductHistoryForBarcode(selectedBarcode));
   on("showAfterOldestCheckBtn","click",()=>{
     selectedHistoryMode="afterOldestCheck";
@@ -1559,6 +1502,7 @@ const I18N = {
     "入荷":"入荷",
     "出荷":"出荷",
     "全体履歴":"全体履歴",
+    "担当者で検索":"担当者で検索",
     "履歴CSV":"履歴CSV",
     "全データCSV":"全データCSV",
     "検索をクリア":"検索をクリア"
@@ -1607,6 +1551,7 @@ const I18N = {
     "入荷":"입고",
     "出荷":"출고",
     "全体履歴":"전체 이력",
+    "担当者で検索":"담당자로 검색",
     "履歴CSV":"이력 CSV",
     "全データCSV":"전체 데이터 CSV",
     "検索をクリア":"검색 초기화"
@@ -1686,12 +1631,14 @@ function applyPlaceholders(lang){
 
 function applySelectLabels(lang){
   const labels=lang==="ko"
-    ?{staff:"담당자를 선택",checkerName:"확인자를 선택"}
-    :{staff:"担当者を選択",checkerName:"チェック者を選択"};
+    ?{staff:"담당자를 선택",checkerName:"확인자를 선택",historyStaffFilter:"모든 담당자"}
+    :{staff:"担当者を選択",checkerName:"チェック者を選択",historyStaffFilter:"すべての担当者"};
   const staff=document.getElementById("staff");
   if(staff&&staff.options.length)staff.options[0].textContent=labels.staff;
   const checker=document.getElementById("checkerName");
   if(checker&&checker.options.length)checker.options[0].textContent=labels.checkerName;
+  const historyStaff=document.getElementById("historyStaffFilter");
+  if(historyStaff&&historyStaff.options.length)historyStaff.options[0].textContent=labels.historyStaffFilter;
 }
 
 function applyLang(){
@@ -1759,36 +1706,6 @@ window.addEventListener("DOMContentLoaded",()=>{
   const hb=document.getElementById("historyCameraBtn");
   if(hb)hb.onclick=startCamera;
 });
-
-/* v67 product form search fallback */
-window.addEventListener("DOMContentLoaded",()=>{
-  const input=document.getElementById("productFormNameSearchInput");
-  if(input)input.oninput=handleProductFormNameSearchInput;
-});
-setTimeout(()=>{
-  const input=document.getElementById("productFormNameSearchInput");
-  if(input)input.oninput=handleProductFormNameSearchInput;
-},500);
-
-/* v68 product form search fallback */
-window.addEventListener("DOMContentLoaded",()=>{
-  const input=document.getElementById("productFormNameSearchInput");
-  if(input)input.oninput=handleProductFormNameSearchInput;
-});
-setTimeout(()=>{
-  const input=document.getElementById("productFormNameSearchInput");
-  if(input)input.oninput=handleProductFormNameSearchInput;
-},500);
-
-/* v69 product form search fallback */
-function bindProductFormSearchInput(){
-  const input=document.getElementById("productFormNameSearchInput");
-  if(input)input.oninput=handleProductFormNameSearchInput;
-}
-window.addEventListener("DOMContentLoaded",bindProductFormSearchInput);
-window.addEventListener("load",bindProductFormSearchInput);
-setTimeout(bindProductFormSearchInput,500);
-setTimeout(bindProductFormSearchInput,1500);
 
 /* v70 popup fallback */
 window.addEventListener("DOMContentLoaded",()=>{

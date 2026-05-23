@@ -1263,95 +1263,6 @@ header h1{
   }
 }
 
-/* ===== v67 product register search clean layout ===== */
-.product-form-search-block{
-  display:block !important;
-  width:100% !important;
-  margin:0 0 14px !important;
-  padding:12px !important;
-  border:1px solid #cfe6d7 !important;
-  border-radius:14px !important;
-  background:#f7fff9 !important;
-  box-sizing:border-box !important;
-}
-
-.product-form-search-block label{
-  display:block !important;
-  margin:0 !important;
-  font-weight:800 !important;
-}
-
-.product-form-search-block input{
-  width:100% !important;
-  margin-top:8px !important;
-  box-sizing:border-box !important;
-}
-
-#productFormSearchResults{
-  width:100% !important;
-  margin-top:10px !important;
-}
-
-/* ===== v68 product register search fixed position ===== */
-.product-form-search-block{
-  display:block !important;
-  width:100% !important;
-  margin:0 0 16px !important;
-  padding:12px !important;
-  border:1px solid #cfe6d7 !important;
-  border-radius:14px !important;
-  background:#f7fff9 !important;
-  box-sizing:border-box !important;
-  grid-column:1 / -1 !important;
-}
-
-.product-form-search-block label{
-  display:block !important;
-  margin:0 !important;
-  font-weight:800 !important;
-}
-
-.product-form-search-block input{
-  width:100% !important;
-  margin-top:8px !important;
-  box-sizing:border-box !important;
-}
-
-#productFormSearchResults{
-  width:100% !important;
-  margin-top:10px !important;
-}
-
-/* ===== v69 product registration search final ===== */
-.product-form-search-block{
-  display:block !important;
-  width:100% !important;
-  margin:12px 0 16px !important;
-  padding:12px !important;
-  border:1px solid #cfe6d7 !important;
-  border-radius:14px !important;
-  background:#f7fff9 !important;
-  box-sizing:border-box !important;
-}
-
-.product-form-search-block label{
-  display:block !important;
-  margin:0 !important;
-  font-weight:800 !important;
-}
-
-.product-form-search-block input{
-  display:block !important;
-  width:100% !important;
-  margin-top:8px !important;
-  box-sizing:border-box !important;
-}
-
-#productFormSearchResults{
-  width:100% !important;
-  margin-top:10px !important;
-}
-
 /* ===== v70 popup / mobile history / memo edit ===== */
 .app-popup{
   position:fixed;
@@ -1410,6 +1321,19 @@ header h1{
   white-space:nowrap;
 }
 
+.global-history-filter{
+  max-width:360px;
+  margin:12px 0 14px;
+}
+
+.global-history-filter label{
+  margin:0;
+}
+
+.global-history-filter select{
+  margin-top:8px;
+}
+
 /* スマホでも全体履歴を表示 */
 @media(max-width:800px){
   section.global-history-section,
@@ -1430,6 +1354,10 @@ header h1{
     display:grid !important;
     grid-template-columns:1fr !important;
     gap:8px !important;
+  }
+
+  .global-history-filter{
+    max-width:none;
   }
 
   .global-history-section .table-wrap{
