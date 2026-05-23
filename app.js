@@ -1,3 +1,38 @@
+// ===== ARICO PORTAL LOGIN GUARD =====
+// ポータルから入った時だけ履歴管理シートを使えるようにする簡易ガード。
+// ポータル側のリンク例：
+// https://履歴管理シートのURL/?auth=ARICO_PORTAL_2026
+const ARICO_PORTAL_URL = "https://arico-portal.vercel.app";
+const ARICO_AUTH_TOKEN = "ARICO_PORTAL_2026";
+const ARICO_LOGIN_KEY = "arico_history_sheet_login";
+
+(function requirePortalLogin(){
+  try{
+    const params = new URLSearchParams(window.location.search);
+    const auth = params.get("auth");
+
+    if(auth === ARICO_AUTH_TOKEN){
+      sessionStorage.setItem(ARICO_LOGIN_KEY, "ok");
+      params.delete("auth");
+
+      const cleanQuery = params.toString();
+      const cleanUrl = window.location.pathname + (cleanQuery ? "?" + cleanQuery : "") + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+      return;
+    }
+
+    if(sessionStorage.getItem(ARICO_LOGIN_KEY) === "ok"){
+      return;
+    }
+
+    alert("ログインしてください");
+    window.location.replace(ARICO_PORTAL_URL);
+  }catch(_){
+    window.location.replace(ARICO_PORTAL_URL);
+  }
+})();
+// ===== /ARICO PORTAL LOGIN GUARD =====
+
 window.addEventListener("error",(e)=>{
   try{
     const m=document.getElementById("message");
@@ -20,6 +55,10 @@ window.addEventListener("unhandledrejection",(e)=>{
 
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";
 const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
+const LOGIN_USER="admin";
+const LOGIN_PASSWORD="1234";
+const LOGIN_SESSION_KEY="arico_portal_logged_in";
+let loginSessionFallback=false;
 
 let products=[];
 let logs=[];
@@ -39,6 +78,108 @@ let zxingReader=null;
 let zxingRunning=false;
 
 const el=(id)=>document.getElementById(id);
+
+function setLoginMessage(text,type=""){
+  const m=el("loginMessage");
+  if(!m)return;
+  m.textContent=text||"";
+  m.className="login-message "+type;
+}
+
+function getLoginSession(){
+  try{
+    return sessionStorage.getItem(LOGIN_SESSION_KEY)==="1" || loginSessionFallback;
+  }catch(_){
+    return loginSessionFallback;
+  }
+}
+
+function setLoginSession(){
+  loginSessionFallback=true;
+  try{
+    sessionStorage.setItem(LOGIN_SESSION_KEY,"1");
+  }catch(_){}
+}
+
+function clearLoginSession(){
+  loginSessionFallback=false;
+  try{
+    sessionStorage.removeItem(LOGIN_SESSION_KEY);
+  }catch(_){}
+}
+
+function showLoginView(){
+  const shell=el("loginShell");
+  const login=el("loginCard");
+  const portal=el("portalCard");
+  const app=el("mainApp");
+  if(shell)shell.classList.remove("is-hidden");
+  if(login)login.hidden=false;
+  if(portal)portal.hidden=true;
+  if(app)app.classList.add("app-is-hidden");
+}
+
+function showPortalView(){
+  const shell=el("loginShell");
+  const login=el("loginCard");
+  const portal=el("portalCard");
+  const app=el("mainApp");
+  if(shell)shell.classList.remove("is-hidden");
+  if(login)login.hidden=true;
+  if(portal)portal.hidden=false;
+  if(app)app.classList.add("app-is-hidden");
+}
+
+function showInventorySystem(){
+  const shell=el("loginShell");
+  const app=el("mainApp");
+  if(shell)shell.classList.add("is-hidden");
+  if(app)app.classList.remove("app-is-hidden");
+}
+
+function handleLogin(e){
+  e.preventDefault();
+  const user=el("loginUser")?.value.trim()||"";
+  const password=el("loginPassword")?.value||"";
+
+  if(user===LOGIN_USER && password===LOGIN_PASSWORD){
+    setLoginSession();
+    setLoginMessage("");
+    showPortalView();
+    return;
+  }
+
+  setLoginMessage("ユーザーIDまたはパスワードが違います。","err");
+}
+
+function logoutPortal(){
+  clearLoginSession();
+  if(el("loginPassword"))el("loginPassword").value="";
+  showLoginView();
+}
+
+function initPortal(){
+  const form=el("loginForm");
+  if(form)form.addEventListener("submit",handleLogin);
+
+  const submit=el("loginSubmitBtn");
+  if(submit)submit.addEventListener("click",(e)=>{
+    e.preventDefault();
+    handleLogin(e);
+  });
+
+  const open=el("openInventorySystem");
+  if(open)open.addEventListener("click",showInventorySystem);
+
+  const back=el("portalBackBtn");
+  if(back)back.addEventListener("click",showPortalView);
+
+  const logout=el("logoutBtn");
+  if(logout)logout.addEventListener("click",logoutPortal);
+
+  if(getLoginSession())showPortalView();
+  else showLoginView();
+}
 
 
 function showPopup(title, body){
@@ -1453,6 +1594,7 @@ function bindEvents(){
 }
 
 bindEvents();
+initPortal();
 reloadAll();
 
 
