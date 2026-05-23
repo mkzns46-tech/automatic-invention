@@ -1,6 +1,6 @@
 // ===== ARICO PORTAL LOGIN GUARD =====
 // 直接アクセス禁止版：?auth=ARICO_PORTAL_2026 が付いている時だけ入れます。
-// localStorageには保存しないので、URL直打ちは必ずポータルへ戻します。
+// 直接URLで開いた場合は「ログインしてください」を表示してポータルへ戻します。
 const ARICO_PORTAL_URL = "https://arico-portal.vercel.app";
 const ARICO_AUTH_TOKEN = "ARICO_PORTAL_2026";
 const ARICO_LOGIN_KEY = "arico_history_sheet_session";
@@ -19,8 +19,10 @@ const ARICO_LOGIN_KEY = "arico_history_sheet_session";
       return;
     }
 
+    alert("ログインしてください");
     window.location.replace(ARICO_PORTAL_URL);
   }catch(_){
+    alert("ログインしてください");
     window.location.replace(ARICO_PORTAL_URL);
   }
 })();
@@ -103,6 +105,7 @@ function clearLoginSession(){
 }
 
 function showLoginView(){
+  alert("ログインしてください");
   window.location.replace(ARICO_PORTAL_URL);
 }
 
