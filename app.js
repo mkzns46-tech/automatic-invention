@@ -1,36 +1,3 @@
-// ===== ARICO PORTAL LOGIN GUARD =====
-const ARICO_PORTAL_URL = "https://arico-portal.vercel.app";
-const ARICO_AUTH_TOKEN = "ARICO_PORTAL_2026";
-const ARICO_LOGIN_KEY = "arico_history_sheet_login";
-
-(function requirePortalLogin(){
-  try{
-    const params = new URLSearchParams(window.location.search);
-    const auth = params.get("auth");
-
-    if(auth === ARICO_AUTH_TOKEN){
-      localStorage.setItem(ARICO_LOGIN_KEY, "ok");
-      sessionStorage.setItem(ARICO_LOGIN_KEY, "ok");
-      params.delete("auth");
-      params.delete("t");
-      const cleanQuery = params.toString();
-      const cleanUrl = window.location.pathname + (cleanQuery ? "?" + cleanQuery : "") + window.location.hash;
-      window.history.replaceState({}, document.title, cleanUrl);
-      return;
-    }
-
-    if(localStorage.getItem(ARICO_LOGIN_KEY) === "ok" || sessionStorage.getItem(ARICO_LOGIN_KEY) === "ok"){
-      return;
-    }
-
-    window.location.replace(ARICO_PORTAL_URL);
-  }catch(_){
-    window.location.replace(ARICO_PORTAL_URL);
-  }
-})();
-// ===== /ARICO PORTAL LOGIN GUARD =====
-
-
 window.addEventListener("error",(e)=>{
   try{
     const m=document.getElementById("message");
@@ -53,8 +20,8 @@ window.addEventListener("unhandledrejection",(e)=>{
 
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";
 const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
-const LOGIN_USER="arico";
-const LOGIN_PASSWORD="0201";
+const LOGIN_USER="admin";
+const LOGIN_PASSWORD="1234";
 const LOGIN_SESSION_KEY="arico_portal_logged_in";
 let loginSessionFallback=false;
 
@@ -152,9 +119,8 @@ function handleLogin(e){
 
 function logoutPortal(){
   clearLoginSession();
-  localStorage.removeItem(ARICO_LOGIN_KEY);
-  sessionStorage.removeItem(ARICO_LOGIN_KEY);
-  window.location.href = ARICO_PORTAL_URL;
+  if(el("loginPassword"))el("loginPassword").value="";
+  showLoginView();
 }
 
 function initPortal(){
@@ -171,7 +137,7 @@ function initPortal(){
   if(open)open.addEventListener("click",showInventorySystem);
 
   const back=el("portalBackBtn");
-  if(back)back.addEventListener("click",()=>{ window.location.href = ARICO_PORTAL_URL; });
+  if(back)back.addEventListener("click",showPortalView);
 
   const logout=el("logoutBtn");
   if(logout)logout.addEventListener("click",logoutPortal);
@@ -1593,22 +1559,7 @@ function bindEvents(){
 }
 
 bindEvents();
-// 旧ログイン画面・旧入口画面は使わず、ポータル認証後は必ず在庫シート本体を表示
-(function startInventoryOnly(){
-  const shell = document.getElementById("loginShell");
-  const app = document.getElementById("mainApp");
-
-  if(shell) shell.classList.add("is-hidden");
-  if(app) app.classList.remove("app-is-hidden");
-
-  const back = document.getElementById("portalBackBtn");
-  if(back){
-    back.onclick = function(){
-      window.location.href = ARICO_PORTAL_URL;
-    };
-  }
-})();
-
+initPortal();
 reloadAll();
 
 
