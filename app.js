@@ -23,6 +23,7 @@ function login(){
   const error = el("error");
 
   if(id === LOGIN_USER && pass === LOGIN_PASSWORD){
+    localStorage.setItem(LOGIN_KEY,"ok");
     sessionStorage.setItem(LOGIN_KEY,"ok");
     error.textContent = "";
     showPortal();
@@ -30,19 +31,24 @@ function login(){
   }
 
   error.textContent = currentLang() === "ko"
-    ? "사용자 ID 또는 비밀번호가 다릅니다。"
+    ? "사용자 ID 또는 비밀번호가 다릅니다."
     : "ユーザーIDまたはパスワードが違います。";
 }
 
 function logout(){
+  localStorage.removeItem(LOGIN_KEY);
   sessionStorage.removeItem(LOGIN_KEY);
   el("pass").value = "";
   showLogin();
 }
 
+function isLoggedIn(){
+  return localStorage.getItem(LOGIN_KEY) === "ok" || sessionStorage.getItem(LOGIN_KEY) === "ok";
+}
+
 function requireLogin(){
-  if(sessionStorage.getItem(LOGIN_KEY) !== "ok"){
-    alert(currentLang() === "ko" ? "로그인해 주세요。" : "ログインしてください");
+  if(!isLoggedIn()){
+    alert(currentLang() === "ko" ? "로그인해 주세요." : "ログインしてください");
     showLogin();
     return false;
   }
@@ -63,7 +69,7 @@ function comingSoon(name){
   };
 
   if(currentLang() === "ko"){
-    alert((koNames[name] || name) + "는 현재 작성 중입니다。");
+    alert((koNames[name] || name) + "는 현재 작성 중입니다.");
   }else{
     alert(name + " は現在作成中です。");
   }
@@ -90,7 +96,7 @@ function setLang(lang){
   const error = el("error");
   if(error && error.textContent){
     error.textContent = lang === "ko"
-      ? "사용자 ID 또는 비밀번호가 다릅니다。"
+      ? "사용자 ID 또는 비밀번호가 다릅니다."
       : "ユーザーIDまたはパスワードが違います。";
   }
 }
@@ -98,7 +104,17 @@ function setLang(lang){
 window.addEventListener("DOMContentLoaded",()=>{
   setLang(currentLang());
 
-  if(sessionStorage.getItem(LOGIN_KEY) === "ok"){
+  const link = el("historyLink");
+  if(link){
+    link.href = HISTORY_SHEET_URL;
+    link.addEventListener("click",(e)=>{
+      if(!requireLogin()){
+        e.preventDefault();
+      }
+    });
+  }
+
+  if(isLoggedIn()){
     showPortal();
   }else{
     showLogin();
