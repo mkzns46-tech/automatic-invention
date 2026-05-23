@@ -177,8 +177,13 @@ function initPortal(){
   const logout=el("logoutBtn");
   if(logout)logout.addEventListener("click",logoutPortal);
 
-  if(getLoginSession())showPortalView();
-  else showLoginView();
+  if(sessionStorage.getItem("arico_history_sheet_login")==="ok"){
+    showInventorySystem();
+  }else if(getLoginSession()){
+    showPortalView();
+  }else{
+    showLoginView();
+  }
 }
 
 
