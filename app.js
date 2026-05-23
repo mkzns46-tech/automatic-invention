@@ -109,25 +109,11 @@ function clearLoginSession(){
 }
 
 function showLoginView(){
-  const shell=el("loginShell");
-  const login=el("loginCard");
-  const portal=el("portalCard");
-  const app=el("mainApp");
-  if(shell)shell.classList.remove("is-hidden");
-  if(login)login.hidden=false;
-  if(portal)portal.hidden=true;
-  if(app)app.classList.add("app-is-hidden");
+  window.location.replace(ARICO_PORTAL_URL);
 }
 
 function showPortalView(){
-  const shell=el("loginShell");
-  const login=el("loginCard");
-  const portal=el("portalCard");
-  const app=el("mainApp");
-  if(shell)shell.classList.remove("is-hidden");
-  if(login)login.hidden=true;
-  if(portal)portal.hidden=false;
-  if(app)app.classList.add("app-is-hidden");
+  window.location.href = ARICO_PORTAL_URL;
 }
 
 function showInventorySystem(){
@@ -154,8 +140,8 @@ function handleLogin(e){
 
 function logoutPortal(){
   clearLoginSession();
-  if(el("loginPassword"))el("loginPassword").value="";
-  showLoginView();
+  sessionStorage.removeItem(ARICO_LOGIN_KEY);
+  window.location.href = ARICO_PORTAL_URL;
 }
 
 function initPortal(){
@@ -172,17 +158,15 @@ function initPortal(){
   if(open)open.addEventListener("click",showInventorySystem);
 
   const back=el("portalBackBtn");
-  if(back)back.addEventListener("click",showPortalView);
+  if(back)back.addEventListener("click",()=>{ window.location.href = ARICO_PORTAL_URL; });
 
   const logout=el("logoutBtn");
   if(logout)logout.addEventListener("click",logoutPortal);
 
-  if(sessionStorage.getItem("arico_history_sheet_login")==="ok"){
+  if(sessionStorage.getItem(ARICO_LOGIN_KEY)==="ok"){
     showInventorySystem();
-  }else if(getLoginSession()){
-    showPortalView();
   }else{
-    showLoginView();
+    window.location.replace(ARICO_PORTAL_URL);
   }
 }
 
