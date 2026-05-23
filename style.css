@@ -1263,8 +1263,67 @@ header h1{
   }
 }
 
-/* ===== v70 scan form product name search ===== */
-.scan-product-search-block{
+/* ===== v67 product register search clean layout ===== */
+.product-form-search-block{
+  display:block !important;
+  width:100% !important;
+  margin:0 0 14px !important;
+  padding:12px !important;
+  border:1px solid #cfe6d7 !important;
+  border-radius:14px !important;
+  background:#f7fff9 !important;
+  box-sizing:border-box !important;
+}
+
+.product-form-search-block label{
+  display:block !important;
+  margin:0 !important;
+  font-weight:800 !important;
+}
+
+.product-form-search-block input{
+  width:100% !important;
+  margin-top:8px !important;
+  box-sizing:border-box !important;
+}
+
+#productFormSearchResults{
+  width:100% !important;
+  margin-top:10px !important;
+}
+
+/* ===== v68 product register search fixed position ===== */
+.product-form-search-block{
+  display:block !important;
+  width:100% !important;
+  margin:0 0 16px !important;
+  padding:12px !important;
+  border:1px solid #cfe6d7 !important;
+  border-radius:14px !important;
+  background:#f7fff9 !important;
+  box-sizing:border-box !important;
+  grid-column:1 / -1 !important;
+}
+
+.product-form-search-block label{
+  display:block !important;
+  margin:0 !important;
+  font-weight:800 !important;
+}
+
+.product-form-search-block input{
+  width:100% !important;
+  margin-top:8px !important;
+  box-sizing:border-box !important;
+}
+
+#productFormSearchResults{
+  width:100% !important;
+  margin-top:10px !important;
+}
+
+/* ===== v69 product registration search final ===== */
+.product-form-search-block{
   display:block !important;
   width:100% !important;
   margin:12px 0 16px !important;
@@ -1275,38 +1334,88 @@ header h1{
   box-sizing:border-box !important;
 }
 
-.scan-product-search-block label{
+.product-form-search-block label{
   display:block !important;
   margin:0 !important;
   font-weight:800 !important;
 }
 
-.scan-product-search-block input{
+.product-form-search-block input{
   display:block !important;
   width:100% !important;
   margin-top:8px !important;
   box-sizing:border-box !important;
 }
 
-#scanProductNameSearchInput,
-#scanProductSearchResults{
+#productFormSearchResults{
   width:100% !important;
-}
-
-#scanProductSearchResults{
   margin-top:10px !important;
 }
 
-/* ===== v71 staff card alignment ===== */
-@media(min-width:801px){
-  .card.scanner,
-  .staff-admin-section{
-    min-height:700px !important;
-  }
+/* ===== v70 popup / mobile history / memo edit ===== */
+.app-popup{
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  background:rgba(0,0,0,.38);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+}
+.app-popup-card{
+  width:min(420px,92vw);
+  background:#fff;
+  border-radius:20px;
+  box-shadow:0 20px 60px rgba(0,0,0,.22);
+  border:2px solid #2d6a4f;
+  padding:22px;
+  text-align:center;
+}
+.app-popup-title{
+  font-size:22px;
+  font-weight:900;
+  color:#1b4332;
+  margin-bottom:12px;
+}
+.app-popup-body{
+  font-size:16px;
+  line-height:1.7;
+  color:#123c2b;
+  white-space:pre-line;
+  margin-bottom:18px;
+}
+#appPopupClose{
+  width:100%;
+  min-height:46px;
+  border-radius:14px;
+  background:#2d6a4f;
+  color:#fff;
+  font-weight:900;
+}
+.memo-cell{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+}
+.memo-text{
+  word-break:break-word;
+}
+.memo-edit-btn{
+  min-height:30px !important;
+  padding:4px 10px !important;
+  border-radius:8px !important;
+  font-size:12px !important;
+  white-space:nowrap;
+}
 
-  .staff-admin-section .table-wrap{
-    height:440px !important;
-    min-height:440px !important;
-    max-height:440px !important;
+/* スマホでも全体履歴を表示 */
+@media(max-width:800px){
+  section:has(#historyBody),
+  #historyBody,
+  .global-history,
+  .all-history{
+    display:block !important;
   }
 }

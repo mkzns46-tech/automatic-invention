@@ -9,7 +9,7 @@
     </div>
     <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
   </div>
-</div><div id="qr-reader"></div><form id="manualForm"><div class="scan-product-search-block"><label>商品名検索<input id="scanProductNameSearchInput" autocomplete="off" placeholder="商品名の一部を入力"/></label><div id="scanProductSearchResults" class="product-search-results"></div></div><label>バーコード入力<input id="barcodeInput" autocomplete="off" placeholder="バーコードをスキャン、または手入力"/></label><div id="scanProductInfo" class="message">バーコード入力後、商品名と現在庫を表示します</div><button type="submit">登録</button></form><div id="message" class="message">起動中...</div></section>
+</div><div id="qr-reader"></div><form id="manualForm"><label>バーコード入力<input id="barcodeInput" autocomplete="off" placeholder="バーコードをスキャン、または手入力"/></label><div id="scanProductInfo" class="message">バーコード入力後、商品名と現在庫を表示します</div><button type="submit">登録</button></form><div id="message" class="message">起動中...</div></section>
 <section class="card pc-only-section staff-admin-section">
   <div class="section-title">
     <h2>担当者設定</h2><p class="section-note">スマホ側の担当者プルダウンに反映されます</p>
@@ -37,6 +37,12 @@
 </section>
 
 <section class="card product-admin-section pc-only-section"><div class="section-title"><h2>商品登録</h2>
+<div class="product-form-search-block">
+  <label>商品名検索
+    <input id="productFormNameSearchInput" placeholder="商品名の一部を入力" />
+  </label>
+  <div id="productFormSearchResults" class="product-search-results"></div>
+</div>
 <div id="productCountBadge" class="badge">登録数：0件</div></div><form id="productForm">
 
 
@@ -58,5 +64,13 @@
 <button id="showAllSelectedHistoryBtn" class="secondary">全履歴を表示</button><button id="showAfterOldestCheckBtn" class="secondary">チェック以降を表示</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th></tr></thead><tbody id="selectedHistoryBody"></tbody></table></div><h3>チェック履歴</h3><div class="table-wrap small-table"><table><thead><tr><th>チェック日時</th><th>チェック者</th><th>実在庫</th><th>メモ</th></tr></thead><tbody id="checkHistoryBody"></tbody></table></div></section>
 <section class="card wide pc-only-section"><h2>全体履歴</h2><div class="button-row"><button id="allDataCsvBtn" class="secondary">全履歴CSV</button><button id="clearFilterBtn" class="secondary">検索をクリア</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
 </main><footer>© ARICO TOKYO 在庫変動確認シート</footer></div><script src="./app.js" defer></script>
+
+<div id="appPopup" class="app-popup" style="display:none;">
+  <div class="app-popup-card">
+    <div id="appPopupTitle" class="app-popup-title">完了</div>
+    <div id="appPopupBody" class="app-popup-body"></div>
+    <button type="button" id="appPopupClose">OK</button>
+  </div>
+</div>
 </body>
 </html>

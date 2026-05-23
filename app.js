@@ -40,6 +40,21 @@ let zxingRunning=false;
 
 const el=(id)=>document.getElementById(id);
 
+
+function showPopup(title, body){
+  const popup=el("appPopup");
+  const t=el("appPopupTitle");
+  const b=el("appPopupBody");
+  if(t)t.textContent=title||"完了";
+  if(b)b.textContent=body||"";
+  if(popup)popup.style.display="flex";
+}
+
+function hidePopup(){
+  const popup=el("appPopup");
+  if(popup)popup.style.display="none";
+}
+
 function showMessage(text,type=""){
   const m=el("message");
   if(!m)return;
@@ -393,6 +408,7 @@ async function saveProduct(e){
     }
 
     showMessage(`商品登録・更新：${name}`,"ok");
+    showPopup("商品登録完了", `商品名：${name}\nバーコード：${barcode}\n現在庫：${base_stock}`);
 
     el("productBarcode").value="";
     el("productName").value="";
@@ -440,9 +456,9 @@ async function registerBarcode(barcode){
       return;
     }
 
-    if(!qtyRaw||!Number.isFinite(qty)||qty<=0){
+    if(!qtyRaw||!Number.isFinite(qty)||(type!=="在庫修正"&&qty<=0)||(type==="在庫修正"&&qty<0)){
       beep(false);
-      showMessage("数量を入力してください。","err");
+      showMessage(type==="在庫修正" ? "在庫修正は0以上の数字を入力してください。" : "数量を入力してください。","err");
       el("qty").focus();
       return;
     }
@@ -468,9 +484,9 @@ async function registerBarcode(barcode){
       return;
     }
 
-    await sb("inventory_logs",{
+    const insertedLog=await sb("inventory_logs",{
       method:"POST",
-      headers:{Prefer:"return=minimal"},
+      headers:{Prefer:"return=representation"},
       body:JSON.stringify({
         type,
         staff,
@@ -484,7 +500,8 @@ async function registerBarcode(barcode){
     await updateProductCurrentStock(barcode,newStock);
 
     logs.unshift({
-      created_at:new Date().toISOString(),
+      id:(typeof insertedLog!=="undefined" && Array.isArray(insertedLog) && insertedLog[0]) ? insertedLog[0].id : "",
+      created_at:(typeof insertedLog!=="undefined" && Array.isArray(insertedLog) && insertedLog[0]) ? insertedLog[0].created_at : new Date().toISOString(),
       type,
       staff,
       barcode,
@@ -573,14 +590,14 @@ async function searchProductsByName(keyword){
 }
 
 
-let scanProductSearchTimer=null;
+let productFormSearchTimer=null;
 
-function renderScanProductSearchResults(rows){
-  const box=el("scanProductSearchResults");
+function renderProductFormSearchResults(rows){
+  const box=el("productFormSearchResults");
   if(!box)return;
 
   if(!rows || !rows.length){
-    box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>別のキーワードで検索してください</span></div>';
+    box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>新規商品として登録できます</span></div>';
     box.classList.add("is-active");
     return;
   }
@@ -600,34 +617,38 @@ function renderScanProductSearchResults(rows){
   box.querySelectorAll(".product-search-item[data-barcode]").forEach(item=>{
     item.onclick=async()=>{
       const barcode=item.dataset.barcode;
-      const barcodeInput=el("barcodeInput");
-      const nameInput=el("scanProductNameSearchInput");
+      const p=await fetchProductByBarcode(barcode);
 
-      if(barcodeInput)barcodeInput.value=barcode;
-      if(nameInput)nameInput.value="";
+      if(p){
+        if(el("productBarcode"))el("productBarcode").value=p.barcode||"";
+        if(el("productName"))el("productName").value=p.name||"";
+        if(el("baseStock"))el("baseStock").value=Number(p.base_stock||0);
+        if(el("location"))el("location").value=p.location||"";
+      }
+
+      const input=el("productFormNameSearchInput");
+      if(input)input.value="";
 
       box.classList.remove("is-active");
       box.innerHTML="";
 
-      await syncHistoryFromScanBarcode();
+      if(typeof renderProductStockInfo==="function"){
+        await renderProductStockInfo();
+      }
 
-      const qty=el("qty");
-      if(qty && !qty.value)qty.focus();
-      else if(barcodeInput)barcodeInput.focus();
-
-      showMessage("在庫変動登録に商品を反映しました。数量と担当者を確認して登録してください。","ok");
+      showMessage("商品登録フォームに商品情報を反映しました。","ok");
     };
   });
 }
 
-function handleScanProductNameSearchInput(){
-  const input=el("scanProductNameSearchInput");
+function handleProductFormNameSearchInput(){
+  const input=el("productFormNameSearchInput");
   if(!input)return;
 
-  clearTimeout(scanProductSearchTimer);
+  clearTimeout(productFormSearchTimer);
 
   const keyword=input.value.trim();
-  const box=el("scanProductSearchResults");
+  const box=el("productFormSearchResults");
 
   if(!keyword){
     if(box){
@@ -637,9 +658,9 @@ function handleScanProductNameSearchInput(){
     return;
   }
 
-  scanProductSearchTimer=setTimeout(async()=>{
+  productFormSearchTimer=setTimeout(async()=>{
     const rows=await searchProductsByName(keyword);
-    renderScanProductSearchResults(rows);
+    renderProductFormSearchResults(rows);
   },250);
 }
 
@@ -732,6 +753,8 @@ function renderSelectedProductHistoryWithData(productLogs,productChecks){
 
   body.innerHTML=buildProductHistoryRowsFromLogs(selectedBarcode,productLogs,productLogs);
 
+  bindMemoEditButtons();
+
   cb.innerHTML=productChecks.map(c=>`<tr>
     <td>${fmt(c.checked_at)}</td>
     <td>${esc(c.checked_by)}</td>
@@ -794,15 +817,66 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
       <td>${r.inQty}</td>
       <td>${r.outQty}</td>
       <td>${r.afterStock}</td>
-      <td>${esc(r.log.memo||"")}</td>
+      <td>${memoCellHtml(r.log)}</td>
     </tr>`;
   }).join("");
+}
+
+
+async function editLogMemo(logId,currentMemo){
+  try{
+    if(!logId){
+      showMessage("この履歴は再読み込み後に備考修正できます。","err");
+      return;
+    }
+
+    const next=prompt("備考を修正してください", currentMemo||"");
+    if(next===null)return;
+
+    await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({memo:next})
+    });
+
+    (logs||[]).forEach(l=>{
+      if(String(l.id)===String(logId))l.memo=next;
+    });
+
+    showMessage("備考を修正しました。","ok");
+
+    if(selectedBarcode){
+      await showProductHistoryForBarcode(selectedBarcode);
+    }else{
+      renderGlobalHistory();
+    }
+  }catch(e){
+    showMessage("備考修正エラー。\\n"+e.message,"err");
+  }
+}
+
+function memoCellHtml(log){
+  const id=log.id||"";
+  const memo=log.memo||"";
+  return `<div class="memo-cell">
+    <span class="memo-text">${esc(memo)}</span>
+    <button type="button" class="memo-edit-btn" data-log-id="${esc(id)}" data-memo="${esc(memo)}">修正</button>
+  </div>`;
+}
+
+function bindMemoEditButtons(){
+  document.querySelectorAll(".memo-edit-btn").forEach(btn=>{
+    btn.onclick=()=>{
+      editLogMemo(btn.dataset.logId,btn.dataset.memo||"");
+    };
+  });
 }
 
 function renderGlobalHistory(){
   const body=el("historyBody");
   if(!body)return;
   body.innerHTML=buildGlobalHistoryRows();
+  bindMemoEditButtons();
 }
 
 function buildGlobalHistoryRows(){
@@ -838,7 +912,7 @@ function buildGlobalHistoryRows(){
       <td>${inQty}</td>
       <td>${outQty}</td>
       <td>${afterStock}</td>
-      <td>${esc(log.memo||"")}</td>
+      <td>${memoCellHtml(log)}</td>
     </tr>`;
   }).join("");
 }
@@ -1398,6 +1472,7 @@ function on(id,event,fn){
 }
 
 function bindEvents(){
+  on("appPopupClose","click",hidePopup);
   on("reloadBtn","click",reloadAll);
   on("productForm","submit",saveProduct);
   on("staffForm","submit",saveStaff);
@@ -1410,8 +1485,8 @@ function bindEvents(){
   on("barcodeInput","input",()=>syncHistoryFromScanBarcode());
   on("productBarcode","input",()=>renderProductStockInfo());
   on("productHistoryBarcodeInput","input",()=>selectProductHistoryByBarcode());
-  on("scanProductNameSearchInput","input",handleScanProductNameSearchInput);
   on("productNameSearchInput","input",handleProductNameSearchInput);
+  on("productFormNameSearchInput","input",handleProductFormNameSearchInput);
 
   on("startCameraBtn","click",startCamera);
   on("historyCameraBtn","click",startCamera);
@@ -1459,7 +1534,6 @@ const I18N = {
     "操作":"操作",
     "削除":"削除",
     "商品登録":"商品登録",
-    "商品名検索":"商品名検索",
     "バーコード":"バーコード",
     "商品名":"商品名",
     "現在庫":"現在庫",
@@ -1508,7 +1582,6 @@ const I18N = {
     "操作":"작업",
     "削除":"삭제",
     "商品登録":"상품 등록",
-    "商品名検索":"상품명 검색",
     "バーコード":"바코드",
     "商品名":"상품명",
     "現在庫":"현재 재고",
@@ -1586,23 +1659,19 @@ function applyPlaceholders(lang){
     ja:{
       staffNameInput:"例：田中",
       barcodeInput:"バーコードをスキャン、または手入力",
-      scanProductNameSearchInput:"商品名の一部を入力",
       memo:"例：棚卸差異、サンプル使用、不良返品など",
       productBarcode:"バーコードを入力",
       productName:"商品名を必ず入力",
       location:"例：A-01",
-      productNameSearchInput:"商品名の一部を入力",
       productHistoryBarcodeInput:"バーコードを入力またはスキャン"
     },
     ko:{
       staffNameInput:"예：다나카",
       barcodeInput:"바코드를 스캔하거나 직접 입력",
-      scanProductNameSearchInput:"상품명의 일부를 입력",
       memo:"예：재고 차이, 샘플 사용, 불량 반품 등",
       productBarcode:"바코드를 입력",
       productName:"상품명을 반드시 입력",
       location:"예：A-01",
-      productNameSearchInput:"상품명의 일부를 입력",
       productHistoryBarcodeInput:"바코드를 입력 또는 스캔"
     }
   };
@@ -1689,12 +1758,38 @@ window.addEventListener("DOMContentLoaded",()=>{
   if(hb)hb.onclick=startCamera;
 });
 
-/* v70 scan form product name search */
-function bindScanProductSearchInput(){
-  const input=document.getElementById("scanProductNameSearchInput");
-  if(input)input.oninput=handleScanProductNameSearchInput;
+/* v67 product form search fallback */
+window.addEventListener("DOMContentLoaded",()=>{
+  const input=document.getElementById("productFormNameSearchInput");
+  if(input)input.oninput=handleProductFormNameSearchInput;
+});
+setTimeout(()=>{
+  const input=document.getElementById("productFormNameSearchInput");
+  if(input)input.oninput=handleProductFormNameSearchInput;
+},500);
+
+/* v68 product form search fallback */
+window.addEventListener("DOMContentLoaded",()=>{
+  const input=document.getElementById("productFormNameSearchInput");
+  if(input)input.oninput=handleProductFormNameSearchInput;
+});
+setTimeout(()=>{
+  const input=document.getElementById("productFormNameSearchInput");
+  if(input)input.oninput=handleProductFormNameSearchInput;
+},500);
+
+/* v69 product form search fallback */
+function bindProductFormSearchInput(){
+  const input=document.getElementById("productFormNameSearchInput");
+  if(input)input.oninput=handleProductFormNameSearchInput;
 }
-window.addEventListener("DOMContentLoaded",bindScanProductSearchInput);
-window.addEventListener("load",bindScanProductSearchInput);
-setTimeout(bindScanProductSearchInput,500);
-setTimeout(bindScanProductSearchInput,1500);
+window.addEventListener("DOMContentLoaded",bindProductFormSearchInput);
+window.addEventListener("load",bindProductFormSearchInput);
+setTimeout(bindProductFormSearchInput,500);
+setTimeout(bindProductFormSearchInput,1500);
+
+/* v70 popup fallback */
+window.addEventListener("DOMContentLoaded",()=>{
+  const c=document.getElementById("appPopupClose");
+  if(c)c.onclick=hidePopup;
+});
