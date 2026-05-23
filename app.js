@@ -1,3 +1,46 @@
+// ===== ARICO PORTAL LOGIN GUARD =====
+// 新ポータルから入った時だけ在庫変動確認シートを使えるようにする。
+// 直アクセス・旧ログイン画面への遷移はすべて新ポータルへ戻す。
+const ARICO_PORTAL_URL = "https://arico-portal.vercel.app";
+const ARICO_AUTH_TOKEN = "ARICO_PORTAL_2026";
+const ARICO_LOGIN_KEY = "arico_history_sheet_login";
+
+(function requirePortalLogin(){
+  try{
+    const params = new URLSearchParams(window.location.search);
+    const auth = params.get("auth");
+
+    if(auth === ARICO_AUTH_TOKEN){
+      localStorage.setItem(ARICO_LOGIN_KEY, "ok");
+      sessionStorage.setItem(ARICO_LOGIN_KEY, "ok");
+      params.delete("auth");
+      params.delete("t");
+
+      const cleanQuery = params.toString();
+      const cleanUrl =
+        window.location.pathname +
+        (cleanQuery ? "?" + cleanQuery : "") +
+        window.location.hash;
+
+      window.history.replaceState({}, document.title, cleanUrl);
+      return;
+    }
+
+    if(
+      localStorage.getItem(ARICO_LOGIN_KEY) === "ok" ||
+      sessionStorage.getItem(ARICO_LOGIN_KEY) === "ok"
+    ){
+      return;
+    }
+
+    window.location.replace(ARICO_PORTAL_URL);
+  }catch(_){
+    window.location.replace(ARICO_PORTAL_URL);
+  }
+})();
+// ===== /ARICO PORTAL LOGIN GUARD =====
+
+
 window.addEventListener("error",(e)=>{
   try{
     const m=document.getElementById("message");
@@ -20,8 +63,8 @@ window.addEventListener("unhandledrejection",(e)=>{
 
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";
 const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
-const LOGIN_USER="admin";
-const LOGIN_PASSWORD="1234";
+const LOGIN_USER="arico";
+const LOGIN_PASSWORD="0201";
 const LOGIN_SESSION_KEY="arico_portal_logged_in";
 let loginSessionFallback=false;
 
@@ -74,25 +117,11 @@ function clearLoginSession(){
 }
 
 function showLoginView(){
-  const shell=el("loginShell");
-  const login=el("loginCard");
-  const portal=el("portalCard");
-  const app=el("mainApp");
-  if(shell)shell.classList.remove("is-hidden");
-  if(login)login.hidden=false;
-  if(portal)portal.hidden=true;
-  if(app)app.classList.add("app-is-hidden");
+  window.location.replace(ARICO_PORTAL_URL);
 }
 
 function showPortalView(){
-  const shell=el("loginShell");
-  const login=el("loginCard");
-  const portal=el("portalCard");
-  const app=el("mainApp");
-  if(shell)shell.classList.remove("is-hidden");
-  if(login)login.hidden=true;
-  if(portal)portal.hidden=false;
-  if(app)app.classList.add("app-is-hidden");
+  window.location.href = ARICO_PORTAL_URL;
 }
 
 function showInventorySystem(){
@@ -119,31 +148,31 @@ function handleLogin(e){
 
 function logoutPortal(){
   clearLoginSession();
-  if(el("loginPassword"))el("loginPassword").value="";
-  showLoginView();
+  localStorage.removeItem(ARICO_LOGIN_KEY);
+  sessionStorage.removeItem(ARICO_LOGIN_KEY);
+  window.location.href = ARICO_PORTAL_URL;
 }
 
 function initPortal(){
-  const form=el("loginForm");
-  if(form)form.addEventListener("submit",handleLogin);
+  // 旧ログイン画面・旧入口画面は完全停止。
+  // 新ポータル認証済みなら、必ず在庫変動確認シート本体だけ表示する。
+  const shell = el("loginShell");
+  const app = el("mainApp");
 
-  const submit=el("loginSubmitBtn");
-  if(submit)submit.addEventListener("click",(e)=>{
-    e.preventDefault();
-    handleLogin(e);
-  });
+  if(shell) shell.classList.add("is-hidden");
+  if(app) app.classList.remove("app-is-hidden");
 
-  const open=el("openInventorySystem");
-  if(open)open.addEventListener("click",showInventorySystem);
+  const back = el("portalBackBtn");
+  if(back){
+    back.onclick = function(){
+      window.location.href = ARICO_PORTAL_URL;
+    };
+  }
 
-  const back=el("portalBackBtn");
-  if(back)back.addEventListener("click",showPortalView);
-
-  const logout=el("logoutBtn");
-  if(logout)logout.addEventListener("click",logoutPortal);
-
-  if(getLoginSession())showPortalView();
-  else showLoginView();
+  const logout = el("logoutBtn");
+  if(logout){
+    logout.onclick = logoutPortal;
+  }
 }
 
 
@@ -1819,3 +1848,33 @@ window.addEventListener("DOMContentLoaded",()=>{
   const c=document.getElementById("appPopupClose");
   if(c)c.onclick=hidePopup;
 });
+
+
+/* ===== ARICO OLD LOGIN FINAL KILL SWITCH ===== */
+window.addEventListener("DOMContentLoaded", function(){
+  try{
+    const shell = document.getElementById("loginShell");
+    const app = document.getElementById("mainApp");
+
+    if(shell) shell.classList.add("is-hidden");
+    if(app) app.classList.remove("app-is-hidden");
+
+    const back = document.getElementById("portalBackBtn");
+    if(back){
+      back.onclick = function(){
+        window.location.href = ARICO_PORTAL_URL;
+      };
+    }
+  }catch(_){}
+});
+
+window.addEventListener("load", function(){
+  try{
+    const shell = document.getElementById("loginShell");
+    const app = document.getElementById("mainApp");
+
+    if(shell) shell.classList.add("is-hidden");
+    if(app) app.classList.remove("app-is-hidden");
+  }catch(_){}
+});
+/* ===== /ARICO OLD LOGIN FINAL KILL SWITCH ===== */
