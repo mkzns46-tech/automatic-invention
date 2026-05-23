@@ -1,4 +1,28 @@
 // ===== ARICO PORTAL LOGIN GUARD =====
+const ARICO_PORTAL_URL = "https://arico-portal.vercel.app";
+const ARICO_AUTH_TOKEN = "ARICO_PORTAL_2026";
+const ARICO_LOGIN_KEY = "arico_history_sheet_login";
+
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const auth = params.get("auth");
+
+  if(auth === ARICO_AUTH_TOKEN){
+    localStorage.setItem(ARICO_LOGIN_KEY,"ok");
+    sessionStorage.setItem(ARICO_LOGIN_KEY,"ok");
+    return;
+  }
+
+  if(
+    localStorage.getItem(ARICO_LOGIN_KEY") !== "ok" &&
+    sessionStorage.getItem(ARICO_LOGIN_KEY") !== "ok"
+  ){
+    window.location.replace(ARICO_PORTAL_URL);
+  }
+})();
+
+
+// ===== ARICO PORTAL LOGIN GUARD =====
 // 新ポータルから入った時だけ在庫変動確認シートを使えるようにする。
 // 直アクセス・旧ログイン画面への遷移はすべて新ポータルへ戻す。
 const ARICO_PORTAL_URL = "https://arico-portal.vercel.app";
