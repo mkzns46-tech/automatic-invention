@@ -1,7 +1,9 @@
 // ===== ARICO PORTAL LOGIN GUARD =====
+// 直接アクセス禁止版：?auth=ARICO_PORTAL_2026 が付いている時だけ入れます。
+// localStorageには保存しないので、URL直打ちは必ずポータルへ戻します。
 const ARICO_PORTAL_URL = "https://arico-portal.vercel.app";
 const ARICO_AUTH_TOKEN = "ARICO_PORTAL_2026";
-const ARICO_LOGIN_KEY = "arico_history_sheet_login";
+const ARICO_LOGIN_KEY = "arico_history_sheet_session";
 
 (function requirePortalLogin(){
   try{
@@ -9,16 +11,11 @@ const ARICO_LOGIN_KEY = "arico_history_sheet_login";
     const auth = params.get("auth");
 
     if(auth === ARICO_AUTH_TOKEN){
-      localStorage.setItem(ARICO_LOGIN_KEY, "ok");
       sessionStorage.setItem(ARICO_LOGIN_KEY, "ok");
-      params.delete("auth");
-      const cleanQuery = params.toString();
-      const cleanUrl = window.location.pathname + (cleanQuery ? "?" + cleanQuery : "") + window.location.hash;
-      window.history.replaceState({}, document.title, cleanUrl);
       return;
     }
 
-    if(localStorage.getItem(ARICO_LOGIN_KEY) === "ok" || sessionStorage.getItem(ARICO_LOGIN_KEY) === "ok"){
+    if(sessionStorage.getItem(ARICO_LOGIN_KEY) === "ok"){
       return;
     }
 
@@ -106,25 +103,11 @@ function clearLoginSession(){
 }
 
 function showLoginView(){
-  const shell=el("loginShell");
-  const login=el("loginCard");
-  const portal=el("portalCard");
-  const app=el("mainApp");
-  if(shell)shell.classList.remove("is-hidden");
-  if(login)login.hidden=false;
-  if(portal)portal.hidden=true;
-  if(app)app.classList.add("app-is-hidden");
+  window.location.replace(ARICO_PORTAL_URL);
 }
 
 function showPortalView(){
-  const shell=el("loginShell");
-  const login=el("loginCard");
-  const portal=el("portalCard");
-  const app=el("mainApp");
-  if(shell)shell.classList.remove("is-hidden");
-  if(login)login.hidden=true;
-  if(portal)portal.hidden=false;
-  if(app)app.classList.add("app-is-hidden");
+  window.location.href = ARICO_PORTAL_URL;
 }
 
 function showInventorySystem(){
@@ -151,8 +134,8 @@ function handleLogin(e){
 
 function logoutPortal(){
   clearLoginSession();
-  if(el("loginPassword"))el("loginPassword").value="";
-  showLoginView();
+  sessionStorage.removeItem(ARICO_LOGIN_KEY);
+  window.location.href = ARICO_PORTAL_URL;
 }
 
 function initPortal(){
@@ -171,11 +154,7 @@ function initPortal(){
 
   const logout = el("logoutBtn");
   if(logout){
-    logout.onclick = function(){
-      localStorage.removeItem(ARICO_LOGIN_KEY);
-      sessionStorage.removeItem(ARICO_LOGIN_KEY);
-      window.location.href = ARICO_PORTAL_URL;
-    };
+    logout.onclick = logoutPortal;
   }
 }
 
@@ -1852,7 +1831,8 @@ window.addEventListener("DOMContentLoaded",()=>{
   const c=document.getElementById("appPopupClose");
   if(c)c.onclick=hidePopup;
 });
-/* ===== old login final hide ===== */
+
+/* ===== ARICO DIRECT ACCESS FINAL FIX ===== */
 window.addEventListener("load", function(){
   try{
     const shell = document.getElementById("loginShell");
@@ -1861,4 +1841,4 @@ window.addEventListener("load", function(){
     if(app) app.classList.remove("app-is-hidden");
   }catch(_){}
 });
-/* ===== /old login final hide ===== */
+/* ===== /ARICO DIRECT ACCESS FINAL FIX ===== */
