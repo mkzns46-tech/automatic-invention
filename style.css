@@ -1522,3 +1522,15 @@ header h1{
   width:auto !important;
   min-width:160px !important;
 }
+/* ===== portal buttons gap fix ===== */
+.header-actions{
+  display:flex !important;
+  gap:16px !important;
+  align-items:center !important;
+  flex-wrap:wrap !important;
+}
+
+#portalBackBtn,
+#reloadBtn{
+  margin:0 !important;
+}
