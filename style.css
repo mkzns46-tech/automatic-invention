@@ -1511,3 +1511,14 @@ header h1{
     overflow:auto !important;
   }
 }
+.button-row{
+  display:flex !important;
+  gap:20px !important;
+  margin-bottom:24px !important;
+  flex-wrap:wrap !important;
+}
+
+.button-row button{
+  width:auto !important;
+  min-width:160px !important;
+}
