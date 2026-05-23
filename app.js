@@ -55,8 +55,8 @@ window.addEventListener("unhandledrejection",(e)=>{
 
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";
 const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
-const LOGIN_USER="admin";
-const LOGIN_PASSWORD="1234";
+const LOGIN_USER="arico";
+const LOGIN_PASSWORD="0201";
 const LOGIN_SESSION_KEY="arico_portal_logged_in";
 let loginSessionFallback=false;
 
