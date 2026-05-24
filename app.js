@@ -649,6 +649,7 @@ async function registerBarcode(barcode){
     if(type==="備品転用"&&!memo){
       beep(false);
       showMessage("備品転用は備考欄の記入が必須です。用途や理由を入力してください。","err");
+      showPopup("備考が必要です","備品転用を登録する場合は、備考欄に用途や理由を入力してください。");
       el("memo").focus();
       return;
     }
@@ -676,7 +677,7 @@ async function registerBarcode(barcode){
     }
 
     const dbType=type==="備品転用" ? "出荷" : type;
-    const logMemo=type==="備品転用" ? `備品転用 / 確認ステータス：未確認 / ${memo}` : memo;
+    const logMemo=type==="備品転用" ? `確認ステータス：未確認 / ${memo}` : memo;
 
     const insertedLog=await sb("inventory_logs",{
       method:"POST",
@@ -901,11 +902,27 @@ function renderSelectedProductHistoryWithData(productLogs,productChecks){
 }
 
 function isEquipmentTransferLog(log){
-  return log?.type==="備品転用" || (log?.type==="出荷" && String(log?.memo||"").includes("備品転用"));
+  return log?.type==="備品転用" || (log?.type==="出荷" && String(log?.memo||"").includes("確認ステータス"));
 }
 
 function displayLogType(log){
   return isEquipmentTransferLog(log) ? "備品転用" : log.type;
+}
+
+function isEquipmentTransferConfirmed(log){
+  return String(log?.memo||"").includes("確認ステータス：確認");
+}
+
+function cleanMemoForDisplay(log){
+  let memo=String(log?.memo||"");
+  if(isEquipmentTransferLog(log)){
+    memo=memo
+      .replace(/^備品転用\s*\/\s*/,"")
+      .replace(/^確認ステータス：未確認\s*\/\s*/,"")
+      .replace(/^確認ステータス：確認済み\s*\/\s*/,"")
+      .replace(/^確認ステータス：確認\s*\/\s*/,"");
+  }
+  return memo;
 }
 
 function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode){
@@ -1000,9 +1017,52 @@ async function editLogMemo(logId,currentMemo){
   }
 }
 
+async function confirmEquipmentLog(logId,currentMemo){
+  try{
+    if(!logId){
+      showMessage("この履歴は再読み込み後に確認できます。","err");
+      return;
+    }
+
+    const cleaned=String(currentMemo||"")
+      .replace(/^備品転用\s*\/\s*/,"")
+      .replace(/^確認ステータス：未確認\s*\/\s*/,"")
+      .replace(/^確認ステータス：確認済み\s*\/\s*/,"")
+      .replace(/^確認ステータス：確認\s*\/\s*/,"");
+    const next=`確認ステータス：確認 / ${cleaned}`;
+
+    await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({memo:next})
+    });
+
+    (logs||[]).forEach(l=>{
+      if(String(l.id)===String(logId))l.memo=next;
+    });
+
+    showMessage("備品転用を確認済みにしました。","ok");
+
+    if(selectedBarcode){
+      await showProductHistoryForBarcode(selectedBarcode);
+    }else{
+      renderGlobalHistory();
+    }
+  }catch(e){
+    showMessage("確認ステータス更新エラー。\n"+e.message,"err");
+  }
+}
+
 function memoCellHtml(log){
   const id=log.id||"";
   const memo=log.memo||"";
+  if(isEquipmentTransferLog(log)){
+    const confirmed=isEquipmentTransferConfirmed(log);
+    return `<div class="memo-cell">
+      <span class="memo-text">${esc(cleanMemoForDisplay(log))}</span>
+      <button type="button" class="memo-edit-btn equipment-confirm-log-btn ${confirmed ? "is-confirmed" : "needs-confirm"}" data-log-id="${esc(id)}" data-memo="${esc(memo)}">${confirmed ? "確認" : "要確認"}</button>
+    </div>`;
+  }
   return `<div class="memo-cell">
     <span class="memo-text">${esc(memo)}</span>
     <button type="button" class="memo-edit-btn" data-log-id="${esc(id)}" data-memo="${esc(memo)}">修正</button>
@@ -1012,6 +1072,11 @@ function memoCellHtml(log){
 function bindMemoEditButtons(){
   document.querySelectorAll(".memo-edit-btn").forEach(btn=>{
     btn.onclick=()=>{
+      if(btn.classList.contains("equipment-confirm-log-btn")){
+        if(btn.classList.contains("is-confirmed"))return;
+        confirmEquipmentLog(btn.dataset.logId,btn.dataset.memo||"");
+        return;
+      }
       editLogMemo(btn.dataset.logId,btn.dataset.memo||"");
     };
   });
@@ -1026,9 +1091,12 @@ function renderGlobalHistory(){
 
 function buildGlobalHistoryRows(){
   const staffFilter=el("historyStaffFilter")?.value||"";
-  const filteredLogs=staffFilter
-    ? logs.filter(log=>String(log.staff||"")===String(staffFilter))
-    : logs;
+  const typeFilter=el("historyTypeFilter")?.value||"";
+  const filteredLogs=(logs||[]).filter(log=>{
+    if(staffFilter&&String(log.staff||"")!==String(staffFilter))return false;
+    if(typeFilter==="備品転用"&&!isEquipmentTransferLog(log))return false;
+    return true;
+  });
 
   return filteredLogs.map(log=>{
     const q=Number(log.quantity||0);
@@ -1875,8 +1943,6 @@ function bindEvents(){
   on("reloadBtn","click",reloadAll);
   on("productForm","submit",saveProduct);
   on("staffForm","submit",saveStaff);
-  on("equipmentTransferForm","submit",saveEquipmentTransfer);
-  on("equipmentTransferCsvBtn","click",exportEquipmentTransferCsv);
 
   on("manualForm","submit",e=>{
     e.preventDefault();
@@ -1888,6 +1954,7 @@ function bindEvents(){
   on("productHistoryBarcodeInput","input",()=>selectProductHistoryByBarcode());
   on("productNameSearchInput","input",handleProductNameSearchInput);
   on("historyStaffFilter","change",renderGlobalHistory);
+  on("historyTypeFilter","change",renderGlobalHistory);
 
   on("startCameraBtn","click",startCamera);
   on("historyCameraBtn","click",startCamera);
@@ -1904,6 +1971,8 @@ function bindEvents(){
   on("clearFilterBtn","click",()=>{
     const historyStaff=el("historyStaffFilter");
     if(historyStaff)historyStaff.value="";
+    const historyType=el("historyTypeFilter");
+    if(historyType)historyType.value="";
     renderGlobalHistory();
   });
   on("showAllSelectedHistoryBtn","click",()=>showProductHistoryForBarcode(selectedBarcode));
