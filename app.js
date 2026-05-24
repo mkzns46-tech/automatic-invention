@@ -1024,6 +1024,8 @@ async function confirmEquipmentLog(logId,currentMemo){
       return;
     }
 
+    const targetLog=(logs||[]).find(l=>String(l.id)===String(logId));
+    const refreshBarcode=targetLog?.barcode || selectedBarcode;
     const cleaned=String(currentMemo||"")
       .replace(/^備品転用\s*\/\s*/,"")
       .replace(/^確認ステータス：未確認\s*\/\s*/,"")
@@ -1043,10 +1045,11 @@ async function confirmEquipmentLog(logId,currentMemo){
 
     showMessage("備品転用を確認済みにしました。","ok");
 
-    if(selectedBarcode){
-      await showProductHistoryForBarcode(selectedBarcode);
-    }else{
-      renderGlobalHistory();
+    renderGlobalHistory();
+
+    if(refreshBarcode){
+      selectedBarcode=refreshBarcode;
+      await showProductHistoryForBarcode(refreshBarcode);
     }
   }catch(e){
     showMessage("確認ステータス更新エラー。\n"+e.message,"err");
@@ -1095,6 +1098,7 @@ function buildGlobalHistoryRows(){
   const filteredLogs=(logs||[]).filter(log=>{
     if(staffFilter&&String(log.staff||"")!==String(staffFilter))return false;
     if(typeFilter==="備品転用"&&!isEquipmentTransferLog(log))return false;
+    if(typeFilter==="要確認"&&(!isEquipmentTransferLog(log)||isEquipmentTransferConfirmed(log)))return false;
     return true;
   });
 
@@ -2174,13 +2178,26 @@ function applySelectLabels(lang){
 
 function applyTypeLabels(lang){
   const type=document.getElementById("type");
-  if(!type)return;
   const labels=lang==="ko"
     ?{入荷:"입고",出荷:"출고",在庫修正:"재고 수정",備品転用:"비품 전용"}
     :{入荷:"入荷",出荷:"出荷",在庫修正:"在庫修正",備品転用:"備品転用"};
-  [...type.options].forEach(option=>{
-    if(labels[option.value])option.textContent=labels[option.value];
-  });
+  if(type){
+    [...type.options].forEach(option=>{
+      if(labels[option.value])option.textContent=labels[option.value];
+    });
+  }
+
+  const historyType=document.getElementById("historyTypeFilter");
+  if(historyType&&historyType.options.length){
+    const historyLabels=lang==="ko"
+      ?{"":"모든 구분",備品転用:"비품 전용만",要確認:"확인 필요만"}
+      :{"":"すべての区分",備品転用:"備品転用のみ",要確認:"要確認のみ"};
+    [...historyType.options].forEach(option=>{
+      if(Object.prototype.hasOwnProperty.call(historyLabels,option.value)){
+        option.textContent=historyLabels[option.value];
+      }
+    });
+  }
 }
 
 function setLabelLeadText(inputId,text){
