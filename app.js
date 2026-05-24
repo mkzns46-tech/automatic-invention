@@ -667,21 +667,22 @@ async function registerBarcode(barcode){
     if(type==="入荷")newStock=currentStock+qty;
     if(type==="出荷")newStock=currentStock-qty;
     if(type==="在庫修正")newStock=qty;
-    if(type==="備品転用")newStock=currentStock;
+    if(type==="備品転用")newStock=currentStock-qty;
 
-    if(type==="出荷"&&newStock<0){
+    if((type==="出荷"||type==="備品転用")&&newStock<0){
       beep(false);
-      showMessage(`在庫不足：${p.name} / 現在庫 ${currentStock} / 出荷数 ${qty}`,"err");
+      showMessage(`在庫不足：${p.name} / 現在庫 ${currentStock} / 数量 ${qty}`,"err");
       return;
     }
 
-    const logMemo=type==="備品転用" ? `確認ステータス：未確認 / ${memo}` : memo;
+    const dbType=type==="備品転用" ? "出荷" : type;
+    const logMemo=type==="備品転用" ? `備品転用 / 確認ステータス：未確認 / ${memo}` : memo;
 
     const insertedLog=await sb("inventory_logs",{
       method:"POST",
       headers:{Prefer:"return=representation"},
       body:JSON.stringify({
-        type,
+        type:dbType,
         staff,
         barcode,
         product_name:p.name,
@@ -690,9 +691,7 @@ async function registerBarcode(barcode){
       })
     });
 
-    if(type!=="備品転用"){
-      await updateProductCurrentStock(barcode,newStock);
-    }
+    await updateProductCurrentStock(barcode,newStock);
 
     logs.unshift({
       id:(typeof insertedLog!=="undefined" && Array.isArray(insertedLog) && insertedLog[0]) ? insertedLog[0].id : "",
@@ -720,7 +719,7 @@ async function registerBarcode(barcode){
 
     beep(true);
     const successText=type==="備品転用"
-      ?`備品転用登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 在庫は変更していません / 通知先：${EQUIPMENT_TRANSFER_NOTIFY_TO}`
+      ?`備品転用登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock} / 通知先：${EQUIPMENT_TRANSFER_NOTIFY_TO}`
       : type==="在庫修正"
       ?`在庫修正：${p.name} / 現在庫を ${qty} に上書き / 担当者：${staff}`
       :`${type}登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock}`;
@@ -901,6 +900,14 @@ function renderSelectedProductHistoryWithData(productLogs,productChecks){
   </tr>`).join("");
 }
 
+function isEquipmentTransferLog(log){
+  return log?.type==="備品転用" || (log?.type==="出荷" && String(log?.memo||"").includes("備品転用"));
+}
+
+function displayLogType(log){
+  return isEquipmentTransferLog(log) ? "備品転用" : log.type;
+}
+
 function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode){
   const p=gp(barcode);
   let running=Number(p?.base_stock||0);
@@ -920,17 +927,13 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
       beforeStock=running-q;
       inQty=q;
       running-=q;
-    }else if(log.type==="出荷"){
+    }else if(log.type==="出荷"||isEquipmentTransferLog(log)){
       beforeStock=running+q;
       outQty=q;
       running+=q;
     }else if(log.type==="在庫修正"){
       beforeStock="-";
       afterStock=q;
-    }else if(log.type==="備品転用"){
-      beforeStock=running;
-      afterStock=running;
-      outQty=q;
     }
 
     const key=String(log.id||log.created_at+log.type+log.quantity+log.memo);
@@ -952,7 +955,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
 
     return `<tr>
       <td>${fmt(r.log.created_at)}</td>
-      <td>${esc(r.log.type)}</td>
+      <td>${esc(displayLogType(r.log))}</td>
       <td>${esc(r.log.staff)}</td>
       <td>${esc(p?.name||r.log.product_name||"")}</td>
       <td>${r.beforeStock}</td>
@@ -1041,22 +1044,18 @@ function buildGlobalHistoryRows(){
       beforeStock=current-q;
       afterStock=current;
       inQty=q;
-    }else if(log.type==="出荷"){
+    }else if(log.type==="出荷"||isEquipmentTransferLog(log)){
       beforeStock=current+q;
       afterStock=current;
       outQty=q;
     }else if(log.type==="在庫修正"){
       beforeStock="-";
       afterStock=q;
-    }else if(log.type==="備品転用"){
-      beforeStock=current;
-      afterStock=current;
-      outQty=q;
     }
 
     return `<tr>
       <td>${fmt(log.created_at)}</td>
-      <td>${esc(log.type)}</td>
+      <td>${esc(displayLogType(log))}</td>
       <td>${esc(log.staff)}</td>
       <td>${esc(gp(log.barcode)?.name||log.product_name||"")}</td>
       <td>${beforeStock}</td>
@@ -1592,7 +1591,7 @@ function buildHistoryExportRows(sourceLogs){
         beforeStock=running-q;
         inQty=q;
         running-=q;
-      }else if(log.type==="出荷"){
+      }else if(log.type==="出荷"||isEquipmentTransferLog(log)){
         beforeStock=running+q;
         outQty=q;
         running+=q;
@@ -1605,7 +1604,7 @@ function buildHistoryExportRows(sourceLogs){
         created_at:log.created_at,
         row:[
           fmt(log.created_at),
-          log.type||"",
+          displayLogType(log)||"",
           log.staff||"",
           gp(log.barcode)?.name || log.product_name || "",
           beforeStock,
