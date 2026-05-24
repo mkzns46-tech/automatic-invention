@@ -51,7 +51,7 @@ window.addEventListener("unhandledrejection",(e)=>{
 
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";
 const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
-const EQUIPMENT_TRANSFER_NOTIFY_TO="tanaka@arico.group";
+const EQUIPMENT_TRANSFER_NOTIFY_TO="Teams";
 const EQUIPMENT_TRANSFER_TABLE="equipment_transfers";
 const EQUIPMENT_TRANSFER_LOCAL_KEY="arico_equipment_transfers_local";
 const EQUIPMENT_CONFIRM_LOCAL_KEY="arico_equipment_transfer_confirmed_ids";
@@ -724,8 +724,9 @@ async function registerBarcode(barcode){
       memo:logMemo
     });
 
+    let notificationOk=true;
     if(type==="備品転用"){
-      await notifyEquipmentTransfer({
+      notificationOk=await notifyEquipmentTransfer({
         product_name:p.name,
         barcode,
         quantity:qty,
@@ -739,12 +740,12 @@ async function registerBarcode(barcode){
 
     beep(true);
     const successText=type==="備品転用"
-      ?`備品転用登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock} / 通知先：${EQUIPMENT_TRANSFER_NOTIFY_TO}`
+      ?`備品転用登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock} / ${notificationOk ? "Teams通知済み" : "Teams通知失敗"}`
       : type==="在庫修正"
       ?`在庫修正：${p.name} / 現在庫を ${qty} に上書き / 担当者：${staff}`
       :`${type}登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock}`;
 
-    showMessage(successText,"ok");
+    showMessage(successText,notificationOk ? "ok" : "err");
     showPopup("登録完了", successText);
 
     el("barcodeInput").value="";
@@ -1223,8 +1224,6 @@ function renderEquipmentTransfers(){
 
   body.innerHTML=(equipmentTransfers||[]).map(row=>{
     const status=equipmentTransferStatus(row);
-    const mailSubject=encodeURIComponent(`【ARICO】備品転用登録：${row.product_name||row.product||""}`);
-    const mailBody=encodeURIComponent(buildEquipmentTransferMailBody(row));
     return `<tr>
       <td>${fmt(row.created_at||row.datetime||row.date||"")}</td>
       <td>
@@ -1237,7 +1236,7 @@ function renderEquipmentTransfers(){
       <td>${esc(row.staff||"")}</td>
       <td>${esc(row.purpose||"")}</td>
       <td>${esc(row.memo||"")}</td>
-      <td><a class="equipment-mail-link" href="mailto:${EQUIPMENT_TRANSFER_NOTIFY_TO}?subject=${mailSubject}&body=${mailBody}">${getLang&&getLang()==="ko"?"메일":"メール"}</a></td>
+      <td>${getLang&&getLang()==="ko"?"Teams 알림":"Teams通知"}</td>
     </tr>`;
   }).join("");
 
@@ -1265,25 +1264,20 @@ function buildEquipmentTransferMailBody(row){
     `日時：${fmt(row.created_at||row.datetime||new Date().toISOString())}`,
     `確認ステータス：${equipmentTransferStatus(row)}`,
     "",
-    "スマレジ在庫は自動減算していません。"
+    "在庫は数量分減算済みです。"
   ].join("\n");
 }
 
 async function notifyEquipmentTransfer(row){
   try{
-    await sbFunction("send-equipment-transfer-mail",{
-      to:EQUIPMENT_TRANSFER_NOTIFY_TO,
+    await sbFunction("send-equipment-transfer-teams",{
       subject:`【ARICO】備品転用登録：${row.product_name||""}`,
       transfer:row,
       body:buildEquipmentTransferMailBody(row)
     });
     return true;
-  }catch(_){
-    try{
-      const subject=encodeURIComponent(`【ARICO】備品転用登録：${row.product_name||""}`);
-      const body=encodeURIComponent(buildEquipmentTransferMailBody(row));
-      window.open(`mailto:${EQUIPMENT_TRANSFER_NOTIFY_TO}?subject=${subject}&body=${body}`,"_blank");
-    }catch(__){}
+  }catch(e){
+    console.warn("Teams notification failed",e);
     return false;
   }
 }
