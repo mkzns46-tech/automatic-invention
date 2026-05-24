@@ -51,6 +51,9 @@ window.addEventListener("unhandledrejection",(e)=>{
 
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";
 const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
+const EQUIPMENT_TRANSFER_NOTIFY_TO="tanaka@arico.group";
+const EQUIPMENT_TRANSFER_TABLE="equipment_transfers";
+const EQUIPMENT_TRANSFER_LOCAL_KEY="arico_equipment_transfers_local";
 const LOGIN_USER="arico";
 const LOGIN_PASSWORD="0201";
 const LOGIN_SESSION_KEY="arico_portal_logged_in";
@@ -60,6 +63,7 @@ let products=[];
 let logs=[];
 let checks=[];
 let staffMembers=[];
+let equipmentTransfers=[];
 let selectedBarcode="";
 let selectedHistoryMode="all";
 let dataLoaded=false;
@@ -255,6 +259,44 @@ async function sbAll(path,pageSize=1000,maxRows=20000){
   return all;
 }
 
+async function sbFunction(name,payload){
+  const res=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/functions/v1/"+name,{
+    method:"POST",
+    headers:{
+      apikey:SUPABASE_API_KEY,
+      Authorization:"Bearer "+SUPABASE_API_KEY,
+      "Content-Type":"application/json",
+      Accept:"application/json"
+    },
+    body:JSON.stringify(payload||{})
+  });
+
+  const text=await res.text();
+  let body=null;
+  try{body=text?JSON.parse(text):null;}catch{body=text;}
+
+  if(!res.ok){
+    const detail=typeof body==="object"?JSON.stringify(body):String(body||"");
+    throw new Error(`通知Functionエラー ${res.status}\n${detail}`);
+  }
+  return body;
+}
+
+function loadLocalEquipmentTransfers(){
+  try{
+    const rows=JSON.parse(localStorage.getItem(EQUIPMENT_TRANSFER_LOCAL_KEY)||"[]");
+    return Array.isArray(rows)?rows:[];
+  }catch(_){
+    return [];
+  }
+}
+
+function saveLocalEquipmentTransfers(rows){
+  try{
+    localStorage.setItem(EQUIPMENT_TRANSFER_LOCAL_KEY,JSON.stringify(rows||[]));
+  }catch(_){}
+}
+
 function esc(s){
   return String(s??"").replace(/[&<>"']/g,(c)=>({
     "&":"&amp;",
@@ -322,6 +364,12 @@ async function reloadAll(){
       staffMembers=[];
     }
 
+    try{
+      equipmentTransfers=await sb(`${EQUIPMENT_TRANSFER_TABLE}?select=*&order=created_at.desc&limit=100`);
+    }catch(_){
+      equipmentTransfers=loadLocalEquipmentTransfers();
+    }
+
     await enrichRecentLogProductNames();
     dataLoaded=true;
     dataLoadError=false;
@@ -340,6 +388,7 @@ function render(){
   renderProductCount();
   renderGlobalHistory();
   renderSelectedProductHistory();
+  renderEquipmentTransfers();
   if(typeof applyLang==='function')setTimeout(applyLang,0);
 }
 
@@ -370,6 +419,12 @@ function renderStaffOptions(){
     const cur=historyStaff.value;
     historyStaff.innerHTML='<option value="">すべての担当者</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
     if(cur)historyStaff.value=cur;
+  }
+  const equipmentStaff=el("equipmentStaffInput");
+  if(equipmentStaff){
+    const cur=equipmentStaff.value;
+    equipmentStaff.innerHTML='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
+    if(cur)equipmentStaff.value=cur;
   }
 }
 
@@ -591,6 +646,13 @@ async function registerBarcode(barcode){
       return;
     }
 
+    if(type==="備品転用"&&!memo){
+      beep(false);
+      showMessage("備品転用は備考欄の記入が必須です。用途や理由を入力してください。","err");
+      el("memo").focus();
+      return;
+    }
+
     const p=await fetchProductByBarcode(barcode);
 
     if(!p){
@@ -605,12 +667,15 @@ async function registerBarcode(barcode){
     if(type==="入荷")newStock=currentStock+qty;
     if(type==="出荷")newStock=currentStock-qty;
     if(type==="在庫修正")newStock=qty;
+    if(type==="備品転用")newStock=currentStock;
 
     if(type==="出荷"&&newStock<0){
       beep(false);
       showMessage(`在庫不足：${p.name} / 現在庫 ${currentStock} / 出荷数 ${qty}`,"err");
       return;
     }
+
+    const logMemo=type==="備品転用" ? `確認ステータス：未確認 / ${memo}` : memo;
 
     const insertedLog=await sb("inventory_logs",{
       method:"POST",
@@ -621,11 +686,13 @@ async function registerBarcode(barcode){
         barcode,
         product_name:p.name,
         quantity:qty,
-        memo
+        memo:logMemo
       })
     });
 
-    await updateProductCurrentStock(barcode,newStock);
+    if(type!=="備品転用"){
+      await updateProductCurrentStock(barcode,newStock);
+    }
 
     logs.unshift({
       id:(typeof insertedLog!=="undefined" && Array.isArray(insertedLog) && insertedLog[0]) ? insertedLog[0].id : "",
@@ -635,11 +702,26 @@ async function registerBarcode(barcode){
       barcode,
       product_name:p.name,
       quantity:qty,
-      memo
+      memo:logMemo
     });
 
+    if(type==="備品転用"){
+      await notifyEquipmentTransfer({
+        product_name:p.name,
+        barcode,
+        quantity:qty,
+        staff,
+        purpose:memo,
+        memo,
+        status:"未確認",
+        created_at:(typeof insertedLog!=="undefined" && Array.isArray(insertedLog) && insertedLog[0]) ? insertedLog[0].created_at : new Date().toISOString()
+      });
+    }
+
     beep(true);
-    const successText=type==="在庫修正"
+    const successText=type==="備品転用"
+      ?`備品転用登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 在庫は変更していません / 通知先：${EQUIPMENT_TRANSFER_NOTIFY_TO}`
+      : type==="在庫修正"
       ?`在庫修正：${p.name} / 現在庫を ${qty} に上書き / 担当者：${staff}`
       :`${type}登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock}`;
 
@@ -845,6 +927,10 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
     }else if(log.type==="在庫修正"){
       beforeStock="-";
       afterStock=q;
+    }else if(log.type==="備品転用"){
+      beforeStock=running;
+      afterStock=running;
+      outQty=q;
     }
 
     const key=String(log.id||log.created_at+log.type+log.quantity+log.memo);
@@ -962,6 +1048,10 @@ function buildGlobalHistoryRows(){
     }else if(log.type==="在庫修正"){
       beforeStock="-";
       afterStock=q;
+    }else if(log.type==="備品転用"){
+      beforeStock=current;
+      afterStock=current;
+      outQty=q;
     }
 
     return `<tr>
@@ -976,6 +1066,255 @@ function buildGlobalHistoryRows(){
       <td>${memoCellHtml(log)}</td>
     </tr>`;
   }).join("");
+}
+
+function equipmentTransferStatus(row){
+  return row.status || row.confirm_status || row.confirmation_status || "未確認";
+}
+
+function equipmentTransferStatusLabel(status){
+  if(getLang&&getLang()==="ko"){
+    return status==="確認済み" ? "확인 완료" : "미확인";
+  }
+  return status;
+}
+
+function getEquipmentProductCandidates(){
+  return (products||[])
+    .filter(p=>p&&p.name)
+    .slice(0,500)
+    .map(p=>`<option value="${esc(p.name)} / ${esc(p.barcode||"")}"></option>`)
+    .join("");
+}
+
+function parseEquipmentProductInput(raw){
+  const text=String(raw||"").trim();
+  const slash=text.lastIndexOf(" / ");
+  if(slash>-1){
+    return {
+      product_name:text.slice(0,slash).trim(),
+      barcode:text.slice(slash+3).trim()
+    };
+  }
+
+  const byBarcode=gp(text);
+  if(byBarcode){
+    return {product_name:byBarcode.name,barcode:String(byBarcode.barcode||"")};
+  }
+
+  const byName=(products||[]).find(p=>String(p.name||"").trim()===text);
+  if(byName){
+    return {product_name:byName.name,barcode:String(byName.barcode||"")};
+  }
+
+  return {product_name:text,barcode:""};
+}
+
+function renderEquipmentTransfers(){
+  const body=el("equipmentTransferBody");
+  const badge=el("equipmentTransferCountBadge");
+  const list=el("equipmentProductList");
+
+  if(list)list.innerHTML=getEquipmentProductCandidates();
+
+  const pending=(equipmentTransfers||[]).filter(r=>equipmentTransferStatus(r)!=="確認済み").length;
+  if(badge)badge.textContent=getLang&&getLang()==="ko" ? `미확인: ${pending}건` : `未確認：${pending}件`;
+  if(!body)return;
+
+  body.innerHTML=(equipmentTransfers||[]).map(row=>{
+    const status=equipmentTransferStatus(row);
+    const mailSubject=encodeURIComponent(`【ARICO】備品転用登録：${row.product_name||row.product||""}`);
+    const mailBody=encodeURIComponent(buildEquipmentTransferMailBody(row));
+    return `<tr>
+      <td>${fmt(row.created_at||row.datetime||row.date||"")}</td>
+      <td>
+        <button type="button" class="equipment-confirm-btn ${status==="確認済み"?"is-confirmed":""}" data-transfer-id="${esc(row.id||"")}">
+          ${esc(equipmentTransferStatusLabel(status))}
+        </button>
+      </td>
+      <td>${esc(row.product_name||row.product||"")}</td>
+      <td>${esc(row.quantity||"")}</td>
+      <td>${esc(row.staff||"")}</td>
+      <td>${esc(row.purpose||"")}</td>
+      <td>${esc(row.memo||"")}</td>
+      <td><a class="equipment-mail-link" href="mailto:${EQUIPMENT_TRANSFER_NOTIFY_TO}?subject=${mailSubject}&body=${mailBody}">${getLang&&getLang()==="ko"?"메일":"メール"}</a></td>
+    </tr>`;
+  }).join("");
+
+  document.querySelectorAll(".equipment-confirm-btn").forEach(btn=>{
+    btn.onclick=()=>confirmEquipmentTransfer(btn.dataset.transferId);
+  });
+}
+
+function setEquipmentTransferMessage(text,type=""){
+  const m=el("equipmentTransferMessage");
+  if(!m)return;
+  m.textContent=text||"";
+  m.className="message "+type;
+}
+
+function buildEquipmentTransferMailBody(row){
+  return [
+    "備品転用が登録されました。",
+    "",
+    `商品：${row.product_name||row.product||""}`,
+    `数量：${row.quantity||""}`,
+    `担当者：${row.staff||""}`,
+    `用途：${row.purpose||""}`,
+    `備考：${row.memo||""}`,
+    `日時：${fmt(row.created_at||row.datetime||new Date().toISOString())}`,
+    `確認ステータス：${equipmentTransferStatus(row)}`,
+    "",
+    "スマレジ在庫は自動減算していません。"
+  ].join("\n");
+}
+
+async function notifyEquipmentTransfer(row){
+  try{
+    await sbFunction("send-equipment-transfer-mail",{
+      to:EQUIPMENT_TRANSFER_NOTIFY_TO,
+      subject:`【ARICO】備品転用登録：${row.product_name||""}`,
+      transfer:row,
+      body:buildEquipmentTransferMailBody(row)
+    });
+    return true;
+  }catch(_){
+    try{
+      const subject=encodeURIComponent(`【ARICO】備品転用登録：${row.product_name||""}`);
+      const body=encodeURIComponent(buildEquipmentTransferMailBody(row));
+      window.open(`mailto:${EQUIPMENT_TRANSFER_NOTIFY_TO}?subject=${subject}&body=${body}`,"_blank");
+    }catch(__){}
+    return false;
+  }
+}
+
+async function saveEquipmentTransfer(e){
+  e.preventDefault();
+
+  const product=parseEquipmentProductInput(el("equipmentProductInput")?.value);
+  const qtyRaw=el("equipmentQtyInput")?.value.trim()||"";
+  const quantity=Number(qtyRaw);
+  const staff=el("equipmentStaffInput")?.value.trim()||"";
+  const purpose=el("equipmentPurposeInput")?.value.trim()||"";
+  const memo=el("equipmentMemoInput")?.value.trim()||"";
+
+  if(!product.product_name){
+    setEquipmentTransferMessage("商品を入力してください。","err");
+    el("equipmentProductInput")?.focus();
+    return;
+  }
+
+  if(!qtyRaw||!Number.isFinite(quantity)||quantity<=0){
+    setEquipmentTransferMessage("数量は1以上で入力してください。","err");
+    el("equipmentQtyInput")?.focus();
+    return;
+  }
+
+  if(!staff){
+    setEquipmentTransferMessage("担当者を選択してください。","err");
+    el("equipmentStaffInput")?.focus();
+    return;
+  }
+
+  if(!purpose){
+    setEquipmentTransferMessage("用途を入力してください。","err");
+    el("equipmentPurposeInput")?.focus();
+    return;
+  }
+
+  if(!memo){
+    setEquipmentTransferMessage("備品転用は備考欄の記入が必須です。","err");
+    el("equipmentMemoInput")?.focus();
+    return;
+  }
+
+  const row={
+    product_name:product.product_name,
+    barcode:product.barcode,
+    quantity,
+    staff,
+    purpose,
+    memo,
+    status:"未確認"
+  };
+
+  try{
+    let saved=null;
+    let savedLocalOnly=false;
+    try{
+      const inserted=await sb(EQUIPMENT_TRANSFER_TABLE,{
+        method:"POST",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify(row)
+      });
+      saved=Array.isArray(inserted)&&inserted[0]?inserted[0]:{...row,created_at:new Date().toISOString()};
+    }catch(dbError){
+      saved={...row,id:"local-"+Date.now(),created_at:new Date().toISOString(),local_only:true};
+      savedLocalOnly=true;
+      equipmentTransfers.unshift(saved);
+      saveLocalEquipmentTransfers(equipmentTransfers);
+    }
+
+    if(!savedLocalOnly)equipmentTransfers.unshift(saved);
+    const notified=await notifyEquipmentTransfer(saved);
+    renderEquipmentTransfers();
+    setEquipmentTransferMessage(savedLocalOnly ? "Supabaseの備品転用テーブルが未作成のため、この端末に一時保存しました。メール通知は作成済みです。" : (notified ? "備品転用を登録し、メール通知しました。" : "備品転用を登録しました。通知Function未設定のためメール作成画面を開きました。"), savedLocalOnly ? "err" : "ok");
+    showPopup("備品転用登録完了",`${saved.product_name}\n数量：${saved.quantity}\n担当者：${saved.staff}\n確認ステータス：未確認`);
+
+    el("equipmentProductInput").value="";
+    el("equipmentQtyInput").value="";
+    el("equipmentPurposeInput").value="";
+    el("equipmentMemoInput").value="";
+  }catch(e){
+    renderEquipmentTransfers();
+    setEquipmentTransferMessage("Supabaseの備品転用テーブルが未作成のため、この端末に一時保存しました。テーブル作成後に再登録してください。\n"+e.message,"err");
+  }
+}
+
+async function confirmEquipmentTransfer(id){
+  if(!id)return;
+
+  const row=(equipmentTransfers||[]).find(r=>String(r.id)===String(id));
+  if(!row)return;
+  if(equipmentTransferStatus(row)==="確認済み")return;
+
+  try{
+    if(row.local_only){
+      row.status="確認済み";
+      row.confirmed_at=new Date().toISOString();
+      saveLocalEquipmentTransfers(equipmentTransfers);
+    }else{
+      await sb(`${EQUIPMENT_TRANSFER_TABLE}?id=eq.${encodeURIComponent(id)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({status:"確認済み",confirmed_at:new Date().toISOString()})
+      });
+      row.status="確認済み";
+      row.confirmed_at=new Date().toISOString();
+    }
+    renderEquipmentTransfers();
+    setEquipmentTransferMessage("確認ステータスを確認済みにしました。","ok");
+  }catch(e){
+    setEquipmentTransferMessage("確認ステータス更新エラー\n"+e.message,"err");
+  }
+}
+
+function exportEquipmentTransferCsv(){
+  const rows=[["日時","確認ステータス","商品","バーコード","数量","担当者","用途","備考"]];
+  (equipmentTransfers||[]).forEach(row=>{
+    rows.push([
+      fmt(row.created_at||""),
+      equipmentTransferStatus(row),
+      row.product_name||row.product||"",
+      row.barcode||"",
+      row.quantity||"",
+      row.staff||"",
+      row.purpose||"",
+      row.memo||""
+    ]);
+  });
+  downloadCsvFile("equipment_transfers.csv",rows);
+  setEquipmentTransferMessage("備品転用CSVを出力しました。","ok");
 }
 
 async function saveStockCheck(){
@@ -1537,6 +1876,8 @@ function bindEvents(){
   on("reloadBtn","click",reloadAll);
   on("productForm","submit",saveProduct);
   on("staffForm","submit",saveStaff);
+  on("equipmentTransferForm","submit",saveEquipmentTransfer);
+  on("equipmentTransferCsvBtn","click",exportEquipmentTransferCsv);
 
   on("manualForm","submit",e=>{
     e.preventDefault();
@@ -1763,11 +2104,74 @@ function applySelectLabels(lang){
   if(historyStaff&&historyStaff.options.length)historyStaff.options[0].textContent=labels.historyStaffFilter;
 }
 
+function applyTypeLabels(lang){
+  const type=document.getElementById("type");
+  if(!type)return;
+  const labels=lang==="ko"
+    ?{入荷:"입고",出荷:"출고",在庫修正:"재고 수정",備品転用:"비품 전용"}
+    :{入荷:"入荷",出荷:"出荷",在庫修正:"在庫修正",備品転用:"備品転用"};
+  [...type.options].forEach(option=>{
+    if(labels[option.value])option.textContent=labels[option.value];
+  });
+}
+
+function setLabelLeadText(inputId,text){
+  const input=document.getElementById(inputId);
+  const label=input&&input.closest("label");
+  if(!label)return;
+  for(const node of label.childNodes){
+    if(node.nodeType===Node.TEXT_NODE && node.nodeValue.trim()){
+      node.nodeValue=text+" ";
+      return;
+    }
+  }
+}
+
+function applyEquipmentTransferLang(lang){
+  const isKo=lang==="ko";
+  const card=document.getElementById("equipmentTransferCard");
+  if(!card)return;
+
+  const title=card.querySelector("h2");
+  const note=card.querySelector(".section-note");
+  const submit=document.getElementById("equipmentTransferSubmitBtn");
+  const csv=document.getElementById("equipmentTransferCsvBtn");
+  const staff=document.getElementById("equipmentStaffInput");
+  const product=document.getElementById("equipmentProductInput");
+  const qty=document.getElementById("equipmentQtyInput");
+  const purpose=document.getElementById("equipmentPurposeInput");
+  const memo=document.getElementById("equipmentMemoInput");
+
+  if(title)title.textContent=isKo?"비품 전용 등록":"備品転用登録";
+  if(note)note.textContent=isKo?"스마트레지 재고는 자동 차감하지 않고 기록, 알림, 확인만 진행합니다":"スマレジ在庫は減算せず、記録・通知・確認のみ行います";
+  if(submit)submit.textContent=isKo?"비품 전용 등록":"備品転用を登録";
+  if(csv)csv.textContent=isKo?"비품 전용 CSV":"備品転用CSV";
+  if(staff&&staff.options.length)staff.options[0].textContent=isKo?"담당자 선택":"担当者を選択";
+  if(product)product.placeholder=isKo?"상품명 또는 바코드":"商品名またはバーコード";
+  if(qty)qty.placeholder=isKo?"수량":"数量";
+  if(purpose)purpose.placeholder=isKo?"예: 매장 비품, 촬영, 샘플":"例：店舗備品、撮影、サンプル";
+  if(memo)memo.placeholder=isKo?"전용 사유나 사용 장소 등을 반드시 입력":"転用理由や使用場所などを必ず入力";
+
+  setLabelLeadText("equipmentProductInput",isKo?"상품":"商品");
+  setLabelLeadText("equipmentQtyInput",isKo?"수량":"数量");
+  setLabelLeadText("equipmentStaffInput",isKo?"담당자":"担当者");
+  setLabelLeadText("equipmentPurposeInput",isKo?"용도":"用途");
+  setLabelLeadText("equipmentMemoInput",isKo?"비고":"備考");
+
+  const headers=card.querySelectorAll(".equipment-transfer-table th");
+  const ja=["日時","確認","商品","数量","担当者","用途","備考","通知"];
+  const ko=["일시","확인","상품","수량","담당자","용도","비고","알림"];
+  headers.forEach((th,i)=>{ th.textContent=(isKo?ko:ja)[i]||th.textContent; });
+}
+
 function applyLang(){
   const lang=getLang();
   walkTextNodes(document.body,lang);
   applyPlaceholders(lang);
   applySelectLabels(lang);
+  applyTypeLabels(lang);
+  applyEquipmentTransferLang(lang);
+  renderEquipmentTransfers();
 
   const ja=document.getElementById("langJaBtn");
   const ko=document.getElementById("langKoBtn");
