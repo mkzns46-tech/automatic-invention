@@ -51,7 +51,6 @@ window.addEventListener("unhandledrejection",(e)=>{
 
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";
 const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
-const EQUIPMENT_TRANSFER_NOTIFY_TO="Teams";
 const EQUIPMENT_TRANSFER_TABLE="equipment_transfers";
 const EQUIPMENT_TRANSFER_LOCAL_KEY="arico_equipment_transfers_local";
 const EQUIPMENT_CONFIRM_LOCAL_KEY="arico_equipment_transfer_confirmed_ids";
@@ -258,29 +257,6 @@ async function sbAll(path,pageSize=1000,maxRows=20000){
     if(offset>=maxRows)break;
   }
   return all;
-}
-
-async function sbFunction(name,payload){
-  const res=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/functions/v1/"+name,{
-    method:"POST",
-    headers:{
-      apikey:SUPABASE_API_KEY,
-      Authorization:"Bearer "+SUPABASE_API_KEY,
-      "Content-Type":"application/json",
-      Accept:"application/json"
-    },
-    body:JSON.stringify(payload||{})
-  });
-
-  const text=await res.text();
-  let body=null;
-  try{body=text?JSON.parse(text):null;}catch{body=text;}
-
-  if(!res.ok){
-    const detail=typeof body==="object"?JSON.stringify(body):String(body||"");
-    throw new Error(`通知Functionエラー ${res.status}\n${detail}`);
-  }
-  return body;
 }
 
 function loadLocalEquipmentTransfers(){
@@ -724,28 +700,14 @@ async function registerBarcode(barcode){
       memo:logMemo
     });
 
-    let notificationOk=true;
-    if(type==="備品転用"){
-      notificationOk=await notifyEquipmentTransfer({
-        product_name:p.name,
-        barcode,
-        quantity:qty,
-        staff,
-        purpose:memo,
-        memo,
-        status:"未確認",
-        created_at:(typeof insertedLog!=="undefined" && Array.isArray(insertedLog) && insertedLog[0]) ? insertedLog[0].created_at : new Date().toISOString()
-      });
-    }
-
     beep(true);
     const successText=type==="備品転用"
-      ?`備品転用登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock} / ${notificationOk ? "Teams通知済み" : "Teams通知失敗"}`
+      ?`備品転用登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock} / 要確認`
       : type==="在庫修正"
       ?`在庫修正：${p.name} / 現在庫を ${qty} に上書き / 担当者：${staff}`
       :`${type}登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock}`;
 
-    showMessage(successText,notificationOk ? "ok" : "err");
+    showMessage(successText,"ok");
     showPopup("登録完了", successText);
 
     el("barcodeInput").value="";
@@ -1236,7 +1198,7 @@ function renderEquipmentTransfers(){
       <td>${esc(row.staff||"")}</td>
       <td>${esc(row.purpose||"")}</td>
       <td>${esc(row.memo||"")}</td>
-      <td>${getLang&&getLang()==="ko"?"Teams 알림":"Teams通知"}</td>
+      <td>${getLang&&getLang()==="ko"?"알림 없음":"通知なし"}</td>
     </tr>`;
   }).join("");
 
@@ -1250,36 +1212,6 @@ function setEquipmentTransferMessage(text,type=""){
   if(!m)return;
   m.textContent=text||"";
   m.className="message "+type;
-}
-
-function buildEquipmentTransferMailBody(row){
-  return [
-    "備品転用が登録されました。",
-    "",
-    `商品：${row.product_name||row.product||""}`,
-    `数量：${row.quantity||""}`,
-    `担当者：${row.staff||""}`,
-    `用途：${row.purpose||""}`,
-    `備考：${row.memo||""}`,
-    `日時：${fmt(row.created_at||row.datetime||new Date().toISOString())}`,
-    `確認ステータス：${equipmentTransferStatus(row)}`,
-    "",
-    "在庫は数量分減算済みです。"
-  ].join("\n");
-}
-
-async function notifyEquipmentTransfer(row){
-  try{
-    await sbFunction("send-equipment-transfer-teams",{
-      subject:`【ARICO】備品転用登録：${row.product_name||""}`,
-      transfer:row,
-      body:buildEquipmentTransferMailBody(row)
-    });
-    return true;
-  }catch(e){
-    console.warn("Teams notification failed",e);
-    return false;
-  }
 }
 
 async function saveEquipmentTransfer(e){
@@ -1350,9 +1282,8 @@ async function saveEquipmentTransfer(e){
     }
 
     if(!savedLocalOnly)equipmentTransfers.unshift(saved);
-    const notified=await notifyEquipmentTransfer(saved);
     renderEquipmentTransfers();
-    setEquipmentTransferMessage(savedLocalOnly ? "Supabaseの備品転用テーブルが未作成のため、この端末に一時保存しました。メール通知は作成済みです。" : (notified ? "備品転用を登録し、メール通知しました。" : "備品転用を登録しました。通知Function未設定のためメール作成画面を開きました。"), savedLocalOnly ? "err" : "ok");
+    setEquipmentTransferMessage(savedLocalOnly ? "Supabaseの備品転用テーブルが未作成のため、この端末に一時保存しました。" : "備品転用を登録しました。", savedLocalOnly ? "err" : "ok");
     showPopup("備品転用登録完了",`${saved.product_name}\n数量：${saved.quantity}\n担当者：${saved.staff}\n確認ステータス：未確認`);
 
     el("equipmentProductInput").value="";
