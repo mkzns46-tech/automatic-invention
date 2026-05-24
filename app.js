@@ -54,6 +54,7 @@ const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 const EQUIPMENT_TRANSFER_NOTIFY_TO="tanaka@arico.group";
 const EQUIPMENT_TRANSFER_TABLE="equipment_transfers";
 const EQUIPMENT_TRANSFER_LOCAL_KEY="arico_equipment_transfers_local";
+const EQUIPMENT_CONFIRM_LOCAL_KEY="arico_equipment_transfer_confirmed_ids";
 const LOGIN_USER="arico";
 const LOGIN_PASSWORD="0201";
 const LOGIN_SESSION_KEY="arico_portal_logged_in";
@@ -294,6 +295,24 @@ function loadLocalEquipmentTransfers(){
 function saveLocalEquipmentTransfers(rows){
   try{
     localStorage.setItem(EQUIPMENT_TRANSFER_LOCAL_KEY,JSON.stringify(rows||[]));
+  }catch(_){}
+}
+
+function getLocalConfirmedEquipmentIds(){
+  try{
+    const ids=JSON.parse(localStorage.getItem(EQUIPMENT_CONFIRM_LOCAL_KEY)||"[]");
+    return Array.isArray(ids)?ids.map(String):[];
+  }catch(_){
+    return [];
+  }
+}
+
+function markLocalEquipmentConfirmed(id){
+  if(!id)return;
+  const ids=new Set(getLocalConfirmedEquipmentIds());
+  ids.add(String(id));
+  try{
+    localStorage.setItem(EQUIPMENT_CONFIRM_LOCAL_KEY,JSON.stringify([...ids]));
   }catch(_){}
 }
 
@@ -910,7 +929,8 @@ function displayLogType(log){
 }
 
 function isEquipmentTransferConfirmed(log){
-  return String(log?.memo||"").includes("確認ステータス：確認");
+  const id=String(log?.id||"");
+  return (id&&getLocalConfirmedEquipmentIds().includes(id)) || String(log?.memo||"").includes("確認ステータス：確認");
 }
 
 function cleanMemoForDisplay(log){
@@ -1017,7 +1037,7 @@ async function editLogMemo(logId,currentMemo){
   }
 }
 
-async function confirmEquipmentLog(logId,currentMemo){
+async function confirmEquipmentLog(logId,currentMemo,barcode){
   try{
     if(!logId){
       showMessage("この履歴は再読み込み後に確認できます。","err");
@@ -1025,7 +1045,7 @@ async function confirmEquipmentLog(logId,currentMemo){
     }
 
     const targetLog=(logs||[]).find(l=>String(l.id)===String(logId));
-    const refreshBarcode=targetLog?.barcode || selectedBarcode;
+    const refreshBarcode=barcode || targetLog?.barcode || selectedBarcode;
     const cleaned=String(currentMemo||"")
       .replace(/^備品転用\s*\/\s*/,"")
       .replace(/^確認ステータス：未確認\s*\/\s*/,"")
@@ -1033,11 +1053,17 @@ async function confirmEquipmentLog(logId,currentMemo){
       .replace(/^確認ステータス：確認\s*\/\s*/,"");
     const next=`確認ステータス：確認 / ${cleaned}`;
 
-    await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
-      method:"PATCH",
-      headers:{Prefer:"return=minimal"},
-      body:JSON.stringify({memo:next})
-    });
+    markLocalEquipmentConfirmed(logId);
+
+    try{
+      await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({memo:next})
+      });
+    }catch(e){
+      showMessage("確認状態をこの端末に保存しました。Supabase側の更新は失敗しています。\n"+e.message,"err");
+    }
 
     (logs||[]).forEach(l=>{
       if(String(l.id)===String(logId))l.memo=next;
@@ -1063,7 +1089,7 @@ function memoCellHtml(log){
     const confirmed=isEquipmentTransferConfirmed(log);
     return `<div class="memo-cell">
       <span class="memo-text">${esc(cleanMemoForDisplay(log))}</span>
-      <button type="button" class="memo-edit-btn equipment-confirm-log-btn ${confirmed ? "is-confirmed" : "needs-confirm"}" data-log-id="${esc(id)}" data-memo="${esc(memo)}">${confirmed ? "確認" : "要確認"}</button>
+      <button type="button" class="memo-edit-btn equipment-confirm-log-btn ${confirmed ? "is-confirmed" : "needs-confirm"}" data-log-id="${esc(id)}" data-barcode="${esc(log.barcode||"")}" data-memo="${esc(memo)}">${confirmed ? "確認" : "要確認"}</button>
     </div>`;
   }
   return `<div class="memo-cell">
@@ -1077,7 +1103,10 @@ function bindMemoEditButtons(){
     btn.onclick=()=>{
       if(btn.classList.contains("equipment-confirm-log-btn")){
         if(btn.classList.contains("is-confirmed"))return;
-        confirmEquipmentLog(btn.dataset.logId,btn.dataset.memo||"");
+        btn.classList.remove("needs-confirm");
+        btn.classList.add("is-confirmed");
+        btn.textContent="確認";
+        confirmEquipmentLog(btn.dataset.logId,btn.dataset.memo||"",btn.dataset.barcode||"");
         return;
       }
       editLogMemo(btn.dataset.logId,btn.dataset.memo||"");
