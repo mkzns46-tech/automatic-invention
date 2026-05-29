@@ -1,15 +1,20 @@
-# ARICO TOKYO 在庫変動確認シート 修正版
+# ARICO PORTAL
 
-## 修正内容
-- ログインページとシステム入口ポータルを追加
-- 仮ログイン情報：ユーザーID `admin` / パスワード `1234`
-- 商品登録・更新時にPOPアップ表示
-- 在庫変動登録時にPOPアップ表示
-- スマホにも全体履歴を表示
-- 在庫修正で0を登録できるよう修正
-- 履歴の備考を後から修正可能に変更
-- 商品登録の名前検索を削除
-- 全体履歴を担当者プルダウンで検索できるよう変更
+## ログイン情報
+- ID: arico
+- PASS: 0201
 
-## SQL操作
-不要です。
+## 履歴管理シートリンク
+`app.js` の `HISTORY_SHEET_URL` を変更してください。
+
+現在:
+https://automatic-invention-eight.vercel.app/?auth=ARICO_PORTAL_2026
+
+## 在庫シートから戻された時
+`index.html?next=history` でログインした場合、ログイン後に在庫変動確認シートへ自動で戻ります。
+
+在庫シート側のログインガードで、未ログイン時の戻り先は以下にしてください。
+
+```js
+const ARICO_PORTAL_URL = "https://arico-portal.vercel.app/index.html?next=history";
+```

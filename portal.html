@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARICO PORTAL</title>
+<link rel="stylesheet" href="style.css">
+<script>
+if(sessionStorage.getItem("arico_portal_login")!=="ok"){
+  location.replace("index.html");
+}
+</script>
+</head>
+<body>
+<main class="wrap">
+<section class="card">
+<div class="topbar">
+<div>
+<div class="brand">ARICO TOKYO</div>
+<h1>システム入口</h1>
+</div>
+<div class="top-actions">
+<a class="pill active" href="portal.html">日本語</a>
+<a class="pill" href="portal_ko.html">한국어</a>
+<a class="pill" href="index.html">ログアウト</a>
+</div>
+</div>
+
+<div class="grid">
+<a class="box" href="https://automatic-invention-eight.vercel.app/?auth=ARICO_PORTAL_2026">
+<h3>在庫変動確認シート</h3>
+<p>入荷・出荷・在庫修正・商品履歴を管理</p>
+</a>
+
+<a class="box disabled" href="#" onclick="alert('レンタルリム管理 は現在作成中です。'); return false;">
+<h3>レンタルリム管理</h3>
+<p>作成中</p>
+</a>
+
+<a class="box disabled" href="#" onclick="alert('出荷前検品 は現在作成中です。'); return false;">
+<h3>出荷前検品</h3>
+<p>作成中</p>
+</a>
+</div>
+</section>
+</main>
+</body>
+</html>

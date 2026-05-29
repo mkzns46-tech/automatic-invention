@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -10,22 +10,22 @@
 <main class="wrap">
 <section class="card">
 <div class="brand">ARICO TOKYO</div>
-<h1>業務システムログイン</h1>
-<p>利用するシステムへ入るための入口です。</p>
+<h1>업무 시스템 로그인</h1>
+<p>이용할 시스템에 들어가기 위한 입구입니다.</p>
 
 <div class="langs">
-<a class="lang active" href="index.html">日本語</a>
-<a class="lang" href="index_ko.html">한국어</a>
+<a class="lang" href="index.html">日本語</a>
+<a class="lang active" href="index_ko.html">한국어</a>
 </div>
 
 <form id="loginForm">
-<label>ユーザーID</label>
-<input name="id" type="text" required pattern="arico" title="ユーザーIDが違います" autocomplete="username">
+<label>사용자 ID</label>
+<input name="id" type="text" required pattern="arico" title="사용자 ID가 다릅니다" autocomplete="username">
 
-<label>パスワード</label>
-<input name="pass" type="password" required pattern="0201" title="パスワードが違います" autocomplete="current-password">
+<label>비밀번호</label>
+<input name="pass" type="password" required pattern="0201" title="비밀번호가 다릅니다" autocomplete="current-password">
 
-<button class="main-btn" type="submit">ログイン</button>
+<button class="main-btn" type="submit">로그인</button>
 </form>
 </section>
 </main>
@@ -41,10 +41,10 @@ document.getElementById("loginForm").addEventListener("submit",function(e){
       location.href="https://automatic-invention-eight.vercel.app/?auth=ARICO_PORTAL_2026";
       return;
     }
-    location.href="portal.html";
+    location.href="portal_ko.html";
     return;
   }
-  alert("ユーザーIDまたはパスワードが違います。");
+  alert("사용자 ID 또는 비밀번호가 다릅니다.");
 });
 </script>
 </body>

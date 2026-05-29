@@ -1,2 +1,3 @@
-在庫変動確認シート側のapp.jsです。
-直接アクセス時に「ログインしてください」のポップアップを出して、ポータルへ戻します。
+この版は index.html 1ファイルだけで動きます。
+GitHub の arico-portal には index.html だけを上書きしてください。
+style.css と app.js が残っていても、この index.html は外部ファイルを読みません。
