@@ -1,32 +1,24 @@
-// ===== ARICO PORTAL LOGIN GUARD =====
-// 直接アクセス禁止版：?auth=ARICO_PORTAL_2026 が付いている時だけ入れます。
-// 直接URLで開いた場合は「ログインしてください」を表示してポータルへ戻します。
+// ===== ARICO PORTAL STRICT LOGIN GUARD =====
+// ポータル経由の ?auth=ARICO_PORTAL_2026 が付いている時だけ入れます。
+// 在庫管理URLを直接開いた場合は、必ず業務ポータルへ戻します。
 const ARICO_PORTAL_URL = "https://arico-portal.vercel.app";
 const ARICO_AUTH_TOKEN = "ARICO_PORTAL_2026";
-const ARICO_LOGIN_KEY = "arico_history_sheet_session";
 
-(function requirePortalLogin(){
+(function requirePortalAuth(){
   try{
     const params = new URLSearchParams(window.location.search);
     const auth = params.get("auth");
 
     if(auth === ARICO_AUTH_TOKEN){
-      sessionStorage.setItem(ARICO_LOGIN_KEY, "ok");
       return;
     }
 
-    if(sessionStorage.getItem(ARICO_LOGIN_KEY) === "ok"){
-      return;
-    }
-
-    alert("ログインしてください");
     window.location.replace(ARICO_PORTAL_URL);
   }catch(_){
-    alert("ログインしてください");
     window.location.replace(ARICO_PORTAL_URL);
   }
 })();
-// ===== /ARICO PORTAL LOGIN GUARD =====
+// ===== /ARICO PORTAL STRICT LOGIN GUARD =====
 
 
 window.addEventListener("error",(e)=>{
