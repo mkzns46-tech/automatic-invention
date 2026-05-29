@@ -784,6 +784,74 @@ async function searchProductsByName(keyword){
 }
 
 
+let scanProductSearchTimer=null;
+
+function renderScanProductSearchResults(rows){
+  const box=el("scanProductSearchResults");
+  if(!box)return;
+
+  if(!rows || !rows.length){
+    box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>別のキーワードで検索してください</span></div>';
+    box.classList.add("is-active");
+    return;
+  }
+
+  box.innerHTML=rows.map(p=>`
+    <div class="product-search-item" data-barcode="${esc(p.barcode)}">
+      <div>
+        <strong>${esc(p.name)}</strong>
+        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)} / 棚番：${esc(p.location||"")}</span>
+      </div>
+      <button type="button">選択</button>
+    </div>
+  `).join("");
+
+  box.classList.add("is-active");
+
+  box.querySelectorAll(".product-search-item[data-barcode]").forEach(item=>{
+    item.onclick=async()=>{
+      const barcode=item.dataset.barcode;
+      const barcodeInput=el("barcodeInput");
+      const nameInput=el("scanProductNameSearchInput");
+
+      if(barcodeInput)barcodeInput.value=barcode;
+      if(nameInput)nameInput.value="";
+
+      box.classList.remove("is-active");
+      box.innerHTML="";
+
+      await syncHistoryFromScanBarcode();
+
+      const qty=el("qty");
+      if(qty && !qty.value)qty.focus();
+      else if(barcodeInput)barcodeInput.focus();
+    };
+  });
+}
+
+function handleScanProductNameSearchInput(){
+  const input=el("scanProductNameSearchInput");
+  if(!input)return;
+
+  clearTimeout(scanProductSearchTimer);
+
+  const keyword=input.value.trim();
+  const box=el("scanProductSearchResults");
+
+  if(!keyword){
+    if(box){
+      box.classList.remove("is-active");
+      box.innerHTML="";
+    }
+    return;
+  }
+
+  scanProductSearchTimer=setTimeout(async()=>{
+    const rows=await searchProductsByName(keyword);
+    renderScanProductSearchResults(rows);
+  },250);
+}
+
 function renderProductSearchResults(rows){
   const box=el("productSearchResults");
   if(!box)return;
@@ -1077,22 +1145,56 @@ function bindMemoEditButtons(){
   });
 }
 
-function renderGlobalHistory(){
-  const body=el("historyBody");
-  if(!body)return;
-  body.innerHTML=buildGlobalHistoryRows();
-  bindMemoEditButtons();
+let globalHistoryRenderSeq=0;
+
+function matchesGlobalHistoryFilter(log,staffFilter,typeFilter){
+  if(staffFilter&&String(log.staff||"")!==String(staffFilter))return false;
+  if(typeFilter==="備品転用"&&!isEquipmentTransferLog(log))return false;
+  if(typeFilter==="要確認"&&(!isEquipmentTransferLog(log)||isEquipmentTransferConfirmed(log)))return false;
+  if(["入荷","出荷","在庫修正"].includes(typeFilter)&&displayLogType(log)!==typeFilter)return false;
+  return true;
 }
 
-function buildGlobalHistoryRows(){
+async function loadGlobalHistoryLogsForFilter(staffFilter,typeFilter){
+  if(!typeFilter)return logs||[];
+
+  const allLogs=await sbAll("inventory_logs?select=*&order=created_at.desc",1000,50000);
+  const filtered=(allLogs||[]).filter(log=>matchesGlobalHistoryFilter(log,staffFilter,typeFilter)).slice(0,50);
+
+  if(typeof fetchProductsByBarcodes==="function"){
+    await fetchProductsByBarcodes(filtered.map(log=>log.barcode));
+  }
+
+  return filtered;
+}
+
+async function renderGlobalHistory(){
+  const seq=++globalHistoryRenderSeq;
+  const body=el("historyBody");
+  if(!body)return;
   const staffFilter=el("historyStaffFilter")?.value||"";
   const typeFilter=el("historyTypeFilter")?.value||"";
-  const filteredLogs=(logs||[]).filter(log=>{
-    if(staffFilter&&String(log.staff||"")!==String(staffFilter))return false;
-    if(typeFilter==="備品転用"&&!isEquipmentTransferLog(log))return false;
-    if(typeFilter==="要確認"&&(!isEquipmentTransferLog(log)||isEquipmentTransferConfirmed(log)))return false;
-    return true;
-  });
+
+  if(typeFilter){
+    body.innerHTML='<tr><td colspan="9">区分検索中...</td></tr>';
+  }
+
+  try{
+    const rows=await loadGlobalHistoryLogsForFilter(staffFilter,typeFilter);
+    if(seq!==globalHistoryRenderSeq)return;
+    body.innerHTML=buildGlobalHistoryRows(rows);
+    bindMemoEditButtons();
+  }catch(e){
+    if(seq!==globalHistoryRenderSeq)return;
+    body.innerHTML="";
+    showMessage("全体履歴検索エラー。\n"+e.message,"err");
+  }
+}
+
+function buildGlobalHistoryRows(sourceLogs){
+  const staffFilter=el("historyStaffFilter")?.value||"";
+  const typeFilter=el("historyTypeFilter")?.value||"";
+  const filteredLogs=(sourceLogs||logs||[]).filter(log=>matchesGlobalHistoryFilter(log,staffFilter,typeFilter));
 
   return filteredLogs.map(log=>{
     const q=Number(log.quantity||0);
@@ -1910,6 +2012,7 @@ function bindEvents(){
   on("barcodeInput","input",()=>syncHistoryFromScanBarcode());
   on("productBarcode","input",()=>renderProductStockInfo());
   on("productHistoryBarcodeInput","input",()=>selectProductHistoryByBarcode());
+  on("scanProductNameSearchInput","input",handleScanProductNameSearchInput);
   on("productNameSearchInput","input",handleProductNameSearchInput);
   on("historyStaffFilter","change",renderGlobalHistory);
   on("historyTypeFilter","change",renderGlobalHistory);
@@ -2095,6 +2198,7 @@ function applyPlaceholders(lang){
     ja:{
       staffNameInput:"例：田中",
       barcodeInput:"バーコードをスキャン、または手入力",
+      scanProductNameSearchInput:"商品名の一部を入力",
       memo:"例：棚卸差異、サンプル使用、不良返品など",
       productBarcode:"バーコードを入力",
       productName:"商品名を必ず入力",
@@ -2104,6 +2208,7 @@ function applyPlaceholders(lang){
     ko:{
       staffNameInput:"예：다나카",
       barcodeInput:"바코드를 스캔하거나 직접 입력",
+      scanProductNameSearchInput:"상품명의 일부를 입력",
       memo:"예：재고 차이, 샘플 사용, 불량 반품 등",
       productBarcode:"바코드를 입력",
       productName:"상품명을 반드시 입력",
@@ -2144,8 +2249,8 @@ function applyTypeLabels(lang){
   const historyType=document.getElementById("historyTypeFilter");
   if(historyType&&historyType.options.length){
     const historyLabels=lang==="ko"
-      ?{"":"모든 구분",備品転用:"비품 전용만",要確認:"확인 필요만"}
-      :{"":"すべての区分",備品転用:"備品転用のみ",要確認:"要確認のみ"};
+      ?{"":"모든 구분",入荷:"입고만",出荷:"출고만",在庫修正:"재고 수정만",備品転用:"비품 전용만",要確認:"확인 필요만"}
+      :{"":"すべての区分",入荷:"入荷のみ",出荷:"出荷のみ",在庫修正:"在庫修正のみ",備品転用:"備品転用のみ",要確認:"要確認のみ"};
     [...historyType.options].forEach(option=>{
       if(Object.prototype.hasOwnProperty.call(historyLabels,option.value)){
         option.textContent=historyLabels[option.value];
