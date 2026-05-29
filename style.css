@@ -1563,3 +1563,68 @@ header h1{
   border-radius:10px !important;
   font-size:13px !important;
 }
+
+
+/* 在庫変動登録カード内の商品名検索 */
+.scan-product-search-box{
+  background:var(--main-soft,#f1fbf4);
+  border:1px solid var(--border,#cfe6d7);
+  border-radius:14px;
+  padding:12px;
+  margin:12px 0 14px;
+}
+
+.scan-product-search-box label{
+  margin:0;
+}
+
+#scanProductNameSearchInput{
+  margin-top:8px;
+  font-weight:800;
+}
+
+.product-search-results{
+  display:none;
+  margin-top:10px;
+  border:1px solid var(--border,#cfe6d7);
+  border-radius:12px;
+  overflow:hidden;
+  background:#fff;
+}
+
+.product-search-results.is-active{
+  display:block;
+}
+
+.product-search-item{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  padding:10px;
+  border-bottom:1px solid #e4efe8;
+}
+
+.product-search-item:last-child{
+  border-bottom:none;
+}
+
+.product-search-item strong,
+.product-search-item span{
+  display:block;
+}
+
+.product-search-item span{
+  margin-top:4px;
+  color:#527161;
+  font-size:12px;
+  line-height:1.45;
+}
+
+.product-search-item button{
+  width:auto;
+  min-width:72px;
+  margin-top:0;
+  padding:8px 10px;
+  font-size:13px;
+}
