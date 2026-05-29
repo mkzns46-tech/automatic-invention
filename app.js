@@ -114,7 +114,14 @@ function showLoginView(){
 }
 
 function showPortalView(){
-  window.location.href = ARICO_PORTAL_URL;
+  const shell=el("loginShell");
+  const login=el("loginCard");
+  const portal=el("portalCard");
+  const app=el("mainApp");
+  if(shell)shell.classList.remove("is-hidden");
+  if(login)login.hidden=true;
+  if(portal)portal.hidden=false;
+  if(app)app.classList.add("app-is-hidden");
 }
 
 function showInventorySystem(){
@@ -155,8 +162,13 @@ function initPortal(){
   const back = el("portalBackBtn");
   if(back){
     back.onclick = function(){
-      window.location.href = ARICO_PORTAL_URL;
+      showPortalView();
     };
+  }
+
+  const open = el("openInventorySystem");
+  if(open){
+    open.onclick = showInventorySystem;
   }
 
   const logout = el("logoutBtn");

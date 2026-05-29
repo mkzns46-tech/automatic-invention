@@ -1589,8 +1589,9 @@ header h1{
 
   .card.scanner,
   .staff-admin-section{
-    height:auto !important;
+    height:620px !important;
     min-height:620px !important;
+    max-height:620px !important;
   }
 
   .staff-admin-section{
@@ -1599,10 +1600,11 @@ header h1{
   }
 
   .staff-admin-section .table-wrap{
-    flex:1 1 auto !important;
+    flex:1 1 0 !important;
     height:auto !important;
     min-height:0 !important;
     max-height:none !important;
+    overflow-y:auto !important;
     margin-top:16px !important;
   }
 }
