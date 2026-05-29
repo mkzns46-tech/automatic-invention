@@ -1,24 +1,54 @@
-// ===== ARICO PORTAL STRICT LOGIN GUARD =====
-// ポータル経由の ?auth=ARICO_PORTAL_2026 が付いている時だけ入れます。
-// 在庫管理URLを直接開いた場合は、必ず業務ポータルへ戻します。
+// ===== ARICO SUPABASE PORTAL SESSION GUARD =====
+// ポータルで発行した一時トークンがある時だけ在庫管理へ入れます。
+// 固定の ?auth=ARICO_PORTAL_2026 では入れません。
 const ARICO_PORTAL_URL = "https://arico-portal.vercel.app";
-const ARICO_AUTH_TOKEN = "ARICO_PORTAL_2026";
+const ARICO_SESSION_PARAM = "session";
+const ARICO_SESSION_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
+const ARICO_SESSION_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 
-(function requirePortalAuth(){
+(async function requirePortalSession(){
   try{
-    const params = new URLSearchParams(window.location.search);
-    const auth = params.get("auth");
+    const token = new URLSearchParams(window.location.search).get(ARICO_SESSION_PARAM);
 
-    if(auth === ARICO_AUTH_TOKEN){
+    if(!token){
+      window.location.replace(ARICO_PORTAL_URL);
       return;
     }
 
-    window.location.replace(ARICO_PORTAL_URL);
+    const now = new Date().toISOString();
+    const url =
+      ARICO_SESSION_SUPABASE_URL +
+      "/rest/v1/portal_sessions?select=token&token=eq." +
+      encodeURIComponent(token) +
+      "&expires_at=gt." +
+      encodeURIComponent(now) +
+      "&limit=1";
+
+    const res = await fetch(url, {
+      headers: {
+        apikey: ARICO_SESSION_SUPABASE_API_KEY,
+        Authorization: "Bearer " + ARICO_SESSION_SUPABASE_API_KEY,
+        Accept: "application/json"
+      }
+    });
+
+    if(!res.ok){
+      window.location.replace(ARICO_PORTAL_URL);
+      return;
+    }
+
+    const rows = await res.json();
+
+    if(!Array.isArray(rows) || rows.length === 0){
+      window.location.replace(ARICO_PORTAL_URL);
+      return;
+    }
+
   }catch(_){
     window.location.replace(ARICO_PORTAL_URL);
   }
 })();
-// ===== /ARICO PORTAL STRICT LOGIN GUARD =====
+// ===== /ARICO SUPABASE PORTAL SESSION GUARD =====
 
 
 window.addEventListener("error",(e)=>{
