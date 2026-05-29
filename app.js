@@ -1,34 +1,3 @@
-// ===== ARICO PORTAL LOGIN GUARD =====
-// 直接アクセス禁止版：?auth=ARICO_PORTAL_2026 が付いている時だけ入れます。
-// 直接URLで開いた場合は「ログインしてください」を表示してポータルへ戻します。
-const ARICO_PORTAL_URL = "https://arico-portal.vercel.app";
-const ARICO_AUTH_TOKEN = "ARICO_PORTAL_2026";
-const ARICO_LOGIN_KEY = "arico_history_sheet_session";
-
-(function requirePortalLogin(){
-  try{
-    const params = new URLSearchParams(window.location.search);
-    const auth = params.get("auth");
-
-    if(auth === ARICO_AUTH_TOKEN){
-      sessionStorage.setItem(ARICO_LOGIN_KEY, "ok");
-      return;
-    }
-
-    if(sessionStorage.getItem(ARICO_LOGIN_KEY) === "ok"){
-      return;
-    }
-
-    alert("ログインしてください");
-    window.location.replace(ARICO_PORTAL_URL);
-  }catch(_){
-    alert("ログインしてください");
-    window.location.replace(ARICO_PORTAL_URL);
-  }
-})();
-// ===== /ARICO PORTAL LOGIN GUARD =====
-
-
 window.addEventListener("error",(e)=>{
   try{
     const m=document.getElementById("message");
@@ -51,11 +20,8 @@ window.addEventListener("unhandledrejection",(e)=>{
 
 const SUPABASE_URL="https://ihsbkknysozkstvylqff.supabase.co";
 const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
-const EQUIPMENT_TRANSFER_TABLE="equipment_transfers";
-const EQUIPMENT_TRANSFER_LOCAL_KEY="arico_equipment_transfers_local";
-const EQUIPMENT_CONFIRM_LOCAL_KEY="arico_equipment_transfer_confirmed_ids";
-const LOGIN_USER="arico";
-const LOGIN_PASSWORD="0201";
+const LOGIN_USER="admin";
+const LOGIN_PASSWORD="1234";
 const LOGIN_SESSION_KEY="arico_portal_logged_in";
 let loginSessionFallback=false;
 
@@ -63,7 +29,6 @@ let products=[];
 let logs=[];
 let checks=[];
 let staffMembers=[];
-let equipmentTransfers=[];
 let selectedBarcode="";
 let selectedHistoryMode="all";
 let dataLoaded=false;
@@ -109,8 +74,14 @@ function clearLoginSession(){
 }
 
 function showLoginView(){
-  alert("ログインしてください");
-  window.location.replace(ARICO_PORTAL_URL);
+  const shell=el("loginShell");
+  const login=el("loginCard");
+  const portal=el("portalCard");
+  const app=el("mainApp");
+  if(shell)shell.classList.remove("is-hidden");
+  if(login)login.hidden=false;
+  if(portal)portal.hidden=true;
+  if(app)app.classList.add("app-is-hidden");
 }
 
 function showPortalView(){
@@ -148,33 +119,31 @@ function handleLogin(e){
 
 function logoutPortal(){
   clearLoginSession();
-  sessionStorage.removeItem(ARICO_LOGIN_KEY);
-  window.location.href = ARICO_PORTAL_URL;
+  if(el("loginPassword"))el("loginPassword").value="";
+  showLoginView();
 }
 
 function initPortal(){
-  const shell = el("loginShell");
-  const app = el("mainApp");
+  const form=el("loginForm");
+  if(form)form.addEventListener("submit",handleLogin);
 
-  if(shell) shell.classList.add("is-hidden");
-  if(app) app.classList.remove("app-is-hidden");
+  const submit=el("loginSubmitBtn");
+  if(submit)submit.addEventListener("click",(e)=>{
+    e.preventDefault();
+    handleLogin(e);
+  });
 
-  const back = el("portalBackBtn");
-  if(back){
-    back.onclick = function(){
-      showPortalView();
-    };
-  }
+  const open=el("openInventorySystem");
+  if(open)open.addEventListener("click",showInventorySystem);
 
-  const open = el("openInventorySystem");
-  if(open){
-    open.onclick = showInventorySystem;
-  }
+  const back=el("portalBackBtn");
+  if(back)back.addEventListener("click",showPortalView);
 
-  const logout = el("logoutBtn");
-  if(logout){
-    logout.onclick = logoutPortal;
-  }
+  const logout=el("logoutBtn");
+  if(logout)logout.addEventListener("click",logoutPortal);
+
+  if(getLoginSession())showPortalView();
+  else showLoginView();
 }
 
 
@@ -271,39 +240,6 @@ async function sbAll(path,pageSize=1000,maxRows=20000){
   return all;
 }
 
-function loadLocalEquipmentTransfers(){
-  try{
-    const rows=JSON.parse(localStorage.getItem(EQUIPMENT_TRANSFER_LOCAL_KEY)||"[]");
-    return Array.isArray(rows)?rows:[];
-  }catch(_){
-    return [];
-  }
-}
-
-function saveLocalEquipmentTransfers(rows){
-  try{
-    localStorage.setItem(EQUIPMENT_TRANSFER_LOCAL_KEY,JSON.stringify(rows||[]));
-  }catch(_){}
-}
-
-function getLocalConfirmedEquipmentIds(){
-  try{
-    const ids=JSON.parse(localStorage.getItem(EQUIPMENT_CONFIRM_LOCAL_KEY)||"[]");
-    return Array.isArray(ids)?ids.map(String):[];
-  }catch(_){
-    return [];
-  }
-}
-
-function markLocalEquipmentConfirmed(id){
-  if(!id)return;
-  const ids=new Set(getLocalConfirmedEquipmentIds());
-  ids.add(String(id));
-  try{
-    localStorage.setItem(EQUIPMENT_CONFIRM_LOCAL_KEY,JSON.stringify([...ids]));
-  }catch(_){}
-}
-
 function esc(s){
   return String(s??"").replace(/[&<>"']/g,(c)=>({
     "&":"&amp;",
@@ -371,12 +307,6 @@ async function reloadAll(){
       staffMembers=[];
     }
 
-    try{
-      equipmentTransfers=await sb(`${EQUIPMENT_TRANSFER_TABLE}?select=*&order=created_at.desc&limit=100`);
-    }catch(_){
-      equipmentTransfers=loadLocalEquipmentTransfers();
-    }
-
     await enrichRecentLogProductNames();
     dataLoaded=true;
     dataLoadError=false;
@@ -395,7 +325,6 @@ function render(){
   renderProductCount();
   renderGlobalHistory();
   renderSelectedProductHistory();
-  renderEquipmentTransfers();
   if(typeof applyLang==='function')setTimeout(applyLang,0);
 }
 
@@ -426,12 +355,6 @@ function renderStaffOptions(){
     const cur=historyStaff.value;
     historyStaff.innerHTML='<option value="">すべての担当者</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
     if(cur)historyStaff.value=cur;
-  }
-  const equipmentStaff=el("equipmentStaffInput");
-  if(equipmentStaff){
-    const cur=equipmentStaff.value;
-    equipmentStaff.innerHTML='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
-    if(cur)equipmentStaff.value=cur;
   }
 }
 
@@ -653,14 +576,6 @@ async function registerBarcode(barcode){
       return;
     }
 
-    if(type==="備品転用"&&!memo){
-      beep(false);
-      showMessage("備品転用は備考欄の記入が必須です。用途や理由を入力してください。","err");
-      showPopup("備考が必要です","備品転用を登録する場合は、備考欄に用途や理由を入力してください。");
-      el("memo").focus();
-      return;
-    }
-
     const p=await fetchProductByBarcode(barcode);
 
     if(!p){
@@ -675,27 +590,23 @@ async function registerBarcode(barcode){
     if(type==="入荷")newStock=currentStock+qty;
     if(type==="出荷")newStock=currentStock-qty;
     if(type==="在庫修正")newStock=qty;
-    if(type==="備品転用")newStock=currentStock-qty;
 
-    if((type==="出荷"||type==="備品転用")&&newStock<0){
+    if(type==="出荷"&&newStock<0){
       beep(false);
-      showMessage(`在庫不足：${p.name} / 現在庫 ${currentStock} / 数量 ${qty}`,"err");
+      showMessage(`在庫不足：${p.name} / 現在庫 ${currentStock} / 出荷数 ${qty}`,"err");
       return;
     }
-
-    const dbType=type==="備品転用" ? "出荷" : type;
-    const logMemo=type==="備品転用" ? `確認ステータス：未確認 / ${memo}` : memo;
 
     const insertedLog=await sb("inventory_logs",{
       method:"POST",
       headers:{Prefer:"return=representation"},
       body:JSON.stringify({
-        type:dbType,
+        type,
         staff,
         barcode,
         product_name:p.name,
         quantity:qty,
-        memo:logMemo
+        memo
       })
     });
 
@@ -709,13 +620,11 @@ async function registerBarcode(barcode){
       barcode,
       product_name:p.name,
       quantity:qty,
-      memo:logMemo
+      memo
     });
 
     beep(true);
-    const successText=type==="備品転用"
-      ?`備品転用登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock} / 要確認`
-      : type==="在庫修正"
+    const successText=type==="在庫修正"
       ?`在庫修正：${p.name} / 現在庫を ${qty} に上書き / 担当者：${staff}`
       :`${type}登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock}`;
 
@@ -795,74 +704,6 @@ async function searchProductsByName(keyword){
   }
 }
 
-
-let scanProductSearchTimer=null;
-
-function renderScanProductSearchResults(rows){
-  const box=el("scanProductSearchResults");
-  if(!box)return;
-
-  if(!rows || !rows.length){
-    box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>別のキーワードで検索してください</span></div>';
-    box.classList.add("is-active");
-    return;
-  }
-
-  box.innerHTML=rows.map(p=>`
-    <div class="product-search-item" data-barcode="${esc(p.barcode)}">
-      <div>
-        <strong>${esc(p.name)}</strong>
-        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)} / 棚番：${esc(p.location||"")}</span>
-      </div>
-      <button type="button">選択</button>
-    </div>
-  `).join("");
-
-  box.classList.add("is-active");
-
-  box.querySelectorAll(".product-search-item[data-barcode]").forEach(item=>{
-    item.onclick=async()=>{
-      const barcode=item.dataset.barcode;
-      const barcodeInput=el("barcodeInput");
-      const nameInput=el("scanProductNameSearchInput");
-
-      if(barcodeInput)barcodeInput.value=barcode;
-      if(nameInput)nameInput.value="";
-
-      box.classList.remove("is-active");
-      box.innerHTML="";
-
-      await syncHistoryFromScanBarcode();
-
-      const qty=el("qty");
-      if(qty && !qty.value)qty.focus();
-      else if(barcodeInput)barcodeInput.focus();
-    };
-  });
-}
-
-function handleScanProductNameSearchInput(){
-  const input=el("scanProductNameSearchInput");
-  if(!input)return;
-
-  clearTimeout(scanProductSearchTimer);
-
-  const keyword=input.value.trim();
-  const box=el("scanProductSearchResults");
-
-  if(!keyword){
-    if(box){
-      box.classList.remove("is-active");
-      box.innerHTML="";
-    }
-    return;
-  }
-
-  scanProductSearchTimer=setTimeout(async()=>{
-    const rows=await searchProductsByName(keyword);
-    renderScanProductSearchResults(rows);
-  },250);
-}
 
 function renderProductSearchResults(rows){
   const box=el("productSearchResults");
@@ -963,31 +804,6 @@ function renderSelectedProductHistoryWithData(productLogs,productChecks){
   </tr>`).join("");
 }
 
-function isEquipmentTransferLog(log){
-  return log?.type==="備品転用" || (log?.type==="出荷" && String(log?.memo||"").includes("確認ステータス"));
-}
-
-function displayLogType(log){
-  return isEquipmentTransferLog(log) ? "備品転用" : log.type;
-}
-
-function isEquipmentTransferConfirmed(log){
-  const id=String(log?.id||"");
-  return (id&&getLocalConfirmedEquipmentIds().includes(id)) || String(log?.memo||"").includes("確認ステータス：確認");
-}
-
-function cleanMemoForDisplay(log){
-  let memo=String(log?.memo||"");
-  if(isEquipmentTransferLog(log)){
-    memo=memo
-      .replace(/^備品転用\s*\/\s*/,"")
-      .replace(/^確認ステータス：未確認\s*\/\s*/,"")
-      .replace(/^確認ステータス：確認済み\s*\/\s*/,"")
-      .replace(/^確認ステータス：確認\s*\/\s*/,"");
-  }
-  return memo;
-}
-
 function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode){
   const p=gp(barcode);
   let running=Number(p?.base_stock||0);
@@ -1007,7 +823,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
       beforeStock=running-q;
       inQty=q;
       running-=q;
-    }else if(log.type==="出荷"||isEquipmentTransferLog(log)){
+    }else if(log.type==="出荷"){
       beforeStock=running+q;
       outQty=q;
       running+=q;
@@ -1035,7 +851,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
 
     return `<tr>
       <td>${fmt(r.log.created_at)}</td>
-      <td>${esc(displayLogType(r.log))}</td>
+      <td>${esc(r.log.type)}</td>
       <td>${esc(r.log.staff)}</td>
       <td>${esc(p?.name||r.log.product_name||"")}</td>
       <td>${r.beforeStock}</td>
@@ -1080,61 +896,9 @@ async function editLogMemo(logId,currentMemo){
   }
 }
 
-async function confirmEquipmentLog(logId,currentMemo,barcode){
-  try{
-    if(!logId){
-      showMessage("この履歴は再読み込み後に確認できます。","err");
-      return;
-    }
-
-    const targetLog=(logs||[]).find(l=>String(l.id)===String(logId));
-    const refreshBarcode=barcode || targetLog?.barcode || selectedBarcode;
-    const cleaned=String(currentMemo||"")
-      .replace(/^備品転用\s*\/\s*/,"")
-      .replace(/^確認ステータス：未確認\s*\/\s*/,"")
-      .replace(/^確認ステータス：確認済み\s*\/\s*/,"")
-      .replace(/^確認ステータス：確認\s*\/\s*/,"");
-    const next=`確認ステータス：確認 / ${cleaned}`;
-
-    markLocalEquipmentConfirmed(logId);
-
-    try{
-      await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
-        method:"PATCH",
-        headers:{Prefer:"return=minimal"},
-        body:JSON.stringify({memo:next})
-      });
-    }catch(e){
-      showMessage("確認状態をこの端末に保存しました。Supabase側の更新は失敗しています。\n"+e.message,"err");
-    }
-
-    (logs||[]).forEach(l=>{
-      if(String(l.id)===String(logId))l.memo=next;
-    });
-
-    showMessage("備品転用を確認済みにしました。","ok");
-
-    renderGlobalHistory();
-
-    if(refreshBarcode){
-      selectedBarcode=refreshBarcode;
-      await showProductHistoryForBarcode(refreshBarcode);
-    }
-  }catch(e){
-    showMessage("確認ステータス更新エラー。\n"+e.message,"err");
-  }
-}
-
 function memoCellHtml(log){
   const id=log.id||"";
   const memo=log.memo||"";
-  if(isEquipmentTransferLog(log)){
-    const confirmed=isEquipmentTransferConfirmed(log);
-    return `<div class="memo-cell">
-      <span class="memo-text">${esc(cleanMemoForDisplay(log))}</span>
-      <button type="button" class="memo-edit-btn equipment-confirm-log-btn ${confirmed ? "is-confirmed" : "needs-confirm"}" data-log-id="${esc(id)}" data-barcode="${esc(log.barcode||"")}" data-memo="${esc(memo)}">${confirmed ? "確認" : "要確認"}</button>
-    </div>`;
-  }
   return `<div class="memo-cell">
     <span class="memo-text">${esc(memo)}</span>
     <button type="button" class="memo-edit-btn" data-log-id="${esc(id)}" data-memo="${esc(memo)}">修正</button>
@@ -1144,69 +908,23 @@ function memoCellHtml(log){
 function bindMemoEditButtons(){
   document.querySelectorAll(".memo-edit-btn").forEach(btn=>{
     btn.onclick=()=>{
-      if(btn.classList.contains("equipment-confirm-log-btn")){
-        if(btn.classList.contains("is-confirmed"))return;
-        btn.classList.remove("needs-confirm");
-        btn.classList.add("is-confirmed");
-        btn.textContent="確認";
-        confirmEquipmentLog(btn.dataset.logId,btn.dataset.memo||"",btn.dataset.barcode||"");
-        return;
-      }
       editLogMemo(btn.dataset.logId,btn.dataset.memo||"");
     };
   });
 }
 
-let globalHistoryRenderSeq=0;
-
-function matchesGlobalHistoryFilter(log,staffFilter,typeFilter){
-  if(staffFilter&&String(log.staff||"")!==String(staffFilter))return false;
-  if(typeFilter==="備品転用"&&!isEquipmentTransferLog(log))return false;
-  if(typeFilter==="要確認"&&(!isEquipmentTransferLog(log)||isEquipmentTransferConfirmed(log)))return false;
-  if(["入荷","出荷","在庫修正"].includes(typeFilter)&&displayLogType(log)!==typeFilter)return false;
-  return true;
-}
-
-async function loadGlobalHistoryLogsForFilter(staffFilter,typeFilter){
-  if(!typeFilter)return logs||[];
-
-  const allLogs=await sbAll("inventory_logs?select=*&order=created_at.desc",1000,50000);
-  const filtered=(allLogs||[]).filter(log=>matchesGlobalHistoryFilter(log,staffFilter,typeFilter)).slice(0,50);
-
-  if(typeof fetchProductsByBarcodes==="function"){
-    await fetchProductsByBarcodes(filtered.map(log=>log.barcode));
-  }
-
-  return filtered;
-}
-
-async function renderGlobalHistory(){
-  const seq=++globalHistoryRenderSeq;
+function renderGlobalHistory(){
   const body=el("historyBody");
   if(!body)return;
-  const staffFilter=el("historyStaffFilter")?.value||"";
-  const typeFilter=el("historyTypeFilter")?.value||"";
-
-  if(typeFilter){
-    body.innerHTML='<tr><td colspan="9">区分検索中...</td></tr>';
-  }
-
-  try{
-    const rows=await loadGlobalHistoryLogsForFilter(staffFilter,typeFilter);
-    if(seq!==globalHistoryRenderSeq)return;
-    body.innerHTML=buildGlobalHistoryRows(rows);
-    bindMemoEditButtons();
-  }catch(e){
-    if(seq!==globalHistoryRenderSeq)return;
-    body.innerHTML="";
-    showMessage("全体履歴検索エラー。\n"+e.message,"err");
-  }
+  body.innerHTML=buildGlobalHistoryRows();
+  bindMemoEditButtons();
 }
 
-function buildGlobalHistoryRows(sourceLogs){
+function buildGlobalHistoryRows(){
   const staffFilter=el("historyStaffFilter")?.value||"";
-  const typeFilter=el("historyTypeFilter")?.value||"";
-  const filteredLogs=(sourceLogs||logs||[]).filter(log=>matchesGlobalHistoryFilter(log,staffFilter,typeFilter));
+  const filteredLogs=staffFilter
+    ? logs.filter(log=>String(log.staff||"")===String(staffFilter))
+    : logs;
 
   return filteredLogs.map(log=>{
     const q=Number(log.quantity||0);
@@ -1222,7 +940,7 @@ function buildGlobalHistoryRows(sourceLogs){
       beforeStock=current-q;
       afterStock=current;
       inQty=q;
-    }else if(log.type==="出荷"||isEquipmentTransferLog(log)){
+    }else if(log.type==="出荷"){
       beforeStock=current+q;
       afterStock=current;
       outQty=q;
@@ -1233,7 +951,7 @@ function buildGlobalHistoryRows(sourceLogs){
 
     return `<tr>
       <td>${fmt(log.created_at)}</td>
-      <td>${esc(displayLogType(log))}</td>
+      <td>${esc(log.type)}</td>
       <td>${esc(log.staff)}</td>
       <td>${esc(gp(log.barcode)?.name||log.product_name||"")}</td>
       <td>${beforeStock}</td>
@@ -1243,217 +961,6 @@ function buildGlobalHistoryRows(sourceLogs){
       <td>${memoCellHtml(log)}</td>
     </tr>`;
   }).join("");
-}
-
-function equipmentTransferStatus(row){
-  return row.status || row.confirm_status || row.confirmation_status || "未確認";
-}
-
-function equipmentTransferStatusLabel(status){
-  if(getLang&&getLang()==="ko"){
-    return status==="確認済み" ? "확인 완료" : "미확인";
-  }
-  return status;
-}
-
-function getEquipmentProductCandidates(){
-  return (products||[])
-    .filter(p=>p&&p.name)
-    .slice(0,500)
-    .map(p=>`<option value="${esc(p.name)} / ${esc(p.barcode||"")}"></option>`)
-    .join("");
-}
-
-function parseEquipmentProductInput(raw){
-  const text=String(raw||"").trim();
-  const slash=text.lastIndexOf(" / ");
-  if(slash>-1){
-    return {
-      product_name:text.slice(0,slash).trim(),
-      barcode:text.slice(slash+3).trim()
-    };
-  }
-
-  const byBarcode=gp(text);
-  if(byBarcode){
-    return {product_name:byBarcode.name,barcode:String(byBarcode.barcode||"")};
-  }
-
-  const byName=(products||[]).find(p=>String(p.name||"").trim()===text);
-  if(byName){
-    return {product_name:byName.name,barcode:String(byName.barcode||"")};
-  }
-
-  return {product_name:text,barcode:""};
-}
-
-function renderEquipmentTransfers(){
-  const body=el("equipmentTransferBody");
-  const badge=el("equipmentTransferCountBadge");
-  const list=el("equipmentProductList");
-
-  if(list)list.innerHTML=getEquipmentProductCandidates();
-
-  const pending=(equipmentTransfers||[]).filter(r=>equipmentTransferStatus(r)!=="確認済み").length;
-  if(badge)badge.textContent=getLang&&getLang()==="ko" ? `미확인: ${pending}건` : `未確認：${pending}件`;
-  if(!body)return;
-
-  body.innerHTML=(equipmentTransfers||[]).map(row=>{
-    const status=equipmentTransferStatus(row);
-    return `<tr>
-      <td>${fmt(row.created_at||row.datetime||row.date||"")}</td>
-      <td>
-        <button type="button" class="equipment-confirm-btn ${status==="確認済み"?"is-confirmed":""}" data-transfer-id="${esc(row.id||"")}">
-          ${esc(equipmentTransferStatusLabel(status))}
-        </button>
-      </td>
-      <td>${esc(row.product_name||row.product||"")}</td>
-      <td>${esc(row.quantity||"")}</td>
-      <td>${esc(row.staff||"")}</td>
-      <td>${esc(row.purpose||"")}</td>
-      <td>${esc(row.memo||"")}</td>
-      <td>${getLang&&getLang()==="ko"?"알림 없음":"通知なし"}</td>
-    </tr>`;
-  }).join("");
-
-  document.querySelectorAll(".equipment-confirm-btn").forEach(btn=>{
-    btn.onclick=()=>confirmEquipmentTransfer(btn.dataset.transferId);
-  });
-}
-
-function setEquipmentTransferMessage(text,type=""){
-  const m=el("equipmentTransferMessage");
-  if(!m)return;
-  m.textContent=text||"";
-  m.className="message "+type;
-}
-
-async function saveEquipmentTransfer(e){
-  e.preventDefault();
-
-  const product=parseEquipmentProductInput(el("equipmentProductInput")?.value);
-  const qtyRaw=el("equipmentQtyInput")?.value.trim()||"";
-  const quantity=Number(qtyRaw);
-  const staff=el("equipmentStaffInput")?.value.trim()||"";
-  const purpose=el("equipmentPurposeInput")?.value.trim()||"";
-  const memo=el("equipmentMemoInput")?.value.trim()||"";
-
-  if(!product.product_name){
-    setEquipmentTransferMessage("商品を入力してください。","err");
-    el("equipmentProductInput")?.focus();
-    return;
-  }
-
-  if(!qtyRaw||!Number.isFinite(quantity)||quantity<=0){
-    setEquipmentTransferMessage("数量は1以上で入力してください。","err");
-    el("equipmentQtyInput")?.focus();
-    return;
-  }
-
-  if(!staff){
-    setEquipmentTransferMessage("担当者を選択してください。","err");
-    el("equipmentStaffInput")?.focus();
-    return;
-  }
-
-  if(!purpose){
-    setEquipmentTransferMessage("用途を入力してください。","err");
-    el("equipmentPurposeInput")?.focus();
-    return;
-  }
-
-  if(!memo){
-    setEquipmentTransferMessage("備品転用は備考欄の記入が必須です。","err");
-    el("equipmentMemoInput")?.focus();
-    return;
-  }
-
-  const row={
-    product_name:product.product_name,
-    barcode:product.barcode,
-    quantity,
-    staff,
-    purpose,
-    memo,
-    status:"未確認"
-  };
-
-  try{
-    let saved=null;
-    let savedLocalOnly=false;
-    try{
-      const inserted=await sb(EQUIPMENT_TRANSFER_TABLE,{
-        method:"POST",
-        headers:{Prefer:"return=representation"},
-        body:JSON.stringify(row)
-      });
-      saved=Array.isArray(inserted)&&inserted[0]?inserted[0]:{...row,created_at:new Date().toISOString()};
-    }catch(dbError){
-      saved={...row,id:"local-"+Date.now(),created_at:new Date().toISOString(),local_only:true};
-      savedLocalOnly=true;
-      equipmentTransfers.unshift(saved);
-      saveLocalEquipmentTransfers(equipmentTransfers);
-    }
-
-    if(!savedLocalOnly)equipmentTransfers.unshift(saved);
-    renderEquipmentTransfers();
-    setEquipmentTransferMessage(savedLocalOnly ? "Supabaseの備品転用テーブルが未作成のため、この端末に一時保存しました。" : "備品転用を登録しました。", savedLocalOnly ? "err" : "ok");
-    showPopup("備品転用登録完了",`${saved.product_name}\n数量：${saved.quantity}\n担当者：${saved.staff}\n確認ステータス：未確認`);
-
-    el("equipmentProductInput").value="";
-    el("equipmentQtyInput").value="";
-    el("equipmentPurposeInput").value="";
-    el("equipmentMemoInput").value="";
-  }catch(e){
-    renderEquipmentTransfers();
-    setEquipmentTransferMessage("Supabaseの備品転用テーブルが未作成のため、この端末に一時保存しました。テーブル作成後に再登録してください。\n"+e.message,"err");
-  }
-}
-
-async function confirmEquipmentTransfer(id){
-  if(!id)return;
-
-  const row=(equipmentTransfers||[]).find(r=>String(r.id)===String(id));
-  if(!row)return;
-  if(equipmentTransferStatus(row)==="確認済み")return;
-
-  try{
-    if(row.local_only){
-      row.status="確認済み";
-      row.confirmed_at=new Date().toISOString();
-      saveLocalEquipmentTransfers(equipmentTransfers);
-    }else{
-      await sb(`${EQUIPMENT_TRANSFER_TABLE}?id=eq.${encodeURIComponent(id)}`,{
-        method:"PATCH",
-        headers:{Prefer:"return=minimal"},
-        body:JSON.stringify({status:"確認済み",confirmed_at:new Date().toISOString()})
-      });
-      row.status="確認済み";
-      row.confirmed_at=new Date().toISOString();
-    }
-    renderEquipmentTransfers();
-    setEquipmentTransferMessage("確認ステータスを確認済みにしました。","ok");
-  }catch(e){
-    setEquipmentTransferMessage("確認ステータス更新エラー\n"+e.message,"err");
-  }
-}
-
-function exportEquipmentTransferCsv(){
-  const rows=[["日時","確認ステータス","商品","バーコード","数量","担当者","用途","備考"]];
-  (equipmentTransfers||[]).forEach(row=>{
-    rows.push([
-      fmt(row.created_at||""),
-      equipmentTransferStatus(row),
-      row.product_name||row.product||"",
-      row.barcode||"",
-      row.quantity||"",
-      row.staff||"",
-      row.purpose||"",
-      row.memo||""
-    ]);
-  });
-  downloadCsvFile("equipment_transfers.csv",rows);
-  setEquipmentTransferMessage("備品転用CSVを出力しました。","ok");
 }
 
 async function saveStockCheck(){
@@ -1731,7 +1238,7 @@ function buildHistoryExportRows(sourceLogs){
         beforeStock=running-q;
         inQty=q;
         running-=q;
-      }else if(log.type==="出荷"||isEquipmentTransferLog(log)){
+      }else if(log.type==="出荷"){
         beforeStock=running+q;
         outQty=q;
         running+=q;
@@ -1744,7 +1251,7 @@ function buildHistoryExportRows(sourceLogs){
         created_at:log.created_at,
         row:[
           fmt(log.created_at),
-          displayLogType(log)||"",
+          log.type||"",
           log.staff||"",
           gp(log.barcode)?.name || log.product_name || "",
           beforeStock,
@@ -2024,10 +1531,8 @@ function bindEvents(){
   on("barcodeInput","input",()=>syncHistoryFromScanBarcode());
   on("productBarcode","input",()=>renderProductStockInfo());
   on("productHistoryBarcodeInput","input",()=>selectProductHistoryByBarcode());
-  on("scanProductNameSearchInput","input",handleScanProductNameSearchInput);
   on("productNameSearchInput","input",handleProductNameSearchInput);
   on("historyStaffFilter","change",renderGlobalHistory);
-  on("historyTypeFilter","change",renderGlobalHistory);
 
   on("startCameraBtn","click",startCamera);
   on("historyCameraBtn","click",startCamera);
@@ -2044,8 +1549,6 @@ function bindEvents(){
   on("clearFilterBtn","click",()=>{
     const historyStaff=el("historyStaffFilter");
     if(historyStaff)historyStaff.value="";
-    const historyType=el("historyTypeFilter");
-    if(historyType)historyType.value="";
     renderGlobalHistory();
   });
   on("showAllSelectedHistoryBtn","click",()=>showProductHistoryForBarcode(selectedBarcode));
@@ -2210,7 +1713,6 @@ function applyPlaceholders(lang){
     ja:{
       staffNameInput:"例：田中",
       barcodeInput:"バーコードをスキャン、または手入力",
-      scanProductNameSearchInput:"商品名の一部を入力",
       memo:"例：棚卸差異、サンプル使用、不良返品など",
       productBarcode:"バーコードを入力",
       productName:"商品名を必ず入力",
@@ -2220,7 +1722,6 @@ function applyPlaceholders(lang){
     ko:{
       staffNameInput:"예：다나카",
       barcodeInput:"바코드를 스캔하거나 직접 입력",
-      scanProductNameSearchInput:"상품명의 일부를 입력",
       memo:"예：재고 차이, 샘플 사용, 불량 반품 등",
       productBarcode:"바코드를 입력",
       productName:"상품명을 반드시 입력",
@@ -2247,87 +1748,11 @@ function applySelectLabels(lang){
   if(historyStaff&&historyStaff.options.length)historyStaff.options[0].textContent=labels.historyStaffFilter;
 }
 
-function applyTypeLabels(lang){
-  const type=document.getElementById("type");
-  const labels=lang==="ko"
-    ?{入荷:"입고",出荷:"출고",在庫修正:"재고 수정",備品転用:"비품 전용"}
-    :{入荷:"入荷",出荷:"出荷",在庫修正:"在庫修正",備品転用:"備品転用"};
-  if(type){
-    [...type.options].forEach(option=>{
-      if(labels[option.value])option.textContent=labels[option.value];
-    });
-  }
-
-  const historyType=document.getElementById("historyTypeFilter");
-  if(historyType&&historyType.options.length){
-    const historyLabels=lang==="ko"
-      ?{"":"모든 구분",入荷:"입고만",出荷:"출고만",在庫修正:"재고 수정만",備品転用:"비품 전용만",要確認:"확인 필요만"}
-      :{"":"すべての区分",入荷:"入荷のみ",出荷:"出荷のみ",在庫修正:"在庫修正のみ",備品転用:"備品転用のみ",要確認:"要確認のみ"};
-    [...historyType.options].forEach(option=>{
-      if(Object.prototype.hasOwnProperty.call(historyLabels,option.value)){
-        option.textContent=historyLabels[option.value];
-      }
-    });
-  }
-}
-
-function setLabelLeadText(inputId,text){
-  const input=document.getElementById(inputId);
-  const label=input&&input.closest("label");
-  if(!label)return;
-  for(const node of label.childNodes){
-    if(node.nodeType===Node.TEXT_NODE && node.nodeValue.trim()){
-      node.nodeValue=text+" ";
-      return;
-    }
-  }
-}
-
-function applyEquipmentTransferLang(lang){
-  const isKo=lang==="ko";
-  const card=document.getElementById("equipmentTransferCard");
-  if(!card)return;
-
-  const title=card.querySelector("h2");
-  const note=card.querySelector(".section-note");
-  const submit=document.getElementById("equipmentTransferSubmitBtn");
-  const csv=document.getElementById("equipmentTransferCsvBtn");
-  const staff=document.getElementById("equipmentStaffInput");
-  const product=document.getElementById("equipmentProductInput");
-  const qty=document.getElementById("equipmentQtyInput");
-  const purpose=document.getElementById("equipmentPurposeInput");
-  const memo=document.getElementById("equipmentMemoInput");
-
-  if(title)title.textContent=isKo?"비품 전용 등록":"備品転用登録";
-  if(note)note.textContent=isKo?"스마트레지 재고는 자동 차감하지 않고 기록, 알림, 확인만 진행합니다":"スマレジ在庫は減算せず、記録・通知・確認のみ行います";
-  if(submit)submit.textContent=isKo?"비품 전용 등록":"備品転用を登録";
-  if(csv)csv.textContent=isKo?"비품 전용 CSV":"備品転用CSV";
-  if(staff&&staff.options.length)staff.options[0].textContent=isKo?"담당자 선택":"担当者を選択";
-  if(product)product.placeholder=isKo?"상품명 또는 바코드":"商品名またはバーコード";
-  if(qty)qty.placeholder=isKo?"수량":"数量";
-  if(purpose)purpose.placeholder=isKo?"예: 매장 비품, 촬영, 샘플":"例：店舗備品、撮影、サンプル";
-  if(memo)memo.placeholder=isKo?"전용 사유나 사용 장소 등을 반드시 입력":"転用理由や使用場所などを必ず入力";
-
-  setLabelLeadText("equipmentProductInput",isKo?"상품":"商品");
-  setLabelLeadText("equipmentQtyInput",isKo?"수량":"数量");
-  setLabelLeadText("equipmentStaffInput",isKo?"담당자":"担当者");
-  setLabelLeadText("equipmentPurposeInput",isKo?"용도":"用途");
-  setLabelLeadText("equipmentMemoInput",isKo?"비고":"備考");
-
-  const headers=card.querySelectorAll(".equipment-transfer-table th");
-  const ja=["日時","確認","商品","数量","担当者","用途","備考","通知"];
-  const ko=["일시","확인","상품","수량","담당자","용도","비고","알림"];
-  headers.forEach((th,i)=>{ th.textContent=(isKo?ko:ja)[i]||th.textContent; });
-}
-
 function applyLang(){
   const lang=getLang();
   walkTextNodes(document.body,lang);
   applyPlaceholders(lang);
   applySelectLabels(lang);
-  applyTypeLabels(lang);
-  applyEquipmentTransferLang(lang);
-  renderEquipmentTransfers();
 
   const ja=document.getElementById("langJaBtn");
   const ko=document.getElementById("langKoBtn");
@@ -2394,14 +1819,3 @@ window.addEventListener("DOMContentLoaded",()=>{
   const c=document.getElementById("appPopupClose");
   if(c)c.onclick=hidePopup;
 });
-
-/* ===== ARICO DIRECT ACCESS FINAL FIX ===== */
-window.addEventListener("load", function(){
-  try{
-    const shell = document.getElementById("loginShell");
-    const app = document.getElementById("mainApp");
-    if(shell) shell.classList.add("is-hidden");
-    if(app) app.classList.remove("app-is-hidden");
-  }catch(_){}
-});
-/* ===== /ARICO DIRECT ACCESS FINAL FIX ===== */
