@@ -1628,3 +1628,74 @@ header h1{
   padding:8px 10px;
   font-size:13px;
 }
+
+
+/* ===== inventory card search/order and card alignment ===== */
+.card.scanner,
+.staff-admin-section{
+  min-height:620px;
+}
+
+@media(min-width:801px){
+  .grid{
+    align-items:stretch;
+  }
+
+  .card.scanner,
+  .staff-admin-section{
+    height:100%;
+  }
+
+  .staff-admin-section{
+    display:flex;
+    flex-direction:column;
+  }
+
+  .staff-admin-section .table-wrap{
+    flex:1 1 auto;
+    min-height:320px;
+    max-height:420px;
+  }
+}
+
+/* 在庫変動登録内：バーコード入力を上、商品名検索を下にして余白調整 */
+#manualForm{
+  margin-bottom:12px;
+}
+
+.scan-product-search-box{
+  margin-top:14px;
+  margin-bottom:14px;
+}
+
+/* 全体履歴：担当者・区分検索 */
+.global-history-filter{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  align-items:end;
+  background:var(--main-soft,#f1fbf4);
+  border:1px solid var(--border,#cfe6d7);
+  border-radius:14px;
+  padding:12px;
+  margin:12px 0 14px;
+}
+
+.global-history-filter label{
+  margin:0;
+}
+
+.global-history-filter select{
+  margin-top:8px;
+}
+
+@media(max-width:800px){
+  .card.scanner,
+  .staff-admin-section{
+    min-height:auto;
+  }
+
+  .global-history-filter{
+    grid-template-columns:1fr;
+  }
+}
