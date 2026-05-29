@@ -1699,3 +1699,66 @@ header h1{
     grid-template-columns:1fr;
   }
 }
+
+
+/* ===== v-next global history layout / equipment alert / staff height ===== */
+
+/* 全体履歴の検索欄を横並びに固定 */
+.global-history-filter{
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:12px !important;
+  align-items:end !important;
+  width:100% !important;
+  max-width:520px !important;
+  background:var(--main-soft,#f1fbf4) !important;
+  border:1px solid var(--border,#cfe6d7) !important;
+  border-radius:14px !important;
+  padding:12px !important;
+  margin:12px 0 16px !important;
+}
+
+.global-history-filter label{
+  margin:0 !important;
+}
+
+.global-history-filter select{
+  margin-top:8px !important;
+  min-height:44px !important;
+}
+
+/* 要確認を赤く目立たせる */
+.equipment-confirm-log-btn.needs-confirm,
+.needs-confirm{
+  background:#dc2626 !important;
+  color:#fff !important;
+  border-color:#dc2626 !important;
+}
+
+.equipment-confirm-log-btn.needs-confirm:hover,
+.needs-confirm:hover{
+  background:#991b1b !important;
+}
+
+/* 確認済みは緑 */
+.equipment-confirm-log-btn.is-confirmed,
+.is-confirmed{
+  background:#2d6a4f !important;
+  color:#fff !important;
+}
+
+/* 担当者設定のスクロール範囲を1名分長くする */
+@media(min-width:801px){
+  .staff-admin-section .table-wrap{
+    min-height:400px !important;
+    max-height:480px !important;
+    height:400px !important;
+  }
+}
+
+@media(max-width:800px){
+  .global-history-filter{
+    grid-template-columns:1fr !important;
+    max-width:none !important;
+  }
+}
