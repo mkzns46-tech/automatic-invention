@@ -1522,7 +1522,10 @@ header h1{
 .smaregi-progress-row button{width:auto;margin:0}
 .smaregi-entry-panel{margin:14px 0;padding:14px;border:2px solid var(--main);border-radius:14px;background:#f0fff4}
 .smaregi-entry-panel h3{margin-top:0}
-.smaregi-entry-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.smaregi-selected-row{display:grid;grid-template-columns:1fr 170px;gap:10px;align-items:end}
+.smaregi-selected-row .message{margin-top:0;min-height:52px}
+.smaregi-selected-row label{margin:0}
+.smaregi-entry-grid{display:grid;grid-template-columns:1fr;gap:10px}
 .smaregi-filter-row label{display:flex;gap:8px;align-items:center}
 .smaregi-filter-row input[type="text"],#smaregiStockSearchInput{min-width:260px}
 .smaregi-difference-filter{font-weight:800}
@@ -1532,7 +1535,6 @@ header h1{
 .smaregi-empty{text-align:center;color:#64748b;padding:20px}
 .smaregi-status{display:inline-block;padding:5px 8px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:900}
 .smaregi-status.is-checked{background:#d8f3dc;color:#1b4332}
-.smaregi-status.is-excluded{background:#e5e7eb;color:#475569}
 .smaregi-row-actions{display:flex;gap:6px}
 .smaregi-row-actions button{width:auto;min-width:76px;margin:0;padding:8px 10px;font-size:13px}
 .smaregi-cause-detail{margin-top:16px;padding:14px;border:2px solid #dcebe1;border-radius:14px;background:#fff}
@@ -1540,12 +1542,16 @@ header h1{
 .smaregi-detail-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .smaregi-detail-summary div{display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:10px;background:#f0fff4}
 .smaregi-detail-summary strong{font-size:12px;color:#527161}
+.smaregi-suspicious-row td{background:#fff1f2 !important;color:#9d0208}
+.smaregi-warning{margin-top:4px;color:#b91c1c;font-weight:900;white-space:normal}
+.smaregi-online-row td{background:#fffbeb !important}
+.smaregi-online-note{margin-top:4px;color:#92400e;font-weight:800;white-space:normal}
 @media(max-width:760px){
   .header-actions{align-items:stretch}
   .menu-link{justify-content:center;text-align:center}
   .smaregi-filter-row{align-items:stretch}
   #smaregiStockSearchInput{min-width:0;width:100%}
-  .smaregi-entry-grid,.smaregi-detail-summary{grid-template-columns:1fr}
+  .smaregi-selected-row,.smaregi-entry-grid,.smaregi-detail-summary{grid-template-columns:1fr}
   .smaregi-entry-panel{padding:12px}
   .smaregi-row-actions{flex-direction:column}
   .smaregi-row-actions button{width:100%}

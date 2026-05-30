@@ -81,7 +81,6 @@
   <div class="smaregi-toolbar">
     <button type="button" id="closeSmaregiStockCheckBtn" class="secondary">トップへ戻る</button>
     <button type="button" id="syncSmaregiStockBtn">スマレジAPIから変動商品取得</button>
-    <button type="button" id="loadSmaregiStockBtn" class="secondary">保存済み一覧を再表示</button>
     <label class="file-button">スマレジ在庫CSV取り込み<input type="file" id="smaregiCsvFile" accept=".csv,text/csv"/></label>
     <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
     <button type="button" id="exportSmaregiDifferenceCsvBtn" class="secondary">差異のみCSV</button>
@@ -95,11 +94,12 @@
   <div class="smaregi-entry-panel">
     <h3>実在庫チェック</h3>
     <label>商品コード / バーコード<input id="smaregiCheckBarcodeInput" inputmode="numeric" autocomplete="off" placeholder="読み取りまたは手入力"/></label>
-    <div id="smaregiSelectedProduct" class="message">商品コードを入力してください。</div>
-    <div class="smaregi-entry-grid">
+    <div class="smaregi-selected-row">
+      <div id="smaregiSelectedProduct" class="message">商品コードを入力してください。</div>
       <label>実在庫数<input id="smaregiActualStockInput" type="number" min="0" step="1" inputmode="numeric" placeholder="0も入力できます"/></label>
+    </div>
+    <div class="smaregi-entry-grid">
       <label>担当者<select id="smaregiCheckerName"><option value="">担当者を選択</option></select></label>
-      <label>担当者を直接入力<input id="smaregiCheckerManualInput" placeholder="一覧にない場合のみ入力"/></label>
     </div>
     <button type="button" id="saveSmaregiActualStockBtn">決定してチェック済みにする</button>
   </div>
@@ -109,7 +109,7 @@
   </div>
   <div class="table-wrap">
     <table class="smaregi-check-table">
-      <thead><tr><th>状態</th><th>商品名</th><th>バーコード</th><th>スマレジ在庫</th><th>シート在庫</th><th>実在庫</th><th>差異</th><th>担当者</th><th>操作</th></tr></thead>
+      <thead><tr><th>状態</th><th>商品名</th><th>バーコード</th><th>スマレジ在庫</th><th>シート在庫</th><th>操作</th></tr></thead>
       <tbody id="smaregiStockCheckBody"></tbody>
     </table>
   </div>
