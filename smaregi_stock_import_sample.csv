@@ -1,4 +1,4 @@
-# v78 スマレジ在庫API診断ログ版
+# v79 スマレジ日時入口変換版
 
 ## 修正内容
 - 商品名検索候補にスクロールバーを追加
@@ -26,6 +26,7 @@
 - Vercelログへ `/stock` 送信直前の日時パラメータを出力
 - Vercelログへ `/stock` の最終送信URL、店舗ID、環境、認証URLを `console.log` で出力
 - `/stock` 失敗時の返却JSONへ同じ診断情報を付加
+- `splitDateRanges(formatSmaregiDate(since), formatSmaregiDate(now))` でAPI送信前の日時変換を明示
 - 旧v72 SQLを実行済みの場合は `supabase_schema_update_v73_smaregi_api_sync.sql` を追加実行
 
 ## スマレジ在庫CSV
