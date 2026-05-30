@@ -1,151 +1,5 @@
 *{box-sizing:border-box}:root{--main:#2d6a4f;--main-dark:#1b4332;--main-light:#d8f3dc;--bg:#f2f7f4;--text:#10251b}body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}.app{max-width:1200px;margin:0 auto;padding:16px}header{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#fff;border-radius:18px;padding:18px 20px;margin-bottom:16px;box-shadow:0 4px 20px #0000000d;border-top:6px solid var(--main)}h1{font-size:26px;margin:0;color:var(--main-dark)}h2{margin:0;font-size:20px;color:var(--main-dark)}h3{margin:18px 0 10px;font-size:16px;color:var(--main-dark)}p{margin:4px 0;color:#527161}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 4px 20px #0000000d;border:1px solid #dcebe1}.wide{grid-column:1/-1}.card small{display:block;margin-top:8px;color:#527161}label{display:block;font-weight:700;font-size:13px;margin:10px 0 5px;color:var(--main-dark)}input,select,button{width:100%;border:1px solid #b7d7c4;border-radius:12px;padding:12px;font-size:16px;background:#fff}input:focus,select:focus{outline:3px solid var(--main-light);border-color:var(--main)}button{border:none;background:var(--main);color:#fff;font-weight:800;cursor:pointer;margin-top:10px}button:hover,.file-button:hover{background:var(--main-dark)}button.secondary{background:#dcebe1;color:var(--main-dark)}button.secondary:hover{background:#c6dfcf}.file-button{width:100%;border:none;border-radius:12px;padding:12px;font-size:16px;background:var(--main);color:#fff;font-weight:800;cursor:pointer;margin-top:10px;text-align:center}.file-button.danger{background:#9d0208}.file-button.danger:hover{background:#6a040f}.file-button input{display:none}.row{display:grid;grid-template-columns:1fr 1fr 120px;gap:10px}.button-row{display:flex;gap:10px}.button-row button,.button-row .file-button{width:auto;flex:1}video{width:100%;max-height:360px;background:#111827;border-radius:16px;margin:12px 0;display:none}.message{margin-top:12px;padding:12px;border-radius:12px;background:#edf6f0;color:var(--main-dark);font-weight:700;white-space:pre-wrap}.message.ok{background:var(--main-light);color:var(--main-dark)}.message.err{background:#fff1f2;color:#9d0208}.table-wrap{overflow:auto;max-height:460px;border:1px solid #dcebe1;border-radius:14px}.small-table{max-height:240px}table{width:100%;border-collapse:collapse;font-size:14px;background:#fff}th,td{padding:10px;border-bottom:1px solid #e4efe8;text-align:left;white-space:nowrap}th{position:sticky;top:0;background:#d8f3dc;color:var(--main-dark);z-index:1}tr.clickable{cursor:pointer}tr.clickable:hover{background:#f0fff4}tr.selected-row{background:#d8f3dc}.stock-minus{color:#dc2626;font-weight:900}.stock-plus{color:var(--main);font-weight:900}.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.badge{display:inline-flex;align-items:center;border-radius:999px;background:var(--main);color:#fff;padding:6px 10px;font-size:13px;font-weight:800}.badge.muted{background:#dcebe1;color:var(--main-dark)}.required{display:inline-block;margin-left:5px;border-radius:999px;background:#fee2e2;color:#b91c1c;padding:2px 7px;font-size:11px}.check-panel{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end;background:#f0fff4;border:1px solid #dcebe1;border-radius:14px;padding:14px;margin-bottom:12px}.check-title{font-weight:900;color:var(--main-dark)}.check-help{font-size:13px;color:#527161;margin-top:4px}.check-actions{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:end}.check-actions button{margin-top:0}@media(max-width:800px){.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr}.app{padding:10px}header{display:block}h1{font-size:22px}.button-row{flex-direction:column}.button-row button,.button-row .file-button{width:100%}.section-title{display:block}.badge{margin-top:10px}.check-panel{grid-template-columns:1fr}.check-actions{grid-template-columns:1fr}}
 
-.app-is-hidden,
-.login-shell.is-hidden{
-  display:none !important;
-}
-
-.login-shell{
-  min-height:100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
-  background:
-    linear-gradient(135deg,rgba(11,79,53,.94),rgba(45,106,79,.88)),
-    linear-gradient(180deg,#f4faf6,#e8f5ec);
-}
-
-.login-card,
-.portal-card{
-  width:min(960px,100%);
-  background:#fff;
-  border:1px solid #cfe6d7;
-  border-radius:18px;
-  box-shadow:0 22px 70px rgba(9,45,30,.22);
-  padding:26px;
-}
-
-.login-card{
-  max-width:430px;
-}
-
-.login-brand{
-  color:#2d6a4f;
-  font-size:13px;
-  font-weight:900;
-  letter-spacing:.08em;
-  margin-bottom:8px;
-}
-
-.login-card h1,
-.portal-card h1{
-  color:#123c2b;
-  font-size:28px;
-  line-height:1.25;
-  margin:0;
-}
-
-.login-card p{
-  margin:8px 0 18px;
-  line-height:1.6;
-}
-
-.login-message{
-  min-height:22px;
-  margin-top:12px;
-  color:#527161;
-  font-weight:800;
-}
-
-.login-message.err{
-  color:#b91c1c;
-}
-
-.portal-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:18px;
-}
-
-.portal-logout{
-  width:auto !important;
-  min-width:120px;
-  background:#dcebe1;
-  color:#1b4332;
-  margin-top:0;
-}
-
-.system-grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:14px;
-}
-
-.system-card{
-  min-height:150px;
-  text-align:left;
-  margin-top:0;
-  padding:18px;
-  border:1px solid #cfe6d7;
-  background:#f7fff9;
-  color:#123c2b;
-}
-
-.system-card:hover{
-  background:#edf8f1;
-}
-
-.system-card strong,
-.system-card span{
-  display:block;
-}
-
-.system-card strong{
-  font-size:18px;
-  margin-bottom:8px;
-}
-
-.system-card span{
-  color:#527161;
-  font-size:13px;
-  line-height:1.5;
-}
-
-.system-card.is-disabled{
-  opacity:.58;
-  cursor:not-allowed;
-}
-
-@media(max-width:800px){
-  .login-shell{
-    padding:12px;
-    align-items:stretch;
-  }
-
-  .login-card,
-  .portal-card{
-    margin:auto 0;
-    padding:20px;
-    border-radius:16px;
-  }
-
-  .portal-header{
-    display:block;
-  }
-
-  .portal-logout{
-    width:100% !important;
-    margin-top:14px;
-  }
-
-  .system-grid{
-    grid-template-columns:1fr;
-  }
-}
-
 /* バーコード入力欄を強調 */
 #barcodeInput{
   border:3px solid var(--main);
@@ -1409,6 +1263,95 @@ header h1{
   }
 }
 
+/* ===== v67 product register search clean layout ===== */
+.product-form-search-block{
+  display:block !important;
+  width:100% !important;
+  margin:0 0 14px !important;
+  padding:12px !important;
+  border:1px solid #cfe6d7 !important;
+  border-radius:14px !important;
+  background:#f7fff9 !important;
+  box-sizing:border-box !important;
+}
+
+.product-form-search-block label{
+  display:block !important;
+  margin:0 !important;
+  font-weight:800 !important;
+}
+
+.product-form-search-block input{
+  width:100% !important;
+  margin-top:8px !important;
+  box-sizing:border-box !important;
+}
+
+#productFormSearchResults{
+  width:100% !important;
+  margin-top:10px !important;
+}
+
+/* ===== v68 product register search fixed position ===== */
+.product-form-search-block{
+  display:block !important;
+  width:100% !important;
+  margin:0 0 16px !important;
+  padding:12px !important;
+  border:1px solid #cfe6d7 !important;
+  border-radius:14px !important;
+  background:#f7fff9 !important;
+  box-sizing:border-box !important;
+  grid-column:1 / -1 !important;
+}
+
+.product-form-search-block label{
+  display:block !important;
+  margin:0 !important;
+  font-weight:800 !important;
+}
+
+.product-form-search-block input{
+  width:100% !important;
+  margin-top:8px !important;
+  box-sizing:border-box !important;
+}
+
+#productFormSearchResults{
+  width:100% !important;
+  margin-top:10px !important;
+}
+
+/* ===== v69 product registration search final ===== */
+.product-form-search-block{
+  display:block !important;
+  width:100% !important;
+  margin:12px 0 16px !important;
+  padding:12px !important;
+  border:1px solid #cfe6d7 !important;
+  border-radius:14px !important;
+  background:#f7fff9 !important;
+  box-sizing:border-box !important;
+}
+
+.product-form-search-block label{
+  display:block !important;
+  margin:0 !important;
+  font-weight:800 !important;
+}
+
+.product-form-search-block input{
+  display:block !important;
+  width:100% !important;
+  margin-top:8px !important;
+  box-sizing:border-box !important;
+}
+
+#productFormSearchResults{
+  width:100% !important;
+  margin-top:10px !important;
+}
+
 /* ===== v70 popup / mobile history / memo edit ===== */
 .app-popup{
   position:fixed;
@@ -1467,298 +1410,109 @@ header h1{
   white-space:nowrap;
 }
 
-.global-history-filter{
-  max-width:360px;
-  margin:12px 0 14px;
-}
-
-.global-history-filter label{
-  margin:0;
-}
-
-.global-history-filter select{
-  margin-top:8px;
-}
-
 /* スマホでも全体履歴を表示 */
 @media(max-width:800px){
-  section.global-history-section,
-  section.global-history-section.pc-only-section,
-  .global-history-section{
+  section:has(#historyBody),
+  #historyBody,
+  .global-history,
+  .all-history{
     display:block !important;
+  }
+}
+
+/* ===== v71 force mobile global history ===== */
+@media(max-width:800px){
+  .mobile-force-history,
+  .mobile-force-history *,
+  section.mobile-force-history,
+  section.mobile-force-history .table-wrap,
+  section.mobile-force-history table,
+  section.mobile-force-history thead,
+  section.mobile-force-history tbody,
+  section.mobile-force-history tr,
+  section.mobile-force-history th,
+  section.mobile-force-history td{
+    display:revert !important;
     visibility:visible !important;
-    height:auto !important;
-    min-height:0 !important;
-    max-height:none !important;
-    overflow:visible !important;
-    padding:16px !important;
-    margin-top:14px !important;
-    border:1px solid var(--border,#cfe6d7) !important;
+    opacity:1 !important;
   }
 
-  .global-history-section .button-row{
-    display:grid !important;
-    grid-template-columns:1fr !important;
-    gap:8px !important;
+  section.mobile-force-history{
+    display:block !important;
   }
 
-  .global-history-filter{
-    max-width:none;
+  section.mobile-force-history .table-wrap{
+    display:block !important;
+    overflow-x:auto !important;
+    max-height:360px !important;
   }
 
-  .global-history-section .table-wrap{
-    max-height:300px !important;
-    overflow:auto !important;
+  section.mobile-force-history table{
+    display:table !important;
+    min-width:760px !important;
+    width:100% !important;
+  }
+
+  section.mobile-force-history thead{
+    display:table-header-group !important;
+  }
+
+  section.mobile-force-history tbody{
+    display:table-row-group !important;
+  }
+
+  section.mobile-force-history tr{
+    display:table-row !important;
+  }
+
+  section.mobile-force-history th,
+  section.mobile-force-history td{
+    display:table-cell !important;
+    white-space:nowrap !important;
+    font-size:12px !important;
   }
 }
 
-/* ===== scan card compact search polish ===== */
-.scan-product-search-block{
-  display:block !important;
-  width:100% !important;
-  margin:12px 0 10px !important;
-  padding:10px !important;
-  border:1px solid #cfe6d7 !important;
-  border-radius:12px !important;
-  background:#f7fff9 !important;
+/* v72 search scroll / camera zoom / bulk check */
+.product-search-results,
+#productSearchResults,
+#productFormSearchResults{
+  max-height:300px !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  scrollbar-width:auto !important;
 }
+.product-search-results::-webkit-scrollbar,
+#productSearchResults::-webkit-scrollbar,
+#productFormSearchResults::-webkit-scrollbar{width:10px;}
+.product-search-results::-webkit-scrollbar-thumb,
+#productSearchResults::-webkit-scrollbar-thumb,
+#productFormSearchResults::-webkit-scrollbar-thumb{background:#2d6a4f;border-radius:999px;}
+.product-search-results::-webkit-scrollbar-track,
+#productSearchResults::-webkit-scrollbar-track,
+#productFormSearchResults::-webkit-scrollbar-track{background:#e9f5ec;}
 
-.scan-product-search-block label{
-  margin:0 !important;
-  font-size:13px !important;
-  font-weight:900 !important;
-}
-
-.scan-product-search-block input{
-  min-height:42px !important;
-  margin-top:8px !important;
-  padding:10px 12px !important;
-  border-radius:10px !important;
-  font-size:14px !important;
-}
-
-#scanProductSearchResults{
-  margin-top:8px !important;
-}
-
-#manualForm label{
-  margin-top:10px !important;
-}
-
-#barcodeInput{
-  min-height:54px !important;
-  padding:14px !important;
-  font-size:18px !important;
-  border-radius:12px !important;
-  box-shadow:none !important;
-}
-
-#barcodeInput::placeholder{
-  font-size:15px !important;
-}
-
-#scanProductInfo{
-  margin-top:10px !important;
-  padding:10px 12px !important;
-  border-radius:10px !important;
-  font-size:13px !important;
-}
-
-
-/* 在庫変動登録カード内の商品名検索 */
-.scan-product-search-box{
-  background:var(--main-soft,#f1fbf4);
-  border:1px solid var(--border,#cfe6d7);
-  border-radius:14px;
-  padding:12px;
-  margin:12px 0 14px;
-}
-
-.scan-product-search-box label{
-  margin:0;
-}
-
-#scanProductNameSearchInput{
-  margin-top:8px;
-  font-weight:800;
-}
-
-.product-search-results{
-  display:none;
-  margin-top:10px;
-  border:1px solid var(--border,#cfe6d7);
+.camera-zoom-row{
+  grid-column:1 / -1;
+  margin:8px 0 10px;
+  padding:10px 12px;
+  border:1px solid #cfe6d7;
   border-radius:12px;
-  overflow:hidden;
-  background:#fff;
+  background:#f7fff9;
 }
-
-.product-search-results.is-active{
-  display:block;
-}
-
-.product-search-item{
-  display:flex;
-  justify-content:space-between;
+.camera-zoom-row label{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
   gap:10px;
   align-items:center;
-  padding:10px;
-  border-bottom:1px solid #e4efe8;
+  font-weight:800;
 }
-
-.product-search-item:last-child{
-  border-bottom:none;
-}
-
-.product-search-item strong,
-.product-search-item span{
-  display:block;
-}
-
-.product-search-item span{
-  margin-top:4px;
-  color:#527161;
-  font-size:12px;
-  line-height:1.45;
-}
-
-.product-search-item button{
-  width:auto;
-  min-width:72px;
-  margin-top:0;
-  padding:8px 10px;
-  font-size:13px;
-}
-
-
-/* ===== inventory card search/order and card alignment ===== */
-.card.scanner,
-.staff-admin-section{
-  min-height:620px;
-}
-
-@media(min-width:801px){
-  .grid{
-    align-items:stretch;
-  }
-
-  .card.scanner,
-  .staff-admin-section{
-    height:100%;
-  }
-
-  .staff-admin-section{
-    display:flex;
-    flex-direction:column;
-  }
-
-  .staff-admin-section .table-wrap{
-    flex:1 1 auto;
-    min-height:320px;
-    max-height:420px;
-  }
-}
-
-/* 在庫変動登録内：バーコード入力を上、商品名検索を下にして余白調整 */
-#manualForm{
-  margin-bottom:12px;
-}
-
-.scan-product-search-box{
-  margin-top:14px;
-  margin-bottom:14px;
-}
-
-/* 全体履歴：担当者・区分検索 */
-.global-history-filter{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:12px;
-  align-items:end;
-  background:var(--main-soft,#f1fbf4);
-  border:1px solid var(--border,#cfe6d7);
-  border-radius:14px;
-  padding:12px;
-  margin:12px 0 14px;
-}
-
-.global-history-filter label{
-  margin:0;
-}
-
-.global-history-filter select{
-  margin-top:8px;
-}
+#cameraZoomRange{width:100%;accent-color:#2d6a4f;}
+#cameraZoomValue{min-width:44px;text-align:right;font-weight:900;color:#1b4332;}
+#bulkStockCheckBtn{background:#2d6a4f !important;color:#fff !important;font-weight:900 !important;}
 
 @media(max-width:800px){
-  .card.scanner,
-  .staff-admin-section{
-    min-height:auto;
-  }
-
-  .global-history-filter{
-    grid-template-columns:1fr;
-  }
-}
-
-
-/* ===== v-next global history layout / equipment alert / staff height ===== */
-
-/* 全体履歴の検索欄を横並びに固定 */
-.global-history-filter{
-  display:grid !important;
-  grid-template-columns:1fr 1fr !important;
-  gap:12px !important;
-  align-items:end !important;
-  width:100% !important;
-  max-width:520px !important;
-  background:var(--main-soft,#f1fbf4) !important;
-  border:1px solid var(--border,#cfe6d7) !important;
-  border-radius:14px !important;
-  padding:12px !important;
-  margin:12px 0 16px !important;
-}
-
-.global-history-filter label{
-  margin:0 !important;
-}
-
-.global-history-filter select{
-  margin-top:8px !important;
-  min-height:44px !important;
-}
-
-/* 要確認を赤く目立たせる */
-.equipment-confirm-log-btn.needs-confirm,
-.needs-confirm{
-  background:#dc2626 !important;
-  color:#fff !important;
-  border-color:#dc2626 !important;
-}
-
-.equipment-confirm-log-btn.needs-confirm:hover,
-.needs-confirm:hover{
-  background:#991b1b !important;
-}
-
-/* 確認済みは緑 */
-.equipment-confirm-log-btn.is-confirmed,
-.is-confirmed{
-  background:#2d6a4f !important;
-  color:#fff !important;
-}
-
-/* 担当者設定のスクロール範囲を1名分長くする */
-@media(min-width:801px){
-  .staff-admin-section .table-wrap{
-    min-height:400px !important;
-    max-height:480px !important;
-    height:400px !important;
-  }
-}
-
-@media(max-width:800px){
-  .global-history-filter{
-    grid-template-columns:1fr !important;
-    max-width:none !important;
-  }
+  .product-search-results,#productSearchResults,#productFormSearchResults{max-height:230px !important;}
+  .camera-zoom-row label{grid-template-columns:1fr;}
+  #cameraZoomValue{text-align:left;}
 }
