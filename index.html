@@ -74,7 +74,7 @@
   <div class="section-title">
     <div>
       <h2>スマレジ変動商品チェック</h2>
-      <p class="section-note">スマレジ在庫を基準に実在庫を入力し、差異がある商品を確認します。</p>
+      <p class="section-note">実在庫を入力し、スマレジ在庫との差異を確認します。</p>
     </div>
     <div id="smaregiSnapshotBadge" class="badge muted">未取得</div>
   </div>
@@ -110,13 +110,13 @@
     <div class="section-title">
       <div>
         <h3>今回の差異一覧</h3>
-        <p class="section-note">スマレジ在庫とシート在庫の差異がある商品だけを表示します。</p>
+        <p class="section-note">実在庫とスマレジ在庫の差異がある商品だけを表示します。</p>
       </div>
       <div id="smaregiDiffSummary" class="badge muted">差異：0件</div>
     </div>
     <div class="table-wrap">
       <table class="smaregi-check-table smaregi-diff-table">
-        <thead><tr><th>状態</th><th>商品名</th><th>スマレジ在庫</th><th>シート在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th></tr></thead>
+        <thead><tr><th>状態</th><th>商品名</th><th>実在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th></tr></thead>
         <tbody id="smaregiDiffOnlyBody"></tbody>
       </table>
     </div>

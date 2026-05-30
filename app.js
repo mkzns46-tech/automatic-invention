@@ -1914,23 +1914,37 @@ function getSmaregiDisplayCheckedBy(check){
 }
 
 function getSmaregiSheetDifference(item){
+  // 参考用：スマレジ在庫とシート在庫の差。棚卸差異の判定には使わない。
   return Number(item.smaregi_stock||0)-Number(getSmaregiAppStock(item.barcode)||0);
 }
 
-function getSmaregiDifference(item){
+function getSmaregiActualDifference(item){
   const check=getSmaregiCheck(item.barcode);
-  if(check&&isSmaregiExcludedCheck(check))return null;
-  return getSmaregiSheetDifference(item);
+  if(!check||isSmaregiExcludedCheck(check))return null;
+  if(check.actual_stock===null||check.actual_stock===undefined||String(check.actual_stock)==="")return null;
+
+  // 棚卸の差異は「実在庫 − スマレジ在庫」で判定する。
+  // スマレジをマスターデータとして扱い、シート在庫との差では判定しない。
+  if(check.difference!==null&&check.difference!==undefined&&String(check.difference)!==""){
+    const saved=Number(check.difference);
+    if(Number.isFinite(saved))return saved;
+  }
+
+  return Number(check.actual_stock||0)-Number(item.smaregi_stock||0);
+}
+
+function getSmaregiDifference(item){
+  return getSmaregiActualDifference(item);
 }
 
 function getSmaregiDiffItems(){
   const keyword=String(el("smaregiStockSearchInput")?.value||"").trim().toLowerCase();
   return smaregiStockItems.filter(item=>{
     const check=getSmaregiCheck(item.barcode);
-    if(check&&isSmaregiExcludedCheck(check))return false;
+    if(!check||isSmaregiExcludedCheck(check))return false;
     if(keyword&&!String(item.product_name||"").toLowerCase().includes(keyword))return false;
-    const difference=getSmaregiSheetDifference(item);
-    return difference!==0;
+    const difference=getSmaregiActualDifference(item);
+    return difference!==null&&difference!==0;
   });
 }
 
@@ -1956,6 +1970,7 @@ function updateSmaregiManagerControls(){
   const manager=isSmaregiManager();
   const complete=el("completeSmaregiStockCheckBtn");
   const differenceCsv=el("exportSmaregiDifferenceCsvBtn");
+  const diffList=el("showSmaregiDiffListBtn");
   const reset=el("resetSmaregiCompletionBtn");
   if(complete){
     complete.disabled=!manager;
@@ -1964,6 +1979,10 @@ function updateSmaregiManagerControls(){
   if(differenceCsv){
     differenceCsv.disabled=!manager;
     differenceCsv.textContent=manager ? "差異のみCSV" : "差異のみCSV（責任者のみ）";
+  }
+  if(diffList){
+    diffList.disabled=!manager;
+    diffList.textContent=manager ? "今回の差異一覧" : "今回の差異一覧（責任者のみ）";
   }
   if(reset){
     reset.disabled=!manager;
@@ -2066,7 +2085,7 @@ function renderSmaregiStockChecks(){
   body.innerHTML=visible.map(item=>{
     const check=getSmaregiCheck(item.barcode);
     const excluded=isSmaregiExcludedCheck(check);
-    const sheetDifference=getSmaregiSheetDifference(item);
+    const actualDifference=getSmaregiActualDifference(item);
     const status=excluded ? "除外" : (check ? "チェック済み" : "未チェック");
     const statusClass=excluded ? " is-excluded" : (check ? " is-checked" : "");
     return `<tr>
@@ -2075,7 +2094,7 @@ function renderSmaregiStockChecks(){
       <td><input type="number" class="smaregi-row-actual-input" data-barcode="${esc(item.barcode)}" min="0" step="1" inputmode="numeric" value="${excluded ? "" : (check?.actual_stock??"")}" placeholder="手入力" ${excluded?"disabled":""}/></td>
       <td><button type="button" class="smaregi-row-save-btn" data-barcode="${esc(item.barcode)}" ${excluded?"disabled":""}>${check&&!excluded?"更新":"保存"}</button></td>
       <td class="smaregi-row-actions">
-        ${isSmaregiManager()&&sheetDifference!==0&&!excluded ? `<button type="button" class="secondary smaregi-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button>` : ""}
+        ${isSmaregiManager()&&actualDifference!==null&&actualDifference!==0&&!excluded ? `<button type="button" class="secondary smaregi-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button>` : ""}
         ${isSmaregiManager() ? (excluded ? `<button type="button" class="secondary smaregi-clear-btn" data-barcode="${esc(item.barcode)}">除外解除</button>` : `<button type="button" class="secondary smaregi-exclude-btn" data-barcode="${esc(item.barcode)}">除外</button>`) : `<span class="smaregi-manager-only-note">責任者のみ</span>`}
       </td>
     </tr>`;
@@ -2120,13 +2139,13 @@ function renderSmaregiDiffOnlyPanel(){
 
   body.innerHTML=diffItems.map(item=>{
     const check=getSmaregiCheck(item.barcode);
-    const difference=getSmaregiSheetDifference(item);
+    const difference=getSmaregiActualDifference(item);
     const differenceClass=difference<0 ? " is-negative" : " is-positive";
     return `<tr>
       <td><span class="smaregi-status is-checked">差異あり</span></td>
       <td>${esc(item.product_name||"")}</td>
+      <td>${esc(check?.actual_stock??"")}</td>
       <td>${Number(item.smaregi_stock||0)}</td>
-      <td>${esc(getSmaregiAppStock(item.barcode))}</td>
       <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
       <td>${esc(getSmaregiDisplayCheckedBy(check))}</td>
       <td>${check?.checked_at ? fmt(check.checked_at) : ""}</td>
@@ -2143,6 +2162,10 @@ function renderSmaregiDiffOnlyPanel(){
 }
 
 function showSmaregiDiffOnlyPanel(){
+  if(!isSmaregiManager()){
+    showMessage("今回の差異一覧は責任者のみ確認できます。","err");
+    return;
+  }
   const panel=el("smaregiDiffOnlyPanel");
   if(!panel)return;
   panel.hidden=false;
@@ -2252,7 +2275,6 @@ async function completeSmaregiStockCheck(){
     `完了　　　　${stats.completed}件`,
     `未入力　　　${stats.unchecked}件`,
     `除外　　　　${stats.excluded}件`,
-    `差異あり　　${stats.diffCount}件`,
     "",
     "チェック完了後、入力済み実在庫をシート在庫へ反映します。",
     "このままチェック完了しますか？",
@@ -2355,7 +2377,7 @@ async function saveSmaregiActualStock(barcode,value){
   }
 
   try{
-    const difference=getSmaregiSheetDifference(item);
+    const difference=actual_stock-Number(item.smaregi_stock||0);
     const checked_by=getSmaregiCheckerName();
     if(!checked_by){
       showMessage("担当者を選択してください","err");
@@ -2387,6 +2409,7 @@ async function saveSmaregiActualStock(barcode,value){
       barcode,
       productName:item.product_name||"",
       actualStock:actual_stock,
+      smaregiStock:Number(item.smaregi_stock||0),
       appStock:getSmaregiAppStock(barcode),
       difference,
       checkedBy:checked_by
@@ -2471,7 +2494,7 @@ async function openHistoryFromSmaregi(barcode){
 }
 
 function smaregiCsvRows(differenceOnly=false){
-  const rows=[["商品コード","商品名","スマレジ在庫数","在庫管理シート上の在庫数","実在庫数","差異","担当者","チェック日時","チェック済み状態"]];
+  const rows=[["商品コード","商品名","スマレジ在庫数","シート在庫数","実在庫数","スマレジ差異","担当者","チェック日時","チェック済み状態"]];
   smaregiStockItems.forEach(item=>{
     const check=getSmaregiCheck(item.barcode);
     const difference=check ? getSmaregiDifference(item) : "";
@@ -2596,7 +2619,7 @@ async function showSmaregiCauseDetail(barcode){
         <div><strong>スマレジ在庫</strong><span>${Number(item.smaregi_stock||0)}</span></div>
         <div><strong>シート在庫</strong><span>${esc(getSmaregiAppStock(barcode))}</span></div>
         <div><strong>実在庫</strong><span>${check?.actual_stock??"-"}</span></div>
-        <div><strong>差異</strong><span class="smaregi-difference${difference ? " is-negative" : ""}">${difference??"-"}</span></div>
+        <div><strong>スマレジ差異</strong><span class="smaregi-difference${difference ? " is-negative" : ""}">${difference??"-"}</span></div>
         <div><strong>担当者</strong><span>${esc(check?.checked_by||"")}</span></div>
         <div><strong>チェック日時</strong><span>${check?.checked_at?fmt(check.checked_at):""}</span></div>
       </div>
