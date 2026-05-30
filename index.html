@@ -80,11 +80,13 @@
   </div>
   <div class="smaregi-toolbar">
     <button type="button" id="closeSmaregiStockCheckBtn" class="secondary">トップへ戻る</button>
-    <button type="button" id="loadSmaregiStockBtn">スマレジ在庫取得</button>
+    <button type="button" id="syncSmaregiStockBtn">スマレジAPIから変動商品取得</button>
+    <button type="button" id="loadSmaregiStockBtn" class="secondary">保存済み一覧を再表示</button>
     <label class="file-button">スマレジ在庫CSV取り込み<input type="file" id="smaregiCsvFile" accept=".csv,text/csv"/></label>
     <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">CSV出力</button>
+    <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
   </div>
-  <p class="section-note">今回の「スマレジ在庫取得」はDBに保存済みの最新スナップショットを表示します。API取得は次フェーズで接続します。</p>
+  <p class="section-note">スマレジAPIから、前回チェック完了日時以降に在庫変動した商品のみ取得します。CSV取り込みはテスト用です。</p>
   <div class="smaregi-filter-row">
     <label>検索<input id="smaregiStockSearchInput" placeholder="商品名またはバーコード"/></label>
     <label class="smaregi-difference-filter"><input type="checkbox" id="smaregiDifferenceOnly"/> 差異ありのみ表示</label>

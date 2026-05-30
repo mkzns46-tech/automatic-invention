@@ -1,4 +1,4 @@
-# v72 スマレジ変動商品チェック版
+# v74 スマレジAPI変動商品チェック版
 
 ## 修正内容
 - 商品名検索候補にスクロールバーを追加
@@ -12,12 +12,28 @@
 - 最新スマレジ在庫スナップショット表示、CSV取り込み、実在庫保存、差異絞り込み、CSV出力を追加
 - 「履歴を見る」から既存の商品別履歴へ連携
 - `supabase_schema_update_v72_smaregi_stock_check.sql` をSupabase SQL Editorで1回実行
+- CSV取り込み直後に一覧を即時描画するよう修正
+- OAuth2 Client CredentialsでスマレジAPIへサーバー側接続
+- 前回チェック完了日時以降に変動した商品のみ取得
+- スマレジ在庫変動履歴を `smaregi_stock_changes` に保存
+- 変動商品の抽出は現行仕様の `GET /stock` 更新日時フィルターを使用
+- 契約プランにより `GET /stock/changes/{product_id}/{store_id}` が利用できない場合も、一覧取得は継続
+- 旧v72 SQLを実行済みの場合は `supabase_schema_update_v73_smaregi_api_sync.sql` を追加実行
 
 ## スマレジ在庫CSV
 ヘッダーは `barcode,product_name,smaregi_stock` を使用します。日本語の `バーコード,商品名,スマレジ在庫` にも対応しています。
 同梱の `smaregi_stock_import_sample.csv` で形式を確認できます。
 
-`スマレジ在庫取得` は保存済みの最新スナップショットを表示します。OAuth認証、スマレジ在庫API取得、前回差分抽出は次フェーズです。
+## Vercel環境変数
+- `SMAREGI_CONTRACT_ID`
+- `SMAREGI_CLIENT_ID`
+- `SMAREGI_CLIENT_SECRET`
+- `SMAREGI_STORE_ID`
+- `SMAREGI_ENV=sandbox` はサンドボックス利用時のみ設定
+
+スマレジ・デベロッパーズ側で `pos.stock:read`、`pos.products:read`、`pos.stock-changes:read` のスコープを有効にしてください。
+
+初回API同期は直近7日間を対象にします。以降は「今回のチェックを完了」を押した日時以降に変動した商品のみ表示します。
 
 ## 確認URL
 https://automatic-invention-eight.vercel.app/?v=72

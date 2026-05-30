@@ -1905,7 +1905,7 @@ function renderSmaregiStockChecks(){
 
   if(badge){
     badge.textContent=smaregiSnapshot
-      ? `最終取得日時：${fmt(smaregiSnapshot.imported_at)}`
+      ? `最終取得日時：${fmt(smaregiSnapshot.imported_at)}${smaregiSnapshot.range_from ? ` / 変動抽出：${fmt(smaregiSnapshot.range_from)} 以降` : ""}`
       : "未取得";
   }
 
@@ -1974,6 +1974,19 @@ async function loadLatestSmaregiSnapshot(){
   }
 }
 
+async function syncSmaregiStockFromApi(){
+  try{
+    showMessage("スマレジAPIから変動商品を取得中...");
+    const res=await fetch("/api/smaregi-sync",{method:"POST",headers:{"Content-Type":"application/json"}});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(data.error||`APIエラー ${res.status}`);
+    await loadLatestSmaregiSnapshot();
+    showPopup("スマレジAPI取得完了",`前回チェック以降の変動商品を取得しました。\n対象商品：${Number(data.item_count||0)}件\n変動履歴：${Number(data.change_count||0)}件${data.warning ? `\n\n注意：${data.warning}` : ""}`);
+  }catch(e){
+    showMessage("スマレジAPI取得エラー。\n"+e.message,"err");
+  }
+}
+
 function smaregiCsvToRows(text){
   const parsed=parseCsv(text);
   if(parsed.length<2)throw new Error("CSVにデータ行がありません。");
@@ -2020,6 +2033,10 @@ async function importSmaregiCsvFile(file){
       });
     }
 
+    smaregiSnapshot=snapshot;
+    smaregiStockItems=rows.map(row=>({...row,snapshot_id:snapshot.id}));
+    smaregiStockChecks=[];
+    renderSmaregiStockChecks();
     await loadLatestSmaregiSnapshot();
     showPopup("取り込み完了",`スマレジ在庫CSVを取り込みました。\n対象商品：${rows.length}件`);
   }catch(e){
@@ -2027,6 +2044,27 @@ async function importSmaregiCsvFile(file){
   }finally{
     const input=el("smaregiCsvFile");
     if(input)input.value="";
+  }
+}
+
+async function completeSmaregiStockCheck(){
+  if(!smaregiSnapshot){
+    showMessage("完了するスマレジ在庫チェックがありません。","err");
+    return;
+  }
+  if(!confirm("今回のチェックを完了しますか？\n次回はこの完了日時以降に変動した商品のみ表示されます。"))return;
+  try{
+    const completed_at=new Date().toISOString();
+    await sb(`smaregi_stock_snapshots?id=eq.${encodeURIComponent(smaregiSnapshot.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({completed_at})
+    });
+    smaregiSnapshot.completed_at=completed_at;
+    renderSmaregiStockChecks();
+    showPopup("チェック完了","今回のチェックを完了しました。\n次回取得時は、この時刻以降の在庫変動商品だけを抽出します。");
+  }catch(e){
+    showMessage("チェック完了保存エラー。\n追加SQLを実行済みか確認してください。\n"+e.message,"err");
   }
 }
 
@@ -2117,9 +2155,11 @@ function hideSmaregiStockCheck(){
 function bindSmaregiStockCheckEvents(){
   on("openSmaregiStockCheckBtn","click",showSmaregiStockCheck);
   on("closeSmaregiStockCheckBtn","click",hideSmaregiStockCheck);
+  on("syncSmaregiStockBtn","click",syncSmaregiStockFromApi);
   on("loadSmaregiStockBtn","click",loadLatestSmaregiSnapshot);
   on("smaregiCsvFile","change",e=>importSmaregiCsvFile(e.target.files&&e.target.files[0]));
   on("exportSmaregiCheckCsvBtn","click",exportSmaregiCheckCsv);
+  on("completeSmaregiStockCheckBtn","click",completeSmaregiStockCheck);
   on("smaregiStockSearchInput","input",renderSmaregiStockChecks);
   on("smaregiDifferenceOnly","change",renderSmaregiStockChecks);
   hideSmaregiStockCheck();
