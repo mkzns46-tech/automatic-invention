@@ -1978,11 +1978,19 @@ function updateSmaregiManagerControls(){
   }
   if(differenceCsv){
     differenceCsv.disabled=!manager;
-    differenceCsv.textContent=manager ? "差異のみCSV" : "差異のみCSV（責任者のみ）";
+    differenceCsv.hidden=!manager;
+    differenceCsv.style.display=manager ? "" : "none";
+    differenceCsv.textContent="差異のみCSV";
   }
   if(diffList){
     diffList.disabled=!manager;
-    diffList.textContent=manager ? "今回の差異一覧" : "今回の差異一覧（責任者のみ）";
+    diffList.hidden=!manager;
+    diffList.style.display=manager ? "" : "none";
+    diffList.textContent="今回の差異一覧";
+  }
+  const diffPanel=el("smaregiDiffOnlyPanel");
+  if(diffPanel&&!manager){
+    diffPanel.hidden=true;
   }
   if(reset){
     reset.disabled=!manager;
@@ -2120,6 +2128,13 @@ function renderSmaregiDiffOnlyPanel(){
   const body=el("smaregiDiffOnlyBody");
   const summary=el("smaregiDiffSummary");
   if(!panel||!body)return;
+
+  if(!isSmaregiManager()){
+    panel.hidden=true;
+    body.innerHTML="";
+    if(summary)summary.textContent="";
+    return;
+  }
 
   const diffItems=getSmaregiDiffItems();
   const stats=getSmaregiStats();
