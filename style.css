@@ -1511,6 +1511,24 @@ header h1{
 #cameraZoomValue{min-width:44px;text-align:right;font-weight:900;color:#1b4332;}
 #bulkStockCheckBtn{background:#2d6a4f !important;color:#fff !important;font-weight:900 !important;}
 
+/* ===== v72 Smaregi stock check ===== */
+.menu-link{display:inline-flex;align-items:center;padding:10px 14px;border-radius:10px;background:#fff;color:var(--main-dark);font-weight:800;text-decoration:none}
+.smaregi-stock-check-section{scroll-margin-top:12px}
+.smaregi-toolbar,.smaregi-filter-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.smaregi-filter-row label{display:flex;gap:8px;align-items:center}
+.smaregi-filter-row input[type="text"],#smaregiStockSearchInput{min-width:260px}
+.smaregi-difference-filter{font-weight:800}
+.smaregi-check-table input[type="number"]{width:100px;min-width:86px}
+.smaregi-difference{font-weight:900}
+.smaregi-difference.is-negative,.smaregi-difference.is-positive{color:#c1121f}
+.smaregi-empty{text-align:center;color:#64748b;padding:20px}
+@media(max-width:760px){
+  .header-actions{align-items:stretch}
+  .menu-link{justify-content:center;text-align:center}
+  .smaregi-filter-row{align-items:stretch}
+  #smaregiStockSearchInput{min-width:0;width:100%}
+}
+
 @media(max-width:800px){
   .product-search-results,#productSearchResults,#productFormSearchResults{max-height:230px !important;}
   .camera-zoom-row label{grid-template-columns:1fr;}
