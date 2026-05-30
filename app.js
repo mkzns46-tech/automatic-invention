@@ -2095,12 +2095,34 @@ function exportSmaregiCheckCsv(){
   showMessage(`スマレジ変動商品チェックCSVを出力しました：${rows.length-1}件`,"ok");
 }
 
+function showSmaregiStockCheck(){
+  const card=el("smaregiStockCheckCard");
+  const main=document.querySelector("main.grid");
+  if(!card||!main)return;
+  main.classList.add("smaregi-mode");
+  card.hidden=false;
+  renderSmaregiStockChecks();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function hideSmaregiStockCheck(){
+  const card=el("smaregiStockCheckCard");
+  const main=document.querySelector("main.grid");
+  if(!card||!main)return;
+  card.hidden=true;
+  main.classList.remove("smaregi-mode");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
 function bindSmaregiStockCheckEvents(){
+  on("openSmaregiStockCheckBtn","click",showSmaregiStockCheck);
+  on("closeSmaregiStockCheckBtn","click",hideSmaregiStockCheck);
   on("loadSmaregiStockBtn","click",loadLatestSmaregiSnapshot);
   on("smaregiCsvFile","change",e=>importSmaregiCsvFile(e.target.files&&e.target.files[0]));
   on("exportSmaregiCheckCsvBtn","click",exportSmaregiCheckCsv);
   on("smaregiStockSearchInput","input",renderSmaregiStockChecks);
   on("smaregiDifferenceOnly","change",renderSmaregiStockChecks);
+  hideSmaregiStockCheck();
   renderSmaregiStockChecks();
 }
 window.addEventListener("DOMContentLoaded",bindSmaregiStockCheckEvents);
