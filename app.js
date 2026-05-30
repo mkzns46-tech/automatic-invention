@@ -1992,7 +1992,7 @@ function getSmaregiStats(){
 
 function getSmaregiStatsText(){
   const stats=getSmaregiStats();
-  return `完了：${stats.completed} / ${stats.targetTotal}（${stats.percent}%） / 未入力：${stats.unchecked} / 除外：${stats.excluded} / 差異あり：${stats.diffCount}`;
+  return `完了：${stats.completed} / ${stats.targetTotal}（${stats.percent}%） / 未入力：${stats.unchecked} / 除外：${stats.excluded}`;
 }
 
 function getSmaregiProgressHtml(){
@@ -2005,7 +2005,6 @@ function getSmaregiProgressHtml(){
         <span class="is-done">完了 ${stats.completed}</span>
         <span class="is-unchecked">未入力 ${stats.unchecked}</span>
         <span class="is-excluded">除外 ${stats.excluded}</span>
-        <span class="is-diff">差異 ${stats.diffCount}</span>
       </div>
     </div>`;
 }
@@ -2363,23 +2362,18 @@ async function saveSmaregiActualStock(barcode,value){
     }
     const checked_at=new Date().toISOString();
     const old=getSmaregiCheck(barcode);
-    const payload={actual_stock,difference,checked_by,checked_at};
+    const payload={snapshot_id:smaregiSnapshot.id,barcode,actual_stock,difference,checked_by,checked_at};
 
-    if(old){
-      await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
-        method:"PATCH",
-        headers:{Prefer:"return=representation"},
-        body:JSON.stringify(payload)
-      });
-    }else{
-      await sb("smaregi_stock_checks",{
-        method:"POST",
-        headers:{Prefer:"return=representation"},
-        body:JSON.stringify([{snapshot_id:smaregiSnapshot.id,barcode,...payload}])
-      });
-    }
+    // 既に保存済みの商品も確実に更新できるよう、PATCHではなく upsert に統一します。
+    // Supabase側の unique(snapshot_id, barcode) を利用して、同じ商品なら上書きします。
+    const savedRows=await sb("smaregi_stock_checks?on_conflict=snapshot_id,barcode",{
+      method:"POST",
+      headers:{Prefer:"resolution=merge-duplicates,return=representation"},
+      body:JSON.stringify([payload])
+    });
 
-    const next={...(old||{}),snapshot_id:smaregiSnapshot.id,barcode,actual_stock,difference,checked_by,checked_at};
+    const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : null;
+    const next={...(old||{}),...(savedRow||payload),snapshot_id:smaregiSnapshot.id,barcode,actual_stock,difference,checked_by,checked_at};
     smaregiStockChecks=smaregiStockChecks.filter(c=>String(c.barcode)!==String(barcode));
     smaregiStockChecks.push(next);
     renderSmaregiStockChecks();

@@ -1920,3 +1920,7 @@ header h1{
     width:100% !important;
   }
 }
+
+
+/* ===== v98 progress privacy / reliable update ===== */
+.smaregi-progress-metrics .is-diff{display:none !important;}
