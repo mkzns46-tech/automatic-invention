@@ -1,37 +1,3 @@
-const ARICO_PORTAL_LOGIN_URL = "https://arico-portal.vercel.app/";
-const ARICO_PORTAL_TOP_URL = "https://arico-portal.vercel.app/portal.html";
-const ARICO_INVENTORY_SESSION_KEY = "arico_inventory_portal_session_ok";
-
-/* v107: portal_sessions 検証で起動停止する問題を回避。
-   ポータルから ?session=... で来た場合はこのタブだけ許可し、
-   直接URL/お気に入りはログイン画面へ戻します。 */
-(function requirePortalLogin(){
-  try{
-    const params = new URLSearchParams(window.location.search);
-    const sessionToken = String(params.get("session") || "").trim();
-
-    if(sessionToken){
-      sessionStorage.setItem(ARICO_INVENTORY_SESSION_KEY, "ok");
-      if(window.history && window.history.replaceState){
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-      return;
-    }
-
-    if(sessionStorage.getItem(ARICO_INVENTORY_SESSION_KEY) === "ok"){
-      return;
-    }
-
-    window.location.replace(ARICO_PORTAL_LOGIN_URL);
-  }catch(_){
-    window.location.replace(ARICO_PORTAL_LOGIN_URL);
-  }
-})();
-
-function goAricoPortalTop(){
-  window.location.href = ARICO_PORTAL_TOP_URL;
-}
-
 window.addEventListener("error",(e)=>{
   try{
     const m=document.getElementById("message");
@@ -283,7 +249,6 @@ function renderStaffOptions(){
     const cur=smaregiChecker.value||localStorage.getItem("arico_smaregi_checker")||"";
     smaregiChecker.innerHTML='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
     if(cur)smaregiChecker.value=cur;
-    setupSmaregiCheckerScrollableSelect();
   }
 }
 
@@ -1997,35 +1962,6 @@ function getSmaregiCheckerName(){
   return String(el("smaregiCheckerName")?.value||"").trim();
 }
 
-
-function setupSmaregiCheckerScrollableSelect(){
-  const select=el("smaregiCheckerName");
-  if(!select || select.dataset.scrollableSetup==="1")return;
-  select.dataset.scrollableSetup="1";
-
-  const openList=()=>{
-    if(window.innerWidth>800)return;
-    const count=Math.max(2, Math.min(7, select.options.length || 2));
-    select.size=count;
-    select.classList.add("is-open-list");
-  };
-
-  const closeList=()=>{
-    select.size=1;
-    select.classList.remove("is-open-list");
-  };
-
-  select.addEventListener("focus", openList);
-  select.addEventListener("click", openList);
-  select.addEventListener("change", ()=>{
-    closeList();
-    try{localStorage.setItem("arico_smaregi_checker",select.value||"");}catch(_){ }
-    updateSmaregiManagerControls();
-    renderSmaregiStockChecks();
-  });
-  select.addEventListener("blur", ()=>setTimeout(closeList,150));
-}
-
 function isSmaregiManager(){
   return getSmaregiCheckerName()===SMAREGI_MANAGER_NAME;
 }
@@ -2768,7 +2704,7 @@ function hideSmaregiStockCheck(){
 
 function bindSmaregiStockCheckEvents(){
   on("openSmaregiStockCheckBtn","click",showSmaregiStockCheck);
-  on("closeSmaregiStockCheckBtn","click",goAricoPortalTop);
+  on("closeSmaregiStockCheckBtn","click",hideSmaregiStockCheck);
   on("syncSmaregiStockBtn","click",syncSmaregiStockFromApi);
   on("refreshSmaregiChecksBtn","click",loadLatestSmaregiSnapshot);
   on("exportSmaregiCheckCsvBtn","click",()=>exportSmaregiCheckCsv(false));
