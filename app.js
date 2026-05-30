@@ -1900,7 +1900,9 @@ let smaregiAutoRefreshTimer=null;
 let smaregiAutoRefreshBusy=false;
 
 function getSmaregiCheck(barcode){
-  return smaregiStockChecks.find(c=>String(c.barcode)===String(barcode));
+  const matches=(smaregiStockChecks||[]).filter(c=>String(c.barcode)===String(barcode));
+  if(!matches.length)return null;
+  return matches.sort((a,b)=>new Date(b.checked_at||0)-new Date(a.checked_at||0))[0];
 }
 
 function isSmaregiExcludedCheck(check){
@@ -2050,7 +2052,7 @@ function renderSmaregiStockChecks(){
   });
 
   if(!smaregiSnapshot){
-    body.innerHTML='<tr><td colspan="5" class="smaregi-empty">「スマレジAPIから変動商品取得」で最新データを表示してください。</td></tr>';
+    body.innerHTML='<tr><td colspan="5" class="smaregi-empty">「スマレジデータ取り込み」で最新データを表示してください。</td></tr>';
     renderSmaregiDiffOnlyPanel();
     return;
   }
@@ -2106,7 +2108,7 @@ function renderSmaregiDiffOnlyPanel(){
   if(summary)summary.textContent=`差異：${diffItems.length}件 / 完了：${stats.completed}件 / 未入力：${stats.unchecked}件 / 除外：${stats.excluded}件`;
 
   if(!smaregiSnapshot){
-    body.innerHTML='<tr><td colspan="8" class="smaregi-empty">スマレジAPIから変動商品を取得してください。</td></tr>';
+    body.innerHTML='<tr><td colspan="8" class="smaregi-empty">スマレジデータ取り込みを実行してください。</td></tr>';
     return;
   }
 
@@ -2175,7 +2177,7 @@ async function loadLatestSmaregiSnapshot(){
     renderSmaregiStockChecks();
     showMessage(smaregiSnapshot
       ? `スマレジ在庫を取得しました：${smaregiStockItems.length}件`
-      : "スマレジ在庫スナップショットはまだありません。スマレジAPIから変動商品を取得してください。",smaregiSnapshot?"ok":"");
+      : "スマレジ在庫スナップショットはまだありません。スマレジデータ取り込みを実行してください。",smaregiSnapshot?"ok":"");
   }catch(e){
     showMessage("スマレジ在庫取得エラー。\n追加SQLを実行済みか確認してください。\n"+e.message,"err");
   }
@@ -2183,14 +2185,14 @@ async function loadLatestSmaregiSnapshot(){
 
 async function syncSmaregiStockFromApi(){
   try{
-    showMessage("スマレジAPIから変動商品を取得中...");
+    showMessage("スマレジデータを取り込み中...");
     const res=await fetch("/api/smaregi-sync",{method:"POST",headers:{"Content-Type":"application/json"}});
     const data=await res.json().catch(()=>({}));
     if(!res.ok)throw new Error(data.error||`APIエラー ${res.status}`);
     await loadLatestSmaregiSnapshot();
-    showPopup("スマレジAPI取得完了",`前回チェック以降の変動商品を取得しました。\n対象商品：${Number(data.item_count||0)}件\n変動履歴：${Number(data.change_count||0)}件${data.warning ? `\n\n注意：${data.warning}` : ""}`);
+    showPopup("スマレジデータ取り込み完了",`前回チェック以降の変動商品を取得しました。\n対象商品：${Number(data.item_count||0)}件\n変動履歴：${Number(data.change_count||0)}件${data.warning ? `\n\n注意：${data.warning}` : ""}`);
   }catch(e){
-    showMessage("スマレジAPI取得エラー。\n"+e.message,"err");
+    showMessage("スマレジデータ取り込みエラー。\n"+e.message,"err");
   }
 }
 
@@ -2361,19 +2363,23 @@ async function saveSmaregiActualStock(barcode,value){
       return false;
     }
     const checked_at=new Date().toISOString();
-    const old=getSmaregiCheck(barcode);
     const payload={snapshot_id:smaregiSnapshot.id,barcode,actual_stock,difference,checked_by,checked_at};
 
-    // 既に保存済みの商品も確実に更新できるよう、PATCHではなく upsert に統一します。
-    // Supabase側の unique(snapshot_id, barcode) を利用して、同じ商品なら上書きします。
-    const savedRows=await sb("smaregi_stock_checks?on_conflict=snapshot_id,barcode",{
+    // 保存済みの実在庫も確実に更新できるよう、同じ snapshot_id + barcode の旧チェックを削除してから登録します。
+    // unique 制約が無いSupabase環境でも、古い実在庫が残って表示される問題を防ぎます。
+    await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+      method:"DELETE",
+      headers:{Prefer:"return=minimal"}
+    });
+
+    const savedRows=await sb("smaregi_stock_checks",{
       method:"POST",
-      headers:{Prefer:"resolution=merge-duplicates,return=representation"},
+      headers:{Prefer:"return=representation"},
       body:JSON.stringify([payload])
     });
 
-    const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : null;
-    const next={...(old||{}),...(savedRow||payload),snapshot_id:smaregiSnapshot.id,barcode,actual_stock,difference,checked_by,checked_at};
+    const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : payload;
+    const next={...savedRow,snapshot_id:smaregiSnapshot.id,barcode,actual_stock,difference,checked_by,checked_at};
     smaregiStockChecks=smaregiStockChecks.filter(c=>String(c.barcode)!==String(barcode));
     smaregiStockChecks.push(next);
     renderSmaregiStockChecks();
@@ -2413,9 +2419,13 @@ async function excludeSmaregiStockItem(barcode){
   if(!confirm(`${item.product_name||barcode} を今回のチェック対象から除外しますか？`))return false;
   try{
     const checked_at=new Date().toISOString();
-    await sb("smaregi_stock_checks?on_conflict=snapshot_id,barcode",{
+    await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+      method:"DELETE",
+      headers:{Prefer:"return:minimal"}
+    });
+    await sb("smaregi_stock_checks",{
       method:"POST",
-      headers:{Prefer:"resolution=merge-duplicates,return=representation"},
+      headers:{Prefer:"return=representation"},
       body:JSON.stringify([{snapshot_id:smaregiSnapshot.id,barcode,actual_stock:0,difference:0,checked_by:`除外:${checked_by}`,checked_at}])
     });
     const old=getSmaregiCheck(barcode);

@@ -1905,8 +1905,13 @@ header h1{
   .smaregi-progress-metrics{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
-  .smaregi-action-grid button:not(#closeSmaregiStockCheckBtn){
+  .smaregi-action-grid button:not(#closeSmaregiStockCheckBtn):not(#syncSmaregiStockBtn){
     display:none !important;
+  }
+  #syncSmaregiStockBtn{
+    display:block !important;
+    width:100% !important;
+    margin-top:10px !important;
   }
   .smaregi-reset-panel,
   #smaregiSnapshotBadge,
