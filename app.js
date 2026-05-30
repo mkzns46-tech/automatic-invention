@@ -1,50 +1,28 @@
 const ARICO_PORTAL_LOGIN_URL = "https://arico-portal.vercel.app/";
 const ARICO_PORTAL_TOP_URL = "https://arico-portal.vercel.app/portal.html";
-const ARICO_PORTAL_SESSION_STORAGE_KEY = "arico_inventory_portal_session_ok";
-const ARICO_PORTAL_SESSION_TOKEN_KEY = "arico_inventory_portal_session_token";
-const ARICO_PORTAL_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
-const ARICO_PORTAL_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
+const ARICO_INVENTORY_SESSION_KEY = "arico_inventory_portal_session_ok";
 
-(async function requirePortalLogin(){
+/* v107: portal_sessions 検証で起動停止する問題を回避。
+   ポータルから ?session=... で来た場合はこのタブだけ許可し、
+   直接URL/お気に入りはログイン画面へ戻します。 */
+(function requirePortalLogin(){
   try{
     const params = new URLSearchParams(window.location.search);
     const sessionToken = String(params.get("session") || "").trim();
 
-    if(sessionStorage.getItem(ARICO_PORTAL_SESSION_STORAGE_KEY) === "ok"){
-      return;
-    }
-
-    if(!sessionToken){
-      window.location.replace(ARICO_PORTAL_LOGIN_URL);
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const query = `/rest/v1/portal_sessions?select=token,expires_at&token=eq.${encodeURIComponent(sessionToken)}&expires_at=gt.${encodeURIComponent(now)}&limit=1`;
-    const res = await fetch(ARICO_PORTAL_SUPABASE_URL + query, {
-      headers: {
-        apikey: ARICO_PORTAL_SUPABASE_API_KEY,
-        Authorization: "Bearer " + ARICO_PORTAL_SUPABASE_API_KEY,
-        Accept: "application/json"
+    if(sessionToken){
+      sessionStorage.setItem(ARICO_INVENTORY_SESSION_KEY, "ok");
+      if(window.history && window.history.replaceState){
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
-    });
-
-    if(!res.ok){
-      throw new Error("portal session check failed");
-    }
-
-    const rows = await res.json();
-    if(!Array.isArray(rows) || rows.length === 0){
-      window.location.replace(ARICO_PORTAL_LOGIN_URL);
       return;
     }
 
-    sessionStorage.setItem(ARICO_PORTAL_SESSION_STORAGE_KEY, "ok");
-    sessionStorage.setItem(ARICO_PORTAL_SESSION_TOKEN_KEY, sessionToken);
-
-    if(window.history && window.history.replaceState){
-      window.history.replaceState({}, document.title, window.location.pathname);
+    if(sessionStorage.getItem(ARICO_INVENTORY_SESSION_KEY) === "ok"){
+      return;
     }
+
+    window.location.replace(ARICO_PORTAL_LOGIN_URL);
   }catch(_){
     window.location.replace(ARICO_PORTAL_LOGIN_URL);
   }
