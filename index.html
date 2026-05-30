@@ -78,38 +78,44 @@
     </div>
     <div id="smaregiSnapshotBadge" class="badge muted">未取得</div>
   </div>
-  <div class="smaregi-toolbar">
-    <button type="button" id="closeSmaregiStockCheckBtn" class="secondary">トップへ戻る</button>
-    <button type="button" id="syncSmaregiStockBtn">スマレジAPIから変動商品取得</button>
-    <label class="file-button">スマレジ在庫CSV取り込み<input type="file" id="smaregiCsvFile" accept=".csv,text/csv"/></label>
-    <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
-    <button type="button" id="exportSmaregiDifferenceCsvBtn" class="secondary">差異のみCSV</button>
-    <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
+  <div class="smaregi-action-grid">
+    <section class="smaregi-action-card">
+      <h3>通常操作</h3>
+      <div class="smaregi-action-buttons">
+        <button type="button" id="closeSmaregiStockCheckBtn" class="secondary">トップへ戻る</button>
+        <button type="button" id="syncSmaregiStockBtn">スマレジAPIから変動商品取得</button>
+        <button type="button" id="refreshSmaregiChecksBtn" class="secondary">最新状態に更新</button>
+      </div>
+    </section>
+    <section class="smaregi-action-card">
+      <h3>CSV</h3>
+      <div class="smaregi-action-buttons">
+        <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
+        <button type="button" id="exportSmaregiDifferenceCsvBtn" class="secondary" disabled>差異のみCSV（責任者のみ）</button>
+      </div>
+    </section>
+    <section class="smaregi-action-card smaregi-manager-card">
+      <h3>責任者操作</h3>
+      <div class="smaregi-action-buttons">
+        <button type="button" id="completeSmaregiStockCheckBtn" class="secondary" disabled>今回のチェックを完了（責任者のみ）</button>
+      </div>
+      <label>戻す日時<input type="datetime-local" id="resetSmaregiCompletedAtInput"/></label>
+      <button type="button" id="resetSmaregiCompletionBtn" class="danger" disabled>チェック完了解除（責任者のみ）</button>
+    </section>
   </div>
-  <p class="section-note">スマレジAPIから、前回チェック完了日時以降に在庫変動した商品のみ取得します。CSV取り込みはテスト用です。</p>
+  <p class="section-note">スマレジAPIから、前回チェック完了日時以降に在庫変動した商品のみ取得します。</p>
   <div class="smaregi-progress-row">
     <div id="smaregiProgressBadge" class="badge muted">チェック済み：0 / 0</div>
-    <button type="button" id="refreshSmaregiChecksBtn" class="secondary">最新状態に更新</button>
   </div>
-  <div class="smaregi-entry-panel">
-    <h3>実在庫チェック</h3>
-    <label>商品コード / バーコード<input id="smaregiCheckBarcodeInput" inputmode="numeric" autocomplete="off" placeholder="読み取りまたは手入力"/></label>
-    <div class="smaregi-selected-row">
-      <div id="smaregiSelectedProduct" class="message">商品コードを入力してください。</div>
-      <label>実在庫数<input id="smaregiActualStockInput" type="number" min="0" step="1" inputmode="numeric" placeholder="0も入力できます"/></label>
-    </div>
-    <div class="smaregi-entry-grid">
-      <label>担当者<select id="smaregiCheckerName"><option value="">担当者を選択</option></select></label>
-    </div>
-    <button type="button" id="saveSmaregiActualStockBtn">決定してチェック済みにする</button>
+  <div class="smaregi-checker-row">
+    <label>担当者<select id="smaregiCheckerName"><option value="">担当者を選択</option></select></label>
   </div>
   <div class="smaregi-filter-row">
-    <label>検索<input id="smaregiStockSearchInput" placeholder="商品名またはバーコード"/></label>
-    <label class="smaregi-difference-filter"><input type="checkbox" id="smaregiDifferenceOnly"/> 差異ありのみ表示</label>
+    <label>検索<input id="smaregiStockSearchInput" placeholder="商品名で検索"/></label>
   </div>
   <div class="table-wrap">
     <table class="smaregi-check-table">
-      <thead><tr><th>状態</th><th>商品名</th><th>バーコード</th><th>スマレジ在庫</th><th>シート在庫</th><th>操作</th></tr></thead>
+      <thead><tr><th>状態</th><th>商品名</th><th>実在庫入力</th><th>入力チェック</th><th>シート在庫</th><th>差異</th><th>操作</th></tr></thead>
       <tbody id="smaregiStockCheckBody"></tbody>
     </table>
   </div>

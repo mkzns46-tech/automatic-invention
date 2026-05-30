@@ -1517,19 +1517,24 @@ header h1{
 #smaregiStockCheckCard[hidden]{display:none !important}
 .grid.smaregi-mode > section:not(#smaregiStockCheckCard){display:none !important}
 .legacy-stock-check-panel{display:none !important}
-.smaregi-toolbar,.smaregi-filter-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.smaregi-action-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+.smaregi-action-card{padding:12px;border:1px solid #dcebe1;border-radius:12px;background:#f8fffb}
+.smaregi-action-card h3{margin:0 0 8px;font-size:15px;color:var(--main-dark)}
+.smaregi-action-buttons{display:grid;gap:8px}
+.smaregi-action-card button{width:100%;margin:0}
+.smaregi-manager-card{border-color:#f4c7c3;background:#fff8f7}
+.smaregi-manager-card label{display:block;margin:10px 0 6px}
+.smaregi-manager-card input{width:100%}
+.smaregi-manager-card .danger{background:#a61b1b;color:#fff}
+.smaregi-filter-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
 .smaregi-progress-row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:12px 0}
 .smaregi-progress-row button{width:auto;margin:0}
-.smaregi-entry-panel{margin:14px 0;padding:14px;border:2px solid var(--main);border-radius:14px;background:#f0fff4}
-.smaregi-entry-panel h3{margin-top:0}
-.smaregi-selected-row{display:grid;grid-template-columns:1fr 170px;gap:10px;align-items:end}
-.smaregi-selected-row .message{margin-top:0;min-height:52px}
-.smaregi-selected-row label{margin:0}
-.smaregi-entry-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.smaregi-checker-row{max-width:320px;margin:14px 0}
 .smaregi-filter-row label{display:flex;gap:8px;align-items:center}
 .smaregi-filter-row input[type="text"],#smaregiStockSearchInput{min-width:260px}
-.smaregi-difference-filter{font-weight:800}
 .smaregi-check-table input[type="number"]{width:100px;min-width:86px}
+.smaregi-row-check-label{display:flex;gap:6px;align-items:center;white-space:nowrap;font-weight:800}
+.smaregi-row-check-label input{width:auto;margin:0}
 .smaregi-difference{font-weight:900}
 .smaregi-difference.is-negative,.smaregi-difference.is-positive{color:#c1121f}
 .smaregi-empty{text-align:center;color:#64748b;padding:20px}
@@ -1549,10 +1554,10 @@ header h1{
 @media(max-width:760px){
   .header-actions{align-items:stretch}
   .menu-link{justify-content:center;text-align:center}
+  .smaregi-action-grid{grid-template-columns:1fr;gap:10px}
   .smaregi-filter-row{align-items:stretch}
   #smaregiStockSearchInput{min-width:0;width:100%}
-  .smaregi-selected-row,.smaregi-entry-grid,.smaregi-detail-summary{grid-template-columns:1fr}
-  .smaregi-entry-panel{padding:12px}
+  .smaregi-detail-summary{grid-template-columns:1fr}
   .smaregi-row-actions{flex-direction:column}
   .smaregi-row-actions button{width:100%}
 }
