@@ -1,4 +1,4 @@
-# v76 スマレジ日時形式修正版
+# v77 スマレジ在庫日時パラメータ修正版
 
 ## 修正内容
 - 商品名検索候補にスクロールバーを追加
@@ -22,6 +22,8 @@
 - Vercel環境変数へ引用符や改行が混入した場合に正規化
 - Vercelログへ認証URL、環境、契約ID先頭、CLIENT_ID先頭、文字数を安全に出力
 - `/stock` の日時パラメータを `YYYY-MM-DDTHH:mm:ss+09:00` 形式へ修正
+- `/stock` の日時クエリキーを `upd_date_time_from` / `upd_date_time_to` に修正
+- Vercelログへ `/stock` 送信直前の日時パラメータを出力
 - 旧v72 SQLを実行済みの場合は `supabase_schema_update_v73_smaregi_api_sync.sql` を追加実行
 
 ## スマレジ在庫CSV
