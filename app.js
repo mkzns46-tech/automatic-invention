@@ -1995,6 +1995,24 @@ function getSmaregiStatsText(){
   return `完了：${stats.completed} / ${stats.targetTotal}（${stats.percent}%） / 未入力：${stats.unchecked} / 除外：${stats.excluded} / 差異あり：${stats.diffCount}`;
 }
 
+function getSmaregiStatsHtml(){
+  const stats=getSmaregiStats();
+  return `
+    <div class="smaregi-progress-main">
+      <span>進捗</span>
+      <strong>${stats.completed} / ${stats.targetTotal}</strong>
+      <em>${stats.percent}%</em>
+    </div>
+    <div class="smaregi-progress-bar" aria-hidden="true"><span style="width:${Math.max(0,Math.min(100,stats.percent))}%"></span></div>
+    <div class="smaregi-progress-details">
+      <span class="is-done">完了 ${stats.completed}</span>
+      <span class="is-unchecked">未入力 ${stats.unchecked}</span>
+      <span class="is-excluded">除外 ${stats.excluded}</span>
+      <span class="is-diff">差異 ${stats.diffCount}</span>
+    </div>
+  `;
+}
+
 function getFocusedSmaregiInputState(){
   const active=document.activeElement;
   if(active&&active.classList&&active.classList.contains("smaregi-row-actual-input")){
@@ -2023,7 +2041,7 @@ function renderSmaregiStockChecks(){
       : "未取得";
   }
   const progress=el("smaregiProgressBadge");
-  if(progress)progress.textContent=getSmaregiStatsText();
+  if(progress)progress.innerHTML=getSmaregiStatsHtml();
   updateSmaregiManagerControls();
   const resetInput=el("resetSmaregiCompletedAtInput");
   if(resetInput&&smaregiSnapshot?.completed_at&&!resetInput.value){
@@ -2051,6 +2069,7 @@ function renderSmaregiStockChecks(){
     const check=getSmaregiCheck(item.barcode);
     const excluded=isSmaregiExcludedCheck(check);
     const sheetDifference=getSmaregiSheetDifference(item);
+    const manager=isSmaregiManager();
     const status=excluded ? "除外" : (check ? "チェック済み" : "未チェック");
     const statusClass=excluded ? " is-excluded" : (check ? " is-checked" : "");
     return `<tr>
@@ -2059,8 +2078,8 @@ function renderSmaregiStockChecks(){
       <td><input type="number" class="smaregi-row-actual-input" data-barcode="${esc(item.barcode)}" min="0" step="1" inputmode="numeric" value="${excluded ? "" : (check?.actual_stock??"")}" placeholder="手入力" ${excluded?"disabled":""}/></td>
       <td><button type="button" class="smaregi-row-save-btn" data-barcode="${esc(item.barcode)}" ${excluded?"disabled":""}>${check&&!excluded?"更新":"保存"}</button></td>
       <td class="smaregi-row-actions">
-        ${sheetDifference!==0&&!excluded ? `<button type="button" class="secondary smaregi-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button>` : ""}
-        ${excluded ? `<button type="button" class="secondary smaregi-clear-btn" data-barcode="${esc(item.barcode)}">除外解除</button>` : `<button type="button" class="secondary smaregi-exclude-btn" data-barcode="${esc(item.barcode)}">除外</button>`}
+        ${manager&&sheetDifference!==0&&!excluded ? `<button type="button" class="secondary smaregi-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button>` : ""}
+        ${manager ? (excluded ? `<button type="button" class="secondary smaregi-clear-btn" data-barcode="${esc(item.barcode)}">除外解除</button>` : `<button type="button" class="secondary smaregi-exclude-btn" data-barcode="${esc(item.barcode)}">除外</button>`) : `<span class="smaregi-manager-only-note">責任者のみ</span>`}
       </td>
     </tr>`;
   }).join("");
@@ -2106,6 +2125,7 @@ function renderSmaregiDiffOnlyPanel(){
     const check=getSmaregiCheck(item.barcode);
     const difference=getSmaregiSheetDifference(item);
     const differenceClass=difference<0 ? " is-negative" : " is-positive";
+    const manager=isSmaregiManager();
     return `<tr>
       <td><span class="smaregi-status is-checked">差異あり</span></td>
       <td>${esc(item.product_name||"")}</td>
@@ -2115,7 +2135,7 @@ function renderSmaregiDiffOnlyPanel(){
       <td>${esc(getSmaregiDisplayCheckedBy(check))}</td>
       <td>${check?.checked_at ? fmt(check.checked_at) : ""}</td>
       <td class="smaregi-row-actions">
-        <button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button>
+        ${manager ? `<button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button>` : `<span class="smaregi-manager-only-note">責任者のみ</span>`}
       </td>
     </tr>`;
   }).join("");
@@ -2375,6 +2395,10 @@ async function saveSmaregiActualStock(barcode,value){
 }
 
 async function excludeSmaregiStockItem(barcode){
+  if(!isSmaregiManager()){
+    showMessage("除外は責任者「田中」のみ操作できます。","err");
+    return false;
+  }
   if(!smaregiSnapshot)return false;
   const item=smaregiStockItems.find(row=>String(row.barcode)===String(barcode));
   if(!item){
@@ -2410,6 +2434,10 @@ async function excludeSmaregiStockItem(barcode){
 }
 
 async function clearSmaregiStockCheck(barcode){
+  if(!isSmaregiManager()){
+    showMessage("除外解除は責任者「田中」のみ操作できます。","err");
+    return;
+  }
   const item=smaregiStockItems.find(row=>String(row.barcode)===String(barcode));
   if(!item||!smaregiSnapshot)return;
   if(!confirm(`${item.product_name||barcode} のチェック済み状態を解除しますか？`))return;
@@ -2520,6 +2548,10 @@ function buildSmaregiChangeRows(smaregiChanges,appLogs){
 }
 
 async function showSmaregiCauseDetail(barcode){
+  if(!isSmaregiManager()){
+    showMessage("原因確認は責任者「田中」のみ操作できます。","err");
+    return;
+  }
   const detail=el("smaregiCauseDetail");
   const item=smaregiStockItems.find(row=>String(row.barcode)===String(barcode));
   if(!detail||!item)return;
