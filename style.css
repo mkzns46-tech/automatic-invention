@@ -1718,40 +1718,65 @@ header h1{
 }
 
 
-/* ===== v93 zero input / diff search / row spacing fix ===== */
+/* ===== v94 手入力・差異一覧・完了時反映 ===== */
 .smaregi-check-table th:nth-child(2),
 .smaregi-check-table td:nth-child(2){
-  min-width:220px !important;
-  max-width:360px !important;
-  white-space:normal !important;
+  width:42% !important;
+  min-width:260px !important;
+  max-width:520px !important;
 }
 .smaregi-check-table th:nth-child(3),
 .smaregi-check-table td:nth-child(3){
-  width:120px !important;
-  min-width:110px !important;
-  padding-left:6px !important;
+  width:122px !important;
+  min-width:112px !important;
+  padding-left:4px !important;
+}
+.smaregi-check-table th:nth-child(4),
+.smaregi-check-table td:nth-child(4){
+  width:92px !important;
+  min-width:86px !important;
+}
+.smaregi-check-table th:nth-child(5),
+.smaregi-check-table td:nth-child(5){
+  min-width:150px !important;
 }
 .smaregi-row-actual-input{
-  width:96px !important;
-  min-width:96px !important;
-  max-width:96px !important;
-  text-align:right;
-  font-weight:900;
+  width:94px !important;
+  min-width:84px !important;
+  max-width:94px !important;
+  text-align:center !important;
+  font-weight:900 !important;
 }
-.smaregi-diff-filter-row{
-  margin:8px 0 12px !important;
+.smaregi-row-save-btn{
+  min-width:70px !important;
+  padding:8px 10px !important;
+}
+.smaregi-diff-table th:nth-child(2),
+.smaregi-diff-table td:nth-child(2){
+  width:34% !important;
+  min-width:240px !important;
+}
+.smaregi-diff-table th:nth-child(3),
+.smaregi-diff-table td:nth-child(3),
+.smaregi-diff-table th:nth-child(4),
+.smaregi-diff-table td:nth-child(4),
+.smaregi-diff-table th:nth-child(5),
+.smaregi-diff-table td:nth-child(5){
+  width:100px !important;
+  min-width:90px !important;
+  text-align:center;
 }
 @media(max-width:800px){
   .smaregi-check-table th:nth-child(2),
   .smaregi-check-table td:nth-child(2){
-    min-width:180px !important;
+    min-width:190px !important;
   }
   .smaregi-check-table th:nth-child(3),
   .smaregi-check-table td:nth-child(3){
-    min-width:100px !important;
+    min-width:96px !important;
   }
   .smaregi-row-actual-input{
-    width:88px !important;
-    min-width:88px !important;
+    width:82px !important;
+    max-width:82px !important;
   }
 }

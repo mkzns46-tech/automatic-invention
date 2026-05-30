@@ -104,7 +104,7 @@
   </div>
   <div class="table-wrap">
     <table class="smaregi-check-table">
-      <thead><tr><th>状態</th><th>商品名</th><th>実在庫入力</th><th>入力チェック</th><th>シート在庫</th><th>差異</th><th>操作</th></tr></thead>
+      <thead><tr><th>状態</th><th>商品名</th><th>実在庫入力</th><th>保存</th><th>操作</th></tr></thead>
       <tbody id="smaregiStockCheckBody"></tbody>
     </table>
   </div>
@@ -112,16 +112,13 @@
     <div class="section-title">
       <div>
         <h3>今回の差異一覧</h3>
-        <p class="section-note">今回のチェックで差異が出た商品だけを表示します。</p>
+        <p class="section-note">スマレジ在庫とシート在庫の差異がある商品だけを表示します。</p>
       </div>
       <div id="smaregiDiffSummary" class="badge muted">差異：0件</div>
     </div>
-    <div class="smaregi-filter-row smaregi-diff-filter-row">
-      <label>差異一覧検索<input id="smaregiDiffSearchInput" placeholder="商品名で検索"/></label>
-    </div>
     <div class="table-wrap">
       <table class="smaregi-check-table smaregi-diff-table">
-        <thead><tr><th>状態</th><th>商品名</th><th>実在庫</th><th>シート在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th></tr></thead>
+        <thead><tr><th>状態</th><th>商品名</th><th>スマレジ在庫</th><th>シート在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th></tr></thead>
         <tbody id="smaregiDiffOnlyBody"></tbody>
       </table>
     </div>
