@@ -1,3 +1,20 @@
+const ARICO_PORTAL_LOGIN_URL = "https://arico-portal.vercel.app/";
+const ARICO_PORTAL_TOP_URL = "https://arico-portal.vercel.app/portal.html";
+
+(function requirePortalLogin(){
+  try{
+    if(localStorage.getItem("arico_portal_login") !== "ok"){
+      window.location.replace(ARICO_PORTAL_LOGIN_URL);
+    }
+  }catch(_){
+    window.location.replace(ARICO_PORTAL_LOGIN_URL);
+  }
+})();
+
+function goAricoPortalTop(){
+  window.location.href = ARICO_PORTAL_TOP_URL;
+}
+
 window.addEventListener("error",(e)=>{
   try{
     const m=document.getElementById("message");
@@ -1612,7 +1629,7 @@ reloadAll();
 /* ===== v50 Japanese / Korean UI toggle ===== */
 const I18N = {
   ja: {
-    "ARICO TOKYO 在庫変動確認シート":"ARICO TOKYO 在庫変動確認シート",
+    "ARICO TOKYO 在庫変動確認シート":"ARICO TOKYO 在庫管理システム",
     
     "再読み込み":"再読み込み",
     "在庫変動登録":"在庫変動登録",
@@ -1660,7 +1677,7 @@ const I18N = {
     "検索をクリア":"検索をクリア"
   },
   ko: {
-    "ARICO TOKYO 在庫変動確認シート":"ARICO TOKYO 재고 변동 확인 시트",
+    "ARICO TOKYO 在庫変動確認シート":"ARICO TOKYO 재고 관리 시스템",
     
     "再読み込み":"다시 불러오기",
     "在庫変動登録":"재고 변동 등록",
@@ -2733,8 +2750,9 @@ function hideSmaregiStockCheck(){
 }
 
 function bindSmaregiStockCheckEvents(){
+  on("portalTopBtn","click",goAricoPortalTop);
   on("openSmaregiStockCheckBtn","click",showSmaregiStockCheck);
-  on("closeSmaregiStockCheckBtn","click",hideSmaregiStockCheck);
+  on("closeSmaregiStockCheckBtn","click",goAricoPortalTop);
   on("syncSmaregiStockBtn","click",syncSmaregiStockFromApi);
   on("refreshSmaregiChecksBtn","click",loadLatestSmaregiSnapshot);
   on("exportSmaregiCheckCsvBtn","click",()=>exportSmaregiCheckCsv(false));

@@ -1968,3 +1968,33 @@ header h1{
     z-index:55;
   }
 }
+
+
+/* ===== v105 portal top button / inventory system title ===== */
+.portal-top-btn{
+  background:#ffffff !important;
+  color:#0b4f35 !important;
+}
+.header-actions{
+  display:flex !important;
+  gap:10px !important;
+  align-items:center !important;
+  flex-wrap:wrap !important;
+}
+.header-actions button{
+  flex:0 0 auto;
+}
+@media(max-width:800px){
+  .header-actions{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:8px !important;
+  }
+  .header-actions button{
+    width:100% !important;
+    min-width:0 !important;
+  }
+  #reloadBtn{
+    grid-column:1 / -1;
+  }
+}
