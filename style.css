@@ -1716,3 +1716,42 @@ header h1{
     max-width:88px !important;
   }
 }
+
+
+/* ===== v93 zero input / diff search / row spacing fix ===== */
+.smaregi-check-table th:nth-child(2),
+.smaregi-check-table td:nth-child(2){
+  min-width:220px !important;
+  max-width:360px !important;
+  white-space:normal !important;
+}
+.smaregi-check-table th:nth-child(3),
+.smaregi-check-table td:nth-child(3){
+  width:120px !important;
+  min-width:110px !important;
+  padding-left:6px !important;
+}
+.smaregi-row-actual-input{
+  width:96px !important;
+  min-width:96px !important;
+  max-width:96px !important;
+  text-align:right;
+  font-weight:900;
+}
+.smaregi-diff-filter-row{
+  margin:8px 0 12px !important;
+}
+@media(max-width:800px){
+  .smaregi-check-table th:nth-child(2),
+  .smaregi-check-table td:nth-child(2){
+    min-width:180px !important;
+  }
+  .smaregi-check-table th:nth-child(3),
+  .smaregi-check-table td:nth-child(3){
+    min-width:100px !important;
+  }
+  .smaregi-row-actual-input{
+    width:88px !important;
+    min-width:88px !important;
+  }
+}

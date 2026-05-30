@@ -1915,10 +1915,31 @@ function getSmaregiDifference(item){
   return check ? Number(check.actual_stock)-Number(item.smaregi_stock||0) : null;
 }
 
+function getSmaregiSearchKeyword(){
+  return String(el("smaregiStockSearchInput")?.value||"").trim().toLowerCase();
+}
+
+function getSmaregiDiffSearchKeyword(){
+  return String(el("smaregiDiffSearchInput")?.value||"").trim().toLowerCase();
+}
+
+function smaregiItemMatchesKeyword(item,keyword){
+  if(!keyword)return true;
+  const text=[
+    item.product_name,
+    item.barcode,
+    item.product_code,
+    item.code
+  ].map(v=>String(v||"").toLowerCase()).join(" ");
+  return text.includes(keyword);
+}
+
 function getSmaregiDiffItems(){
+  const keyword=getSmaregiDiffSearchKeyword() || getSmaregiSearchKeyword();
   return smaregiStockItems.filter(item=>{
     const check=getSmaregiCheck(item.barcode);
-    if(!check)return false;
+    if(!check || isSmaregiExcludedCheck(check))return false;
+    if(!smaregiItemMatchesKeyword(item,keyword))return false;
     const difference=getSmaregiDifference(item);
     return difference!==null && difference!==0;
   });
@@ -1988,10 +2009,8 @@ function renderSmaregiStockChecks(){
     resetInput.value=formatDateTimeLocal(smaregiSnapshot.completed_at);
   }
 
-  const keyword=String(el("smaregiStockSearchInput")?.value||"").trim().toLowerCase();
-  const visible=smaregiStockItems.filter(item=>{
-    return !keyword || String(item.product_name||"").toLowerCase().includes(keyword);
-  });
+  const keyword=getSmaregiSearchKeyword();
+  const visible=smaregiStockItems.filter(item=>smaregiItemMatchesKeyword(item,keyword));
 
   if(!smaregiSnapshot){
     body.innerHTML='<tr><td colspan="7" class="smaregi-empty">「スマレジAPIから変動商品取得」で最新データを表示してください。</td></tr>';
@@ -2049,7 +2068,10 @@ function renderSmaregiDiffOnlyPanel(){
 
   const diffItems=getSmaregiDiffItems();
   const checkedCount=smaregiStockItems.filter(item=>getSmaregiCheck(item.barcode)).length;
-  if(summary)summary.textContent=`差異：${diffItems.length}件 / チェック済み：${checkedCount}件`;
+  const diffKeyword=getSmaregiDiffSearchKeyword() || getSmaregiSearchKeyword();
+  if(summary)summary.textContent=diffKeyword
+    ? `差異：${diffItems.length}件 / チェック済み：${checkedCount}件 / 検索中`
+    : `差異：${diffItems.length}件 / チェック済み：${checkedCount}件`;
 
   if(!smaregiSnapshot){
     body.innerHTML='<tr><td colspan="8" class="smaregi-empty">スマレジAPIから変動商品を取得してください。</td></tr>';
@@ -2498,6 +2520,7 @@ function bindSmaregiStockCheckEvents(){
   on("resetSmaregiCompletionBtn","click",resetSmaregiStockCheckCompletion);
   on("showSmaregiDiffListBtn","click",showSmaregiDiffOnlyPanel);
   on("smaregiStockSearchInput","input",renderSmaregiStockChecks);
+  on("smaregiDiffSearchInput","input",renderSmaregiDiffOnlyPanel);
   on("smaregiCheckerName","change",e=>{
     localStorage.setItem("arico_smaregi_checker",e.target.value||"");
     updateSmaregiManagerControls();
