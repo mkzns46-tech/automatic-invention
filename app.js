@@ -249,6 +249,7 @@ function renderStaffOptions(){
     const cur=smaregiChecker.value||localStorage.getItem("arico_smaregi_checker")||"";
     smaregiChecker.innerHTML='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
     if(cur)smaregiChecker.value=cur;
+    setupSmaregiCheckerScrollableSelect();
   }
 }
 
@@ -1960,6 +1961,35 @@ function getSmaregiAppStock(barcode){
 
 function getSmaregiCheckerName(){
   return String(el("smaregiCheckerName")?.value||"").trim();
+}
+
+
+function setupSmaregiCheckerScrollableSelect(){
+  const select=el("smaregiCheckerName");
+  if(!select || select.dataset.scrollableSetup==="1")return;
+  select.dataset.scrollableSetup="1";
+
+  const openList=()=>{
+    if(window.innerWidth>800)return;
+    const count=Math.max(2, Math.min(7, select.options.length || 2));
+    select.size=count;
+    select.classList.add("is-open-list");
+  };
+
+  const closeList=()=>{
+    select.size=1;
+    select.classList.remove("is-open-list");
+  };
+
+  select.addEventListener("focus", openList);
+  select.addEventListener("click", openList);
+  select.addEventListener("change", ()=>{
+    closeList();
+    try{localStorage.setItem("arico_smaregi_checker",select.value||"");}catch(_){ }
+    updateSmaregiManagerControls();
+    renderSmaregiStockChecks();
+  });
+  select.addEventListener("blur", ()=>setTimeout(closeList,150));
 }
 
 function isSmaregiManager(){

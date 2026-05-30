@@ -1929,3 +1929,42 @@ header h1{
 
 /* ===== v98 progress privacy / reliable update ===== */
 .smaregi-progress-metrics .is-diff{display:none !important;}
+
+
+/* ===== v103 mobile staff select + entrance button fix ===== */
+#closeSmaregiStockCheckBtn{
+  display:block !important;
+}
+
+@media(max-width:800px){
+  #closeSmaregiStockCheckBtn{
+    display:block !important;
+    visibility:visible !important;
+    width:100% !important;
+    min-height:52px !important;
+    margin:0 0 10px !important;
+    background:#e9f4ee !important;
+    color:#0b4f35 !important;
+    border:1px solid #b7d7c4 !important;
+    font-weight:900 !important;
+  }
+
+  #smaregiCheckerName{
+    position:relative;
+    z-index:60;
+  }
+
+  #smaregiCheckerName.is-open-list{
+    height:auto !important;
+    max-height:260px !important;
+    overflow-y:auto !important;
+    border:2px solid var(--main) !important;
+    box-shadow:0 8px 20px rgba(27,67,50,.18) !important;
+    background:#fff !important;
+  }
+
+  .smaregi-checker-panel{
+    position:relative;
+    z-index:55;
+  }
+}
