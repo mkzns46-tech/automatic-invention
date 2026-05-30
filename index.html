@@ -74,24 +74,26 @@
   <div class="section-title">
     <div>
       <h2>スマレジ変動商品チェック</h2>
-      <p class="section-note">実在庫を入力し、スマレジ在庫との差異を確認します。</p>
+      <p class="section-note">スマレジ在庫を基準に実在庫を入力し、差異がある商品を確認します。</p>
     </div>
     <div id="smaregiSnapshotBadge" class="badge muted">未取得</div>
   </div>
-  <div class="smaregi-progress-row">
-    <div id="smaregiProgressBadge" class="badge muted">チェック済み：0 / 0</div>
-  </div>
   <div class="smaregi-toolbar smaregi-action-grid">
-    <button type="button" id="closeSmaregiStockCheckBtn" class="secondary">トップに戻る</button>
-    <button type="button" id="syncSmaregiStockBtn">スマレジデータ取り込み</button>
+    <button type="button" id="closeSmaregiStockCheckBtn" class="secondary">トップへ戻る</button>
+    <button type="button" id="syncSmaregiStockBtn">スマレジAPIから変動商品取得</button>
     <button type="button" id="refreshSmaregiChecksBtn" class="secondary">最新状態に更新</button>
     <button type="button" id="showSmaregiDiffListBtn" class="secondary">今回の差異一覧</button>
     <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
     <button type="button" id="exportSmaregiDifferenceCsvBtn" class="secondary">差異のみCSV</button>
     <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
   </div>
+  <p class="section-note">スマレジAPIから、前回チェック完了日時以降に在庫変動した商品のみ取得します。実在庫入力ではスマレジ在庫・シート在庫は変更しません。</p>
+  <div class="smaregi-progress-row">
+    <div id="smaregiProgressBadge" class="badge muted">チェック済み：0 / 0</div>
+  </div>
   <div class="smaregi-entry-panel smaregi-checker-panel">
     <label>担当者（チェックした人）<select id="smaregiCheckerName"><option value="">担当者を選択</option></select></label>
+    <div class="section-note">担当者は保存時に記録されます。責任者「田中」のみ、チェック完了・差異のみCSV・チェック完了解除を操作できます。</div>
   </div>
   <div class="smaregi-reset-panel">
     <label>チェック完了解除日時<input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
@@ -110,13 +112,13 @@
     <div class="section-title">
       <div>
         <h3>今回の差異一覧</h3>
-        <p class="section-note">実在庫とスマレジ在庫の差異がある商品だけを表示します。</p>
+        <p class="section-note">スマレジ在庫とシート在庫の差異がある商品だけを表示します。</p>
       </div>
       <div id="smaregiDiffSummary" class="badge muted">差異：0件</div>
     </div>
     <div class="table-wrap">
       <table class="smaregi-check-table smaregi-diff-table">
-        <thead><tr><th>状態</th><th>商品名</th><th>実在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th></tr></thead>
+        <thead><tr><th>状態</th><th>商品名</th><th>スマレジ在庫</th><th>シート在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th></tr></thead>
         <tbody id="smaregiDiffOnlyBody"></tbody>
       </table>
     </div>

@@ -1,19 +1,49 @@
 const ARICO_PORTAL_LOGIN_URL = "https://arico-portal.vercel.app/";
 const ARICO_PORTAL_TOP_URL = "https://arico-portal.vercel.app/portal.html";
-const ARICO_PORTAL_AUTH_TOKEN = "ARICO_PORTAL_2026";
+const ARICO_PORTAL_SESSION_STORAGE_KEY = "arico_inventory_portal_session_ok";
+const ARICO_PORTAL_SESSION_TOKEN_KEY = "arico_inventory_portal_session_token";
+const ARICO_PORTAL_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
+const ARICO_PORTAL_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 
-(function requirePortalLogin(){
+(async function requirePortalLogin(){
   try{
     const params = new URLSearchParams(window.location.search);
-    const auth = params.get("auth");
+    const sessionToken = String(params.get("session") || "").trim();
 
-    if(auth === ARICO_PORTAL_AUTH_TOKEN){
-      localStorage.setItem("arico_portal_login", "ok");
+    if(sessionStorage.getItem(ARICO_PORTAL_SESSION_STORAGE_KEY) === "ok"){
       return;
     }
 
-    if(localStorage.getItem("arico_portal_login") !== "ok"){
+    if(!sessionToken){
       window.location.replace(ARICO_PORTAL_LOGIN_URL);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const query = `/rest/v1/portal_sessions?select=token,expires_at&token=eq.${encodeURIComponent(sessionToken)}&expires_at=gt.${encodeURIComponent(now)}&limit=1`;
+    const res = await fetch(ARICO_PORTAL_SUPABASE_URL + query, {
+      headers: {
+        apikey: ARICO_PORTAL_SUPABASE_API_KEY,
+        Authorization: "Bearer " + ARICO_PORTAL_SUPABASE_API_KEY,
+        Accept: "application/json"
+      }
+    });
+
+    if(!res.ok){
+      throw new Error("portal session check failed");
+    }
+
+    const rows = await res.json();
+    if(!Array.isArray(rows) || rows.length === 0){
+      window.location.replace(ARICO_PORTAL_LOGIN_URL);
+      return;
+    }
+
+    sessionStorage.setItem(ARICO_PORTAL_SESSION_STORAGE_KEY, "ok");
+    sessionStorage.setItem(ARICO_PORTAL_SESSION_TOKEN_KEY, sessionToken);
+
+    if(window.history && window.history.replaceState){
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }catch(_){
     window.location.replace(ARICO_PORTAL_LOGIN_URL);
