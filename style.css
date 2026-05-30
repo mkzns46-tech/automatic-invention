@@ -1780,3 +1780,29 @@ header h1{
     max-width:82px !important;
   }
 }
+
+/* ===== v95 auto refresh + completion summary polish ===== */
+#smaregiProgressBadge{
+  width:100%;
+  justify-content:center;
+  font-size:14px;
+  line-height:1.5;
+  white-space:normal;
+  text-align:center;
+}
+.smaregi-progress-row{
+  margin:12px 0 14px;
+}
+.smaregi-checker-panel{
+  margin-top:10px;
+}
+.smaregi-diff-panel .smaregi-row-actions{
+  justify-content:flex-start;
+}
+@media(max-width:800px){
+  #smaregiProgressBadge{
+    align-items:flex-start;
+    justify-content:flex-start;
+    text-align:left;
+  }
+}

@@ -87,13 +87,12 @@
     <button type="button" id="exportSmaregiDifferenceCsvBtn" class="secondary">差異のみCSV</button>
     <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
   </div>
-  <p class="section-note">スマレジAPIから、前回チェック完了日時以降に在庫変動した商品のみ取得します。実在庫入力ではスマレジ在庫・シート在庫は変更しません。</p>
+  <p class="section-note">スマレジAPIから、前回チェック完了日時以降に在庫変動した商品のみ取得します。</p>
   <div class="smaregi-progress-row">
     <div id="smaregiProgressBadge" class="badge muted">チェック済み：0 / 0</div>
   </div>
   <div class="smaregi-entry-panel smaregi-checker-panel">
     <label>担当者（チェックした人）<select id="smaregiCheckerName"><option value="">担当者を選択</option></select></label>
-    <div class="section-note">担当者は保存時に記録されます。責任者「田中」のみ、チェック完了・差異のみCSV・チェック完了解除を操作できます。</div>
   </div>
   <div class="smaregi-reset-panel">
     <label>チェック完了解除日時<input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
