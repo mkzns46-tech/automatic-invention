@@ -1058,6 +1058,15 @@ function equipmentCheckHtml(log){
   return `<span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${esc(log.id||"")}">確認</button>`;
 }
 
+function replaceEquipmentConfirmationDom(logId,log){
+  if(!isEquipmentTransferChecked(log))return;
+  document.querySelectorAll(".equipment-confirm-btn").forEach(button=>{
+    if(String(button.dataset.logId||"")!==String(logId))return;
+    const cell=button.closest("td");
+    if(cell)cell.innerHTML=equipmentCheckHtml(log);
+  });
+}
+
 function getEquipmentConfirmationStaff(){
   return String(
     el("staff")?.value||
@@ -1089,12 +1098,27 @@ async function confirmEquipmentTransfer(logId,button=null){
       body:JSON.stringify({equipment_checked:true,equipment_checked_by:checkedBy,equipment_checked_at})
     });
     console.log("[Equipment Transfer Confirm PATCH Success]",{logId,checkedBy,equipment_checked_at});
+    replaceEquipmentConfirmationDom(logId,{
+      id:logId,
+      type:"備品転用",
+      equipment_checked:true,
+      equipment_checked_by:checkedBy,
+      equipment_checked_at
+    });
     const refreshedRows=await sb(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`);
     const refreshedLog=Array.isArray(refreshedRows)&&refreshedRows[0] ? refreshedRows[0] : null;
+    const displayLog=refreshedLog&&isEquipmentTransferChecked(refreshedLog) ? refreshedLog : {
+      ...(refreshedLog||{}),
+      id:refreshedLog?.id||logId,
+      type:refreshedLog?.type||"備品転用",
+      equipment_checked:true,
+      equipment_checked_by:refreshedLog?.equipment_checked_by||checkedBy,
+      equipment_checked_at:refreshedLog?.equipment_checked_at||equipment_checked_at
+    };
     if(!refreshedLog)throw new Error(`更新後の備品転用履歴を再取得できませんでした。inventory_logs.id=${logId}`);
     logs=(logs||[]).some(log=>String(log.id)===String(logId))
-      ? logs.map(log=>String(log.id)===String(logId) ? refreshedLog : log)
-      : [refreshedLog,...logs];
+      ? logs.map(log=>String(log.id)===String(logId) ? displayLog : log)
+      : [displayLog,...logs];
     console.log("[Equipment Transfer Confirm Refetched]",{
       id:refreshedLog.id,
       equipment_checked:refreshedLog.equipment_checked,
@@ -1103,7 +1127,8 @@ async function confirmEquipmentTransfer(logId,button=null){
     });
     showMessage(`備品転用を確認済みにしました：${checkedBy}`,"ok");
     renderGlobalHistory();
-    if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode,refreshedLog);
+    if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode,displayLog);
+    replaceEquipmentConfirmationDom(logId,displayLog);
   }catch(e){
     showMessage("備品転用確認エラー。\nSQL追加済みか確認してください。\n"+e.message,"err");
   }
@@ -2242,12 +2267,12 @@ function getSmaregiStats(){
   const excluded=smaregiStockItems.filter(item=>isSmaregiExcludedCheck(getSmaregiCheck(item.barcode))).length;
   const completed=smaregiStockItems.filter(item=>{
     const check=getSmaregiCheck(item.barcode);
-    return check&&!isSmaregiExcludedCheck(check);
+    return Boolean(check);
   }).length;
-  const unchecked=Math.max(0,total-completed-excluded);
+  const unchecked=Math.max(0,total-completed);
   const diffCount=getSmaregiDiffItems().length;
-  const targetTotal=Math.max(0,total-excluded);
-  const percent=targetTotal>0?Math.round((completed/targetTotal)*100):0;
+  const targetTotal=total;
+  const percent=total>0?Math.round((completed/total)*100):0;
   return {total,completed,unchecked,excluded,diffCount,targetTotal,percent};
 }
 
@@ -2262,6 +2287,10 @@ function getSmaregiProgressHtml(){
     <div class="smaregi-progress-card-inner">
       <div class="smaregi-progress-main">チェック済み <span>${stats.completed} / ${stats.total}</span></div>
       <div class="smaregi-progress-sub">除外 ${stats.excluded}</div>
+      <div class="smaregi-progress-graph" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stats.percent}">
+        <div class="smaregi-progress-fill" style="width:${stats.percent}%"></div>
+      </div>
+      <div class="smaregi-progress-text">進捗 ${stats.percent}%</div>
     </div>`;
 }
 

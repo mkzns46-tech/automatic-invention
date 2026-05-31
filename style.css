@@ -2242,6 +2242,28 @@ td small{margin-top:4px;color:#527161}
 /* ===== v98 progress privacy / reliable update ===== */
 .smaregi-progress-metrics .is-diff{display:none !important;}
 
+/* ===== v102 Smaregi progress graph ===== */
+.smaregi-progress-graph{
+  width:100%;
+  height:14px;
+  background:#dceee5;
+  border-radius:999px;
+  overflow:hidden;
+  margin-top:8px;
+}
+.smaregi-progress-fill{
+  height:100%;
+  background:#2d6a4f;
+  border-radius:999px;
+  transition:width .25s ease;
+}
+.smaregi-progress-text{
+  margin-top:4px;
+  font-size:13px;
+  font-weight:700;
+  color:#d8f3dc;
+}
+
 /* ===== emergency mobile Smaregi cards ===== */
 @media(max-width:800px){
   .smaregi-stock-check-section .table-wrap{
