@@ -643,7 +643,7 @@ async function loadProductHistoryByBarcode(barcode){
   return productLogs;
 }
 
-async function showProductHistoryForBarcode(barcode){
+async function showProductHistoryForBarcode(barcode,replacementLog=null){
   barcode=String(barcode||"").trim();
   if(!barcode)return;
 
@@ -654,7 +654,12 @@ async function showProductHistoryForBarcode(barcode){
   }
 
   selectedBarcode=barcode;
-  const productLogs=await loadProductHistoryByBarcode(barcode);
+  let productLogs=await loadProductHistoryByBarcode(barcode);
+  if(replacementLog){
+    productLogs=productLogs.map(log=>
+      String(log.id)===String(replacementLog.id) ? replacementLog : log
+    );
+  }
   renderSelectedProductHistoryWithData(productLogs);
 }
 
@@ -1087,12 +1092,18 @@ async function confirmEquipmentTransfer(logId,button=null){
     const refreshedRows=await sb(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`);
     const refreshedLog=Array.isArray(refreshedRows)&&refreshedRows[0] ? refreshedRows[0] : null;
     if(!refreshedLog)throw new Error(`更新後の備品転用履歴を再取得できませんでした。inventory_logs.id=${logId}`);
-    const localLog=(logs||[]).find(log=>String(log.id)===String(logId));
-    if(localLog)Object.assign(localLog,refreshedLog);
-    else logs.unshift(refreshedLog);
+    logs=(logs||[]).some(log=>String(log.id)===String(logId))
+      ? logs.map(log=>String(log.id)===String(logId) ? refreshedLog : log)
+      : [refreshedLog,...logs];
+    console.log("[Equipment Transfer Confirm Refetched]",{
+      id:refreshedLog.id,
+      equipment_checked:refreshedLog.equipment_checked,
+      equipment_checked_by:refreshedLog.equipment_checked_by,
+      equipment_checked_at:refreshedLog.equipment_checked_at
+    });
     showMessage(`備品転用を確認済みにしました：${checkedBy}`,"ok");
     renderGlobalHistory();
-    if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode);
+    if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode,refreshedLog);
   }catch(e){
     showMessage("備品転用確認エラー。\nSQL追加済みか確認してください。\n"+e.message,"err");
   }
