@@ -1030,14 +1030,28 @@ function equipmentCheckHtml(log){
   return `<span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${esc(log.id||"")}">確認</button>`;
 }
 
+function getEquipmentConfirmationStaff(){
+  return String(
+    el("staff")?.value||
+    el("smaregiCheckerName")?.value||
+    localStorage.getItem("arico_smaregi_checker")||
+    ""
+  ).trim();
+}
+
 async function confirmEquipmentTransfer(logId){
-  const checkedBy=String(el("staff")?.value||"").trim();
+  logId=String(logId||"").trim();
+  console.log("[Equipment Transfer Confirm Click]",{logId});
+  const checkedBy=getEquipmentConfirmationStaff();
   if(!checkedBy){
     showMessage("確認する担当者を選択してください。","err");
-    el("staff")?.focus();
+    el("staffPicker")?.querySelector(".staff-picker-toggle")?.focus();
     return;
   }
-  if(!logId)return;
+  if(!logId){
+    showMessage("備品転用履歴IDが見つかりません。再読み込みしてください。","err");
+    return;
+  }
   try{
     const equipment_checked_at=new Date().toISOString();
     await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
@@ -1045,11 +1059,13 @@ async function confirmEquipmentTransfer(logId){
       headers:{Prefer:"return=minimal"},
       body:JSON.stringify({equipment_checked:true,equipment_checked_by:checkedBy,equipment_checked_at})
     });
+    console.log("[Equipment Transfer Confirm PATCH Success]",{logId,checkedBy,equipment_checked_at});
+    const refreshedRows=await sb(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`);
+    const refreshedLog=Array.isArray(refreshedRows)&&refreshedRows[0] ? refreshedRows[0] : null;
+    if(!refreshedLog)throw new Error(`更新後の備品転用履歴を再取得できませんでした。inventory_logs.id=${logId}`);
     (logs||[]).forEach(log=>{
       if(String(log.id)===String(logId)){
-        log.equipment_checked=true;
-        log.equipment_checked_by=checkedBy;
-        log.equipment_checked_at=equipment_checked_at;
+        Object.assign(log,refreshedLog);
       }
     });
     showMessage(`備品転用を確認済みにしました：${checkedBy}`,"ok");
@@ -1063,6 +1079,7 @@ async function confirmEquipmentTransfer(logId){
 function bindEquipmentConfirmButtons(){
   document.querySelectorAll(".equipment-confirm-btn").forEach(button=>{
     button.onclick=()=>{
+      console.log("[Equipment Confirm Button]",{logId:button.dataset.logId||""});
       confirmEquipmentTransfer(button.dataset.logId);
     };
   });
@@ -2651,6 +2668,7 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
       return false;
     }
     const checked_at=new Date().toISOString();
+    const correctedNow=markCorrected||isUpdate;
     const payload={
       snapshot_id:smaregiSnapshot.id,
       barcode,
@@ -2662,9 +2680,9 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
       no_issue_by:previousCheck?.no_issue_by||null,
       no_issue_at:previousCheck?.no_issue_at||null,
       no_issue_reason:previousCheck?.no_issue_reason||"",
-      actual_corrected:markCorrected||previousCheck?.actual_corrected===true,
-      actual_corrected_by:markCorrected ? checked_by : (previousCheck?.actual_corrected_by||null),
-      actual_corrected_at:markCorrected ? checked_at : (previousCheck?.actual_corrected_at||null)
+      actual_corrected:correctedNow||previousCheck?.actual_corrected===true,
+      actual_corrected_by:correctedNow ? checked_by : (previousCheck?.actual_corrected_by||null),
+      actual_corrected_at:correctedNow ? checked_at : (previousCheck?.actual_corrected_at||null)
     };
 
     // 保存済みの実在庫も確実に更新できるよう、同じ snapshot_id + barcode の旧チェックを削除してから登録します。
