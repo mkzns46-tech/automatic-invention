@@ -867,11 +867,6 @@ header h1{
   }
 }
 
-/* チェック者プルダウン */
-#checkerName{
-  min-height:48px;
-}
-
 /* ===== v33 iPhone camera scan ===== */
 #qr-reader{
   display:none;
@@ -1509,12 +1504,14 @@ header h1{
 }
 #cameraZoomRange{width:100%;accent-color:#2d6a4f;}
 #cameraZoomValue{min-width:44px;text-align:right;font-weight:900;color:#1b4332;}
-#bulkStockCheckBtn{background:#2d6a4f !important;color:#fff !important;font-weight:900 !important;}
-
 /* ===== v72 Smaregi stock check ===== */
 .menu-link{display:inline-flex;align-items:center;padding:10px 14px;border-radius:10px;background:#fff;color:var(--main-dark);font-weight:800;text-decoration:none}
 .smaregi-stock-check-section{scroll-margin-top:12px}
 #smaregiStockCheckCard[hidden]{display:none !important}
+.smaregi-manager-control[hidden],
+.smaregi-reset-panel[hidden]{display:none !important}
+#syncSmaregiStockBtn.smaregi-manager-control[hidden]{display:none !important}
+#smaregiMessage:empty{display:none}
 .grid.smaregi-mode > section:not(#smaregiStockCheckCard){display:none !important}
 .legacy-stock-check-panel{display:none !important}
 .smaregi-action-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}

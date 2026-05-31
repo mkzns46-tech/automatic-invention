@@ -1,20 +1,12 @@
 window.addEventListener("error",(e)=>{
   try{
-    const m=document.getElementById("message");
-    if(m){
-      m.textContent="起動エラー。\n"+(e.message||"");
-      m.className="message err";
-    }
+    if(typeof showMessage==="function")showMessage("起動エラー。\n"+(e.message||""),"err");
   }catch(_){}
 });
 
 window.addEventListener("unhandledrejection",(e)=>{
   try{
-    const m=document.getElementById("message");
-    if(m){
-      m.textContent="通信または処理エラー。\n"+(e.reason?.message||e.reason||"");
-      m.className="message err";
-    }
+    if(typeof showMessage==="function")showMessage("通信または処理エラー。\n"+(e.reason?.message||e.reason||""),"err");
   }catch(_){}
 });
 
@@ -23,10 +15,8 @@ const SUPABASE_API_KEY="sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 
 let products=[];
 let logs=[];
-let checks=[];
 let staffMembers=[];
 let selectedBarcode="";
-let selectedHistoryMode="all";
 let dataLoaded=false;
 let dataLoadError=false;
 
@@ -56,7 +46,8 @@ function hidePopup(){
 }
 
 function showMessage(text,type=""){
-  const m=el("message");
+  const smaregiCard=el("smaregiStockCheckCard");
+  const m=smaregiCard&&!smaregiCard.hidden ? el("smaregiMessage") : el("message");
   if(!m)return;
   m.textContent=text;
   m.className="message "+type;
@@ -190,12 +181,6 @@ async function reloadAll(){
     }
 
     try{
-      checks=await sb("inventory_checks?select=*&order=checked_at.desc&limit=50");
-    }catch(_){
-      checks=[];
-    }
-
-    try{
       staffMembers=await sb("staff_members?select=*&order=name.asc");
     }catch(_){
       staffMembers=[];
@@ -235,13 +220,6 @@ function renderStaffOptions(){
     const cur=staff.value;
     staff.innerHTML=options;
     if(cur)staff.value=cur;
-  }
-
-  const checker=el("checkerName");
-  if(checker){
-    const cur=checker.value;
-    checker.innerHTML='<option value="">チェック者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
-    if(cur)checker.value=cur;
   }
 
   const smaregiChecker=el("smaregiCheckerName");
@@ -355,7 +333,6 @@ async function syncHistoryFromScanBarcode(){
   const p=await fetchProductByBarcode(barcode);
   if(p){
     selectedBarcode=barcode;
-    selectedHistoryMode="all";
     await showProductHistoryForBarcode(barcode);
   }
 }
@@ -544,14 +521,6 @@ async function loadProductHistoryByBarcode(barcode){
   return await sbAll(`inventory_logs?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=created_at.desc`,1000,10000);
 }
 
-async function loadProductChecksByBarcode(barcode){
-  try{
-    return await sbAll(`inventory_checks?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=checked_at.desc`,1000,10000);
-  }catch(_){
-    return [];
-  }
-}
-
 async function showProductHistoryForBarcode(barcode){
   barcode=String(barcode||"").trim();
   if(!barcode)return;
@@ -564,9 +533,7 @@ async function showProductHistoryForBarcode(barcode){
 
   selectedBarcode=barcode;
   const productLogs=await loadProductHistoryByBarcode(barcode);
-  const productChecks=await loadProductChecksByBarcode(barcode);
-
-  renderSelectedProductHistoryWithData(productLogs,productChecks);
+  renderSelectedProductHistoryWithData(productLogs);
 }
 
 async function selectProductHistoryByBarcode(){
@@ -743,21 +710,17 @@ function handleProductNameSearchInput(){
 
 function renderSelectedProductHistory(){
   const body=el("selectedHistoryBody");
-  const cb=el("checkHistoryBody");
-  if(!body||!cb)return;
+  if(!body)return;
   if(!selectedBarcode){
     body.innerHTML="";
-    cb.innerHTML="";
   }
 }
 
-function renderSelectedProductHistoryWithData(productLogs,productChecks){
+function renderSelectedProductHistoryWithData(productLogs){
   const badge=el("selectedProductBadge");
   const range=el("historyRangeBadge");
   const body=el("selectedHistoryBody");
-  const cb=el("checkHistoryBody");
-
-  if(!body||!cb)return;
+  if(!body)return;
 
   const p=gp(selectedBarcode);
 
@@ -768,12 +731,6 @@ function renderSelectedProductHistoryWithData(productLogs,productChecks){
 
   bindMemoEditButtons();
 
-  cb.innerHTML=productChecks.map(c=>`<tr>
-    <td>${fmt(c.checked_at)}</td>
-    <td>${esc(c.checked_by)}</td>
-    <td>${esc(c.stock_at_check)}</td>
-    <td>${esc(c.memo||"")}</td>
-  </tr>`).join("");
 }
 
 function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode){
@@ -928,79 +885,6 @@ function buildGlobalHistoryRows(){
       <td>${memoCellHtml(log)}</td>
     </tr>`;
   }).join("");
-}
-
-
-async function bulkStockCheckVisible(){
-  try{
-    if(!selectedBarcode){
-      showMessage("商品を選択してください。","err");
-      return;
-    }
-    const checked_by=el("checkerName") ? el("checkerName").value.trim() : "";
-    if(!checked_by){
-      showMessage("チェック者名を選択してください。","err");
-      if(el("checkerName"))el("checkerName").focus();
-      return;
-    }
-    const p=await fetchProductByBarcode(selectedBarcode);
-    const stock_at_check=Number(p?.base_stock||0);
-    await sb("inventory_checks",{
-      method:"POST",
-      headers:{Prefer:"return:minimal"},
-      body:JSON.stringify({
-        barcode:selectedBarcode,
-        product_name:p?.name||"",
-        checked_by,
-        stock_at_check,
-        memo:"表示中履歴を一括チェック"
-      })
-    });
-    showMessage(`一括チェック記録：${p?.name||selectedBarcode} / ${checked_by} / 現在庫 ${stock_at_check}`,"ok");
-    if(typeof showPopup==="function"){
-      showPopup("一括チェック完了",`商品名：${p?.name||selectedBarcode}\nチェック者：${checked_by}\n現在庫：${stock_at_check}`);
-    }
-    await showProductHistoryForBarcode(selectedBarcode);
-  }catch(e){
-    showMessage("一括チェックエラー。\n"+e.message,"err");
-  }
-}
-
-async function saveStockCheck(){
-  try{
-    if(!selectedBarcode){
-      showMessage("商品別履歴から商品を選択してください。","err");
-      return;
-    }
-
-    const checked_by=el("checkerName").value.trim();
-
-    if(!checked_by){
-      showMessage("チェック者名を選択してください。","err");
-      el("checkerName").focus();
-      return;
-    }
-
-    const p=gp(selectedBarcode);
-    const stock_at_check=Number(p?.base_stock||0);
-
-    await sb("inventory_checks",{
-      method:"POST",
-      headers:{Prefer:"return=minimal"},
-      body:JSON.stringify({
-        barcode:selectedBarcode,
-        product_name:p?.name||"",
-        checked_by,
-        stock_at_check,
-        memo:""
-      })
-    });
-
-    showMessage(`在庫チェック記録：${p?.name||selectedBarcode} / ${checked_by} / 現在庫 ${stock_at_check}`,"ok");
-    await showProductHistoryForBarcode(selectedBarcode);
-  }catch(e){
-    showMessage("チェック記録エラー。\n"+e.message,"err");
-  }
 }
 
 
@@ -1595,13 +1479,7 @@ function bindEvents(){
   on("csvFile","change",e=>importCsvFile(e.target.files&&e.target.files[0]));
   on("downloadSampleCsvBtn","click",downloadSampleCsv);
 
-  on("bulkStockCheckBtn","click",bulkStockCheckVisible);
-  on("stockCheckBtn","click",saveStockCheck);
   on("showAllSelectedHistoryBtn","click",()=>showProductHistoryForBarcode(selectedBarcode));
-  on("showAfterOldestCheckBtn","click",()=>{
-    selectedHistoryMode="afterOldestCheck";
-    showProductHistoryForBarcode(selectedBarcode);
-  });
 }
 
 bindEvents();
@@ -1611,7 +1489,7 @@ reloadAll();
 /* ===== v50 Japanese / Korean UI toggle ===== */
 const I18N = {
   ja: {
-    "ARICO TOKYO 在庫変動確認シート":"ARICO TOKYO 在庫変動確認シート",
+    "ARICO TOKYO 在庫確認アプリ":"ARICO TOKYO 在庫確認アプリ",
     
     "再読み込み":"再読み込み",
     "在庫変動登録":"在庫変動登録",
@@ -1659,7 +1537,7 @@ const I18N = {
     "検索をクリア":"検索をクリア"
   },
   ko: {
-    "ARICO TOKYO 在庫変動確認シート":"ARICO TOKYO 재고 변동 확인 시트",
+    "ARICO TOKYO 在庫確認アプリ":"ARICO TOKYO 재고 확인 앱",
     
     "再読み込み":"다시 불러오기",
     "在庫変動登録":"재고 변동 등록",
@@ -1781,12 +1659,10 @@ function applyPlaceholders(lang){
 
 function applySelectLabels(lang){
   const labels=lang==="ko"
-    ?{staff:"담당자를 선택",checkerName:"확인자를 선택"}
-    :{staff:"担当者を選択",checkerName:"チェック者を選択"};
+    ?{staff:"담당자를 선택"}
+    :{staff:"担当者を選択"};
   const staff=document.getElementById("staff");
   if(staff&&staff.options.length)staff.options[0].textContent=labels.staff;
-  const checker=document.getElementById("checkerName");
-  if(checker&&checker.options.length)checker.options[0].textContent=labels.checkerName;
 }
 
 function applyLang(){
@@ -1923,14 +1799,9 @@ function getSmaregiActualDifference(item){
   if(!check||isSmaregiExcludedCheck(check))return null;
   if(check.actual_stock===null||check.actual_stock===undefined||String(check.actual_stock)==="")return null;
 
-  // 棚卸の差異は「実在庫 − スマレジ在庫」で判定する。
+  // 棚卸の差異は「スマレジ在庫 - 実在庫」で判定する。
   // スマレジをマスターデータとして扱い、シート在庫との差では判定しない。
-  if(check.difference!==null&&check.difference!==undefined&&String(check.difference)!==""){
-    const saved=Number(check.difference);
-    if(Number.isFinite(saved))return saved;
-  }
-
-  return Number(check.actual_stock||0)-Number(item.smaregi_stock||0);
+  return Number(item.smaregi_stock||0)-Number(check.actual_stock||0);
 }
 
 function getSmaregiDifference(item){
@@ -1968,24 +1839,34 @@ function isSmaregiManager(){
 
 function updateSmaregiManagerControls(){
   const manager=isSmaregiManager();
+  const sync=el("syncSmaregiStockBtn");
   const complete=el("completeSmaregiStockCheckBtn");
   const differenceCsv=el("exportSmaregiDifferenceCsvBtn");
   const diffList=el("showSmaregiDiffListBtn");
   const reset=el("resetSmaregiCompletionBtn");
+  if(sync){
+    sync.disabled=!manager;
+    sync.hidden=!manager;
+    sync.classList.add("smaregi-manager-control");
+  }
   if(complete){
     complete.disabled=!manager;
-    complete.textContent=manager ? "今回のチェックを完了" : "今回のチェックを完了（責任者のみ）";
+    complete.hidden=!manager;
+    complete.classList.add("smaregi-manager-control");
+    complete.textContent="今回のチェックを完了";
   }
   if(differenceCsv){
     differenceCsv.disabled=!manager;
     differenceCsv.hidden=!manager;
     differenceCsv.style.display=manager ? "" : "none";
+    differenceCsv.classList.add("smaregi-manager-control");
     differenceCsv.textContent="差異のみCSV";
   }
   if(diffList){
     diffList.disabled=!manager;
     diffList.hidden=!manager;
     diffList.style.display=manager ? "" : "none";
+    diffList.classList.add("smaregi-manager-control");
     diffList.textContent="今回の差異一覧";
   }
   const diffPanel=el("smaregiDiffOnlyPanel");
@@ -1994,8 +1875,12 @@ function updateSmaregiManagerControls(){
   }
   if(reset){
     reset.disabled=!manager;
-    reset.textContent=manager ? "チェック完了解除" : "チェック完了解除（責任者のみ）";
+    reset.hidden=!manager;
+    reset.classList.add("smaregi-manager-control");
+    reset.textContent="チェック完了解除";
   }
+  const resetPanel=el("resetSmaregiCompletionBtn")?.closest(".smaregi-reset-panel");
+  if(resetPanel)resetPanel.hidden=!manager;
 }
 
 function formatDateTimeLocal(value){
@@ -2028,13 +1913,7 @@ function getSmaregiProgressHtml(){
   const stats=getSmaregiStats();
   return `
     <div class="smaregi-progress-card-inner">
-      <div class="smaregi-progress-main">完了 ${stats.completed} / ${stats.targetTotal} <span>${stats.percent}%</span></div>
-      <div class="smaregi-progress-bar"><div style="width:${Math.max(0,Math.min(100,stats.percent))}%"></div></div>
-      <div class="smaregi-progress-metrics">
-        <span class="is-done">完了 ${stats.completed}</span>
-        <span class="is-unchecked">未入力 ${stats.unchecked}</span>
-        <span class="is-excluded">除外 ${stats.excluded}</span>
-      </div>
+      <div class="smaregi-progress-main">チェック済み <span>${stats.completed} / ${stats.total}</span></div>
     </div>`;
 }
 
@@ -2103,7 +1982,7 @@ function renderSmaregiStockChecks(){
       <td><button type="button" class="smaregi-row-save-btn" data-barcode="${esc(item.barcode)}" ${excluded?"disabled":""}>${check&&!excluded?"更新":"保存"}</button></td>
       <td class="smaregi-row-actions">
         ${isSmaregiManager()&&actualDifference!==null&&actualDifference!==0&&!excluded ? `<button type="button" class="secondary smaregi-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button>` : ""}
-        ${isSmaregiManager() ? (excluded ? `<button type="button" class="secondary smaregi-clear-btn" data-barcode="${esc(item.barcode)}">除外解除</button>` : `<button type="button" class="secondary smaregi-exclude-btn" data-barcode="${esc(item.barcode)}">除外</button>`) : `<span class="smaregi-manager-only-note">責任者のみ</span>`}
+        ${isSmaregiManager() ? (excluded ? `<button type="button" class="secondary smaregi-clear-btn" data-barcode="${esc(item.barcode)}">除外解除</button>` : `<button type="button" class="secondary smaregi-exclude-btn" data-barcode="${esc(item.barcode)}">除外</button>`) : ""}
       </td>
     </tr>`;
   }).join("");
@@ -2142,12 +2021,12 @@ function renderSmaregiDiffOnlyPanel(){
   if(summary)summary.textContent=`差異：${diffItems.length}件 / 完了：${stats.completed}件 / 未入力：${stats.unchecked}件 / 除外：${stats.excluded}件`;
 
   if(!smaregiSnapshot){
-    body.innerHTML='<tr><td colspan="8" class="smaregi-empty">スマレジデータ取り込みを実行してください。</td></tr>';
+    body.innerHTML='<tr><td colspan="6" class="smaregi-empty">スマレジデータ取り込みを実行してください。</td></tr>';
     return;
   }
 
   if(!diffItems.length){
-    body.innerHTML='<tr><td colspan="8" class="smaregi-empty">差異のある商品はありません。</td></tr>';
+    body.innerHTML='<tr><td colspan="6" class="smaregi-empty">差異のある商品はありません。</td></tr>';
     console.log("[Smaregi Diff List Rendered]",{diffCount:0,totalCheckedCount:checkedCount});
     return;
   }
@@ -2157,22 +2036,14 @@ function renderSmaregiDiffOnlyPanel(){
     const difference=getSmaregiActualDifference(item);
     const differenceClass=difference<0 ? " is-negative" : " is-positive";
     return `<tr>
-      <td><span class="smaregi-status is-checked">差異あり</span></td>
       <td>${esc(item.product_name||"")}</td>
       <td>${esc(check?.actual_stock??"")}</td>
       <td>${Number(item.smaregi_stock||0)}</td>
       <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
       <td>${esc(getSmaregiDisplayCheckedBy(check))}</td>
       <td>${check?.checked_at ? fmt(check.checked_at) : ""}</td>
-      <td class="smaregi-row-actions">
-        ${isSmaregiManager() ? `<button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button>` : `<span class="smaregi-manager-only-note">責任者のみ</span>`}
-      </td>
     </tr>`;
   }).join("");
-
-  body.querySelectorAll(".smaregi-diff-cause-btn").forEach(button=>{
-    button.onclick=()=>showSmaregiCauseDetail(button.dataset.barcode);
-  });
   console.log("[Smaregi Diff List Rendered]",{diffCount:diffItems.length,totalCheckedCount:checkedCount});
 }
 
@@ -2186,6 +2057,7 @@ function showSmaregiDiffOnlyPanel(){
   panel.hidden=false;
   renderSmaregiDiffOnlyPanel();
   scrollToSmaregiDiffPanel();
+  showMessage("今回の差異一覧を表示しました。","ok");
 }
 
 async function handleSmaregiRowSave(button){
@@ -2222,6 +2094,10 @@ async function loadLatestSmaregiSnapshot(){
 }
 
 async function syncSmaregiStockFromApi(){
+  if(!isSmaregiManager()){
+    showMessage("スマレジデータ取り込みは責任者「田中」のみ操作できます。","err");
+    return;
+  }
   try{
     showMessage("スマレジデータを取り込み中...");
     const res=await fetch("/api/smaregi-sync",{method:"POST",headers:{"Content-Type":"application/json"}});
@@ -2314,6 +2190,7 @@ async function completeSmaregiStockCheck(){
       stats
     });
     showPopup("チェック完了",`今回のチェックを完了しました。\nシート在庫へ反映：${appliedCount}件\n差異がある商品は今回の差異一覧で確認できます。`);
+    showMessage(`今回のチェックを完了しました。シート在庫へ反映：${appliedCount}件`,"ok");
     showSmaregiDiffOnlyPanel();
   }catch(e){
     showMessage("チェック完了保存エラー。\n追加SQLを実行済みか確認してください。\n"+e.message,"err");
@@ -2362,6 +2239,7 @@ async function resetSmaregiStockCheckCompletion(){
       resetTo
     });
     showPopup("チェック完了解除","チェック完了日時を選択した日時に戻しました。");
+    showMessage("チェック完了を解除しました。","ok");
   }catch(e){
     showMessage("チェック完了解除エラー。\n"+e.message,"err");
   }
@@ -2392,7 +2270,8 @@ async function saveSmaregiActualStock(barcode,value){
   }
 
   try{
-    const difference=actual_stock-Number(item.smaregi_stock||0);
+    const isUpdate=!!getSmaregiCheck(barcode);
+    const difference=Number(item.smaregi_stock||0)-actual_stock;
     const checked_by=getSmaregiCheckerName();
     if(!checked_by){
       showMessage("担当者を選択してください","err");
@@ -2429,7 +2308,7 @@ async function saveSmaregiActualStock(barcode,value){
       difference,
       checkedBy:checked_by
     });
-    showMessage(`実在庫を保存しました：${item.product_name||barcode}`,"ok");
+    showMessage(`実在庫を${isUpdate?"更新":"保存"}しました：${item.product_name||barcode}`,"ok");
     return true;
   }catch(e){
     showMessage("実在庫保存エラー。\n"+e.message,"err");
@@ -2664,6 +2543,7 @@ async function refreshSmaregiCheckStateSilently(){
     console.log("[Smaregi Auto Refresh]",getSmaregiStats());
   }catch(e){
     console.warn("[Smaregi Auto Refresh Error]",e);
+    showMessage("自動更新エラー。\n"+e.message,"err");
   }finally{
     smaregiAutoRefreshBusy=false;
   }
@@ -2681,7 +2561,7 @@ function stopSmaregiAutoRefresh(){
   }
 }
 
-function showSmaregiStockCheck(){
+async function showSmaregiStockCheck(){
   const card=el("smaregiStockCheckCard");
   const main=document.querySelector("main.grid");
   if(!card||!main)return;
@@ -2690,21 +2570,17 @@ function showSmaregiStockCheck(){
   renderSmaregiStockChecks();
   startSmaregiAutoRefresh();
   window.scrollTo({top:0,behavior:"smooth"});
+  await loadLatestSmaregiSnapshot();
 }
 
-function hideSmaregiStockCheck(){
-  const card=el("smaregiStockCheckCard");
-  const main=document.querySelector("main.grid");
-  if(!card||!main)return;
-  card.hidden=true;
-  main.classList.remove("smaregi-mode");
+function goToPortal(){
   stopSmaregiAutoRefresh();
-  window.scrollTo({top:0,behavior:"smooth"});
+  window.location.href="https://arico-portal.vercel.app/portal.html";
 }
 
 function bindSmaregiStockCheckEvents(){
   on("openSmaregiStockCheckBtn","click",showSmaregiStockCheck);
-  on("closeSmaregiStockCheckBtn","click",hideSmaregiStockCheck);
+  on("closeSmaregiStockCheckBtn","click",goToPortal);
   on("syncSmaregiStockBtn","click",syncSmaregiStockFromApi);
   on("refreshSmaregiChecksBtn","click",loadLatestSmaregiSnapshot);
   on("exportSmaregiCheckCsvBtn","click",()=>exportSmaregiCheckCsv(false));
@@ -2718,7 +2594,8 @@ function bindSmaregiStockCheckEvents(){
     updateSmaregiManagerControls();
     renderSmaregiStockChecks();
   });
-  hideSmaregiStockCheck();
+  const card=el("smaregiStockCheckCard");
+  if(card)card.hidden=true;
   renderSmaregiStockChecks();
 }
 window.addEventListener("DOMContentLoaded",bindSmaregiStockCheckEvents);
@@ -2745,8 +2622,6 @@ function bindCameraZoomControls(){
     };
     updateCameraZoomLabel();
   }
-  const bulk=document.getElementById("bulkStockCheckBtn");
-  if(bulk)bulk.onclick=bulkStockCheckVisible;
 }
 window.addEventListener("DOMContentLoaded",bindCameraZoomControls);
 window.addEventListener("load",bindCameraZoomControls);
