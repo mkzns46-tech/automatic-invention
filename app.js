@@ -219,8 +219,8 @@ function updateSmaregiProductImportControl(){
   const button=el("importSmaregiProductsBtn");
   if(!button)return;
   const manager=String(el("staff")?.value||"").trim()==="田中";
-  button.hidden=!manager;
   button.disabled=!manager;
+  button.textContent=manager ? "スマレジ商品マスター取込" : "スマレジ商品マスター取込（田中のみ）";
 }
 
 function renderProductCount(){
@@ -1972,6 +1972,15 @@ function getSmaregiCheckerName(){
   return String(el("smaregiCheckerName")?.value||"").trim();
 }
 
+function getSmaregiItemGroup(item){
+  const product=gp(item.barcode)||{};
+  return String(
+    item.category||item.genre||item.department||item.location||
+    product.category||product.genre||product.department||product.location||
+    "未分類"
+  ).trim()||"未分類";
+}
+
 function isSmaregiManager(){
   return getSmaregiCheckerName()===SMAREGI_MANAGER_NAME;
 }
@@ -2094,6 +2103,10 @@ function renderSmaregiStockChecks(){
   const keyword=String(el("smaregiStockSearchInput")?.value||"").trim().toLowerCase();
   const visible=smaregiStockItems.filter(item=>{
     return !keyword || String(item.product_name||"").toLowerCase().includes(keyword);
+  }).sort((a,b)=>{
+    const groupCompare=getSmaregiItemGroup(a).localeCompare(getSmaregiItemGroup(b),"ja");
+    if(groupCompare)return groupCompare;
+    return String(a.product_name||"").localeCompare(String(b.product_name||""),"ja");
   });
 
   if(!smaregiSnapshot){
@@ -2108,13 +2121,17 @@ function renderSmaregiStockChecks(){
     return;
   }
 
+  let lastGroup="";
   body.innerHTML=visible.map(item=>{
     const check=getSmaregiCheck(item.barcode);
     const excluded=isSmaregiExcludedCheck(check);
     const actualDifference=getSmaregiActualDifference(item);
     const status=excluded ? "除外" : (check ? "チェック済み" : "未チェック");
     const statusClass=excluded ? " is-excluded" : (check ? " is-checked" : "");
-    return `<tr>
+    const group=getSmaregiItemGroup(item);
+    const heading=group!==lastGroup ? `<tr class="smaregi-group-row"><td colspan="5">【${esc(group)}】</td></tr>` : "";
+    lastGroup=group;
+    return `${heading}<tr class="smaregi-product-row">
       <td><span class="smaregi-status${statusClass}">${status}</span></td>
       <td class="smaregi-product-name-cell">${esc(item.product_name||"")}</td>
       <td><input type="number" class="smaregi-row-actual-input" data-barcode="${esc(item.barcode)}" min="0" step="1" inputmode="numeric" value="${excluded ? "" : (check?.actual_stock??"")}" placeholder="手入力" ${excluded?"disabled":""}/></td>
@@ -2128,6 +2145,14 @@ function renderSmaregiStockChecks(){
 
   body.querySelectorAll(".smaregi-row-save-btn").forEach(button=>{
     button.onclick=()=>handleSmaregiRowSave(button);
+  });
+  body.querySelectorAll(".smaregi-row-actual-input").forEach(input=>{
+    input.onkeydown=e=>{
+      if(e.key!=="Enter")return;
+      e.preventDefault();
+      const button=input.closest("tr")?.querySelector(".smaregi-row-save-btn");
+      if(button&&!button.disabled)handleSmaregiRowSave(button);
+    };
   });
   body.querySelectorAll(".smaregi-exclude-btn").forEach(button=>{
     button.onclick=()=>excludeSmaregiStockItem(button.dataset.barcode);
@@ -2741,7 +2766,7 @@ function goToPortal(){
 
 function bindSmaregiStockCheckEvents(){
   on("openSmaregiStockCheckBtn","click",toggleSmaregiStockCheck);
-  on("closeSmaregiStockCheckBtn","click",goToPortal);
+  on("portalTopBtn","click",goToPortal);
   on("syncSmaregiStockBtn","click",syncSmaregiStockFromApi);
   on("refreshSmaregiChecksBtn","click",loadLatestSmaregiSnapshot);
   on("exportSmaregiCheckCsvBtn","click",()=>exportSmaregiCheckCsv(false));

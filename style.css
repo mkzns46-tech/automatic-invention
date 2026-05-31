@@ -1521,6 +1521,79 @@ header h1{
 .equipment-confirm-btn{width:auto !important;min-width:70px;margin:0 !important;padding:7px 10px !important;font-size:13px !important;background:#b91c1c !important}
 td small{margin-top:4px;color:#527161}
 @media(max-width:800px){.history-filter-grid{grid-template-columns:1fr}}
+.smaregi-group-row td{
+  background:#e7f5ec !important;
+  color:#1b4332;
+  font-size:15px;
+  font-weight:900;
+  border-top:2px solid #95d5b2;
+}
+@media(max-width:800px){
+  .smaregi-stock-check-section .table-wrap{
+    max-height:none !important;
+    overflow:visible !important;
+    border:0 !important;
+  }
+  .smaregi-check-table,
+  .smaregi-check-table tbody{
+    display:block !important;
+    width:100% !important;
+  }
+  .smaregi-check-table > thead{
+    display:none !important;
+  }
+  .smaregi-check-table tr.smaregi-group-row{
+    display:block !important;
+    margin:16px 0 8px !important;
+  }
+  .smaregi-check-table tr.smaregi-group-row td{
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    border-radius:10px !important;
+  }
+  .smaregi-check-table tr.smaregi-product-row{
+    display:grid !important;
+    grid-template-columns:1fr auto !important;
+    gap:8px !important;
+    margin:0 0 10px !important;
+    padding:12px !important;
+    border:1px solid #cfe6d7 !important;
+    border-radius:14px !important;
+    background:#fff !important;
+    box-shadow:0 3px 12px rgba(27,67,50,.08) !important;
+  }
+  .smaregi-check-table tr.smaregi-product-row td{
+    display:block !important;
+    width:auto !important;
+    min-width:0 !important;
+    max-width:none !important;
+    padding:2px !important;
+    border:0 !important;
+  }
+  .smaregi-check-table tr.smaregi-product-row td:nth-child(1),
+  .smaregi-check-table tr.smaregi-product-row td:nth-child(2),
+  .smaregi-check-table tr.smaregi-product-row td:nth-child(5){
+    grid-column:1 / -1 !important;
+  }
+  .smaregi-check-table tr.smaregi-product-row td:nth-child(3){
+    grid-column:1 !important;
+  }
+  .smaregi-check-table tr.smaregi-product-row td:nth-child(4){
+    grid-column:2 !important;
+  }
+  .smaregi-row-actual-input{
+    width:100% !important;
+    max-width:none !important;
+    min-width:0 !important;
+    min-height:48px !important;
+    font-size:20px !important;
+  }
+  .smaregi-row-save-btn{
+    min-height:48px !important;
+    min-width:82px !important;
+  }
+}
 .grid.smaregi-mode > section:not(#smaregiStockCheckCard){display:none !important}
 .legacy-stock-check-panel{display:none !important}
 .smaregi-action-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
@@ -1935,3 +2008,66 @@ td small{margin-top:4px;color:#527161}
 
 /* ===== v98 progress privacy / reliable update ===== */
 .smaregi-progress-metrics .is-diff{display:none !important;}
+
+/* ===== emergency mobile Smaregi cards ===== */
+@media(max-width:800px){
+  .smaregi-stock-check-section .table-wrap{
+    max-height:none !important;
+    overflow:visible !important;
+    border:0 !important;
+  }
+  .smaregi-check-table,
+  .smaregi-check-table tbody{
+    display:block !important;
+    width:100% !important;
+  }
+  .smaregi-check-table > thead{display:none !important}
+  .smaregi-check-table tr.smaregi-group-row{
+    display:block !important;
+    margin:16px 0 8px !important;
+  }
+  .smaregi-check-table tr.smaregi-group-row td{
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    border-radius:10px !important;
+  }
+  .smaregi-check-table tr.smaregi-product-row{
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto !important;
+    gap:8px !important;
+    margin:0 0 10px !important;
+    padding:12px !important;
+    border:1px solid #cfe6d7 !important;
+    border-radius:14px !important;
+    background:#fff !important;
+    box-shadow:0 3px 12px rgba(27,67,50,.08) !important;
+  }
+  .smaregi-check-table tr.smaregi-product-row td{
+    display:block !important;
+    width:auto !important;
+    min-width:0 !important;
+    max-width:none !important;
+    padding:2px !important;
+    border:0 !important;
+  }
+  .smaregi-check-table tr.smaregi-product-row td:nth-child(1),
+  .smaregi-check-table tr.smaregi-product-row td:nth-child(2),
+  .smaregi-check-table tr.smaregi-product-row td:nth-child(5){
+    grid-column:1 / -1 !important;
+  }
+  .smaregi-check-table tr.smaregi-product-row td:nth-child(3){grid-column:1 !important}
+  .smaregi-check-table tr.smaregi-product-row td:nth-child(4){grid-column:2 !important}
+  .smaregi-row-actual-input{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    min-height:48px !important;
+    font-size:20px !important;
+  }
+  .smaregi-row-save-btn{
+    min-height:48px !important;
+    min-width:82px !important;
+  }
+}
