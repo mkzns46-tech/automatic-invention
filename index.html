@@ -1,25 +1,124 @@
-# 追加設定
+<!doctype html><html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><title>ARICO TOKYO 在庫確認アプリ</title><link rel="stylesheet" href="./style.css"/></head><body><div class="app">
+<header><div><h1>ARICO TOKYO 在庫確認アプリ</h1></div><div class="header-actions"><button type="button" id="openSmaregiStockCheckBtn" class="menu-link">スマレジ変動商品チェック</button><button id="reloadBtn">再読み込み</button></div></header><div class="language-bar"><button type="button" id="langJaBtn">日本語</button><button type="button" id="langKoBtn">한국어</button></div>
+<main class="grid">
+<section class="card scanner"><div class="section-title compact-title"><div><h2>在庫変動登録</h2><p class="section-note">持ち出し・入荷・在庫修正・備品転用を記録します</p></div></div><div class="row"><label>区分<select id="type"><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option></select></label><label>担当者 <span class="required">必須</span><select id="staff"><option value="">担当者を選択</option></select></label><label>数量 <span class="required">必須</span><input id="qty" type="number" min="1" step="1" placeholder="数量" required/></label></div><label><span id="memoLabelText">備考（自由入力・連続スキャン中は保持）</span><span id="equipmentMemoRequired" class="required equipment-memo-required" hidden>備品転用時は理由入力必須</span><input id="memo" placeholder="例：棚卸差異、サンプル使用、不良返品など"/></label><div class="button-row"><button id="startCameraBtn">📷 カメラでバーコード読み取り</button><div class="camera-zoom-row">
+  <label>カメラズーム
+    <input id="cameraZoomRange" type="range" min="1" max="3" step="0.1" value="1.5">
+    <span id="cameraZoomValue">1.5x</span>
+  </label>
+</div>
+<button id="stopCameraBtn" class="secondary">停止</button></div><div class="camera-area">
+  <video id="video" muted playsinline></video>
+  <div id="cameraGuideOverlay" class="camera-guide-overlay">
+    <div class="camera-guide-box">
+      <div class="camera-guide-line"></div>
+    </div>
+    <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
+  </div>
+</div><div id="qr-reader"></div><form id="manualForm"><label>バーコード入力<input id="barcodeInput" autocomplete="off" placeholder="バーコードをスキャン、または手入力"/></label><div id="scanProductInfo" class="message">バーコード入力後、商品名と現在庫を表示します</div><button type="submit">登録</button></form><div id="message" class="message">起動中...</div></section>
+<section class="card pc-only-section staff-admin-section">
+  <div class="section-title">
+    <h2>担当者設定</h2><p class="section-note">スマホ側の担当者プルダウンに反映されます</p>
+    <div id="staffCountBadge" class="badge">担当者：0人</div>
+  </div>
 
-## Supabase SQL
+  <form id="staffForm">
+    <label>担当者名
+      <input id="staffNameInput" placeholder="例：田中" />
+    </label>
+    <button type="submit">担当者を追加</button>
+  </form>
 
-備品転用の確認者と確認日時を保存するため、デプロイ前に
-`supabase_equipment_use_confirmation.sql` を Supabase で実行してください。
+  <div class="table-wrap small-table">
+    <table>
+      <thead>
+        <tr>
+          <th>担当者名</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="staffListBody"></tbody>
+    </table>
+  </div>
+</section>
 
-## Vercel 環境変数
+<section class="card pc-only-section csv-admin-section"><h2>CSV取り込み</h2><p class="section-note">商品マスターをまとめて登録・更新できます</p><p>対応形式：<b>barcode,name,base_stock,location</b>（locationは任意）</p><p>日本語見出しも対応：<b>バーコード,商品名,現在在庫,棚番</b></p><div class="csv-feature-grid">
+  <div class="csv-feature-card"><strong>簡単インポート</strong><span>CSVを選ぶだけで商品を一括登録・更新</span></div>
+  <div class="csv-feature-card"><strong>上書き対応</strong><span>同じバーコードの商品名・現在庫・棚番を更新</span></div>
+  <div class="csv-feature-card"><strong>サンプルあり</strong><span>CSV形式をすぐ確認できます</span></div>
+</div>
+<div class="button-row"><label class="file-button">⬆ 追加・更新で取り込み<input type="file" id="csvFile" accept=".csv,text/csv"/></label><button id="downloadSampleCsvBtn" class="secondary">サンプルCSVをダウンロード</button><button id="importSmaregiProductsBtn" class="secondary">スマレジ商品マスター取込</button></div><small>CSVは同じバーコードがある場合、商品名・原在庫・棚番を上書きします。履歴は消しません。</small></section>
 
-`api/smaregi-products.js` はスマレジ POS API の `GET /products` と
-`GET /stock` を利用します。
 
-必要な環境変数:
+<section class="card wide mobile-history-section" id="productHistoryCard"><div class="section-title"><h2>商品別履歴</h2><div id="historyRangeBadge" class="badge muted">商品を選択してください</div></div><div class="history-search-box"><label>商品履歴検索<input id="productHistoryBarcodeInput" placeholder="バーコードを入力またはスキャン" />
+<label class="product-name-search-label">商品名検索
+  <input id="productNameSearchInput" placeholder="商品名の一部を入力" />
+</label>
+<div id="productSearchResults" class="product-search-results"></div></label></div><div class="history-camera-row"><button type="button" id="historyCameraBtn">📷 カメラでバーコード読み取り</button></div><div class="button-row"><button id="productHistoryCsvBtn" type="button">商品履歴CSV</button>
+<button id="showAllSelectedHistoryBtn" class="secondary">全履歴を表示</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="selectedHistoryBody"></tbody></table></div></section>
+<section class="mobile-force-history card wide pc-only-section"><h2>全体履歴</h2><div class="history-filter-grid"><label>区分検索<select id="historyTypeFilter"><option value="">すべて</option><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option></select></label><label>商品名検索<input id="historyProductFilter" placeholder="商品名キーワード"/></label><label>担当者検索<input id="historyStaffFilter" placeholder="担当者キーワード"/></label><label>備考検索<input id="historyMemoFilter" placeholder="備考キーワード"/></label></div><div class="button-row"><button id="allDataCsvBtn" class="secondary">全履歴CSV</button><button id="clearFilterBtn" class="secondary">検索をクリア</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
+<section class="card wide smaregi-stock-check-section" id="smaregiStockCheckCard" hidden>
+  <div class="section-title">
+    <div>
+      <h2>スマレジ変動商品チェック</h2>
+      <p class="section-note">実在庫を入力し、スマレジ在庫との差異を確認します。</p>
+    </div>
+    <div id="smaregiSnapshotBadge" class="badge muted">未取得</div>
+  </div>
+  <div class="smaregi-progress-row">
+    <div id="smaregiProgressBadge" class="badge muted">チェック済み：0 / 0</div>
+  </div>
+  <div id="smaregiMessage" class="message"></div>
+  <div class="smaregi-toolbar smaregi-action-grid">
+    <button type="button" id="closeSmaregiStockCheckBtn" class="secondary">トップへ戻る</button>
+    <button type="button" id="syncSmaregiStockBtn">スマレジデータ取り込み</button>
+    <button type="button" id="refreshSmaregiChecksBtn" class="secondary">最新状態に更新</button>
+    <button type="button" id="showSmaregiDiffListBtn" class="secondary">今回の差異一覧</button>
+    <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
+    <button type="button" id="exportSmaregiDifferenceCsvBtn" class="secondary">差異のみCSV</button>
+    <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
+  </div>
+  <div class="smaregi-entry-panel smaregi-checker-panel">
+    <label>担当者（チェックした人）<select id="smaregiCheckerName"><option value="">担当者を選択</option></select></label>
+  </div>
+  <div class="smaregi-reset-panel">
+    <label>チェック完了解除日時<input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
+    <button type="button" id="resetSmaregiCompletionBtn" class="secondary">チェック完了解除（責任者のみ）</button>
+  </div>
+  <div class="smaregi-filter-row">
+    <label>検索<input id="smaregiStockSearchInput" placeholder="商品名で検索"/></label>
+  </div>
+  <div class="table-wrap">
+    <table class="smaregi-check-table">
+      <thead><tr><th>状態</th><th>商品名</th><th>実在庫入力</th><th>保存</th><th>操作</th></tr></thead>
+      <tbody id="smaregiStockCheckBody"></tbody>
+    </table>
+  </div>
+  <section id="smaregiDiffOnlyPanel" class="smaregi-diff-panel" hidden>
+    <div class="section-title">
+      <div>
+        <h3>今回の差異一覧</h3>
+        <p class="section-note">実在庫とスマレジ在庫の差異がある商品だけを表示します。</p>
+      </div>
+      <div id="smaregiDiffSummary" class="badge muted">差異：0件</div>
+    </div>
+    <div class="table-wrap">
+      <table class="smaregi-check-table smaregi-diff-table">
+        <thead><tr><th>商品名</th><th>実在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th></tr></thead>
+        <tbody id="smaregiDiffOnlyBody"></tbody>
+      </table>
+    </div>
+  </section>
+  <div id="smaregiCauseDetail" class="smaregi-cause-detail" hidden></div>
+</section>
+</main><footer>© ARICO TOKYO 在庫確認アプリ</footer></div><script src="./app.js" defer></script>
 
-- `SMAREGI_CONTRACT_ID`
-- `SMAREGI_ACCESS_TOKEN`
-
-任意:
-
-- `SMAREGI_STORE_ID`
-  - 指定時は、その店舗の在庫だけを商品マスターへ反映します。
-- `SMAREGI_POS_API_BASE_URL`
-  - 未指定時は `https://api.smaregi.jp/{契約ID}/pos` を利用します。
-
-アクセストークンには `pos.products:read` と `pos.stock:read` が必要です。
+<div id="appPopup" class="app-popup" style="display:none;">
+  <div class="app-popup-card">
+    <div id="appPopupTitle" class="app-popup-title">完了</div>
+    <div id="appPopupBody" class="app-popup-body"></div>
+    <button type="button" id="appPopupClose">OK</button>
+  </div>
+</div>
+</body>
+</html>
