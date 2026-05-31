@@ -2351,12 +2351,12 @@ function renderSmaregiDiffOnlyPanel(){
     const differenceClass=difference<0 ? " is-negative" : " is-positive";
     return `<tr>
       <td>${esc(item.product_name||"")}</td>
-      <td><input type="number" class="smaregi-diff-actual-input" data-barcode="${esc(item.barcode)}" min="0" step="1" inputmode="numeric" value="${esc(check?.actual_stock??"")}"/></td>
+      <td><input type="number" class="smaregi-diff-actual-input" data-barcode="${esc(item.barcode)}" min="0" step="1" inputmode="numeric" value="${esc(check?.actual_stock??"")}"/>${check?.actual_corrected===true?'<span class="smaregi-corrected-badge">修正済</span>':""}</td>
       <td>${Number(item.smaregi_stock||0)}</td>
       <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
       <td>${esc(getSmaregiDisplayCheckedBy(check))}</td>
       <td>${check?.checked_at ? fmt(check.checked_at) : ""}</td>
-      <td><div class="smaregi-diff-action-buttons"><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">修正保存</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${esc(item.barcode)}">問題なし</button></div></td>
+      <td><div class="diff-action-group"><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${esc(item.barcode)}">原因</button><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">保存</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${esc(item.barcode)}">問題なし</button></div></td>
     </tr>`;
   }).join("");
   body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
@@ -2405,7 +2405,7 @@ async function handleSmaregiDiffSave(button){
   }
   const barcode=String(button.dataset.barcode||"");
   const value=button.closest("tr")?.querySelector(".smaregi-diff-actual-input")?.value;
-  const saved=await saveSmaregiActualStock(barcode,value);
+  const saved=await saveSmaregiActualStock(barcode,value,{markCorrected:true});
   if(!saved)renderSmaregiDiffOnlyPanel();
 }
 
@@ -2616,7 +2616,7 @@ async function resetSmaregiStockCheckCompletion(){
   }
 }
 
-async function saveSmaregiActualStock(barcode,value){
+async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
   if(!smaregiSnapshot)return false;
   if(!String(barcode||"").trim()){
     showMessage("対象商品が見つかりません。","err");
@@ -2641,7 +2641,8 @@ async function saveSmaregiActualStock(barcode,value){
   }
 
   try{
-    const isUpdate=!!getSmaregiCheck(barcode);
+    const previousCheck=getSmaregiCheck(barcode);
+    const isUpdate=!!previousCheck;
     const difference=calculateSmaregiDifference(item.smaregi_stock,actual_stock);
     const checked_by=getSmaregiCheckerName();
     if(!checked_by){
@@ -2650,7 +2651,21 @@ async function saveSmaregiActualStock(barcode,value){
       return false;
     }
     const checked_at=new Date().toISOString();
-    const payload={snapshot_id:smaregiSnapshot.id,barcode,actual_stock,difference,checked_by,checked_at};
+    const payload={
+      snapshot_id:smaregiSnapshot.id,
+      barcode,
+      actual_stock,
+      difference,
+      checked_by,
+      checked_at,
+      no_issue:previousCheck?.no_issue===true,
+      no_issue_by:previousCheck?.no_issue_by||null,
+      no_issue_at:previousCheck?.no_issue_at||null,
+      no_issue_reason:previousCheck?.no_issue_reason||"",
+      actual_corrected:markCorrected||previousCheck?.actual_corrected===true,
+      actual_corrected_by:markCorrected ? checked_by : (previousCheck?.actual_corrected_by||null),
+      actual_corrected_at:markCorrected ? checked_at : (previousCheck?.actual_corrected_at||null)
+    };
 
     // 保存済みの実在庫も確実に更新できるよう、同じ snapshot_id + barcode の旧チェックを削除してから登録します。
     // unique 制約が無いSupabase環境でも、古い実在庫が残って表示される問題を防ぎます。

@@ -1666,6 +1666,61 @@ td small{margin-top:4px;color:#527161}
     min-width:82px !important;
   }
 }
+
+/* ===== v100 final PC difference action override ===== */
+.smaregi-diff-table th:last-child,
+.smaregi-diff-table td:last-child{
+  width:110px !important;
+  min-width:110px !important;
+  max-width:110px !important;
+}
+.diff-action-group{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:6px !important;
+  align-items:stretch !important;
+}
+.diff-action-group button{
+  width:100% !important;
+  min-width:88px !important;
+  margin:0 !important;
+  padding:7px 8px !important;
+  font-size:12px !important;
+  border-radius:10px !important;
+  white-space:nowrap !important;
+}
+
+/* ===== v99 difference action column ===== */
+.smaregi-diff-table th:last-child,
+.smaregi-diff-table td:last-child{
+  width:110px !important;
+  min-width:110px !important;
+  max-width:110px !important;
+  vertical-align:middle !important;
+}
+.diff-action-group{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  align-items:stretch;
+}
+.diff-action-group button{
+  width:100% !important;
+  min-width:88px !important;
+  margin:0 !important;
+  padding:7px 8px !important;
+  border-radius:10px;
+  font-size:12px !important;
+  white-space:nowrap;
+}
+.smaregi-corrected-badge{
+  display:block;
+  margin-top:4px;
+  color:#166534;
+  font-size:11px;
+  font-weight:900;
+  text-align:center;
+}
 .grid.smaregi-mode > section:not(#smaregiStockCheckCard){display:none !important}
 .legacy-stock-check-panel{display:none !important}
 .smaregi-action-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
@@ -2248,4 +2303,27 @@ td small{margin-top:4px;color:#527161}
     min-height:48px !important;
     min-width:82px !important;
   }
+}
+
+/* ===== v101 final difference action override ===== */
+.smaregi-diff-table th:last-child,
+.smaregi-diff-table td:last-child{
+  width:110px !important;
+  min-width:110px !important;
+  max-width:110px !important;
+}
+.diff-action-group{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:6px !important;
+  align-items:stretch !important;
+}
+.diff-action-group button{
+  width:100% !important;
+  min-width:88px !important;
+  margin:0 !important;
+  padding:7px 8px !important;
+  font-size:12px !important;
+  border-radius:10px !important;
+  white-space:nowrap !important;
 }
