@@ -2418,14 +2418,14 @@ async function markSmaregiDifferenceNoIssue(barcode){
     await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
       method:"PATCH",
       headers:{Prefer:"return=minimal"},
-      body:JSON.stringify({no_issue:true,no_issue_by:checkedBy,no_issue_at,no_issue_note:""})
+      body:JSON.stringify({no_issue:true,no_issue_by:checkedBy,no_issue_at,no_issue_reason:""})
     });
     smaregiStockChecks.forEach(check=>{
       if(String(check.barcode)===String(barcode)){
         check.no_issue=true;
         check.no_issue_by=checkedBy;
         check.no_issue_at=no_issue_at;
-        check.no_issue_note="";
+        check.no_issue_reason="";
       }
     });
     renderSmaregiStockChecks();
