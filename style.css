@@ -1533,6 +1533,53 @@ header h1{
 #checkerName option{
   padding:10px;
 }
+.staff-native-select{
+  display:none !important;
+}
+.staff-picker{
+  position:relative;
+  width:100%;
+}
+.staff-picker-toggle{
+  width:100%;
+  margin:0;
+  text-align:left;
+  background:#fff !important;
+  color:#1f2937 !important;
+  border:1px solid #bfd8c7 !important;
+}
+.staff-picker-list{
+  position:absolute;
+  z-index:40;
+  top:calc(100% + 4px);
+  left:0;
+  right:0;
+  max-height:260px;
+  overflow-y:auto;
+  scrollbar-width:auto;
+  border:1px solid #bfd8c7;
+  border-radius:10px;
+  background:#fff;
+  box-shadow:0 10px 24px rgba(15,23,42,.16);
+}
+.staff-picker-list[hidden]{display:none !important;}
+.staff-picker-option{
+  display:block;
+  width:100%;
+  margin:0;
+  padding:12px;
+  border:0;
+  border-bottom:1px solid #e5f2ea;
+  border-radius:0;
+  text-align:left;
+  background:#fff !important;
+  color:#1f2937 !important;
+}
+.staff-picker-option.is-selected{
+  background:#e9f5ec !important;
+  color:#1b4332 !important;
+  font-weight:900;
+}
 .smaregi-progress-sub{
   margin-top:6px;
   font-size:14px;
@@ -1739,6 +1786,20 @@ td small{margin-top:4px;color:#527161}
 .smaregi-diff-table td,
 .smaregi-diff-table th{
   vertical-align:middle;
+}
+.smaregi-diff-actual-input{
+  width:88px !important;
+  min-width:78px !important;
+  margin:0 !important;
+  text-align:center;
+  font-weight:900;
+}
+.smaregi-diff-save-btn{
+  width:auto !important;
+  min-width:82px;
+  margin:0 !important;
+  padding:8px 10px !important;
+  font-size:13px;
 }
 @media(max-width:800px){
   .smaregi-action-grid{

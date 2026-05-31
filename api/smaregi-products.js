@@ -27,6 +27,33 @@ async function fetchAll(baseUrl, path, token) {
   return rows;
 }
 
+async function getAccessToken(contractId) {
+  const clientId = env("SMAREGI_CLIENT_ID");
+  const clientSecret = env("SMAREGI_CLIENT_SECRET");
+  if (!contractId || !clientId || !clientSecret) {
+    throw new Error("スマレジ変動商品チェックと同じOAuth認証設定を読み込めません。/api/smaregi-sync.js と同じ環境変数設定を確認してください。");
+  }
+
+  const tokenUrl = `https://id.smaregi.jp/app/${contractId}/token`;
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json"
+    },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      scope: "pos.products:read"
+    }).toString()
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body?.access_token) {
+    throw new Error(`スマレジOAuth認証エラー ${response.status}: ${JSON.stringify(body)}`);
+  }
+  return body.access_token;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -35,10 +62,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const contractId = env("SMAREGI_CONTRACT_ID", "SMAREGI_CONTRACTID");
-    const token = env("SMAREGI_ACCESS_TOKEN", "SMAREGI_APP_ACCESS_TOKEN", "SMAREGI_TOKEN");
-    if (!contractId || !token) {
-      throw new Error("SMAREGI_CONTRACT_ID and SMAREGI_ACCESS_TOKEN are required");
-    }
+    const token = await getAccessToken(contractId);
 
     const apiBase = env("SMAREGI_POS_API_BASE_URL") || `https://api.smaregi.jp/${contractId}/pos`;
     const products = await fetchAll(apiBase, "/products", token);

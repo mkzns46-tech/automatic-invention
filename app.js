@@ -244,7 +244,49 @@ function renderStaffOptions(){
     smaregiChecker.innerHTML='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
     if(cur)smaregiChecker.value=cur;
   }
+  renderScrollableStaffPicker("staff","staffPicker");
+  renderScrollableStaffPicker("smaregiCheckerName","smaregiCheckerNamePicker");
 }
+
+function renderScrollableStaffPicker(selectId,pickerId){
+  const select=el(selectId);
+  const picker=el(pickerId);
+  if(!select||!picker)return;
+
+  select.classList.add("staff-native-select");
+  const selected=String(select.value||"");
+  picker.innerHTML=`
+    <button type="button" class="staff-picker-toggle" aria-expanded="false">${esc(selected||"担当者を選択")}</button>
+    <div class="staff-picker-list" hidden>
+      ${staffMembers.map(member=>`<button type="button" class="staff-picker-option${member.name===selected?" is-selected":""}" data-staff-name="${esc(member.name)}">${esc(member.name)}</button>`).join("")}
+    </div>`;
+
+  const toggle=picker.querySelector(".staff-picker-toggle");
+  const list=picker.querySelector(".staff-picker-list");
+  toggle.onclick=e=>{
+    e.stopPropagation();
+    const willOpen=list.hidden;
+    document.querySelectorAll(".staff-picker-list").forEach(other=>{other.hidden=true;});
+    document.querySelectorAll(".staff-picker-toggle").forEach(other=>other.setAttribute("aria-expanded","false"));
+    list.hidden=!willOpen;
+    toggle.setAttribute("aria-expanded",String(willOpen));
+  };
+  picker.querySelectorAll(".staff-picker-option").forEach(option=>{
+    option.onclick=e=>{
+      e.stopPropagation();
+      select.value=option.dataset.staffName||"";
+      list.hidden=true;
+      toggle.textContent=select.value||"担当者を選択";
+      toggle.setAttribute("aria-expanded","false");
+      select.dispatchEvent(new Event("change",{bubbles:true}));
+    };
+  });
+}
+
+document.addEventListener("click",()=>{
+  document.querySelectorAll(".staff-picker-list").forEach(list=>{list.hidden=true;});
+  document.querySelectorAll(".staff-picker-toggle").forEach(toggle=>toggle.setAttribute("aria-expanded","false"));
+});
 
 function renderStaffList(){
   const badge=el("staffCountBadge");
@@ -1001,9 +1043,13 @@ async function confirmEquipmentUse(logId){
   }
 }
 
+let equipmentConfirmDelegationBound=false;
 function bindEquipmentConfirmButtons(){
-  document.querySelectorAll(".equipment-confirm-btn").forEach(btn=>{
-    btn.onclick=()=>confirmEquipmentUse(btn.dataset.logId);
+  if(equipmentConfirmDelegationBound)return;
+  equipmentConfirmDelegationBound=true;
+  document.addEventListener("click",event=>{
+    const button=event.target?.closest?.(".equipment-confirm-btn");
+    if(button)confirmEquipmentUse(button.dataset.logId);
   });
 }
 
@@ -2146,15 +2192,15 @@ function getSmaregiProgressHtml(){
 
 function getFocusedSmaregiInputState(){
   const active=document.activeElement;
-  if(active&&active.classList&&active.classList.contains("smaregi-row-actual-input")){
-    return {barcode:String(active.dataset.barcode||""),value:active.value,selectionStart:active.selectionStart,selectionEnd:active.selectionEnd};
+  if(active&&active.classList&&(active.classList.contains("smaregi-row-actual-input")||active.classList.contains("smaregi-diff-actual-input"))){
+    return {barcode:String(active.dataset.barcode||""),value:active.value,selectionStart:active.selectionStart,selectionEnd:active.selectionEnd,inputClass:active.classList.contains("smaregi-diff-actual-input")?"smaregi-diff-actual-input":"smaregi-row-actual-input"};
   }
   return null;
 }
 
 function restoreFocusedSmaregiInputState(state){
   if(!state||!state.barcode)return;
-  const input=[...document.querySelectorAll(".smaregi-row-actual-input")].find(el=>String(el.dataset.barcode||"")===String(state.barcode));
+  const input=[...document.querySelectorAll(`.${state.inputClass||"smaregi-row-actual-input"}`)].find(el=>String(el.dataset.barcode||"")===String(state.barcode));
   if(!input)return;
   input.value=state.value;
   input.focus();
@@ -2266,12 +2312,12 @@ function renderSmaregiDiffOnlyPanel(){
   if(summary)summary.textContent=`差異：${diffItems.length}件 / 完了：${stats.completed}件 / 未入力：${stats.unchecked}件 / 除外：${stats.excluded}件`;
 
   if(!smaregiSnapshot){
-    body.innerHTML='<tr><td colspan="6" class="smaregi-empty">スマレジデータ取り込みを実行してください。</td></tr>';
+    body.innerHTML='<tr><td colspan="7" class="smaregi-empty">スマレジデータ取り込みを実行してください。</td></tr>';
     return;
   }
 
   if(!diffItems.length){
-    body.innerHTML='<tr><td colspan="6" class="smaregi-empty">差異のある商品はありません。</td></tr>';
+    body.innerHTML='<tr><td colspan="7" class="smaregi-empty">差異のある商品はありません。</td></tr>';
     console.log("[Smaregi Diff List Rendered]",{diffCount:0,totalCheckedCount:checkedCount});
     return;
   }
@@ -2282,13 +2328,24 @@ function renderSmaregiDiffOnlyPanel(){
     const differenceClass=difference<0 ? " is-negative" : " is-positive";
     return `<tr>
       <td>${esc(item.product_name||"")}</td>
-      <td>${esc(check?.actual_stock??"")}</td>
+      <td><input type="number" class="smaregi-diff-actual-input" data-barcode="${esc(item.barcode)}" min="0" step="1" inputmode="numeric" value="${esc(check?.actual_stock??"")}"/></td>
       <td>${Number(item.smaregi_stock||0)}</td>
       <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
       <td>${esc(getSmaregiDisplayCheckedBy(check))}</td>
       <td>${check?.checked_at ? fmt(check.checked_at) : ""}</td>
+      <td><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">修正保存</button></td>
     </tr>`;
   }).join("");
+  body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
+    button.onclick=()=>handleSmaregiDiffSave(button);
+  });
+  body.querySelectorAll(".smaregi-diff-actual-input").forEach(input=>{
+    input.addEventListener("keydown",event=>{
+      if(event.key!=="Enter")return;
+      event.preventDefault();
+      input.closest("tr")?.querySelector(".smaregi-diff-save-btn")?.click();
+    });
+  });
   console.log("[Smaregi Diff List Rendered]",{diffCount:diffItems.length,totalCheckedCount:checkedCount});
 }
 
@@ -2310,6 +2367,17 @@ async function handleSmaregiRowSave(button){
   const value=button.closest("tr")?.querySelector(".smaregi-row-actual-input")?.value;
   const saved=await saveSmaregiActualStock(barcode,value);
   if(!saved)renderSmaregiStockChecks();
+}
+
+async function handleSmaregiDiffSave(button){
+  if(!isSmaregiManager()){
+    showMessage("差異一覧の数量修正は責任者「田中」のみ操作できます。","err");
+    return;
+  }
+  const barcode=String(button.dataset.barcode||"");
+  const value=button.closest("tr")?.querySelector(".smaregi-diff-actual-input")?.value;
+  const saved=await saveSmaregiActualStock(barcode,value);
+  if(!saved)renderSmaregiDiffOnlyPanel();
 }
 
 async function loadLatestSmaregiSnapshot(){
@@ -2855,7 +2923,6 @@ function bindSmaregiStockCheckEvents(){
   on("completeSmaregiStockCheckBtn","click",completeSmaregiStockCheck);
   on("resetSmaregiCompletionBtn","click",resetSmaregiStockCheckCompletion);
   on("showSmaregiDiffListBtn","click",showSmaregiDiffOnlyPanel);
-  on("smaregiStockSearchInput","input",renderSmaregiStockChecks);
   on("smaregiCheckerName","change",e=>{
     localStorage.setItem("arico_smaregi_checker",e.target.value||"");
     updateSmaregiManagerControls();

@@ -1,7 +1,7 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><title>ARICO TOKYO 在庫確認アプリ</title><link rel="stylesheet" href="./style.css"/></head><body><div class="app">
 <header><div><h1>ARICO TOKYO 在庫確認アプリ</h1></div><div class="header-actions"><button type="button" id="openSmaregiStockCheckBtn" class="menu-link">スマレジ変動商品チェック</button><button type="button" id="portalTopBtn" class="menu-link">トップに戻る</button><button id="reloadBtn">再読み込み</button></div></header><div class="language-bar"><button type="button" id="langJaBtn">日本語</button><button type="button" id="langKoBtn">한국어</button></div>
 <main class="grid">
-<section class="card scanner"><div class="section-title compact-title"><div><h2>在庫変動登録</h2><p class="section-note">持ち出し・入荷・在庫修正・備品転用を記録します</p></div></div><div class="row"><label>区分<select id="type"><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option></select></label><label>担当者 <span class="required">必須</span><select id="staff"><option value="">担当者を選択</option></select></label><label>数量 <span class="required">必須</span><input id="qty" type="number" min="1" step="1" placeholder="数量" required/></label></div><label><span id="memoLabelText">備考（自由入力・連続スキャン中は保持）</span><span id="equipmentMemoRequired" class="required equipment-memo-required" hidden>備品転用時は理由入力必須</span><input id="memo" placeholder="例：棚卸差異、サンプル使用、不良返品など"/></label><div class="button-row"><button id="startCameraBtn">📷 カメラでバーコード読み取り</button><div class="camera-zoom-row">
+<section class="card scanner"><div class="section-title compact-title"><div><h2>在庫変動登録</h2><p class="section-note">持ち出し・入荷・在庫修正・備品転用を記録します</p></div></div><div class="row"><label>区分<select id="type"><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option></select></label><label>担当者 <span class="required">必須</span><select id="staff"><option value="">担当者を選択</option></select><div id="staffPicker" class="staff-picker"></div></label><label>数量 <span class="required">必須</span><input id="qty" type="number" min="1" step="1" placeholder="数量" required/></label></div><label><span id="memoLabelText">備考（自由入力・連続スキャン中は保持）</span><span id="equipmentMemoRequired" class="required equipment-memo-required" hidden>備品転用時は理由入力必須</span><input id="memo" placeholder="例：棚卸差異、サンプル使用、不良返品など"/></label><div class="button-row"><button id="startCameraBtn">📷 カメラでバーコード読み取り</button><div class="camera-zoom-row">
   <label>カメラズーム
     <input id="cameraZoomRange" type="range" min="1" max="3" step="0.1" value="1.5">
     <span id="cameraZoomValue">1.5x</span>
@@ -78,14 +78,11 @@
     <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
   </div>
   <div class="smaregi-entry-panel smaregi-checker-panel">
-    <label>担当者（チェックした人）<select id="smaregiCheckerName"><option value="">担当者を選択</option></select></label>
+    <label>担当者（チェックした人）<select id="smaregiCheckerName"><option value="">担当者を選択</option></select><div id="smaregiCheckerNamePicker" class="staff-picker"></div></label>
   </div>
   <div class="smaregi-reset-panel">
     <label>チェック完了解除日時<input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
     <button type="button" id="resetSmaregiCompletionBtn" class="secondary">チェック完了解除（責任者のみ）</button>
-  </div>
-  <div class="smaregi-filter-row">
-    <label>検索<input id="smaregiStockSearchInput" placeholder="商品名で検索"/></label>
   </div>
   <div class="table-wrap">
     <table class="smaregi-check-table">
@@ -103,7 +100,7 @@
     </div>
     <div class="table-wrap">
       <table class="smaregi-check-table smaregi-diff-table">
-        <thead><tr><th>商品名</th><th>実在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th></tr></thead>
+        <thead><tr><th>商品名</th><th>実在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>修正</th></tr></thead>
         <tbody id="smaregiDiffOnlyBody"></tbody>
       </table>
     </div>
