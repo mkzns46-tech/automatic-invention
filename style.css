@@ -1813,6 +1813,13 @@ td small{margin-top:4px;color:#527161}
   padding:8px 10px !important;
   font-size:13px;
 }
+.smaregi-diff-cause-btn{
+  width:auto !important;
+  min-width:82px;
+  margin:0 !important;
+  padding:8px 10px !important;
+  font-size:13px;
+}
 #productHistoryToggleBtn{
   width:auto;
   margin:0;
@@ -1829,6 +1836,60 @@ td small{margin-top:4px;color:#527161}
     margin:0 !important;
     border:0 !important;
     overflow:hidden !important;
+  }
+}
+
+/* ===== v98 PC差異一覧専用レイアウト ===== */
+.smaregi-diff-table{
+  width:100%;
+  table-layout:fixed;
+}
+.smaregi-diff-table th,
+.smaregi-diff-table td{
+  padding:8px 6px !important;
+}
+.smaregi-diff-table th:nth-child(1),
+.smaregi-diff-table td:nth-child(1){
+  width:28% !important;
+  min-width:0 !important;
+  text-align:left;
+  white-space:normal;
+}
+.smaregi-diff-table th:nth-child(2),
+.smaregi-diff-table td:nth-child(2){
+  width:82px !important;
+  min-width:0 !important;
+  text-align:center;
+}
+.smaregi-diff-table th:nth-child(3),
+.smaregi-diff-table td:nth-child(3),
+.smaregi-diff-table th:nth-child(4),
+.smaregi-diff-table td:nth-child(4){
+  width:72px !important;
+  min-width:0 !important;
+  text-align:center;
+}
+.smaregi-diff-table th:nth-child(5),
+.smaregi-diff-table td:nth-child(5){
+  width:82px !important;
+  min-width:0 !important;
+  text-align:center;
+}
+.smaregi-diff-table th:nth-child(6),
+.smaregi-diff-table td:nth-child(6){
+  width:145px !important;
+  min-width:0 !important;
+  text-align:center;
+}
+.smaregi-diff-table th:nth-child(7),
+.smaregi-diff-table td:nth-child(7){
+  width:245px !important;
+  min-width:0 !important;
+}
+@media(max-width:800px){
+  #showSmaregiDiffListBtn,
+  #smaregiDiffOnlyPanel{
+    display:none !important;
   }
 }
 @media(max-width:800px){

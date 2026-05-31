@@ -2356,7 +2356,7 @@ function renderSmaregiDiffOnlyPanel(){
       <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
       <td>${esc(getSmaregiDisplayCheckedBy(check))}</td>
       <td>${check?.checked_at ? fmt(check.checked_at) : ""}</td>
-      <td><div class="smaregi-diff-action-buttons"><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">修正保存</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${esc(item.barcode)}">問題なし</button></div></td>
+      <td><div class="smaregi-diff-action-buttons"><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">修正保存</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${esc(item.barcode)}">問題なし</button></div></td>
     </tr>`;
   }).join("");
   body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
@@ -2364,6 +2364,9 @@ function renderSmaregiDiffOnlyPanel(){
   });
   body.querySelectorAll(".smaregi-no-issue-btn").forEach(button=>{
     button.onclick=()=>markSmaregiDifferenceNoIssue(button.dataset.barcode);
+  });
+  body.querySelectorAll(".smaregi-diff-cause-btn").forEach(button=>{
+    button.onclick=()=>showSmaregiCauseDetail(button.dataset.barcode);
   });
   body.querySelectorAll(".smaregi-diff-actual-input").forEach(input=>{
     input.addEventListener("keydown",event=>{
