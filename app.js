@@ -1052,18 +1052,22 @@ function isEquipmentTransferChecked(log){
 
 function equipmentCheckHtml(log){
   if(log.type!=="備品転用")return "";
+  const logId=esc(log.id||"");
   if(isEquipmentTransferChecked(log)){
-    return `<span class="equipment-check-status is-checked">確認済</span><small>${esc(log.equipment_checked_by||"")} / ${fmt(log.equipment_checked_at)}</small>`;
+    return `<div class="equipment-check-cell" data-log-id="${logId}"><span class="equipment-check-status is-checked">確認済</span><small>${esc(log.equipment_checked_by||"")} / ${fmt(log.equipment_checked_at)}</small></div>`;
   }
-  return `<span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${esc(log.id||"")}">確認</button>`;
+  return `<div class="equipment-check-cell" data-log-id="${logId}"><span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${logId}">確認</button></div>`;
 }
 
 function replaceEquipmentConfirmationDom(logId,log){
-  if(!isEquipmentTransferChecked(log))return;
+  const checkedHtml=`<span class="equipment-check-status is-checked">確認済</span><small>${esc(log.equipment_checked_by||"")} / ${fmt(log.equipment_checked_at)}</small>`;
+  document.querySelectorAll(".equipment-check-cell").forEach(cell=>{
+    if(String(cell.dataset.logId||"")===String(logId))cell.innerHTML=checkedHtml;
+  });
   document.querySelectorAll(".equipment-confirm-btn").forEach(button=>{
     if(String(button.dataset.logId||"")!==String(logId))return;
     const cell=button.closest("td");
-    if(cell)cell.innerHTML=equipmentCheckHtml(log);
+    if(cell)cell.innerHTML=`<div class="equipment-check-cell" data-log-id="${esc(logId)}">${checkedHtml}</div>`;
   });
 }
 
@@ -2287,11 +2291,17 @@ function getSmaregiProgressHtml(){
     <div class="smaregi-progress-card-inner">
       <div class="smaregi-progress-main">チェック済み <span>${stats.completed} / ${stats.total}</span></div>
       <div class="smaregi-progress-sub">除外 ${stats.excluded}</div>
-      <div class="smaregi-progress-graph" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stats.percent}">
-        <div class="smaregi-progress-fill" style="width:${stats.percent}%"></div>
-      </div>
-      <div class="smaregi-progress-text">進捗 ${stats.percent}%</div>
     </div>`;
+}
+
+function updateSmaregiProgressGraph(){
+  const stats=getSmaregiStats();
+  const graph=el("smaregiProgressGraph");
+  const fill=el("smaregiProgressFill");
+  const text=el("smaregiProgressText");
+  if(graph)graph.setAttribute("aria-valuenow",String(stats.percent));
+  if(fill)fill.style.width=`${stats.percent}%`;
+  if(text)text.textContent=`進捗 ${stats.percent}%`;
 }
 
 function getFocusedSmaregiInputState(){
@@ -2323,6 +2333,7 @@ function renderSmaregiStockChecks(){
   }
   const progress=el("smaregiProgressBadge");
   if(progress)progress.innerHTML=getSmaregiProgressHtml();
+  updateSmaregiProgressGraph();
   updateSmaregiManagerControls();
   const resetInput=el("resetSmaregiCompletedAtInput");
   if(resetInput&&smaregiSnapshot?.completed_at&&!resetInput.value){
