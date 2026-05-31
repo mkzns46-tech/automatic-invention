@@ -478,21 +478,38 @@ async function importSmaregiProducts(){
     const data=await res.json().catch(()=>({}));
     if(!res.ok)throw new Error(data.error||`APIエラー ${res.status}`);
     const rows=Array.isArray(data.products)?data.products:[];
-    const existingRows=await sbAll("products?select=barcode",1000,50000);
+    const existingRows=await sbAll("products?select=barcode,name,category,genre,department,location",1000,50000);
     const existingBarcodes=new Set((existingRows||[]).map(row=>String(row.barcode||"")));
-    const safeRows=rows.map(row=>{
-      const {base_stock:ignoredBaseStock,...productInfo}=row;
-      return existingBarcodes.has(String(row.barcode||""))
-        ? productInfo
-        : {...productInfo,base_stock:0};
+    const existingProductsByBarcode=new Map((existingRows||[]).map(row=>[String(row.barcode||""),row]));
+    const normalizeProductInfo=(row,current={})=>({
+      barcode:String(row.barcode||""),
+      name:String(row.name||current.name||""),
+      category:String(row.category||current.category||""),
+      genre:String(row.genre||current.genre||""),
+      department:String(row.department||current.department||""),
+      location:String(row.location||current.location||"")
     });
-    for(let i=0;i<safeRows.length;i+=500){
-      await upsertProducts(safeRows.slice(i,i+500));
+    const existingProductRows=[];
+    const newProductRows=[];
+    rows.forEach(row=>{
+      const productInfo=normalizeProductInfo(row,existingProductsByBarcode.get(String(row.barcode||"")));
+      if(existingBarcodes.has(productInfo.barcode)){
+        existingProductRows.push(productInfo);
+      }else{
+        newProductRows.push({...productInfo,base_stock:0});
+      }
+    });
+    const payloadSampleRows=[...existingProductRows,...newProductRows];
+    console.log("[Smaregi Product Master Upsert Payload Sample]",payloadSampleRows.slice(0,3));
+    for(const payloadRows of [existingProductRows,newProductRows]){
+      for(let i=0;i<payloadRows.length;i+=500){
+        await upsertProducts(payloadRows.slice(i,i+500));
+      }
     }
     products=[];
-    console.log("[Smaregi product master import] success",{count:safeRows.length});
-    showMessage(`スマレジ商品マスター取込完了：${safeRows.length}件。在庫数は変更していません。`,"ok");
-    showPopup("スマレジ商品マスター取込完了",`商品情報を更新しました。\n取込件数：${safeRows.length}件\n在庫数は変更していません。`);
+    console.log("[Smaregi product master import] success",{count:rows.length});
+    showMessage(`スマレジ商品マスター取込完了：${rows.length}件。在庫数は変更していません。`,"ok");
+    showPopup("スマレジ商品マスター取込完了",`商品情報を更新しました。\n取込件数：${rows.length}件\n在庫数は変更していません。`);
   }catch(e){
     console.error("[Smaregi product master import] error",e);
     showMessage("スマレジ商品マスター取込エラー："+e.message,"err");
@@ -1013,7 +1030,7 @@ function equipmentCheckHtml(log){
   return `<span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${esc(log.id||"")}">確認</button>`;
 }
 
-async function confirmEquipmentUse(logId){
+async function confirmEquipmentTransfer(logId){
   const checkedBy=String(el("staff")?.value||"").trim();
   if(!checkedBy){
     showMessage("確認する担当者を選択してください。","err");
@@ -1043,13 +1060,11 @@ async function confirmEquipmentUse(logId){
   }
 }
 
-let equipmentConfirmDelegationBound=false;
 function bindEquipmentConfirmButtons(){
-  if(equipmentConfirmDelegationBound)return;
-  equipmentConfirmDelegationBound=true;
-  document.addEventListener("click",event=>{
-    const button=event.target?.closest?.(".equipment-confirm-btn");
-    if(button)confirmEquipmentUse(button.dataset.logId);
+  document.querySelectorAll(".equipment-confirm-btn").forEach(button=>{
+    button.onclick=()=>{
+      confirmEquipmentTransfer(button.dataset.logId);
+    };
   });
 }
 
@@ -1722,6 +1737,13 @@ function bindEvents(){
   });
 
   on("showAllSelectedHistoryBtn","click",()=>showProductHistoryForBarcode(selectedBarcode));
+  on("productHistoryToggleBtn","click",()=>{
+    const content=el("productHistoryContent");
+    const toggle=el("productHistoryToggleBtn");
+    if(!content||!toggle)return;
+    content.hidden=!content.hidden;
+    toggle.textContent=content.hidden ? "商品別履歴を開く" : "商品別履歴を閉じる";
+  });
   updateEquipmentMemoUi();
 }
 
@@ -2076,6 +2098,7 @@ function getSmaregiDiffItems(){
   return smaregiStockItems.filter(item=>{
     const check=getSmaregiCheck(item.barcode);
     if(!check||isSmaregiExcludedCheck(check))return false;
+    if(check.no_issue===true)return false;
     if(keyword&&!String(item.product_name||"").toLowerCase().includes(keyword))return false;
     const difference=getSmaregiActualDifference(item);
     return difference!==null&&difference!==0;
@@ -2333,11 +2356,14 @@ function renderSmaregiDiffOnlyPanel(){
       <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
       <td>${esc(getSmaregiDisplayCheckedBy(check))}</td>
       <td>${check?.checked_at ? fmt(check.checked_at) : ""}</td>
-      <td><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">修正保存</button></td>
+      <td><div class="smaregi-diff-action-buttons"><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">修正保存</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${esc(item.barcode)}">問題なし</button></div></td>
     </tr>`;
   }).join("");
   body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
     button.onclick=()=>handleSmaregiDiffSave(button);
+  });
+  body.querySelectorAll(".smaregi-no-issue-btn").forEach(button=>{
+    button.onclick=()=>markSmaregiDifferenceNoIssue(button.dataset.barcode);
   });
   body.querySelectorAll(".smaregi-diff-actual-input").forEach(input=>{
     input.addEventListener("keydown",event=>{
@@ -2378,6 +2404,35 @@ async function handleSmaregiDiffSave(button){
   const value=button.closest("tr")?.querySelector(".smaregi-diff-actual-input")?.value;
   const saved=await saveSmaregiActualStock(barcode,value);
   if(!saved)renderSmaregiDiffOnlyPanel();
+}
+
+async function markSmaregiDifferenceNoIssue(barcode){
+  if(!isSmaregiManager()){
+    showMessage("差異の問題なし処理は責任者「田中」のみ操作できます。","err");
+    return;
+  }
+  if(!smaregiSnapshot||!confirm("この差異を問題なしとして処理しますか？"))return;
+  const checkedBy=getSmaregiCheckerName();
+  const no_issue_at=new Date().toISOString();
+  try{
+    await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({no_issue:true,no_issue_by:checkedBy,no_issue_at,no_issue_note:""})
+    });
+    smaregiStockChecks.forEach(check=>{
+      if(String(check.barcode)===String(barcode)){
+        check.no_issue=true;
+        check.no_issue_by=checkedBy;
+        check.no_issue_at=no_issue_at;
+        check.no_issue_note="";
+      }
+    });
+    renderSmaregiStockChecks();
+    showMessage("差異を問題なしとして処理しました。","ok");
+  }catch(e){
+    showMessage("問題なし処理エラー。\n追加SQLを実行済みか確認してください。\n"+e.message,"err");
+  }
 }
 
 async function loadLatestSmaregiSnapshot(){
@@ -2706,6 +2761,7 @@ function smaregiCsvRows(differenceOnly=false){
     const check=getSmaregiCheck(item.barcode);
     const difference=check ? getSmaregiDifference(item) : "";
     if(differenceOnly&&isSmaregiExcludedCheck(check))return;
+    if(differenceOnly&&check?.no_issue===true)return;
     if(differenceOnly&&difference===0)return;
     if(differenceOnly&&!check)return;
     rows.push([

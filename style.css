@@ -1801,6 +1801,36 @@ td small{margin-top:4px;color:#527161}
   padding:8px 10px !important;
   font-size:13px;
 }
+.smaregi-diff-action-buttons{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.smaregi-no-issue-btn{
+  width:auto !important;
+  min-width:82px;
+  margin:0 !important;
+  padding:8px 10px !important;
+  font-size:13px;
+}
+#productHistoryToggleBtn{
+  width:auto;
+  margin:0;
+}
+#productHistoryContent[hidden]{
+  display:none !important;
+}
+@media(max-width:800px){
+  #productHistoryCard.mobile-history-section{
+    display:none !important;
+    visibility:hidden !important;
+    height:0 !important;
+    padding:0 !important;
+    margin:0 !important;
+    border:0 !important;
+    overflow:hidden !important;
+  }
+}
 @media(max-width:800px){
   .smaregi-action-grid{
     grid-template-columns:1fr !important;
