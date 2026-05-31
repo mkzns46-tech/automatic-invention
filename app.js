@@ -631,7 +631,16 @@ async function registerBarcode(barcode){
 }
 
 async function loadProductHistoryByBarcode(barcode){
-  return await sbAll(`inventory_logs?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=created_at.desc`,1000,10000);
+  const productLogs=await sbAll(`inventory_logs?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=created_at.desc`,1000,10000);
+  console.log("[Product History Equipment State]",productLogs
+    .filter(log=>log.type==="備品転用")
+    .map(log=>({
+      id:log.id,
+      equipment_checked:log.equipment_checked,
+      equipment_checked_by:log.equipment_checked_by,
+      equipment_checked_at:log.equipment_checked_at
+    })));
+  return productLogs;
 }
 
 async function showProductHistoryForBarcode(barcode){
@@ -904,6 +913,14 @@ function renderSelectedProductHistoryWithData(productLogs){
 
   if(badge)badge.textContent=p?`${p.name} / 全履歴：${productLogs.length}件`:"商品を選択してください";
   if(range)range.textContent=`全履歴：${productLogs.length}件`;
+  console.log("[Selected Product History Render]",productLogs
+    .filter(log=>log.type==="備品転用")
+    .map(log=>({
+      id:log.id,
+      equipment_checked:log.equipment_checked,
+      equipment_checked_by:log.equipment_checked_by,
+      equipment_checked_at:log.equipment_checked_at
+    })));
 
   body.innerHTML=buildProductHistoryRowsFromLogs(selectedBarcode,productLogs,productLogs);
 
@@ -1022,9 +1039,15 @@ function bindMemoEditButtons(){
   });
 }
 
+function isEquipmentTransferChecked(log){
+  return log?.equipment_checked===true
+    || String(log?.equipment_checked||"").toLowerCase()==="true"
+    || Boolean(log?.equipment_checked_at);
+}
+
 function equipmentCheckHtml(log){
   if(log.type!=="備品転用")return "";
-  if(log.equipment_checked===true||log.equipment_checked_at){
+  if(isEquipmentTransferChecked(log)){
     return `<span class="equipment-check-status is-checked">確認済</span><small>${esc(log.equipment_checked_by||"")} / ${fmt(log.equipment_checked_at)}</small>`;
   }
   return `<span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${esc(log.id||"")}">確認</button>`;
@@ -1039,7 +1062,7 @@ function getEquipmentConfirmationStaff(){
   ).trim();
 }
 
-async function confirmEquipmentTransfer(logId){
+async function confirmEquipmentTransfer(logId,button=null){
   logId=String(logId||"").trim();
   console.log("[Equipment Transfer Confirm Click]",{logId});
   const checkedBy=getEquipmentConfirmationStaff();
@@ -1052,7 +1075,8 @@ async function confirmEquipmentTransfer(logId){
     showMessage("備品転用履歴IDが見つかりません。再読み込みしてください。","err");
     return;
   }
-  try{
+  await runWithSmaregiAutoRefreshPaused(async()=>{
+   try{
     const equipment_checked_at=new Date().toISOString();
     await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
       method:"PATCH",
@@ -1063,24 +1087,23 @@ async function confirmEquipmentTransfer(logId){
     const refreshedRows=await sb(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`);
     const refreshedLog=Array.isArray(refreshedRows)&&refreshedRows[0] ? refreshedRows[0] : null;
     if(!refreshedLog)throw new Error(`更新後の備品転用履歴を再取得できませんでした。inventory_logs.id=${logId}`);
-    (logs||[]).forEach(log=>{
-      if(String(log.id)===String(logId)){
-        Object.assign(log,refreshedLog);
-      }
-    });
+    const localLog=(logs||[]).find(log=>String(log.id)===String(logId));
+    if(localLog)Object.assign(localLog,refreshedLog);
+    else logs.unshift(refreshedLog);
     showMessage(`備品転用を確認済みにしました：${checkedBy}`,"ok");
     renderGlobalHistory();
     if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode);
   }catch(e){
     showMessage("備品転用確認エラー。\nSQL追加済みか確認してください。\n"+e.message,"err");
   }
+  },{button});
 }
 
 function bindEquipmentConfirmButtons(){
   document.querySelectorAll(".equipment-confirm-btn").forEach(button=>{
     button.onclick=()=>{
       console.log("[Equipment Confirm Button]",{logId:button.dataset.logId||""});
-      confirmEquipmentTransfer(button.dataset.logId);
+      confirmEquipmentTransfer(button.dataset.logId,button);
     };
   });
 }
@@ -1405,7 +1428,7 @@ function buildHistoryExportRows(sourceLogs){
           outQty,
           afterStock,
           log.memo||"",
-          log.type==="備品転用" ? (log.equipment_checked_at ? "確認済" : "未確認") : "",
+          log.type==="備品転用" ? (isEquipmentTransferChecked(log) ? "確認済" : "未確認") : "",
           log.equipment_checked_by||"",
           log.equipment_checked_at ? fmt(log.equipment_checked_at) : ""
         ]
@@ -2070,6 +2093,7 @@ let smaregiStockChecks=[];
 const SMAREGI_MANAGER_NAME="田中";
 let smaregiAutoRefreshTimer=null;
 let smaregiAutoRefreshBusy=false;
+let smaregiMutationBusy=false;
 
 function getSmaregiCheck(barcode){
   const matches=(smaregiStockChecks||[]).filter(c=>String(c.barcode)===String(barcode));
@@ -2322,10 +2346,16 @@ function renderSmaregiStockChecks(){
     };
   });
   body.querySelectorAll(".smaregi-exclude-btn").forEach(button=>{
-    button.onclick=()=>excludeSmaregiStockItem(button.dataset.barcode);
+    button.onclick=()=>runWithSmaregiAutoRefreshPaused(
+      ()=>excludeSmaregiStockItem(button.dataset.barcode),
+      {button}
+    );
   });
   body.querySelectorAll(".smaregi-clear-btn").forEach(button=>{
-    button.onclick=()=>clearSmaregiStockCheck(button.dataset.barcode);
+    button.onclick=()=>runWithSmaregiAutoRefreshPaused(
+      ()=>clearSmaregiStockCheck(button.dataset.barcode),
+      {button}
+    );
   });
   body.querySelectorAll(".smaregi-cause-btn").forEach(button=>{
     button.onclick=()=>showSmaregiCauseDetail(button.dataset.barcode);
@@ -2380,7 +2410,7 @@ function renderSmaregiDiffOnlyPanel(){
     button.onclick=()=>handleSmaregiDiffSave(button);
   });
   body.querySelectorAll(".smaregi-no-issue-btn").forEach(button=>{
-    button.onclick=()=>markSmaregiDifferenceNoIssue(button.dataset.barcode);
+    button.onclick=()=>markSmaregiDifferenceNoIssue(button.dataset.barcode,button);
   });
   body.querySelectorAll(".smaregi-diff-cause-btn").forEach(button=>{
     button.onclick=()=>showSmaregiCauseDetail(button.dataset.barcode);
@@ -2411,7 +2441,10 @@ function showSmaregiDiffOnlyPanel(){
 async function handleSmaregiRowSave(button){
   const barcode=String(button.dataset.barcode||"");
   const value=button.closest("tr")?.querySelector(".smaregi-row-actual-input")?.value;
-  const saved=await saveSmaregiActualStock(barcode,value);
+  const saved=await runWithSmaregiAutoRefreshPaused(
+    ()=>saveSmaregiActualStock(barcode,value),
+    {button}
+  );
   if(!saved)renderSmaregiStockChecks();
 }
 
@@ -2422,19 +2455,23 @@ async function handleSmaregiDiffSave(button){
   }
   const barcode=String(button.dataset.barcode||"");
   const value=button.closest("tr")?.querySelector(".smaregi-diff-actual-input")?.value;
-  const saved=await saveSmaregiActualStock(barcode,value,{markCorrected:true});
+  const saved=await runWithSmaregiAutoRefreshPaused(
+    ()=>saveSmaregiActualStock(barcode,value,{markCorrected:true}),
+    {button}
+  );
   if(!saved)renderSmaregiDiffOnlyPanel();
 }
 
-async function markSmaregiDifferenceNoIssue(barcode){
+async function markSmaregiDifferenceNoIssue(barcode,button=null){
   if(!isSmaregiManager()){
     showMessage("差異の問題なし処理は責任者「田中」のみ操作できます。","err");
     return;
   }
   if(!smaregiSnapshot||!confirm("この差異を問題なしとして処理しますか？"))return;
-  const checkedBy=getSmaregiCheckerName();
-  const no_issue_at=new Date().toISOString();
-  try{
+  await runWithSmaregiAutoRefreshPaused(async()=>{
+   const checkedBy=getSmaregiCheckerName();
+   const no_issue_at=new Date().toISOString();
+   try{
     await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
       method:"PATCH",
       headers:{Prefer:"return=minimal"},
@@ -2453,6 +2490,7 @@ async function markSmaregiDifferenceNoIssue(barcode){
   }catch(e){
     showMessage("問題なし処理エラー。\n追加SQLを実行済みか確認してください。\n"+e.message,"err");
   }
+  },{button});
 }
 
 async function loadLatestSmaregiSnapshot(){
@@ -2501,7 +2539,13 @@ async function syncSmaregiStockFromApi(){
 async function applySmaregiActualStocksToSheet(completedBy){
   const targets=smaregiStockItems.filter(item=>{
     const check=getSmaregiCheck(item.barcode);
-    return check&&!isSmaregiExcludedCheck(check)&&check.actual_stock!==null&&check.actual_stock!==undefined&&String(check.actual_stock)!=="";
+    return check
+      && !isSmaregiExcludedCheck(check)
+      && check.no_issue!==true
+      && check.actual_corrected===true
+      && check.actual_stock!==null
+      && check.actual_stock!==undefined
+      && String(check.actual_stock)!=="";
   });
 
   for(const item of targets){
@@ -2555,7 +2599,7 @@ async function completeSmaregiStockCheck(){
     `未入力　　　${stats.unchecked}件`,
     `除外　　　　${stats.excluded}件`,
     "",
-    "チェック完了後、入力済み実在庫をシート在庫へ反映します。",
+    "チェック完了後、差異一覧で明示的に修正保存した実在庫のみシート在庫へ反映します。",
     "このままチェック完了しますか？",
     warning
   ].join("\n");
@@ -2740,6 +2784,22 @@ async function excludeSmaregiStockItem(barcode){
   if(!confirm(`${item.product_name||barcode} を今回のチェック対象から除外しますか？`))return false;
   try{
     const checked_at=new Date().toISOString();
+    const old=getSmaregiCheck(barcode);
+    const next={
+      snapshot_id:smaregiSnapshot.id,
+      barcode,
+      actual_stock:old?.actual_stock??null,
+      difference:old?.difference??null,
+      checked_by:`除外:${checked_by}`,
+      checked_at,
+      no_issue:old?.no_issue===true,
+      no_issue_by:old?.no_issue_by||null,
+      no_issue_at:old?.no_issue_at||null,
+      no_issue_reason:old?.no_issue_reason||"",
+      actual_corrected:old?.actual_corrected===true,
+      actual_corrected_by:old?.actual_corrected_by||null,
+      actual_corrected_at:old?.actual_corrected_at||null
+    };
     await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
       method:"DELETE",
       headers:{Prefer:"return:minimal"}
@@ -2747,10 +2807,8 @@ async function excludeSmaregiStockItem(barcode){
     await sb("smaregi_stock_checks",{
       method:"POST",
       headers:{Prefer:"return=representation"},
-      body:JSON.stringify([{snapshot_id:smaregiSnapshot.id,barcode,actual_stock:0,difference:0,checked_by:`除外:${checked_by}`,checked_at}])
+      body:JSON.stringify([next])
     });
-    const old=getSmaregiCheck(barcode);
-    const next={...(old||{}),snapshot_id:smaregiSnapshot.id,barcode,actual_stock:0,difference:0,checked_by:`除外:${checked_by}`,checked_at};
     smaregiStockChecks=smaregiStockChecks.filter(c=>String(c.barcode)!==String(barcode));
     smaregiStockChecks.push(next);
     renderSmaregiStockChecks();
@@ -2772,11 +2830,23 @@ async function clearSmaregiStockCheck(barcode){
   if(!item||!smaregiSnapshot)return;
   if(!confirm(`${item.product_name||barcode} のチェック済み状態を解除しますか？`))return;
   try{
-    await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
-      method:"DELETE",
-      headers:{Prefer:"return=minimal"}
-    });
-    smaregiStockChecks=smaregiStockChecks.filter(check=>String(check.barcode)!==String(barcode));
+    const old=getSmaregiCheck(barcode);
+    const hasActualStock=old?.actual_stock!==null&&old?.actual_stock!==undefined&&String(old.actual_stock)!=="";
+    if(hasActualStock){
+      const checked_by=getSmaregiDisplayCheckedBy(old);
+      await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({checked_by})
+      });
+      if(old)old.checked_by=checked_by;
+    }else{
+      await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+        method:"DELETE",
+        headers:{Prefer:"return=minimal"}
+      });
+      smaregiStockChecks=smaregiStockChecks.filter(check=>String(check.barcode)!==String(barcode));
+    }
     renderSmaregiStockChecks();
     showMessage(`チェックを解除しました：${item.product_name||barcode}`,"ok");
   }catch(e){
@@ -2789,6 +2859,15 @@ async function openHistoryFromSmaregi(barcode){
   if(input)input.value=barcode;
   await showProductHistoryForBarcode(barcode);
   el("productHistoryCard")?.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function getSmaregiCsvStatus(check,difference){
+  if(!check)return "未チェック";
+  if(isSmaregiExcludedCheck(check))return "除外";
+  if(check.no_issue===true)return "問題なし";
+  if(check.actual_corrected===true)return "修正済";
+  if(difference===0)return "正常";
+  return "チェック済み";
 }
 
 function smaregiCsvRows(differenceOnly=false){
@@ -2809,7 +2888,7 @@ function smaregiCsvRows(differenceOnly=false){
       difference,
       getSmaregiDisplayCheckedBy(check),
       check?.checked_at ? fmt(check.checked_at) : "",
-      check ? (isSmaregiExcludedCheck(check) ? "除外" : "チェック済み") : "未チェック"
+      getSmaregiCsvStatus(check,difference)
     ]);
   });
   return rows;
@@ -2938,15 +3017,43 @@ async function showSmaregiCauseDetail(barcode){
   }
 }
 
+async function refreshSmaregiChecksFromSupabase(){
+  if(!smaregiSnapshot)return;
+  const snapshotId=encodeURIComponent(smaregiSnapshot.id);
+  smaregiStockChecks=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=eq.${snapshotId}&order=checked_at.desc`,1000,20000);
+  await fetchProductsByBarcodes(smaregiStockItems.map(item=>item.barcode));
+  renderSmaregiStockChecks();
+}
+
+async function runWithSmaregiAutoRefreshPaused(task,{button=null,refresh=true}={}){
+  if(smaregiMutationBusy)return false;
+  smaregiMutationBusy=true;
+  if(button)button.disabled=true;
+  stopSmaregiAutoRefresh();
+  try{
+    while(smaregiAutoRefreshBusy){
+      await new Promise(resolve=>setTimeout(resolve,25));
+    }
+    return await task();
+  }finally{
+    try{
+      if(refresh&&smaregiSnapshot)await refreshSmaregiChecksFromSupabase();
+    }catch(e){
+      console.warn("[Smaregi Mutation Refresh Error]",e);
+      showMessage("最新状態の再取得エラー。\n"+e.message,"err");
+    }
+    smaregiMutationBusy=false;
+    if(button)button.disabled=false;
+    if(!el("smaregiStockCheckCard")?.hidden)startSmaregiAutoRefresh();
+  }
+}
+
 async function refreshSmaregiCheckStateSilently(){
-  if(smaregiAutoRefreshBusy||!smaregiSnapshot||el("smaregiStockCheckCard")?.hidden)return;
+  if(smaregiMutationBusy||smaregiAutoRefreshBusy||!smaregiSnapshot||el("smaregiStockCheckCard")?.hidden)return;
   smaregiAutoRefreshBusy=true;
   const focused=getFocusedSmaregiInputState();
   try{
-    const snapshotId=encodeURIComponent(smaregiSnapshot.id);
-    smaregiStockChecks=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=eq.${snapshotId}&order=checked_at.desc`,1000,20000);
-    await fetchProductsByBarcodes(smaregiStockItems.map(item=>item.barcode));
-    renderSmaregiStockChecks();
+    await refreshSmaregiChecksFromSupabase();
     restoreFocusedSmaregiInputState(focused);
     console.log("[Smaregi Auto Refresh]",getSmaregiStats());
   }catch(e){
@@ -3008,12 +3115,12 @@ function goToPortal(){
 function bindSmaregiStockCheckEvents(){
   on("openSmaregiStockCheckBtn","click",toggleSmaregiStockCheck);
   on("portalTopBtn","click",goToPortal);
-  on("syncSmaregiStockBtn","click",syncSmaregiStockFromApi);
+  on("syncSmaregiStockBtn","click",e=>runWithSmaregiAutoRefreshPaused(syncSmaregiStockFromApi,{button:e.currentTarget}));
   on("refreshSmaregiChecksBtn","click",loadLatestSmaregiSnapshot);
   on("exportSmaregiCheckCsvBtn","click",()=>exportSmaregiCheckCsv(false));
   on("exportSmaregiDifferenceCsvBtn","click",()=>exportSmaregiCheckCsv(true));
-  on("completeSmaregiStockCheckBtn","click",completeSmaregiStockCheck);
-  on("resetSmaregiCompletionBtn","click",resetSmaregiStockCheckCompletion);
+  on("completeSmaregiStockCheckBtn","click",e=>runWithSmaregiAutoRefreshPaused(completeSmaregiStockCheck,{button:e.currentTarget}));
+  on("resetSmaregiCompletionBtn","click",e=>runWithSmaregiAutoRefreshPaused(resetSmaregiStockCheckCompletion,{button:e.currentTarget}));
   on("showSmaregiDiffListBtn","click",showSmaregiDiffOnlyPanel);
   on("smaregiCheckerName","change",e=>{
     localStorage.setItem("arico_smaregi_checker",e.target.value||"");
