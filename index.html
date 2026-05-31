@@ -15,7 +15,7 @@
     </div>
     <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
   </div>
-</div><div id="qr-reader"></div><form id="manualForm"><label>バーコード入力<input id="barcodeInput" autocomplete="off" placeholder="バーコードをスキャン、または手入力"/></label><div id="scanProductInfo" class="message">バーコード入力後、商品名と現在庫を表示します</div><button type="submit">登録</button></form><div id="message" class="message">起動中...</div></section>
+</div><div id="qr-reader"></div><form id="manualForm"><label class="product-name-search-label">商品名検索<input id="inventoryProductNameSearchInput" autocomplete="off" placeholder="商品名の一部を入力"/></label><div id="inventoryProductSearchResults" class="product-search-results"></div><label>バーコード入力<input id="barcodeInput" autocomplete="off" placeholder="バーコードをスキャン、または手入力"/></label><div id="scanProductInfo" class="message"></div><button type="submit">登録</button></form><div id="message" class="message">起動中...</div></section>
 <section class="card pc-only-section staff-admin-section">
   <div class="section-title">
     <h2>担当者設定</h2><p class="section-note">スマホ側の担当者プルダウンに反映されます</p>
@@ -42,12 +42,12 @@
   </div>
 </section>
 
-<section class="card pc-only-section csv-admin-section"><h2>CSV取り込み</h2><p class="section-note">商品マスターをまとめて登録・更新できます</p><p>対応形式：<b>barcode,name,base_stock,location</b>（locationは任意）</p><p>日本語見出しも対応：<b>バーコード,商品名,現在在庫,棚番</b></p><div class="csv-feature-grid">
+<section class="card pc-only-section csv-admin-section"><h2>CSV取り込み</h2><p class="section-note">商品マスターをまとめて登録・更新できます</p><div class="csv-feature-grid">
   <div class="csv-feature-card"><strong>簡単インポート</strong><span>CSVを選ぶだけで商品を一括登録・更新</span></div>
   <div class="csv-feature-card"><strong>上書き対応</strong><span>同じバーコードの商品名・現在庫・棚番を更新</span></div>
   <div class="csv-feature-card"><strong>サンプルあり</strong><span>CSV形式をすぐ確認できます</span></div>
 </div>
-<div class="button-row"><label class="file-button">⬆ 追加・更新で取り込み<input type="file" id="csvFile" accept=".csv,text/csv"/></label><button id="downloadSampleCsvBtn" class="secondary">サンプルCSVをダウンロード</button><button id="importSmaregiProductsBtn" class="secondary">スマレジ商品マスター取込</button></div><small>CSVは同じバーコードがある場合、商品名・原在庫・棚番を上書きします。履歴は消しません。</small></section>
+<div class="button-row"><label class="file-button">⬆ 追加・更新で取り込み<input type="file" id="csvFile" accept=".csv,text/csv"/></label><button id="downloadSampleCsvBtn" class="secondary">サンプルCSVをダウンロード</button><button type="button" id="importSmaregiProductsBtn" class="secondary">スマレジ商品マスター取込</button></div></section>
 
 
 <section class="card wide mobile-history-section" id="productHistoryCard"><div class="section-title"><h2>商品別履歴</h2><div id="historyRangeBadge" class="badge muted">商品を選択してください</div></div><div class="history-search-box"><label>商品履歴検索<input id="productHistoryBarcodeInput" placeholder="バーコードを入力またはスキャン" />

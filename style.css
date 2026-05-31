@@ -227,6 +227,9 @@ button,.file-button{
   margin-top:14px;
   font-size:15px;
 }
+#scanProductInfo:empty{
+  display:none;
+}
 
 #message{
   margin-top:16px;
@@ -1471,7 +1474,8 @@ header h1{
 /* v72 search scroll / camera zoom / bulk check */
 .product-search-results,
 #productSearchResults,
-#productFormSearchResults{
+#productFormSearchResults,
+#inventoryProductSearchResults{
   max-height:300px !important;
   overflow-y:auto !important;
   overflow-x:hidden !important;
@@ -1479,13 +1483,16 @@ header h1{
 }
 .product-search-results::-webkit-scrollbar,
 #productSearchResults::-webkit-scrollbar,
-#productFormSearchResults::-webkit-scrollbar{width:10px;}
+#productFormSearchResults::-webkit-scrollbar,
+#inventoryProductSearchResults::-webkit-scrollbar{width:10px;}
 .product-search-results::-webkit-scrollbar-thumb,
 #productSearchResults::-webkit-scrollbar-thumb,
-#productFormSearchResults::-webkit-scrollbar-thumb{background:#2d6a4f;border-radius:999px;}
+#productFormSearchResults::-webkit-scrollbar-thumb,
+#inventoryProductSearchResults::-webkit-scrollbar-thumb{background:#2d6a4f;border-radius:999px;}
 .product-search-results::-webkit-scrollbar-track,
 #productSearchResults::-webkit-scrollbar-track,
-#productFormSearchResults::-webkit-scrollbar-track{background:#e9f5ec;}
+#productFormSearchResults::-webkit-scrollbar-track,
+#inventoryProductSearchResults::-webkit-scrollbar-track{background:#e9f5ec;}
 
 .camera-zoom-row{
   grid-column:1 / -1;
@@ -1514,6 +1521,24 @@ header h1{
 #smaregiMessage:empty{display:none}
 #importSmaregiProductsBtn[hidden],
 .equipment-memo-required[hidden]{display:none !important}
+#staff,
+#smaregiCheckerName,
+#checkerName{
+  min-height:52px;
+  font-size:17px;
+  overflow-y:auto;
+}
+#staff option,
+#smaregiCheckerName option,
+#checkerName option{
+  padding:10px;
+}
+.smaregi-progress-sub{
+  margin-top:6px;
+  font-size:14px;
+  font-weight:900;
+  color:#fff;
+}
 .history-filter-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
 .equipment-check-status{display:inline-block;font-weight:900;margin-right:8px}
 .equipment-check-status.is-unchecked{color:#b91c1c}
@@ -1642,7 +1667,8 @@ td small{margin-top:4px;color:#527161}
 }
 
 @media(max-width:800px){
-  .product-search-results,#productSearchResults,#productFormSearchResults{max-height:230px !important;}
+  .product-search-results,#productSearchResults,#productFormSearchResults,#inventoryProductSearchResults{max-height:230px !important;}
+  #staff,#smaregiCheckerName,#checkerName{min-height:56px;font-size:18px;}
   .camera-zoom-row label{grid-template-columns:1fr;}
   #cameraZoomValue{text-align:left;}
 }
