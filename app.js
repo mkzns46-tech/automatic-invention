@@ -91,7 +91,6 @@ async function startInventoryApp(){
   bindEvents();
   bindSmaregiStockCheckEvents();
   await reloadAll();
-  await refreshSmaregiCheckStateSilently();
   await loadSmaregiAccuracy();
 }
 

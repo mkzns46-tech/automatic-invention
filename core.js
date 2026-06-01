@@ -17,13 +17,14 @@ const INVENTORY_APP_MENU_ITEMS=[
   {key:"inventory",label:"在庫変動登録",action:"inventory"},
   {key:"smaregi",label:"変動商品チェック",id:"openSmaregiStockCheckBtn"},
   {key:"booth",label:"ブース管理",action:"booth",title:"準備中"},
-  {key:"analytics",label:"分析",action:"analytics"},
-  {key:"settings",label:"設定",action:"settings"}
+  {key:"analytics",label:"分析",action:"analytics"}
 ];
 const INVENTORY_APP_MENU_FOOTER_ITEMS=[
+  {key:"portal",label:"トップへ戻る",action:"portal"},
+  {key:"settings",label:"設定",action:"settings"},
   {key:"logout",label:"ログアウト",action:"logout"}
 ];
-const INVENTORY_SETTINGS_PASSWORD="Sedc##530.";
+const INVENTORY_SETTINGS_PASSWORD="S3edc##530.";
 const INVENTORY_ANALYTICS_PASSWORD="S3edc##530.";
 const INVENTORY_SETTINGS_UNLOCK_KEY="arico_inventory_settings_unlocked";
 const INVENTORY_ANALYTICS_UNLOCK_KEY="arico_inventory_analytics_unlocked";
@@ -58,6 +59,8 @@ function renderInventoryAppMenu(){
   if(boothButton)boothButton.addEventListener("click",()=>showPopup("ブース管理","準備中です。"));
   const analyticsButton=menu.querySelector('[data-menu-action="analytics"]');
   if(analyticsButton)analyticsButton.addEventListener("click",showInventoryAnalytics);
+  const portalButton=menu.querySelector('[data-menu-action="portal"]');
+  if(portalButton)portalButton.addEventListener("click",goToPortal);
   const settingsButton=menu.querySelector('[data-menu-action="settings"]');
   if(settingsButton)settingsButton.addEventListener("click",showInventorySettings);
   const logoutButton=menu.querySelector('[data-menu-action="logout"]');
@@ -126,7 +129,7 @@ function showInventoryScreen(screen){
   document.querySelectorAll("[data-inventory-screen]").forEach(panel=>{
     panel.hidden=panel.dataset.inventoryScreen!==screen;
   });
-  if((screen==="inventory"||screen==="smaregi")&&typeof startSmaregiAutoRefresh==="function")startSmaregiAutoRefresh();
+  if(screen==="smaregi"&&typeof startSmaregiAutoRefresh==="function")startSmaregiAutoRefresh();
   else if(typeof stopSmaregiAutoRefresh==="function")stopSmaregiAutoRefresh();
   if(typeof updateSmaregiManagerControls==="function")updateSmaregiManagerControls();
   setInventoryAppMenuActive(screen);

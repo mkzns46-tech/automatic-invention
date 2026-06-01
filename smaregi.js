@@ -165,21 +165,6 @@ function getSmaregiProgressHtml(){
     </div>`;
 }
 
-function getSmaregiGeneralProgressHtml(){
-  const stats=getSmaregiStats();
-  return `
-    <div class="smaregi-progress-card-inner">
-      <div class="smaregi-progress-main">チェック済み <span>${stats.completed} / ${stats.total}</span></div>
-      <div class="smaregi-progress-sub">除外 ${stats.excluded}　残り ${stats.unchecked}件</div>
-      <div class="smaregi-progress-area">
-        <div class="smaregi-progress-graph" role="progressbar" aria-label="棚卸進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stats.percent}">
-          <div class="smaregi-progress-fill" style="width:${stats.percent}%"></div>
-        </div>
-        <div class="smaregi-progress-text">進捗 ${stats.percent}%</div>
-      </div>
-    </div>`;
-}
-
 function updateSmaregiProgressGraph(){
   const stats=getSmaregiStats();
   const graph=el("smaregiProgressGraph");
@@ -219,8 +204,6 @@ function renderSmaregiStockChecks(){
   }
   const progress=el("smaregiProgressBadge");
   if(progress)progress.innerHTML=getSmaregiProgressHtml();
-  const generalProgress=el("inventoryGeneralProgressBadge");
-  if(generalProgress)generalProgress.innerHTML=getSmaregiGeneralProgressHtml();
   updateSmaregiProgressGraph();
   updateSmaregiManagerControls();
   const resetInput=el("resetSmaregiCompletedAtInput");
@@ -933,20 +916,6 @@ async function refreshSmaregiChecksFromSupabase(){
   renderSmaregiStockChecks();
 }
 
-async function loadLatestSmaregiProgressStateSilently(){
-  const snapshots=await sb("smaregi_stock_snapshots?select=*&order=imported_at.desc&limit=1");
-  smaregiSnapshot=Array.isArray(snapshots)&&snapshots.length ? snapshots[0] : null;
-  smaregiStockItems=[];
-  smaregiStockChecks=[];
-  if(smaregiSnapshot){
-    const snapshotId=encodeURIComponent(smaregiSnapshot.id);
-    smaregiStockItems=await sbAll(`smaregi_stock_items?select=*&snapshot_id=eq.${snapshotId}&order=product_name.asc`,1000,20000);
-    smaregiStockChecks=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=eq.${snapshotId}&order=checked_at.desc`,1000,20000);
-    await fetchProductsByBarcodes(smaregiStockItems.map(item=>item.barcode));
-  }
-  renderSmaregiStockChecks();
-}
-
 async function runWithSmaregiAutoRefreshPaused(task,{button=null,refresh=true}={}){
   if(smaregiMutationBusy)return false;
   smaregiMutationBusy=true;
@@ -972,13 +941,11 @@ async function runWithSmaregiAutoRefreshPaused(task,{button=null,refresh=true}={
 
 async function refreshSmaregiCheckStateSilently(){
   const smaregiVisible=!el("smaregiStockCheckCard")?.hidden;
-  const generalProgressVisible=!el("inventoryGeneralProgressCard")?.hidden;
-  if(smaregiMutationBusy||smaregiAutoRefreshBusy||(!smaregiVisible&&!generalProgressVisible))return;
+  if(smaregiMutationBusy||smaregiAutoRefreshBusy||!smaregiSnapshot||!smaregiVisible)return;
   smaregiAutoRefreshBusy=true;
   const focused=smaregiVisible ? getFocusedSmaregiInputState() : null;
   try{
-    if(smaregiSnapshot)await refreshSmaregiChecksFromSupabase();
-    else await loadLatestSmaregiProgressStateSilently();
+    await refreshSmaregiChecksFromSupabase();
     restoreFocusedSmaregiInputState(focused);
     if(!el("smaregiAccuracyPanel")?.hidden)await loadSmaregiAccuracy();
     console.log("[Smaregi Auto Refresh]",getSmaregiStats());
