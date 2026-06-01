@@ -14,22 +14,49 @@ window.addEventListener("unhandledrejection",(e)=>{
 const el=(id)=>document.getElementById(id);
 
 const INVENTORY_APP_MENU_ITEMS=[
-  {label:"在庫変動登録",href:"#inventoryRegistrationCard"},
-  {label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"},
-  {label:"商品データ取り込み",href:"#productImportCard"},
-  {label:"履歴",href:"#globalHistoryCard"},
-  {label:"分析",href:"#smaregiAccuracyPanel"},
-  {label:"ブース管理",disabled:true,title:"準備中"}
+  {key:"inventory",icon:"📦",label:"在庫変動登録",href:"#inventoryRegistrationCard"},
+  {key:"smaregi",icon:"🔄",label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"},
+  {key:"products",icon:"📥",label:"商品データ取込",href:"#productImportCard"},
+  {key:"history",icon:"📋",label:"履歴",href:"#globalHistoryCard"},
+  {key:"analytics",icon:"📊",label:"分析",href:"#smaregiAccuracyPanel"},
+  {key:"booth",icon:"🏪",label:"ブース管理",disabled:true,title:"準備中"}
 ];
+const INVENTORY_APP_MENU_FOOTER_ITEMS=[
+  {key:"settings",icon:"⚙",label:"設定",href:"#staffSettingsCard"},
+  {key:"logout",icon:"🚪",label:"ログアウト",action:"logout"}
+];
+
+function getInventoryAppMenuItemHtml(item){
+  const attrs=`class="inventory-app-menu-item" data-menu-key="${esc(item.key)}" ${item.disabled?"disabled":""} ${item.title?`title="${esc(item.title)}"`:""}`;
+  const body=`<span class="inventory-app-menu-icon" aria-hidden="true">${esc(item.icon||"")}</span><span>${esc(item.label)}</span>`;
+  if(item.href)return `<a ${attrs} href="${esc(item.href)}">${body}</a>`;
+  return `<button type="button" ${attrs} ${item.id?`id="${esc(item.id)}"`:""} data-menu-action="${esc(item.action||"")}">${body}</button>`;
+}
 
 function renderInventoryAppMenu(){
   const menu=el("inventoryAppMenu");
   if(!menu)return;
   menu.hidden=false;
-  menu.innerHTML=INVENTORY_APP_MENU_ITEMS.map(item=>{
-    if(item.href)return `<a class="inventory-app-menu-item" href="${esc(item.href)}">${esc(item.label)}</a>`;
-    return `<button type="button" class="inventory-app-menu-item" ${item.id?`id="${esc(item.id)}"`:""} ${item.disabled?"disabled":""} ${item.title?`title="${esc(item.title)}"`:""}>${esc(item.label)}</button>`;
-  }).join("");
+  menu.innerHTML=`
+    <div class="inventory-app-menu-main">${INVENTORY_APP_MENU_ITEMS.map(getInventoryAppMenuItemHtml).join("")}</div>
+    <div class="inventory-app-menu-footer">${INVENTORY_APP_MENU_FOOTER_ITEMS.map(getInventoryAppMenuItemHtml).join("")}</div>`;
+  menu.querySelectorAll(".inventory-app-menu-item[href]").forEach(link=>{
+    link.addEventListener("click",()=>setInventoryAppMenuActive(link.dataset.menuKey));
+  });
+  const logoutButton=menu.querySelector('[data-menu-action="logout"]');
+  if(logoutButton)logoutButton.addEventListener("click",logout);
+  setInventoryAppMenuActive("inventory");
+}
+
+function setInventoryAppMenuActive(key){
+  const menu=el("inventoryAppMenu");
+  if(!menu)return;
+  menu.querySelectorAll(".inventory-app-menu-item").forEach(item=>{
+    const active=item.dataset.menuKey===key;
+    item.classList.toggle("is-active",active);
+    if(active)item.setAttribute("aria-current","page");
+    else item.removeAttribute("aria-current");
+  });
 }
 
 

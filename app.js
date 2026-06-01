@@ -154,6 +154,7 @@ async function showSmaregiStockCheck(){
   if(!card||!main)return;
   main.classList.add("smaregi-mode");
   card.hidden=false;
+  setInventoryAppMenuActive("smaregi");
   const toggle=el("openSmaregiStockCheckBtn");
   if(toggle)toggle.textContent="在庫確認に戻る";
   renderSmaregiStockChecks();
@@ -171,6 +172,7 @@ function hideSmaregiStockCheck(){
   if(el("smaregiDiffOnlyPanel"))el("smaregiDiffOnlyPanel").hidden=true;
   if(el("smaregiReasonSummaryPanel"))el("smaregiReasonSummaryPanel").hidden=true;
   main.classList.remove("smaregi-mode");
+  setInventoryAppMenuActive("inventory");
   stopSmaregiAutoRefresh();
   const toggle=el("openSmaregiStockCheckBtn");
   if(toggle)toggle.textContent="スマレジ変動商品チェック";

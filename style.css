@@ -2757,33 +2757,73 @@ td small{margin-top:4px;color:#527161}
 }
 
 /* ===== sales inventory application menu ===== */
+.inventory-app-layout{
+  display:grid;
+  grid-template-columns:238px minmax(0,1fr);
+  gap:18px;
+  align-items:start;
+}
+.inventory-sidebar{
+  position:sticky;
+  top:12px;
+  min-height:calc(100vh - 24px);
+  padding:14px 10px;
+  border:1px solid #d9e5dd;
+  border-radius:16px;
+  background:#fff;
+  box-shadow:0 4px 20px rgba(27,67,50,.06);
+}
 .inventory-app-menu{
   display:flex !important;
-  flex-wrap:wrap;
-  gap:12px;
-  margin:14px 0 18px;
+  min-height:calc(100vh - 54px);
+  flex-direction:column;
+  justify-content:space-between;
+  gap:20px;
   visibility:visible !important;
 }
+.inventory-app-menu-main,
+.inventory-app-menu-footer{
+  display:grid;
+  gap:5px;
+}
+.inventory-app-menu-footer{
+  padding-top:12px;
+  border-top:1px solid #e5e7eb;
+}
 .inventory-app-menu-item{
-  display:inline-flex;
+  display:flex;
   align-items:center;
-  width:auto;
-  min-height:42px;
+  gap:10px;
+  width:100%;
+  min-height:48px;
   margin:0;
-  padding:9px 13px;
-  border:1px solid #d9e5dd;
-  border-radius:10px;
-  background:#f8fffb;
+  padding:10px 11px;
+  border:1px solid transparent;
+  border-radius:11px;
+  background:#fff;
   color:#1b4332;
   font-size:13px;
   font-weight:800;
   line-height:1.35;
   text-align:left;
   text-decoration:none;
-  box-shadow:0 4px 14px rgba(27,67,50,.06);
+  box-shadow:none;
 }
 .inventory-app-menu-item:hover{
-  background:#dcebe1;
+  background:#f0f7f2;
+}
+.inventory-app-menu-item.is-active{
+  border-color:#d8eee0;
+  background:#eaf6ee;
+  color:#0b5d40;
+}
+.inventory-app-menu-icon{
+  flex:0 0 22px;
+  width:22px;
+  color:#0b5d40;
+  font-size:17px;
+  line-height:1;
+  text-align:center;
 }
 .inventory-app-menu-item:disabled{
   background:#f3f4f6;
@@ -2791,14 +2831,45 @@ td small{margin-top:4px;color:#527161}
   cursor:not-allowed;
 }
 @media(max-width:800px){
+  .inventory-app-layout{
+    display:block;
+  }
+  .inventory-sidebar{
+    position:sticky;
+    top:0;
+    z-index:80;
+    min-height:0;
+    margin-bottom:12px;
+    padding:8px;
+    border-radius:12px;
+  }
   .inventory-app-menu{
+    display:flex !important;
+    min-height:0;
+    flex-direction:row;
+    justify-content:flex-start;
     gap:8px;
-    margin:10px 0 14px;
+    overflow-x:auto;
+    padding-bottom:4px;
+    scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch;
+  }
+  .inventory-app-menu-main,
+  .inventory-app-menu-footer{
+    display:flex;
+    flex:0 0 auto;
+    gap:8px;
+    padding:0;
+    border:0;
   }
   .inventory-app-menu-item{
-    flex:1 1 calc(50% - 8px);
-    padding:8px;
+    flex:0 0 auto;
+    width:auto;
+    min-height:42px;
+    padding:8px 10px;
     font-size:12px;
+    white-space:nowrap;
+    scroll-snap-align:start;
   }
 }
 
