@@ -197,6 +197,43 @@ function formatPercent(value,digits=1){
   return `${Number(value||0).toFixed(digits)}%`;
 }
 
+function getSmaregiAccuracyMonthlyTrend(historical,monthCount=6){
+  const rows=[];
+  for(let offset=-(monthCount-1);offset<=0;offset+=1){
+    const range=getMonthRange(offset);
+    const current=calculateSmaregiAccuracy(historical,range);
+    if(!current.checkedCount)continue;
+    const previous=calculateSmaregiAccuracy(historical,getMonthRange(offset-1));
+    const month=new Date(range.fromTime);
+    rows.push({
+      ...current,
+      year:month.getFullYear(),
+      month:month.getMonth()+1,
+      change:previous.checkedCount ? current.accuracy-previous.accuracy : null
+    });
+  }
+  return rows;
+}
+
+function renderSmaregiAccuracyMonthlyTrend(rows){
+  const list=el("smaregiAccuracyMonthlyTrend");
+  if(!list)return;
+  list.innerHTML=rows.length
+    ? rows.map(row=>`
+      <div class="smaregi-accuracy-trend-row">
+        <div class="smaregi-accuracy-trend-heading">
+          <strong>${row.year}年${row.month}月</strong>
+          <span>チェック ${row.checkedCount}件 / 差異 ${row.differenceCount}件</span>
+        </div>
+        <div class="smaregi-accuracy-trend-values">
+          <strong>${formatPercent(row.accuracy)}</strong>
+          <span class="${row.change===null?"":(row.change>=0?"is-improved":"is-worse")}">前月比 ${row.change===null?"-":`${row.change>=0?"+":""}${row.change.toFixed(1)}%`}</span>
+        </div>
+        <div class="smaregi-accuracy-trend-bar"><div style="width:${Math.max(0,Math.min(100,row.accuracy))}%"></div></div>
+      </div>`).join("")
+    : '<div class="smaregi-empty">直近6ヶ月の棚卸精度データはありません。</div>';
+}
+
 async function loadSmaregiAccuracy(){
   if(!inventoryAuthReady)return;
   const panel=el("smaregiAccuracyPanel");
@@ -206,6 +243,7 @@ async function loadSmaregiAccuracy(){
     const historical=await loadSmaregiHistoricalDifferenceRows();
     const current=calculateSmaregiAccuracy(historical,getMonthRange(0));
     const previous=calculateSmaregiAccuracy(historical,getMonthRange(-1));
+    renderSmaregiAccuracyMonthlyTrend(getSmaregiAccuracyMonthlyTrend(historical));
     const change=current.accuracy-previous.accuracy;
     if(el("smaregiAccuracyChecked"))el("smaregiAccuracyChecked").textContent=`${current.checkedCount}件`;
     if(el("smaregiAccuracyDifference"))el("smaregiAccuracyDifference").textContent=`${current.differenceCount}件`;

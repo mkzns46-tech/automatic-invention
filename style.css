@@ -2626,6 +2626,66 @@ td small{margin-top:4px;color:#527161}
   font-weight:800;
 }
 
+/* ===== monthly inventory accuracy trend ===== */
+.smaregi-accuracy-trend{
+  margin-top:16px;
+  padding-top:14px;
+  border-top:1px solid #e5e7eb;
+}
+.smaregi-accuracy-trend h3{
+  margin:0 0 10px;
+  color:#1b4332;
+  font-size:15px;
+}
+.smaregi-accuracy-trend-list{
+  display:grid;
+  gap:10px;
+}
+.smaregi-accuracy-trend-row{
+  display:grid;
+  grid-template-columns:minmax(170px,1fr) auto;
+  gap:8px 12px;
+  padding:10px 12px;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  background:#fffdf5;
+}
+.smaregi-accuracy-trend-heading span,
+.smaregi-accuracy-trend-values span{
+  display:block;
+  margin-top:3px;
+  color:#6b7280;
+  font-size:12px;
+  font-weight:700;
+}
+.smaregi-accuracy-trend-values{
+  text-align:right;
+}
+.smaregi-accuracy-trend-values strong{
+  color:#1b4332;
+  font-size:18px;
+}
+.smaregi-accuracy-trend-bar{
+  grid-column:1 / -1;
+  height:14px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#f3f4f6;
+}
+.smaregi-accuracy-trend-bar div{
+  height:100%;
+  border-radius:999px;
+  background:#facc15;
+}
+@media(max-width:800px){
+  .smaregi-accuracy-trend-row{
+    grid-template-columns:1fr;
+  }
+  .smaregi-accuracy-trend-values{
+    text-align:left;
+  }
+}
+
 /* ===== emergency mobile Smaregi cards ===== */
 @media(max-width:800px){
   .smaregi-stock-check-section .table-wrap{
