@@ -31,6 +31,14 @@
 `supabase_inventory_logs_update_policy.sql` を Supabase で実行してください。
 公開キーからの `inventory_logs` 更新を許可するUPDATEポリシーを追加します。
 
+## 簡易ログイン認証
+
+ポータルから在庫アプリへ渡すワンタイムトークンを検証するため、
+`supabase_portal_session_auth.sql` を Supabase で実行してください。
+
+在庫アプリへ直接アクセスした場合はポータルのログイン画面へ戻ります。
+ログイン後の認証有効期限は12時間です。
+
 ## Vercel 環境変数
 
 `api/smaregi-products.js` はスマレジ POS API の `GET /products` を利用します。
