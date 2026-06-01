@@ -16,16 +16,15 @@ const el=(id)=>document.getElementById(id);
 const INVENTORY_APP_MENU_ITEMS=[
   {key:"inventory",label:"在庫変動登録",action:"inventory"},
   {key:"smaregi",label:"変動商品チェック",id:"openSmaregiStockCheckBtn"},
-  {key:"booth",label:"ブース管理",action:"booth",title:"準備中"},
-  {key:"analytics",label:"分析",action:"analytics"}
+  {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
 ];
 const INVENTORY_APP_MENU_FOOTER_ITEMS=[
+  {key:"analytics",label:"分析",action:"analytics"},
   {key:"portal",label:"トップへ戻る",action:"portal"},
   {key:"settings",label:"設定",action:"settings"},
   {key:"logout",label:"ログアウト",action:"logout"}
 ];
-const INVENTORY_SETTINGS_PASSWORD="S3edc##530.";
-const INVENTORY_ANALYTICS_PASSWORD="S3edc##530.";
+const INVENTORY_ADMIN_PASSWORD="S3edc##530.";
 const INVENTORY_SETTINGS_UNLOCK_KEY="arico_inventory_settings_unlocked";
 const INVENTORY_ANALYTICS_UNLOCK_KEY="arico_inventory_analytics_unlocked";
 
@@ -101,8 +100,7 @@ function unlockInventoryScreen(screen){
   const unlocked=isSettings ? hasInventorySettingsAccess() : hasInventoryAnalyticsAccess();
   if(unlocked)return true;
   const password=prompt(`${isSettings?"設定":"分析"}画面のパスワードを入力してください。`);
-  const expected=isSettings ? INVENTORY_SETTINGS_PASSWORD : INVENTORY_ANALYTICS_PASSWORD;
-  if(password!==expected){
+  if(String(password||"").trim()!==INVENTORY_ADMIN_PASSWORD){
     if(password!==null)showPopup("認証エラー","パスワードが違います。");
     return false;
   }

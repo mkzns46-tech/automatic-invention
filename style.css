@@ -3137,3 +3137,28 @@ header h1{
   grid-column:1 / -1 !important;
   width:100% !important;
 }
+
+/* ===== final screen cleanup ===== */
+.inventory-app-layout > .grid{
+  display:grid !important;
+  grid-template-columns:1fr !important;
+}
+.inventory-app-layout > .grid > section[hidden]{
+  display:none !important;
+}
+body[data-inventory-screen="analytics"] #smaregiAccuracyPanel:not([hidden]),
+body[data-inventory-screen="analytics"] #productHistoryCard:not([hidden]),
+body[data-inventory-screen="analytics"] #globalHistoryCard:not([hidden]),
+body[data-inventory-screen="analytics"] #smaregiDiffOnlyPanel:not([hidden]),
+body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden]),
+body[data-inventory-screen="settings"] #staffSettingsCard:not([hidden]),
+body[data-inventory-screen="settings"] #productImportCard:not([hidden]){
+  display:block !important;
+  grid-column:1 / -1 !important;
+  width:100% !important;
+  max-width:none !important;
+}
+.inventory-app-menu-footer{
+  display:grid !important;
+  gap:5px !important;
+}
