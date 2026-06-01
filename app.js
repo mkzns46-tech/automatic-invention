@@ -3361,7 +3361,6 @@ async function showSmaregiStockCheck(){
   startSmaregiAutoRefresh();
   window.scrollTo({top:0,behavior:"smooth"});
   await loadLatestSmaregiSnapshot();
-  if(el("smaregiAccuracyPanel"))el("smaregiAccuracyPanel").hidden=false;
   await loadSmaregiAccuracy();
 }
 
@@ -3370,7 +3369,6 @@ function hideSmaregiStockCheck(){
   const main=document.querySelector("main.grid");
   if(!card||!main)return;
   card.hidden=true;
-  if(el("smaregiAccuracyPanel"))el("smaregiAccuracyPanel").hidden=true;
   if(el("smaregiDiffOnlyPanel"))el("smaregiDiffOnlyPanel").hidden=true;
   if(el("smaregiReasonSummaryPanel"))el("smaregiReasonSummaryPanel").hidden=true;
   main.classList.remove("smaregi-mode");
@@ -3417,6 +3415,7 @@ function bindSmaregiStockCheckEvents(){
   renderSmaregiStockChecks();
 }
 window.addEventListener("DOMContentLoaded",bindSmaregiStockCheckEvents);
+window.addEventListener("DOMContentLoaded",loadSmaregiAccuracy);
 
 /* v71 popup close fallback */
 window.addEventListener("DOMContentLoaded",()=>{

@@ -1745,6 +1745,36 @@ td small{margin-top:4px;color:#527161}
   }
 }
 
+/* ===== v107 accuracy card beside product import ===== */
+.smaregi-accuracy-card{
+  min-height:100%;
+  background:#fff;
+  border:1px solid var(--border);
+  box-shadow:0 6px 22px #1b43320d;
+}
+.smaregi-accuracy-compact{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(100px,140px) minmax(100px,140px);
+  gap:10px;
+  align-items:stretch;
+}
+.smaregi-accuracy-compact .smaregi-accuracy-main,
+.smaregi-accuracy-compact .smaregi-accuracy-metric{
+  min-height:104px;
+}
+@media(max-width:800px){
+  .csv-admin-section,
+  #smaregiAccuracyPanel{
+    display:block !important;
+  }
+  .smaregi-accuracy-compact{
+    grid-template-columns:1fr 1fr;
+  }
+  .smaregi-accuracy-compact .smaregi-accuracy-main{
+    grid-column:1 / -1;
+  }
+}
+
 /* ===== v106 product import + accuracy card ===== */
 .csv-admin-section #importSmaregiProductsBtn{
   margin-top:16px;
