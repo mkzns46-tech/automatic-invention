@@ -1690,6 +1690,43 @@ td small{margin-top:4px;color:#527161}
   white-space:nowrap !important;
 }
 
+/* ===== v103 difference reason record / summary ===== */
+.smaregi-date-filter{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,220px));
+  gap:12px;
+  align-items:end;
+  margin:12px 0;
+}
+.smaregi-date-filter label{margin:0}
+.smaregi-reason-form{
+  display:grid;
+  grid-template-columns:minmax(180px,260px) minmax(240px,1fr) 120px;
+  gap:10px;
+  align-items:end;
+  padding:12px;
+  margin:12px 0;
+  border:1px solid #cfe6d7;
+  border-radius:12px;
+  background:#f8fffb;
+}
+.smaregi-reason-form label{margin:0}
+.smaregi-reason-form button{margin:0}
+.smaregi-reason-note{
+  display:block;
+  margin-top:5px;
+  max-width:105px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  color:#527161;
+  font-size:11px;
+  font-weight:700;
+}
+@media(max-width:800px){
+  .smaregi-date-filter,
+  .smaregi-reason-form{grid-template-columns:1fr}
+}
+
 /* ===== v99 difference action column ===== */
 .smaregi-diff-table th:last-child,
 .smaregi-diff-table td:last-child{
@@ -2264,7 +2301,7 @@ td small{margin-top:4px;color:#527161}
   margin-top:4px;
   font-size:13px;
   font-weight:700;
-  color:#d8f3dc;
+  color:var(--main-dark);
 }
 
 /* ===== emergency mobile Smaregi cards ===== */

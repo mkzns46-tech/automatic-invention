@@ -2131,9 +2131,11 @@ let smaregiSnapshot=null;
 let smaregiStockItems=[];
 let smaregiStockChecks=[];
 const SMAREGI_MANAGER_NAME="田中";
+const SMAREGI_DIFFERENCE_REASON_CATEGORIES=["入力ミス","出荷処理漏れ","入荷処理漏れ","備品転用","サンプル使用","商品持ち出し","返品処理漏れ","スマレジ登録ミス","棚違い","不明"];
 let smaregiAutoRefreshTimer=null;
 let smaregiAutoRefreshBusy=false;
 let smaregiMutationBusy=false;
+let smaregiReasonSummaryRows=[];
 
 function getSmaregiCheck(barcode){
   const matches=(smaregiStockChecks||[]).filter(c=>String(c.barcode)===String(barcode));
@@ -2219,6 +2221,7 @@ function updateSmaregiManagerControls(){
   const complete=el("completeSmaregiStockCheckBtn");
   const differenceCsv=el("exportSmaregiDifferenceCsvBtn");
   const diffList=el("showSmaregiDiffListBtn");
+  const reasonSummary=el("showSmaregiReasonSummaryBtn");
   const reset=el("resetSmaregiCompletionBtn");
   if(sync){
     sync.disabled=!manager;
@@ -2245,9 +2248,19 @@ function updateSmaregiManagerControls(){
     diffList.classList.add("smaregi-manager-control");
     diffList.textContent="今回の差異一覧";
   }
+  if(reasonSummary){
+    reasonSummary.disabled=!manager;
+    reasonSummary.hidden=!manager;
+    reasonSummary.style.display=manager ? "" : "none";
+    reasonSummary.classList.add("smaregi-manager-control");
+  }
   const diffPanel=el("smaregiDiffOnlyPanel");
   if(diffPanel&&!manager){
     diffPanel.hidden=true;
+  }
+  const reasonSummaryPanel=el("smaregiReasonSummaryPanel");
+  if(reasonSummaryPanel&&!manager){
+    reasonSummaryPanel.hidden=true;
   }
   if(reset){
     reset.disabled=!manager;
@@ -2454,7 +2467,7 @@ function renderSmaregiDiffOnlyPanel(){
       <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
       <td>${esc(getSmaregiDisplayCheckedBy(check))}</td>
       <td>${check?.checked_at ? fmt(check.checked_at) : ""}</td>
-      <td><div class="diff-action-group"><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${esc(item.barcode)}">原因</button><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">保存</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${esc(item.barcode)}">問題なし</button></div></td>
+      <td><div class="diff-action-group"><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${esc(item.barcode)}">原因</button><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">保存</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${esc(item.barcode)}">問題なし</button>${check?.difference_reason_category?`<small class="smaregi-reason-note" title="${esc(check.difference_reason_memo||"")}">${esc(check.difference_reason_category)}</small>`:""}</div></td>
     </tr>`;
   }).join("");
   body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
@@ -2775,6 +2788,10 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
       no_issue_by:previousCheck?.no_issue_by||null,
       no_issue_at:previousCheck?.no_issue_at||null,
       no_issue_reason:previousCheck?.no_issue_reason||"",
+      difference_reason_category:previousCheck?.difference_reason_category||null,
+      difference_reason_memo:previousCheck?.difference_reason_memo||"",
+      difference_reason_by:previousCheck?.difference_reason_by||null,
+      difference_reason_at:previousCheck?.difference_reason_at||null,
       actual_corrected:correctedNow||previousCheck?.actual_corrected===true,
       actual_corrected_by:correctedNow ? checked_by : (previousCheck?.actual_corrected_by||null),
       actual_corrected_at:correctedNow ? checked_at : (previousCheck?.actual_corrected_at||null)
@@ -2847,6 +2864,10 @@ async function excludeSmaregiStockItem(barcode){
       no_issue_by:old?.no_issue_by||null,
       no_issue_at:old?.no_issue_at||null,
       no_issue_reason:old?.no_issue_reason||"",
+      difference_reason_category:old?.difference_reason_category||null,
+      difference_reason_memo:old?.difference_reason_memo||"",
+      difference_reason_by:old?.difference_reason_by||null,
+      difference_reason_at:old?.difference_reason_at||null,
       actual_corrected:old?.actual_corrected===true,
       actual_corrected_by:old?.actual_corrected_by||null,
       actual_corrected_at:old?.actual_corrected_at||null
@@ -2922,7 +2943,7 @@ function getSmaregiCsvStatus(check,difference){
 }
 
 function smaregiCsvRows(differenceOnly=false){
-  const rows=[["商品コード","商品名","スマレジ在庫数","シート在庫数","実在庫数","スマレジ差異","担当者","チェック日時","チェック済み状態"]];
+  const rows=[["商品コード","商品名","スマレジ在庫数","シート在庫数","実在庫数","スマレジ差異","担当者","チェック日時","チェック済み状態","原因カテゴリ","原因メモ","原因記入者","原因記入日時"]];
   smaregiStockItems.forEach(item=>{
     const check=getSmaregiCheck(item.barcode);
     const difference=check ? getSmaregiDifference(item) : "";
@@ -2939,13 +2960,75 @@ function smaregiCsvRows(differenceOnly=false){
       difference,
       getSmaregiDisplayCheckedBy(check),
       check?.checked_at ? fmt(check.checked_at) : "",
-      getSmaregiCsvStatus(check,difference)
+    getSmaregiCsvStatus(check,difference),
+    check?.difference_reason_category||"",
+    check?.difference_reason_memo||"",
+    check?.difference_reason_by||"",
+    check?.difference_reason_at ? fmt(check.difference_reason_at) : ""
     ]);
   });
   return rows;
 }
 
-function exportSmaregiCheckCsv(differenceOnly=false){
+function getSmaregiDifferenceDateRange(){
+  const from=String(el("smaregiDifferenceFromDate")?.value||"").trim();
+  const to=String(el("smaregiDifferenceToDate")?.value||"").trim();
+  return {
+    from,
+    to,
+    fromTime:from ? new Date(`${from}T00:00:00`).getTime() : null,
+    toTime:to ? new Date(`${to}T23:59:59.999`).getTime() : null
+  };
+}
+
+function isInSmaregiDifferenceDateRange(value,range=getSmaregiDifferenceDateRange()){
+  const time=new Date(value).getTime();
+  if(!Number.isFinite(time))return false;
+  if(Number.isFinite(range.fromTime)&&time<range.fromTime)return false;
+  if(Number.isFinite(range.toTime)&&time>range.toTime)return false;
+  return true;
+}
+
+async function loadSmaregiHistoricalDifferenceRows(){
+  const checks=await sbAll("smaregi_stock_checks?select=*&order=checked_at.desc",1000,50000);
+  const items=await sbAll("smaregi_stock_items?select=*",1000,50000);
+  const itemMap=new Map(items.map(item=>[`${item.snapshot_id}::${item.barcode}`,item]));
+  return checks.map(check=>{
+    const item=itemMap.get(`${check.snapshot_id}::${check.barcode}`)||{};
+    const difference=check.difference===null||check.difference===undefined||String(check.difference)===""
+      ? calculateSmaregiDifference(item.smaregi_stock,check.actual_stock)
+      : Number(check.difference);
+    return {check,item,difference};
+  });
+}
+
+async function smaregiHistoricalDifferenceCsvRows(){
+  const range=getSmaregiDifferenceDateRange();
+  const historical=await loadSmaregiHistoricalDifferenceRows();
+  const rows=[["チェック日時","商品コード","バーコード","商品名","スマレジ在庫","実在庫","差異","担当者","状態","原因カテゴリ","原因メモ","原因記入者","原因記入日時"]];
+  historical.forEach(({check,item,difference})=>{
+    if(!isInSmaregiDifferenceDateRange(check.checked_at,range))return;
+    if(isSmaregiExcludedCheck(check)||check.no_issue===true||difference===0||!Number.isFinite(difference))return;
+    rows.push([
+      check.checked_at ? fmt(check.checked_at) : "",
+      item.product_code||item.productCode||check.barcode||"",
+      check.barcode||"",
+      item.product_name||item.productName||"",
+      item.smaregi_stock??"",
+      check.actual_stock??"",
+      difference,
+      getSmaregiDisplayCheckedBy(check),
+      getSmaregiCsvStatus(check,difference),
+      check.difference_reason_category||"",
+      check.difference_reason_memo||"",
+      check.difference_reason_by||"",
+      check.difference_reason_at ? fmt(check.difference_reason_at) : ""
+    ]);
+  });
+  return rows;
+}
+
+async function exportSmaregiCheckCsv(differenceOnly=false){
   if(differenceOnly&&!isSmaregiManager()){
     showMessage("差異のみCSVは責任者「田中」のみダウンロードできます。","err");
     return;
@@ -2954,9 +3037,13 @@ function exportSmaregiCheckCsv(differenceOnly=false){
     showMessage("出力するスマレジ在庫がありません。","err");
     return;
   }
-  const rows=smaregiCsvRows(differenceOnly);
-  downloadCsvFile(differenceOnly?"smaregi_stock_difference_only.csv":"smaregi_stock_check_all.csv",rows);
-  showMessage(`${differenceOnly?"差異のみ":"全体"}CSVを出力しました：${rows.length-1}件`,"ok");
+  try{
+    const rows=differenceOnly ? await smaregiHistoricalDifferenceCsvRows() : smaregiCsvRows(false);
+    downloadCsvFile(differenceOnly?"smaregi_stock_difference_only.csv":"smaregi_stock_check_all.csv",rows);
+    showMessage(`${differenceOnly?"差異のみ":"全体"}CSVを出力しました：${rows.length-1}件`,"ok");
+  }catch(e){
+    showMessage("差異CSV出力エラー。\n"+e.message,"err");
+  }
 }
 
 function hasSmaregiChangeBefore(log,smaregiChanges){
@@ -3053,6 +3140,19 @@ async function showSmaregiCauseDetail(barcode){
         <div><strong>担当者</strong><span>${esc(check?.checked_by||"")}</span></div>
         <div><strong>チェック日時</strong><span>${check?.checked_at?fmt(check.checked_at):""}</span></div>
       </div>
+      <div class="smaregi-reason-form">
+        <label>原因カテゴリ
+          <select id="smaregiDifferenceReasonCategory">
+            <option value="">選択してください</option>
+            ${SMAREGI_DIFFERENCE_REASON_CATEGORIES.map(category=>`<option value="${esc(category)}" ${check?.difference_reason_category===category?"selected":""}>${esc(category)}</option>`).join("")}
+          </select>
+        </label>
+        <label>原因メモ
+          <input id="smaregiDifferenceReasonMemo" value="${esc(check?.difference_reason_memo||"")}" placeholder="状況や再発防止に必要な補足を入力"/>
+        </label>
+        <button type="button" id="saveSmaregiDifferenceReasonBtn">原因を保存</button>
+      </div>
+      <p class="section-note">原因記入者：${esc(check?.difference_reason_by||"未記入")} / 原因記入日時：${check?.difference_reason_at?fmt(check.difference_reason_at):"未記入"}</p>
       <h3>在庫管理シート側の履歴</h3>
       <p class="section-note">前回チェック以降の履歴のみ表示します。赤い行は調査優先です。通常はスマレジ変動の後にシート在庫が動きます。</p>
       <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>数量</th><th>担当者</th><th>備考</th><th>処理後在庫</th></tr></thead><tbody>${buildSmaregiAppHistoryRows(appLogs,barcode,smaregiChanges)||'<tr><td colspan="6">履歴なし</td></tr>'}</tbody></table></div>
@@ -3060,11 +3160,108 @@ async function showSmaregiCauseDetail(barcode){
       <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>数量</th><th>在庫数</th><th>理由・備考</th></tr></thead><tbody>${buildSmaregiChangeRows(smaregiChanges,appLogs)||'<tr><td colspan="5">取得可能なスマレジ履歴はありません。</td></tr>'}</tbody></table></div>
     `;
     el("closeSmaregiCauseDetailBtn").onclick=()=>{detail.hidden=true;detail.innerHTML="";};
+    el("saveSmaregiDifferenceReasonBtn").onclick=e=>saveSmaregiDifferenceReason(barcode,e.currentTarget);
     showMessage(`原因確認を表示しました：${item.product_name||barcode}`,"ok");
     detail.scrollIntoView({behavior:"smooth",block:"start"});
   }catch(e){
     detail.innerHTML=`<div class="message err">原因確認データ取得エラー。\n${esc(e.message)}</div>`;
     showMessage("原因確認データ取得エラー。\n"+e.message,"err");
+  }
+}
+
+async function saveSmaregiDifferenceReason(barcode,button=null){
+  if(!isSmaregiManager()){
+    showMessage("原因登録は責任者のみ操作できます。","err");
+    return;
+  }
+  const check=getSmaregiCheck(barcode);
+  if(!smaregiSnapshot||!check){
+    showMessage("原因を記入する差異データが見つかりません。","err");
+    return;
+  }
+  const difference_reason_category=String(el("smaregiDifferenceReasonCategory")?.value||"").trim();
+  const difference_reason_memo=String(el("smaregiDifferenceReasonMemo")?.value||"").trim();
+  const difference_reason_by=getSmaregiCheckerName();
+  if(!difference_reason_category){
+    showMessage("原因カテゴリを選択してください。","err");
+    el("smaregiDifferenceReasonCategory")?.focus();
+    return;
+  }
+  if(!difference_reason_by){
+    showMessage("担当者を選択してください。","err");
+    el("smaregiCheckerName")?.focus();
+    return;
+  }
+  await runWithSmaregiAutoRefreshPaused(async()=>{
+    const difference_reason_at=new Date().toISOString();
+    try{
+      await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({difference_reason_category,difference_reason_memo,difference_reason_by,difference_reason_at})
+      });
+      Object.assign(check,{difference_reason_category,difference_reason_memo,difference_reason_by,difference_reason_at});
+      showMessage(`差異原因を保存しました：${difference_reason_category}`,"ok");
+      await showSmaregiCauseDetail(barcode);
+    }catch(e){
+      showMessage("差異原因保存エラー。\n追加SQLを実行済みか確認してください。\n"+e.message,"err");
+    }
+  },{button});
+}
+
+function getSmaregiReasonSummaryRows(historical,range=getSmaregiDifferenceDateRange()){
+  const grouped=new Map();
+  historical.forEach(({check,difference})=>{
+    if(!isInSmaregiDifferenceDateRange(check.checked_at,range))return;
+    if(isSmaregiExcludedCheck(check)||check.no_issue===true||difference===0||!Number.isFinite(difference))return;
+    const category=String(check.difference_reason_category||"未記入");
+    const current=grouped.get(category)||{category,count:0,differenceTotal:0};
+    current.count+=1;
+    current.differenceTotal+=Math.abs(difference);
+    grouped.set(category,current);
+  });
+  return [...grouped.values()].sort((a,b)=>b.count-a.count||b.differenceTotal-a.differenceTotal||a.category.localeCompare(b.category,"ja"));
+}
+
+function renderSmaregiReasonSummary(){
+  const body=el("smaregiReasonSummaryBody");
+  const message=el("smaregiReasonSummaryMessage");
+  if(!body)return;
+  body.innerHTML=smaregiReasonSummaryRows.length
+    ? smaregiReasonSummaryRows.map(row=>`<tr><td>${esc(row.category)}</td><td>${row.count}件</td><td>${row.differenceTotal}</td></tr>`).join("")
+    : '<tr><td colspan="3" class="smaregi-empty">指定期間内の差異原因はありません。</td></tr>';
+  if(message)message.textContent=`原因カテゴリ：${smaregiReasonSummaryRows.length}件`;
+}
+
+async function showSmaregiReasonSummary(){
+  if(!isSmaregiManager()){
+    showMessage("差異原因集計は責任者のみ確認できます。","err");
+    return;
+  }
+  const panel=el("smaregiReasonSummaryPanel");
+  if(!panel)return;
+  panel.hidden=false;
+  const message=el("smaregiReasonSummaryMessage");
+  if(message)message.textContent="差異原因を集計中...";
+  try{
+    smaregiReasonSummaryRows=getSmaregiReasonSummaryRows(await loadSmaregiHistoricalDifferenceRows());
+    renderSmaregiReasonSummary();
+    panel.scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(e){
+    if(message)message.textContent="差異原因集計エラー。\n"+e.message;
+  }
+}
+
+async function exportSmaregiReasonSummaryCsv(){
+  try{
+    smaregiReasonSummaryRows=getSmaregiReasonSummaryRows(await loadSmaregiHistoricalDifferenceRows());
+    renderSmaregiReasonSummary();
+    const rows=[["原因カテゴリ","件数","差異数量合計"]];
+    smaregiReasonSummaryRows.forEach(row=>rows.push([row.category,row.count,row.differenceTotal]));
+    downloadCsvFile("smaregi_difference_reason_summary.csv",rows);
+    showMessage(`差異原因集計CSVを出力しました：${rows.length-1}件`,"ok");
+  }catch(e){
+    showMessage("差異原因集計CSV出力エラー。\n"+e.message,"err");
   }
 }
 
@@ -3164,6 +3361,12 @@ function goToPortal(){
 }
 
 function bindSmaregiStockCheckEvents(){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,"0");
+  const today=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  const monthStart=`${now.getFullYear()}-${pad(now.getMonth()+1)}-01`;
+  if(el("smaregiDifferenceFromDate")&&!el("smaregiDifferenceFromDate").value)el("smaregiDifferenceFromDate").value=monthStart;
+  if(el("smaregiDifferenceToDate")&&!el("smaregiDifferenceToDate").value)el("smaregiDifferenceToDate").value=today;
   on("openSmaregiStockCheckBtn","click",toggleSmaregiStockCheck);
   on("portalTopBtn","click",goToPortal);
   on("syncSmaregiStockBtn","click",e=>runWithSmaregiAutoRefreshPaused(syncSmaregiStockFromApi,{button:e.currentTarget}));
@@ -3173,6 +3376,10 @@ function bindSmaregiStockCheckEvents(){
   on("completeSmaregiStockCheckBtn","click",e=>runWithSmaregiAutoRefreshPaused(completeSmaregiStockCheck,{button:e.currentTarget}));
   on("resetSmaregiCompletionBtn","click",e=>runWithSmaregiAutoRefreshPaused(resetSmaregiStockCheckCompletion,{button:e.currentTarget}));
   on("showSmaregiDiffListBtn","click",showSmaregiDiffOnlyPanel);
+  on("showSmaregiReasonSummaryBtn","click",showSmaregiReasonSummary);
+  on("exportSmaregiReasonSummaryCsvBtn","click",exportSmaregiReasonSummaryCsv);
+  on("smaregiDifferenceFromDate","change",()=>{if(!el("smaregiReasonSummaryPanel")?.hidden)showSmaregiReasonSummary();});
+  on("smaregiDifferenceToDate","change",()=>{if(!el("smaregiReasonSummaryPanel")?.hidden)showSmaregiReasonSummary();});
   on("smaregiCheckerName","change",e=>{
     localStorage.setItem("arico_smaregi_checker",e.target.value||"");
     updateSmaregiManagerControls();

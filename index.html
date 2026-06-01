@@ -79,7 +79,12 @@
     <button type="button" id="showSmaregiDiffListBtn" class="secondary">今回の差異一覧</button>
     <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
     <button type="button" id="exportSmaregiDifferenceCsvBtn" class="secondary">差異のみCSV</button>
+    <button type="button" id="showSmaregiReasonSummaryBtn" class="secondary">差異原因集計</button>
     <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
+  </div>
+  <div class="smaregi-date-filter">
+    <label>差異CSV・原因集計 開始日<input id="smaregiDifferenceFromDate" type="date"/></label>
+    <label>終了日<input id="smaregiDifferenceToDate" type="date"/></label>
   </div>
   <div class="smaregi-entry-panel smaregi-checker-panel">
     <label>担当者（チェックした人）<select id="smaregiCheckerName"><option value="">担当者を選択</option></select><div id="smaregiCheckerNamePicker" class="staff-picker"></div></label>
@@ -104,8 +109,24 @@
     </div>
     <div class="table-wrap">
       <table class="smaregi-check-table smaregi-diff-table">
-        <thead><tr><th>商品名</th><th>実在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>修正</th></tr></thead>
+        <thead><tr><th>商品名</th><th>実在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th></tr></thead>
         <tbody id="smaregiDiffOnlyBody"></tbody>
+      </table>
+    </div>
+  </section>
+  <section id="smaregiReasonSummaryPanel" class="smaregi-diff-panel" hidden>
+    <div class="section-title">
+      <div>
+        <h3>差異原因集計</h3>
+        <p class="section-note">指定期間内の原因カテゴリ別件数と差異数量合計を表示します。</p>
+      </div>
+      <button type="button" id="exportSmaregiReasonSummaryCsvBtn" class="secondary">集計CSV</button>
+    </div>
+    <div id="smaregiReasonSummaryMessage" class="message"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>原因カテゴリ</th><th>件数</th><th>差異数量合計</th></tr></thead>
+        <tbody id="smaregiReasonSummaryBody"></tbody>
       </table>
     </div>
   </section>
