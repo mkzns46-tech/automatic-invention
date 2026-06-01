@@ -14,7 +14,7 @@ window.addEventListener("unhandledrejection",(e)=>{
 const el=(id)=>document.getElementById(id);
 
 const INVENTORY_APP_MENU_ITEMS=[
-  {key:"inventory",label:"在庫変動登録",href:"#inventoryRegistrationCard"},
+  {key:"inventory",label:"在庫変動登録",action:"inventory"},
   {key:"smaregi",label:"変動商品チェック",id:"openSmaregiStockCheckBtn"},
   {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
 ];
@@ -49,6 +49,8 @@ function renderInventoryAppMenu(){
   });
   const portalButton=menu.querySelector('[data-menu-action="portal"]');
   if(portalButton)portalButton.addEventListener("click",goToPortal);
+  const inventoryButton=menu.querySelector('[data-menu-action="inventory"]');
+  if(inventoryButton)inventoryButton.addEventListener("click",showInventoryRegistration);
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
   if(boothButton)boothButton.addEventListener("click",()=>showPopup("ブース管理","準備中です。"));
   const logoutButton=menu.querySelector('[data-menu-action="logout"]');
@@ -66,6 +68,12 @@ function setInventoryAppMenuActive(key){
     if(active)item.setAttribute("aria-current","page");
     else item.removeAttribute("aria-current");
   });
+}
+
+function showInventoryRegistration(){
+  if(typeof hideSmaregiStockCheck==="function")hideSmaregiStockCheck();
+  setInventoryAppMenuActive("inventory");
+  closeInventoryMenuDrawer();
 }
 
 function setInventoryMenuDrawerOpen(open){
@@ -255,7 +263,7 @@ function on(id,event,fn){
 /* ===== v50 Japanese / Korean UI toggle ===== */
 const I18N = {
   ja: {
-    "ARICO TOKYO 在庫確認アプリ":"ARICO TOKYO 在庫確認アプリ",
+    "ARICO TOKYO 在庫管理":"ARICO TOKYO 在庫管理",
     
     "再読み込み":"再読み込み",
     "在庫変動登録":"在庫変動登録",
@@ -310,7 +318,7 @@ const I18N = {
     "検索をクリア":"検索をクリア"
   },
   ko: {
-    "ARICO TOKYO 在庫確認アプリ":"ARICO TOKYO 재고 확인 앱",
+    "ARICO TOKYO 在庫管理":"ARICO TOKYO 재고 관리",
     
     "再読み込み":"다시 불러오기",
     "在庫変動登録":"재고 변동 등록",

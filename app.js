@@ -196,7 +196,6 @@ function bindSmaregiStockCheckEvents(){
   ["smaregiDiffCsvFromDate","smaregiReasonFromDate"].forEach(id=>{if(el(id)&&!el(id).value)el(id).value=monthStart;});
   ["smaregiDiffCsvToDate","smaregiReasonToDate"].forEach(id=>{if(el(id)&&!el(id).value)el(id).value=today;});
   on("openSmaregiStockCheckBtn","click",toggleSmaregiStockCheck);
-  on("portalTopBtn","click",goToPortal);
   on("syncSmaregiStockBtn","click",e=>runWithSmaregiAutoRefreshPaused(syncSmaregiStockFromApi,{button:e.currentTarget}));
   on("refreshSmaregiChecksBtn","click",loadLatestSmaregiSnapshot);
   on("exportSmaregiCheckCsvBtn","click",()=>exportSmaregiCheckCsv(false));
