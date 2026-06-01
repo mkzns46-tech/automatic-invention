@@ -14,21 +14,18 @@ window.addEventListener("unhandledrejection",(e)=>{
 const el=(id)=>document.getElementById(id);
 
 const INVENTORY_APP_MENU_ITEMS=[
-  {key:"inventory",icon:"📦",label:"在庫変動登録",href:"#inventoryRegistrationCard"},
-  {key:"smaregi",icon:"🔄",label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"},
-  {key:"products",icon:"📥",label:"商品データ取込",href:"#productImportCard"},
-  {key:"history",icon:"📋",label:"履歴",href:"#globalHistoryCard"},
-  {key:"analytics",icon:"📊",label:"分析",href:"#smaregiAccuracyPanel"},
-  {key:"booth",icon:"🏪",label:"ブース管理",disabled:true,title:"準備中"}
+  {key:"inventory",label:"在庫変動登録",href:"#inventoryRegistrationCard"},
+  {key:"smaregi",label:"変動商品チェック",id:"openSmaregiStockCheckBtn"},
+  {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
 ];
 const INVENTORY_APP_MENU_FOOTER_ITEMS=[
-  {key:"settings",icon:"⚙",label:"設定",href:"#staffSettingsCard"},
-  {key:"logout",icon:"🚪",label:"ログアウト",action:"logout"}
+  {key:"portal",label:"トップに戻る",action:"portal"},
+  {key:"logout",label:"ログアウト",action:"logout"}
 ];
 
 function getInventoryAppMenuItemHtml(item){
   const attrs=`class="inventory-app-menu-item" data-menu-key="${esc(item.key)}" ${item.disabled?"disabled":""} ${item.title?`title="${esc(item.title)}"`:""}`;
-  const body=`<span class="inventory-app-menu-icon" aria-hidden="true">${esc(item.icon||"")}</span><span>${esc(item.label)}</span>`;
+  const body=`<span>${esc(item.label)}</span>`;
   if(item.href)return `<a ${attrs} href="${esc(item.href)}">${body}</a>`;
   return `<button type="button" ${attrs} ${item.id?`id="${esc(item.id)}"`:""} data-menu-action="${esc(item.action||"")}">${body}</button>`;
 }
@@ -41,10 +38,22 @@ function renderInventoryAppMenu(){
     <div class="inventory-app-menu-main">${INVENTORY_APP_MENU_ITEMS.map(getInventoryAppMenuItemHtml).join("")}</div>
     <div class="inventory-app-menu-footer">${INVENTORY_APP_MENU_FOOTER_ITEMS.map(getInventoryAppMenuItemHtml).join("")}</div>`;
   menu.querySelectorAll(".inventory-app-menu-item[href]").forEach(link=>{
-    link.addEventListener("click",()=>setInventoryAppMenuActive(link.dataset.menuKey));
+    link.addEventListener("click",()=>{
+      if(link.dataset.menuKey==="inventory"&&typeof hideSmaregiStockCheck==="function")hideSmaregiStockCheck();
+      setInventoryAppMenuActive(link.dataset.menuKey);
+      closeInventoryMenuDrawer();
+    });
   });
+  menu.querySelectorAll(".inventory-app-menu-item:not([disabled])").forEach(item=>{
+    item.addEventListener("click",closeInventoryMenuDrawer);
+  });
+  const portalButton=menu.querySelector('[data-menu-action="portal"]');
+  if(portalButton)portalButton.addEventListener("click",goToPortal);
+  const boothButton=menu.querySelector('[data-menu-action="booth"]');
+  if(boothButton)boothButton.addEventListener("click",()=>showPopup("ブース管理","準備中です。"));
   const logoutButton=menu.querySelector('[data-menu-action="logout"]');
   if(logoutButton)logoutButton.addEventListener("click",logout);
+  bindInventoryMenuDrawer();
   setInventoryAppMenuActive("inventory");
 }
 
@@ -57,6 +66,29 @@ function setInventoryAppMenuActive(key){
     if(active)item.setAttribute("aria-current","page");
     else item.removeAttribute("aria-current");
   });
+}
+
+function setInventoryMenuDrawerOpen(open){
+  document.body.classList.toggle("inventory-menu-open",Boolean(open));
+  const toggle=el("inventoryMenuToggleBtn");
+  if(toggle)toggle.setAttribute("aria-expanded",String(Boolean(open)));
+}
+
+function closeInventoryMenuDrawer(){
+  setInventoryMenuDrawerOpen(false);
+}
+
+function bindInventoryMenuDrawer(){
+  const toggle=el("inventoryMenuToggleBtn");
+  const overlay=el("inventoryMenuOverlay");
+  if(toggle&&!toggle.dataset.menuBound){
+    toggle.dataset.menuBound="1";
+    toggle.addEventListener("click",()=>setInventoryMenuDrawerOpen(!document.body.classList.contains("inventory-menu-open")));
+  }
+  if(overlay&&!overlay.dataset.menuBound){
+    overlay.dataset.menuBound="1";
+    overlay.addEventListener("click",closeInventoryMenuDrawer);
+  }
 }
 
 
