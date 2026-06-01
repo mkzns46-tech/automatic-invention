@@ -13,6 +13,25 @@ window.addEventListener("unhandledrejection",(e)=>{
 });
 const el=(id)=>document.getElementById(id);
 
+const INVENTORY_APP_MENU_ITEMS=[
+  {label:"在庫変動登録",href:"#inventoryRegistrationCard"},
+  {label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"},
+  {label:"商品データ取り込み",href:"#productImportCard"},
+  {label:"履歴",href:"#globalHistoryCard"},
+  {label:"分析",href:"#smaregiAccuracyPanel"},
+  {label:"ブース管理",disabled:true,title:"準備中"}
+];
+
+function renderInventoryAppMenu(){
+  const menu=el("inventoryAppMenu");
+  if(!menu)return;
+  menu.hidden=false;
+  menu.innerHTML=INVENTORY_APP_MENU_ITEMS.map(item=>{
+    if(item.href)return `<a class="inventory-app-menu-item" href="${esc(item.href)}">${esc(item.label)}</a>`;
+    return `<button type="button" class="inventory-app-menu-item" ${item.id?`id="${esc(item.id)}"`:""} ${item.disabled?"disabled":""} ${item.title?`title="${esc(item.title)}"`:""}>${esc(item.label)}</button>`;
+  }).join("");
+}
+
 
 function showPopup(title, body){
   const popup=el("appPopup");

@@ -86,7 +86,9 @@ function bindEvents(){
 async function startInventoryApp(){
   if(!await checkAuthOrRedirect())return;
   inventoryAuthReady=true;
+  renderInventoryAppMenu();
   bindEvents();
+  bindSmaregiStockCheckEvents();
   await reloadAll();
   await loadSmaregiAccuracy();
 }
@@ -185,7 +187,10 @@ function goToPortal(){
   window.location.href="https://arico-portal.vercel.app/portal.html";
 }
 
+let smaregiStockCheckEventsBound=false;
 function bindSmaregiStockCheckEvents(){
+  if(smaregiStockCheckEventsBound)return;
+  smaregiStockCheckEventsBound=true;
   const now=new Date();
   const pad=n=>String(n).padStart(2,"0");
   const today=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
@@ -200,6 +205,7 @@ function bindSmaregiStockCheckEvents(){
   on("completeSmaregiStockCheckBtn","click",e=>runWithSmaregiAutoRefreshPaused(completeSmaregiStockCheck,{button:e.currentTarget}));
   on("resetSmaregiCompletionBtn","click",e=>runWithSmaregiAutoRefreshPaused(resetSmaregiStockCheckCompletion,{button:e.currentTarget}));
   on("aggregateSmaregiReasonSummaryBtn","click",showSmaregiReasonSummary);
+  on("openSmaregiReasonSummaryMenuBtn","click",showSmaregiReasonSummary);
   on("exportSmaregiDiffCardCsvBtn","click",()=>exportSmaregiCheckCsv(true));
   on("exportSmaregiReasonSummaryCsvBtn","click",exportSmaregiReasonSummaryCsv);
   on("smaregiCheckerName","change",e=>{

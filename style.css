@@ -2756,6 +2756,52 @@ td small{margin-top:4px;color:#527161}
   background:#facc15;
 }
 
+/* ===== sales inventory application menu ===== */
+.inventory-app-menu{
+  display:flex !important;
+  flex-wrap:wrap;
+  gap:12px;
+  margin:14px 0 18px;
+  visibility:visible !important;
+}
+.inventory-app-menu-item{
+  display:inline-flex;
+  align-items:center;
+  width:auto;
+  min-height:42px;
+  margin:0;
+  padding:9px 13px;
+  border:1px solid #d9e5dd;
+  border-radius:10px;
+  background:#f8fffb;
+  color:#1b4332;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.35;
+  text-align:left;
+  text-decoration:none;
+  box-shadow:0 4px 14px rgba(27,67,50,.06);
+}
+.inventory-app-menu-item:hover{
+  background:#dcebe1;
+}
+.inventory-app-menu-item:disabled{
+  background:#f3f4f6;
+  color:#6b7280;
+  cursor:not-allowed;
+}
+@media(max-width:800px){
+  .inventory-app-menu{
+    gap:8px;
+    margin:10px 0 14px;
+  }
+  .inventory-app-menu-item{
+    flex:1 1 calc(50% - 8px);
+    padding:8px;
+    font-size:12px;
+  }
+}
+
 /* ===== emergency mobile Smaregi cards ===== */
 @media(max-width:800px){
   .smaregi-stock-check-section .table-wrap{
