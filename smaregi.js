@@ -18,7 +18,9 @@ function getSmaregiCheck(barcode){
 }
 
 function isSmaregiExcludedCheck(check){
-  return check?.excluded===true||String(check?.checked_by||"").startsWith("除外:");
+  return check?.excluded===true
+    || String(check?.excluded||"").toLowerCase()==="true"
+    || String(check?.checked_by||"").startsWith("除外:");
 }
 
 function getSmaregiDisplayCheckedBy(check){
@@ -153,6 +155,12 @@ function getSmaregiProgressHtml(){
       <div class="smaregi-progress-checker">チェック担当者：<strong>${esc(checker)}</strong></div>
       <div class="smaregi-progress-main">チェック済み <span>${stats.completed} / ${stats.total}</span></div>
       <div class="smaregi-progress-sub">除外 ${stats.excluded}　残り ${stats.unchecked}件</div>
+      <div class="smaregi-progress-area">
+        <div id="smaregiProgressGraph" class="smaregi-progress-graph" role="progressbar" aria-label="棚卸進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stats.percent}">
+          <div id="smaregiProgressFill" class="smaregi-progress-fill" style="width:${stats.percent}%"></div>
+        </div>
+        <div id="smaregiProgressText" class="smaregi-progress-text">進捗 ${stats.percent}%</div>
+      </div>
     </div>`;
 }
 
