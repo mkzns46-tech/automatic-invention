@@ -27,6 +27,10 @@
 `supabase_verify_equipment_confirmation.sql` を実行してください。
 3行すべて返ることを確認してください。
 
+備品転用確認ボタンのPATCHが更新行0件になる場合は、
+`supabase_inventory_logs_update_policy.sql` を Supabase で実行してください。
+公開キーからの `inventory_logs` 更新を許可するUPDATEポリシーを追加します。
+
 ## Vercel 環境変数
 
 `api/smaregi-products.js` はスマレジ POS API の `GET /products` を利用します。

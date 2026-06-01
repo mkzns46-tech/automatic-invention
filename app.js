@@ -1096,13 +1096,20 @@ async function confirmEquipmentTransfer(logId,button=null){
   await runWithSmaregiAutoRefreshPaused(async()=>{
    try{
     const equipment_checked_at=new Date().toISOString();
-    const patchedRows=await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}&select=id,equipment_checked,equipment_checked_by,equipment_checked_at`,{
+    const patchPath=`inventory_logs?id=eq.${encodeURIComponent(logId)}&select=id,equipment_checked,equipment_checked_by,equipment_checked_at`;
+    const patchPayload={equipment_checked:true,equipment_checked_by:checkedBy,equipment_checked_at};
+    console.log("[Equipment Transfer Confirm PATCH Request]",{
+      url:SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/"+patchPath,
+      payload:patchPayload
+    });
+    const patchedRows=await sb(patchPath,{
       method:"PATCH",
       headers:{Prefer:"return=representation"},
-      body:JSON.stringify({equipment_checked:true,equipment_checked_by:checkedBy,equipment_checked_at})
+      body:JSON.stringify(patchPayload)
     });
+    console.log("[Equipment Transfer Confirm PATCH Response]",patchedRows);
     const patchedLog=Array.isArray(patchedRows)&&patchedRows[0] ? patchedRows[0] : null;
-    if(!patchedLog)throw new Error(`備品転用履歴を更新できませんでした。inventory_logs.id=${logId}`);
+    if(!patchedLog)throw new Error(`備品転用履歴を更新できませんでした。inventory_logs.id=${logId}\nSupabaseのinventory_logs UPDATEポリシーを確認してください。`);
     const refreshedRows=await sb(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`);
     const refreshedLog=Array.isArray(refreshedRows)&&refreshedRows[0] ? refreshedRows[0] : null;
     if(!refreshedLog)throw new Error(`更新後の備品転用履歴を再取得できませんでした。inventory_logs.id=${logId}`);
@@ -1111,6 +1118,7 @@ async function confirmEquipmentTransfer(logId,button=null){
     }
     const displayLog=refreshedLog;
     console.log("[Equipment Transfer Confirm PATCH Verified]",{logId,checkedBy,equipment_checked_at,patchedLog});
+    replaceEquipmentConfirmationDom(logId,displayLog);
     logs=(logs||[]).some(log=>String(log.id)===String(logId))
       ? logs.map(log=>String(log.id)===String(logId) ? displayLog : log)
       : [displayLog,...logs];
@@ -2211,7 +2219,6 @@ function updateSmaregiManagerControls(){
   const sync=el("syncSmaregiStockBtn");
   const complete=el("completeSmaregiStockCheckBtn");
   const differenceCsv=el("exportSmaregiDifferenceCsvBtn");
-  const diffList=el("showSmaregiDiffListBtn");
   const reasonSummary=el("showSmaregiReasonSummaryBtn");
   const reset=el("resetSmaregiCompletionBtn");
   if(sync){
@@ -2231,13 +2238,6 @@ function updateSmaregiManagerControls(){
     differenceCsv.style.display=manager ? "" : "none";
     differenceCsv.classList.add("smaregi-manager-control");
     differenceCsv.textContent="差異のみCSV";
-  }
-  if(diffList){
-    diffList.disabled=!manager;
-    diffList.hidden=!manager;
-    diffList.style.display=manager ? "" : "none";
-    diffList.classList.add("smaregi-manager-control");
-    diffList.textContent="今回の差異一覧";
   }
   if(reasonSummary){
     reasonSummary.disabled=!manager;
@@ -2454,7 +2454,7 @@ function renderSmaregiDiffOnlyPanel(){
       <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
       <td>${esc(getSmaregiDisplayCheckedBy(check))}</td>
       <td>${check?.checked_at ? fmt(check.checked_at) : ""}</td>
-      <td><div class="diff-action-group"><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${esc(item.barcode)}">原因</button><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">保存</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${esc(item.barcode)}">問題なし</button>${check?.difference_reason_category?`<small class="smaregi-reason-note" title="${esc(check.difference_reason_memo||"")}">${esc(check.difference_reason_category)}</small>`:""}</div></td>
+      <td><div class="diff-action-group"><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${esc(item.barcode)}">原因確認</button><button type="button" class="smaregi-diff-save-btn" data-barcode="${esc(item.barcode)}">保存</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${esc(item.barcode)}">問題なし</button>${check?.difference_reason_category?`<small class="smaregi-reason-note" title="${esc(check.difference_reason_memo||"")}">${esc(check.difference_reason_category)}</small>`:""}</div></td>
     </tr>`;
   }).join("");
   body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
@@ -3366,7 +3366,6 @@ function bindSmaregiStockCheckEvents(){
   on("exportSmaregiDifferenceCsvBtn","click",()=>exportSmaregiCheckCsv(true));
   on("completeSmaregiStockCheckBtn","click",e=>runWithSmaregiAutoRefreshPaused(completeSmaregiStockCheck,{button:e.currentTarget}));
   on("resetSmaregiCompletionBtn","click",e=>runWithSmaregiAutoRefreshPaused(resetSmaregiStockCheckCompletion,{button:e.currentTarget}));
-  on("showSmaregiDiffListBtn","click",showSmaregiDiffOnlyPanel);
   on("showSmaregiReasonSummaryBtn","click",showSmaregiReasonSummary);
   on("aggregateSmaregiReasonSummaryBtn","click",showSmaregiReasonSummary);
   on("exportSmaregiDiffCardCsvBtn","click",()=>exportSmaregiCheckCsv(true));
