@@ -21,6 +21,12 @@
 差異原因の記録・集計機能を利用するため、デプロイ前に
 `supabase_difference_reasons.sql` も Supabase で実行してください。
 
+このSQLには差異一覧の明示的な除外状態を保存する `excluded` も含まれます。
+
+備品転用確認カラムの存在確認には
+`supabase_verify_equipment_confirmation.sql` を実行してください。
+3行すべて返ることを確認してください。
+
 ## Vercel 環境変数
 
 `api/smaregi-products.js` はスマレジ POS API の `GET /products` を利用します。

@@ -82,10 +82,6 @@
     <button type="button" id="showSmaregiReasonSummaryBtn" class="secondary">差異原因集計</button>
     <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
   </div>
-  <div class="smaregi-date-filter">
-    <label>差異CSV・原因集計 開始日<input id="smaregiDifferenceFromDate" type="date"/></label>
-    <label>終了日<input id="smaregiDifferenceToDate" type="date"/></label>
-  </div>
   <div class="smaregi-entry-panel smaregi-checker-panel">
     <label>担当者（チェックした人）<select id="smaregiCheckerName"><option value="">担当者を選択</option></select><div id="smaregiCheckerNamePicker" class="staff-picker"></div></label>
   </div>
@@ -99,13 +95,19 @@
       <tbody id="smaregiStockCheckBody"></tbody>
     </table>
   </div>
-  <section id="smaregiDiffOnlyPanel" class="smaregi-diff-panel" hidden>
+  <div class="smaregi-analysis-grid">
+  <section id="smaregiDiffOnlyPanel" class="card smaregi-diff-panel" hidden>
     <div class="section-title">
       <div>
         <h3>今回の差異一覧</h3>
         <p class="section-note">実在庫とスマレジ在庫の差異がある商品だけを表示します。</p>
       </div>
       <div id="smaregiDiffSummary" class="badge muted">差異：0件</div>
+    </div>
+    <div class="smaregi-date-filter">
+      <label>差異CSV 開始日<input id="smaregiDiffCsvFromDate" type="date"/></label>
+      <label>終了日<input id="smaregiDiffCsvToDate" type="date"/></label>
+      <button type="button" id="exportSmaregiDiffCardCsvBtn" class="secondary">差異CSV出力</button>
     </div>
     <div class="table-wrap">
       <table class="smaregi-check-table smaregi-diff-table">
@@ -114,13 +116,18 @@
       </table>
     </div>
   </section>
-  <section id="smaregiReasonSummaryPanel" class="smaregi-diff-panel" hidden>
+  <section id="smaregiReasonSummaryPanel" class="card smaregi-diff-panel" hidden>
     <div class="section-title">
       <div>
         <h3>差異原因集計</h3>
         <p class="section-note">指定期間内の原因カテゴリ別件数と差異数量合計を表示します。</p>
       </div>
-      <button type="button" id="exportSmaregiReasonSummaryCsvBtn" class="secondary">集計CSV</button>
+    </div>
+    <div class="smaregi-date-filter">
+      <label>原因集計 開始日<input id="smaregiReasonFromDate" type="date"/></label>
+      <label>終了日<input id="smaregiReasonToDate" type="date"/></label>
+      <button type="button" id="aggregateSmaregiReasonSummaryBtn">集計</button>
+      <button type="button" id="exportSmaregiReasonSummaryCsvBtn" class="secondary">集計CSV出力</button>
     </div>
     <div id="smaregiReasonSummaryMessage" class="message"></div>
     <div class="table-wrap">
@@ -130,6 +137,7 @@
       </table>
     </div>
   </section>
+  </div>
   <div id="smaregiCauseDetail" class="smaregi-cause-detail" hidden></div>
 </section>
 </main><footer>© ARICO TOKYO 在庫確認アプリ</footer></div><script src="./app.js" defer></script>
