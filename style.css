@@ -1690,6 +1690,59 @@ td small{margin-top:4px;color:#527161}
   white-space:nowrap !important;
 }
 
+/* ===== v104 final separated cards override ===== */
+.grid.smaregi-mode > section:not(#smaregiStockCheckCard):not(#smaregiDiffOnlyPanel):not(#smaregiReasonSummaryPanel){
+  display:none !important;
+}
+.grid.smaregi-mode > #smaregiDiffOnlyPanel:not([hidden]),
+.grid.smaregi-mode > #smaregiReasonSummaryPanel:not([hidden]){
+  display:block !important;
+}
+.smaregi-work-card{
+  margin-top:0 !important;
+  background:#fff !important;
+  border:1px solid var(--border) !important;
+  box-shadow:0 6px 22px #1b43320d !important;
+}
+.smaregi-progress-area{
+  width:100%;
+  max-width:520px;
+  margin:12px 0 0;
+}
+.smaregi-progress-area .smaregi-progress-graph{
+  width:100%;
+  height:18px !important;
+  flex:none;
+  margin:0;
+  background:#dceee5;
+  border:1px solid #b7dbc5;
+  border-radius:999px;
+  overflow:hidden;
+  box-shadow:none;
+}
+.smaregi-progress-area .smaregi-progress-fill{
+  height:100%;
+  background:#2d6a4f;
+  border-radius:999px;
+  transition:width .25s ease;
+}
+.smaregi-progress-area .smaregi-progress-text{
+  width:auto;
+  margin-top:6px;
+  color:#1b4332;
+  font-size:13px;
+  font-weight:700;
+}
+@media(max-width:800px){
+  #smaregiDiffOnlyPanel,
+  #smaregiReasonSummaryPanel{
+    display:none !important;
+  }
+  .smaregi-progress-area{
+    max-width:100%;
+  }
+}
+
 /* ===== v103 difference reason record / summary ===== */
 .smaregi-date-filter{
   display:grid;
@@ -1745,6 +1798,55 @@ td small{margin-top:4px;color:#527161}
   .smaregi-analysis-grid{grid-template-columns:1fr}
   #smaregiDiffOnlyPanel{display:none !important}
   .smaregi-progress-graph{height:20px !important}
+}
+
+/* ===== v104 separated Smaregi work cards ===== */
+.grid.smaregi-mode > section:not(#smaregiStockCheckCard):not(#smaregiDiffOnlyPanel):not(#smaregiReasonSummaryPanel){
+  display:none !important;
+}
+.smaregi-work-card{
+  margin-top:0 !important;
+  background:#fff !important;
+  border:1px solid var(--border) !important;
+  box-shadow:0 6px 22px #1b43320d !important;
+}
+.smaregi-progress-area{
+  width:100%;
+  max-width:520px;
+  margin:12px 0 0;
+}
+.smaregi-progress-area .smaregi-progress-graph{
+  width:100%;
+  height:18px !important;
+  flex:none;
+  margin:0;
+  background:#dceee5;
+  border:1px solid #b7dbc5;
+  border-radius:999px;
+  overflow:hidden;
+  box-shadow:none;
+}
+.smaregi-progress-area .smaregi-progress-fill{
+  height:100%;
+  background:#2d6a4f;
+  border-radius:999px;
+  transition:width .25s ease;
+}
+.smaregi-progress-area .smaregi-progress-text{
+  width:auto;
+  margin-top:6px;
+  color:#1b4332;
+  font-size:13px;
+  font-weight:700;
+}
+@media(max-width:800px){
+  #smaregiDiffOnlyPanel,
+  #smaregiReasonSummaryPanel{
+    display:none !important;
+  }
+  .smaregi-progress-area{
+    max-width:100%;
+  }
 }
 
 /* ===== v99 difference action column ===== */

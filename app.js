@@ -2218,8 +2218,6 @@ function updateSmaregiManagerControls(){
   const manager=isSmaregiManager();
   const sync=el("syncSmaregiStockBtn");
   const complete=el("completeSmaregiStockCheckBtn");
-  const differenceCsv=el("exportSmaregiDifferenceCsvBtn");
-  const reasonSummary=el("showSmaregiReasonSummaryBtn");
   const reset=el("resetSmaregiCompletionBtn");
   if(sync){
     sync.disabled=!manager;
@@ -2231,19 +2229,6 @@ function updateSmaregiManagerControls(){
     complete.hidden=!manager;
     complete.classList.add("smaregi-manager-control");
     complete.textContent="今回のチェックを完了";
-  }
-  if(differenceCsv){
-    differenceCsv.disabled=!manager;
-    differenceCsv.hidden=!manager;
-    differenceCsv.style.display=manager ? "" : "none";
-    differenceCsv.classList.add("smaregi-manager-control");
-    differenceCsv.textContent="差異のみCSV";
-  }
-  if(reasonSummary){
-    reasonSummary.disabled=!manager;
-    reasonSummary.hidden=!manager;
-    reasonSummary.style.display=manager ? "" : "none";
-    reasonSummary.classList.add("smaregi-manager-control");
   }
   const diffPanel=el("smaregiDiffOnlyPanel");
   if(diffPanel)diffPanel.hidden=!manager;
@@ -3334,6 +3319,8 @@ function hideSmaregiStockCheck(){
   const main=document.querySelector("main.grid");
   if(!card||!main)return;
   card.hidden=true;
+  if(el("smaregiDiffOnlyPanel"))el("smaregiDiffOnlyPanel").hidden=true;
+  if(el("smaregiReasonSummaryPanel"))el("smaregiReasonSummaryPanel").hidden=true;
   main.classList.remove("smaregi-mode");
   stopSmaregiAutoRefresh();
   const toggle=el("openSmaregiStockCheckBtn");
@@ -3363,10 +3350,8 @@ function bindSmaregiStockCheckEvents(){
   on("syncSmaregiStockBtn","click",e=>runWithSmaregiAutoRefreshPaused(syncSmaregiStockFromApi,{button:e.currentTarget}));
   on("refreshSmaregiChecksBtn","click",loadLatestSmaregiSnapshot);
   on("exportSmaregiCheckCsvBtn","click",()=>exportSmaregiCheckCsv(false));
-  on("exportSmaregiDifferenceCsvBtn","click",()=>exportSmaregiCheckCsv(true));
   on("completeSmaregiStockCheckBtn","click",e=>runWithSmaregiAutoRefreshPaused(completeSmaregiStockCheck,{button:e.currentTarget}));
   on("resetSmaregiCompletionBtn","click",e=>runWithSmaregiAutoRefreshPaused(resetSmaregiStockCheckCompletion,{button:e.currentTarget}));
-  on("showSmaregiReasonSummaryBtn","click",showSmaregiReasonSummary);
   on("aggregateSmaregiReasonSummaryBtn","click",showSmaregiReasonSummary);
   on("exportSmaregiDiffCardCsvBtn","click",()=>exportSmaregiCheckCsv(true));
   on("exportSmaregiReasonSummaryCsvBtn","click",exportSmaregiReasonSummaryCsv);
