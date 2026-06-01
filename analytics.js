@@ -220,18 +220,16 @@ function renderSmaregiAccuracyMonthlyTrend(rows){
   if(!list)return;
   list.innerHTML=rows.length
     ? rows.map(row=>`
-      <div class="smaregi-accuracy-trend-row">
-        <div class="smaregi-accuracy-trend-heading">
-          <strong>${row.year}年${row.month}月</strong>
-          <span>チェック ${row.checkedCount}件 / 差異 ${row.differenceCount}件</span>
-        </div>
-        <div class="smaregi-accuracy-trend-values">
-          <strong>${formatPercent(row.accuracy)}</strong>
-          <span class="${row.change===null?"":(row.change>=0?"is-improved":"is-worse")}">前月比 ${row.change===null?"-":`${row.change>=0?"+":""}${row.change.toFixed(1)}%`}</span>
-        </div>
-        <div class="smaregi-accuracy-trend-bar"><div style="width:${Math.max(0,Math.min(100,row.accuracy))}%"></div></div>
+      <div class="inventory-accuracy-month-card">
+        <strong class="inventory-accuracy-month-title">${row.year}年${row.month}月</strong>
+        <div class="inventory-accuracy-month-value">精度 ${formatPercent(row.accuracy)}</div>
+        <div class="inventory-accuracy-month-detail">チェック ${row.checkedCount}件</div>
+        <div class="inventory-accuracy-month-detail">差異 ${row.differenceCount}件</div>
+        <div class="inventory-accuracy-diff ${row.change===null?"":(row.change>=0?"good":"bad")}">前月比 ${row.change===null?"-":`${row.change>=0?"+":""}${row.change.toFixed(1)}%`}</div>
+        <div class="inventory-accuracy-mini-bar"><div class="inventory-accuracy-mini-fill" style="width:${Math.max(0,Math.min(100,row.accuracy))}%"></div></div>
       </div>`).join("")
     : '<div class="smaregi-empty">直近6ヶ月の棚卸精度データはありません。</div>';
+  list.scrollLeft=list.scrollWidth;
 }
 
 async function loadSmaregiAccuracy(){
