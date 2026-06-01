@@ -85,6 +85,26 @@
     </div>
   </div>
 </section>
+<section id="smaregiDifferenceRankingPanel" class="card smaregi-difference-ranking-card" data-inventory-screen="analytics" hidden>
+  <div class="section-title">
+    <div>
+      <h2>差異ランキング</h2>
+      <p class="section-note">指定期間内で差異が多い商品を確認します。</p>
+    </div>
+  </div>
+  <div class="smaregi-ranking-filter">
+    <label>開始日<input id="smaregiRankingFromDate" type="date"/></label>
+    <label>終了日<input id="smaregiRankingToDate" type="date"/></label>
+    <button type="button" id="aggregateSmaregiDifferenceRankingBtn">検索・反映</button>
+  </div>
+  <div id="smaregiDifferenceRankingMessage" class="message">差異ランキングを集計中...</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>順位</th><th>商品コード</th><th>商品名</th><th>差異回数</th><th>差異数量</th><th>主な原因</th></tr></thead>
+      <tbody id="smaregiDifferenceRankingBody"></tbody>
+    </table>
+  </div>
+</section>
 
 
 <section class="card wide mobile-history-section" id="productHistoryCard" data-inventory-screen="analytics" hidden><div class="section-title"><h2>商品別履歴</h2><button type="button" id="productHistoryToggleBtn" class="secondary">商品別履歴を開く</button></div><div id="productHistoryContent" hidden><div id="historyRangeBadge" class="badge muted">商品を選択してください</div><div class="history-search-box"><label>商品履歴検索<input id="productHistoryBarcodeInput" placeholder="バーコードを入力またはスキャン" />

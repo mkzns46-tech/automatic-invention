@@ -1704,6 +1704,7 @@ body[data-inventory-screen="settings"] .grid > [data-inventory-screen="settings"
 }
 body[data-inventory-screen="settings"] #staffSettingsCard:not([hidden]),
 body[data-inventory-screen="analytics"] #smaregiAccuracyPanel:not([hidden]),
+body[data-inventory-screen="analytics"] #smaregiDifferenceRankingPanel:not([hidden]),
 body[data-inventory-screen="analytics"] #productHistoryCard:not([hidden]),
 body[data-inventory-screen="analytics"] #globalHistoryCard:not([hidden]),
 body[data-inventory-screen="analytics"] #smaregiDiffOnlyPanel:not([hidden]),
@@ -3147,6 +3148,7 @@ header h1{
   display:none !important;
 }
 body[data-inventory-screen="analytics"] #smaregiAccuracyPanel:not([hidden]),
+body[data-inventory-screen="analytics"] #smaregiDifferenceRankingPanel:not([hidden]),
 body[data-inventory-screen="analytics"] #productHistoryCard:not([hidden]),
 body[data-inventory-screen="analytics"] #globalHistoryCard:not([hidden]),
 body[data-inventory-screen="analytics"] #smaregiDiffOnlyPanel:not([hidden]),
@@ -3161,4 +3163,52 @@ body[data-inventory-screen="settings"] #productImportCard:not([hidden]){
 .inventory-app-menu-footer{
   display:grid !important;
   gap:5px !important;
+}
+
+/* ===== settings and analytics paired cards ===== */
+.staff-action-group{
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+.staff-action-group button{
+  width:auto !important;
+  min-height:36px !important;
+  margin:0 !important;
+  padding:8px 12px !important;
+  white-space:nowrap;
+}
+.smaregi-ranking-filter{
+  display:grid;
+  grid-template-columns:minmax(140px,1fr) minmax(140px,1fr) auto;
+  gap:10px;
+  align-items:end;
+  margin:12px 0;
+}
+.smaregi-ranking-filter label,
+.smaregi-ranking-filter button{
+  margin:0;
+}
+@media(min-width:801px){
+  body[data-inventory-screen="settings"] .inventory-app-layout > .grid,
+  body[data-inventory-screen="analytics"] .inventory-app-layout > .grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+  body[data-inventory-screen="settings"] #staffSettingsCard:not([hidden]),
+  body[data-inventory-screen="settings"] #productImportCard:not([hidden]),
+  body[data-inventory-screen="analytics"] #smaregiAccuracyPanel:not([hidden]),
+  body[data-inventory-screen="analytics"] #smaregiDifferenceRankingPanel:not([hidden]){
+    grid-column:auto !important;
+  }
+  body[data-inventory-screen="analytics"] #productHistoryCard:not([hidden]),
+  body[data-inventory-screen="analytics"] #globalHistoryCard:not([hidden]),
+  body[data-inventory-screen="analytics"] #smaregiDiffOnlyPanel:not([hidden]),
+  body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden]){
+    grid-column:1 / -1 !important;
+  }
+}
+@media(max-width:800px){
+  .smaregi-ranking-filter{
+    grid-template-columns:1fr;
+  }
 }

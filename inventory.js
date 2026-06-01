@@ -110,8 +110,10 @@ function renderStaffList(){
     <tr>
       <td>${esc(s.name)}</td>
       <td>
-        <button type="button" class="staff-edit-btn secondary" data-staff-id="${s.id}" data-staff-name="${esc(s.name)}">編集</button>
-        <button type="button" class="staff-delete-btn" data-staff-id="${s.id}">削除</button>
+        <div class="staff-action-group">
+          <button type="button" class="staff-edit-btn secondary" data-staff-id="${s.id}" data-staff-name="${esc(s.name)}">編集</button>
+          <button type="button" class="staff-delete-btn" data-staff-id="${s.id}">削除</button>
+        </div>
       </td>
     </tr>
   `).join("");

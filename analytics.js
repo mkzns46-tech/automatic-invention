@@ -177,6 +177,55 @@ function getSmaregiReasonSummaryRows(historical,range=getSmaregiDifferenceDateRa
   return [...grouped.values()].sort((a,b)=>b.count-a.count||b.differenceTotal-a.differenceTotal||a.category.localeCompare(b.category,"ja"));
 }
 
+function getSmaregiDifferenceRankingRows(historical,range=getSmaregiDifferenceDateRange("smaregiRankingFromDate","smaregiRankingToDate")){
+  const grouped=new Map();
+  historical.forEach(({check,item,difference})=>{
+    if(!isInSmaregiDifferenceDateRange(check.checked_at,range))return;
+    if(isSmaregiExcludedCheck(check)||check.no_issue===true||difference===0||!Number.isFinite(difference))return;
+    const barcode=String(check.barcode||item.barcode||"");
+    if(!barcode)return;
+    const current=grouped.get(barcode)||{
+      barcode,
+      productName:String(item.product_name||item.productName||gp(barcode)?.name||""),
+      differenceCount:0,
+      differenceTotal:0,
+      reasonCounts:new Map()
+    };
+    const category=String(check.difference_reason_category||"未分類");
+    current.differenceCount+=1;
+    current.differenceTotal+=Math.abs(difference);
+    current.reasonCounts.set(category,(current.reasonCounts.get(category)||0)+1);
+    grouped.set(barcode,current);
+  });
+  return [...grouped.values()].map(row=>{
+    const mainReason=[...row.reasonCounts.entries()]
+      .sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"ja"))[0]?.[0]||"未分類";
+    return {...row,mainReason};
+  }).sort((a,b)=>b.differenceCount-a.differenceCount||b.differenceTotal-a.differenceTotal||a.productName.localeCompare(b.productName,"ja"));
+}
+
+function renderSmaregiDifferenceRanking(rows){
+  const body=el("smaregiDifferenceRankingBody");
+  const message=el("smaregiDifferenceRankingMessage");
+  if(!body)return;
+  body.innerHTML=rows.length
+    ? rows.map((row,index)=>`<tr><td><strong>${index+1}位</strong></td><td>${esc(row.barcode)}</td><td>${esc(row.productName)}</td><td>${row.differenceCount}件</td><td>${row.differenceTotal}</td><td>${esc(row.mainReason)}</td></tr>`).join("")
+    : '<tr><td colspan="6" class="smaregi-empty">指定期間内の差異商品はありません。</td></tr>';
+  if(message)message.textContent=`差異商品：${rows.length}件`;
+}
+
+async function loadSmaregiDifferenceRanking(){
+  const panel=el("smaregiDifferenceRankingPanel");
+  if(!panel)return;
+  const message=el("smaregiDifferenceRankingMessage");
+  if(message)message.textContent="差異ランキングを集計中...";
+  try{
+    renderSmaregiDifferenceRanking(getSmaregiDifferenceRankingRows(await loadSmaregiHistoricalDifferenceRows()));
+  }catch(e){
+    if(message)message.textContent="差異ランキング集計エラー。\n"+e.message;
+  }
+}
+
 function getMonthRange(monthOffset=0){
   const now=new Date();
   const from=new Date(now.getFullYear(),now.getMonth()+monthOffset,1);

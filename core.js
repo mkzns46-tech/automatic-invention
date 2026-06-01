@@ -20,8 +20,8 @@ const INVENTORY_APP_MENU_ITEMS=[
 ];
 const INVENTORY_APP_MENU_FOOTER_ITEMS=[
   {key:"analytics",label:"分析",action:"analytics"},
-  {key:"portal",label:"トップへ戻る",action:"portal"},
   {key:"settings",label:"設定",action:"settings"},
+  {key:"portal",label:"トップへ戻る",action:"portal"},
   {key:"logout",label:"ログアウト",action:"logout"}
 ];
 const INVENTORY_ADMIN_PASSWORD="S3edc##530.";
@@ -117,6 +117,7 @@ function showInventoryAnalytics(){
   if(!unlockInventoryScreen("analytics"))return;
   showInventoryScreen("analytics");
   if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();
+  if(typeof loadSmaregiDifferenceRanking==="function")loadSmaregiDifferenceRanking();
   if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
   if(typeof showSmaregiReasonSummary==="function")showSmaregiReasonSummary({scroll:false});
 }

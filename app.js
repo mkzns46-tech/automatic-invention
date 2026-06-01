@@ -187,8 +187,8 @@ function bindSmaregiStockCheckEvents(){
   const pad=n=>String(n).padStart(2,"0");
   const today=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   const monthStart=`${now.getFullYear()}-${pad(now.getMonth()+1)}-01`;
-  ["smaregiDiffCsvFromDate","smaregiReasonFromDate"].forEach(id=>{if(el(id)&&!el(id).value)el(id).value=monthStart;});
-  ["smaregiDiffCsvToDate","smaregiReasonToDate"].forEach(id=>{if(el(id)&&!el(id).value)el(id).value=today;});
+  ["smaregiDiffCsvFromDate","smaregiReasonFromDate","smaregiRankingFromDate"].forEach(id=>{if(el(id)&&!el(id).value)el(id).value=monthStart;});
+  ["smaregiDiffCsvToDate","smaregiReasonToDate","smaregiRankingToDate"].forEach(id=>{if(el(id)&&!el(id).value)el(id).value=today;});
   on("openSmaregiStockCheckBtn","click",toggleSmaregiStockCheck);
   on("syncSmaregiStockBtn","click",e=>runWithSmaregiAutoRefreshPaused(syncSmaregiStockFromApi,{button:e.currentTarget}));
   on("refreshSmaregiChecksBtn","click",loadLatestSmaregiSnapshot);
@@ -196,6 +196,7 @@ function bindSmaregiStockCheckEvents(){
   on("completeSmaregiStockCheckBtn","click",e=>runWithSmaregiAutoRefreshPaused(completeSmaregiStockCheck,{button:e.currentTarget}));
   on("resetSmaregiCompletionBtn","click",e=>runWithSmaregiAutoRefreshPaused(resetSmaregiStockCheckCompletion,{button:e.currentTarget}));
   on("aggregateSmaregiReasonSummaryBtn","click",showSmaregiReasonSummary);
+  on("aggregateSmaregiDifferenceRankingBtn","click",loadSmaregiDifferenceRanking);
   on("exportSmaregiDiffCardCsvBtn","click",()=>exportSmaregiCheckCsv(true));
   on("exportSmaregiReasonSummaryCsvBtn","click",exportSmaregiReasonSummaryCsv);
   on("smaregiCheckerName","change",e=>{
