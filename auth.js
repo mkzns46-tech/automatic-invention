@@ -15,13 +15,18 @@ function clearAuthSession(){
   localStorage.removeItem(ARICO_AUTH_EXPIRES_KEY);
 }
 
-function createAuthSession(userName,token=""){
+function createAuthSession(userName,token="",expiresAt=Date.now()+ARICO_AUTH_DURATION_MS){
   const authToken=token||(crypto.randomUUID
     ? crypto.randomUUID()
     : String(Date.now())+"_"+Math.random().toString(36).slice(2));
   localStorage.setItem(ARICO_AUTH_TOKEN_KEY,authToken);
   localStorage.setItem(ARICO_AUTH_USER_KEY,userName||"");
-  localStorage.setItem(ARICO_AUTH_EXPIRES_KEY,String(Date.now()+ARICO_AUTH_DURATION_MS));
+  localStorage.setItem(ARICO_AUTH_EXPIRES_KEY,String(expiresAt));
+  console.log("[AUTH LOGIN SAVED]", {
+    token: localStorage.getItem("arico_auth_token"),
+    user: localStorage.getItem("arico_auth_user"),
+    expires: localStorage.getItem("arico_auth_expires")
+  });
 }
 
 async function consumePortalSession(token){
@@ -42,10 +47,26 @@ async function consumePortalSession(token){
 async function checkAuthOrRedirect(){
   const token=localStorage.getItem(ARICO_AUTH_TOKEN_KEY);
   const expires=Number(localStorage.getItem(ARICO_AUTH_EXPIRES_KEY)||0);
+  console.log("[AUTH CHECK START]", {
+    token: localStorage.getItem("arico_auth_token"),
+    user: localStorage.getItem("arico_auth_user"),
+    expires: localStorage.getItem("arico_auth_expires")
+  });
+  console.log("[AUTH CHECK]", {token,expires,now:Date.now()});
   if(token&&expires&&Date.now()<expires)return true;
 
   clearAuthSession();
-  const incomingToken=new URLSearchParams(location.search).get("session")||"";
+  const params=new URLSearchParams(location.search);
+  const incomingAuthToken=params.get("auth_token")||"";
+  const incomingAuthUser=params.get("auth_user")||"";
+  const incomingAuthExpires=Number(params.get("auth_expires")||0);
+  if(incomingAuthToken&&incomingAuthExpires&&Date.now()<incomingAuthExpires){
+    createAuthSession(incomingAuthUser,incomingAuthToken,incomingAuthExpires);
+    history.replaceState(null,"",location.pathname);
+    return true;
+  }
+
+  const incomingToken=params.get("session")||"";
   if(incomingToken&&await consumePortalSession(incomingToken)){
     createAuthSession("portal",incomingToken);
     history.replaceState(null,"",location.pathname);
