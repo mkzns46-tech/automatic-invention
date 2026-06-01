@@ -2272,10 +2272,12 @@ function getSmaregiStatsText(){
 
 function getSmaregiProgressHtml(){
   const stats=getSmaregiStats();
+  const checker=getSmaregiCheckerName()||"未選択";
   return `
     <div class="smaregi-progress-card-inner">
+      <div class="smaregi-progress-checker">チェック担当者：<strong>${esc(checker)}</strong></div>
       <div class="smaregi-progress-main">チェック済み <span>${stats.completed} / ${stats.total}</span></div>
-      <div class="smaregi-progress-sub">除外 ${stats.excluded}</div>
+      <div class="smaregi-progress-sub">除外 ${stats.excluded}　残り ${stats.unchecked}件</div>
     </div>`;
 }
 
