@@ -3201,6 +3201,52 @@ function getSmaregiReasonSummaryRows(historical,range=getSmaregiDifferenceDateRa
   return [...grouped.values()].sort((a,b)=>b.count-a.count||b.differenceTotal-a.differenceTotal||a.category.localeCompare(b.category,"ja"));
 }
 
+function getMonthRange(monthOffset=0){
+  const now=new Date();
+  const from=new Date(now.getFullYear(),now.getMonth()+monthOffset,1);
+  const to=new Date(now.getFullYear(),now.getMonth()+monthOffset+1,1);
+  return {fromTime:from.getTime(),toTime:to.getTime()-1};
+}
+
+function calculateSmaregiAccuracy(historical,range){
+  const rows=historical.filter(({check})=>isInSmaregiDifferenceDateRange(check.checked_at,range)&&!isSmaregiExcludedCheck(check));
+  const checkedCount=rows.length;
+  const differenceCount=rows.filter(({check,difference})=>check.no_issue!==true&&Number.isFinite(difference)&&difference!==0).length;
+  const differenceRate=checkedCount?differenceCount/checkedCount*100:0;
+  const accuracy=checkedCount?(checkedCount-differenceCount)/checkedCount*100:0;
+  return {checkedCount,differenceCount,differenceRate,accuracy};
+}
+
+function formatPercent(value,digits=1){
+  return `${Number(value||0).toFixed(digits)}%`;
+}
+
+async function loadSmaregiAccuracy(){
+  const panel=el("smaregiAccuracyPanel");
+  if(!panel)return;
+  const message=el("smaregiAccuracyMessage");
+  try{
+    const historical=await loadSmaregiHistoricalDifferenceRows();
+    const current=calculateSmaregiAccuracy(historical,getMonthRange(0));
+    const previous=calculateSmaregiAccuracy(historical,getMonthRange(-1));
+    const change=current.accuracy-previous.accuracy;
+    if(el("smaregiAccuracyChecked"))el("smaregiAccuracyChecked").textContent=`${current.checkedCount}件`;
+    if(el("smaregiAccuracyDifference"))el("smaregiAccuracyDifference").textContent=`${current.differenceCount}件`;
+    if(el("smaregiDifferenceRate"))el("smaregiDifferenceRate").textContent=formatPercent(current.differenceRate);
+    if(el("smaregiAccuracyPercent"))el("smaregiAccuracyPercent").textContent=formatPercent(current.accuracy);
+    if(el("smaregiPreviousAccuracy"))el("smaregiPreviousAccuracy").textContent=formatPercent(previous.accuracy);
+    if(el("smaregiAccuracyFill"))el("smaregiAccuracyFill").style.width=`${Math.max(0,Math.min(100,current.accuracy))}%`;
+    const changeEl=el("smaregiAccuracyChange");
+    if(changeEl){
+      changeEl.textContent=`${change>=0?"+":""}${change.toFixed(1)}%`;
+      changeEl.className=change>=0?"is-improved":"is-worse";
+    }
+    if(message)message.textContent=`今月 ${formatPercent(current.accuracy)} / 先月 ${formatPercent(previous.accuracy)}`;
+  }catch(e){
+    if(message)message.textContent="棚卸精度集計エラー。\n"+e.message;
+  }
+}
+
 function renderSmaregiReasonSummary(){
   const body=el("smaregiReasonSummaryBody");
   const message=el("smaregiReasonSummaryMessage");
@@ -3281,6 +3327,7 @@ async function refreshSmaregiCheckStateSilently(){
   try{
     await refreshSmaregiChecksFromSupabase();
     restoreFocusedSmaregiInputState(focused);
+    if(!el("smaregiAccuracyPanel")?.hidden)await loadSmaregiAccuracy();
     console.log("[Smaregi Auto Refresh]",getSmaregiStats());
   }catch(e){
     console.warn("[Smaregi Auto Refresh Error]",e);
@@ -3314,6 +3361,8 @@ async function showSmaregiStockCheck(){
   startSmaregiAutoRefresh();
   window.scrollTo({top:0,behavior:"smooth"});
   await loadLatestSmaregiSnapshot();
+  if(el("smaregiAccuracyPanel"))el("smaregiAccuracyPanel").hidden=false;
+  await loadSmaregiAccuracy();
 }
 
 function hideSmaregiStockCheck(){
@@ -3321,6 +3370,7 @@ function hideSmaregiStockCheck(){
   const main=document.querySelector("main.grid");
   if(!card||!main)return;
   card.hidden=true;
+  if(el("smaregiAccuracyPanel"))el("smaregiAccuracyPanel").hidden=true;
   if(el("smaregiDiffOnlyPanel"))el("smaregiDiffOnlyPanel").hidden=true;
   if(el("smaregiReasonSummaryPanel"))el("smaregiReasonSummaryPanel").hidden=true;
   main.classList.remove("smaregi-mode");

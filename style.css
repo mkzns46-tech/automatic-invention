@@ -1691,9 +1691,10 @@ td small{margin-top:4px;color:#527161}
 }
 
 /* ===== v104 final separated cards override ===== */
-.grid.smaregi-mode > section:not(#smaregiStockCheckCard):not(#smaregiDiffOnlyPanel):not(#smaregiReasonSummaryPanel){
+.grid.smaregi-mode > section:not(#smaregiStockCheckCard):not(#smaregiAccuracyPanel):not(#smaregiDiffOnlyPanel):not(#smaregiReasonSummaryPanel){
   display:none !important;
 }
+.grid.smaregi-mode > #smaregiAccuracyPanel:not([hidden]),
 .grid.smaregi-mode > #smaregiDiffOnlyPanel:not([hidden]),
 .grid.smaregi-mode > #smaregiReasonSummaryPanel:not([hidden]){
   display:block !important;
@@ -1734,6 +1735,7 @@ td small{margin-top:4px;color:#527161}
   font-weight:700;
 }
 @media(max-width:800px){
+  #smaregiAccuracyPanel,
   #smaregiDiffOnlyPanel,
   #smaregiReasonSummaryPanel{
     display:none !important;
@@ -1741,6 +1743,75 @@ td small{margin-top:4px;color:#527161}
   .smaregi-progress-area{
     max-width:100%;
   }
+}
+
+/* ===== v106 product import + accuracy card ===== */
+.csv-admin-section #importSmaregiProductsBtn{
+  margin-top:16px;
+  min-height:56px;
+}
+.csv-admin-details{
+  margin-top:18px;
+  padding-top:14px;
+  border-top:1px solid #dcebe1;
+}
+.csv-admin-details summary{
+  cursor:pointer;
+  color:var(--main-dark);
+  font-size:14px;
+  font-weight:900;
+}
+.csv-admin-details .button-row{
+  margin-top:12px !important;
+}
+.smaregi-accuracy-grid{
+  display:grid;
+  grid-template-columns:minmax(240px,1.4fr) repeat(5,minmax(110px,1fr));
+  gap:10px;
+}
+.smaregi-accuracy-main,
+.smaregi-accuracy-metric{
+  padding:14px;
+  border:1px solid #dcebe1;
+  border-radius:14px;
+  background:#f8fffb;
+}
+.smaregi-accuracy-main span,
+.smaregi-accuracy-metric span{
+  display:block;
+  color:#527161;
+  font-size:12px;
+  font-weight:800;
+}
+.smaregi-accuracy-main strong{
+  display:block;
+  margin:4px 0 10px;
+  color:#1b4332;
+  font-size:32px;
+}
+.smaregi-accuracy-metric strong{
+  display:block;
+  margin-top:6px;
+  color:#1b4332;
+  font-size:20px;
+}
+.smaregi-accuracy-bar{
+  height:16px;
+  overflow:hidden;
+  border:1px solid #b7dbc5;
+  border-radius:999px;
+  background:#dceee5;
+}
+.smaregi-accuracy-bar div{
+  height:100%;
+  border-radius:999px;
+  background:#2d6a4f;
+}
+.is-improved{color:#15803d !important}
+.is-worse{color:#b91c1c !important}
+@media(max-width:1100px){
+  .smaregi-accuracy-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .smaregi-accuracy-main{grid-column:1 / -1}
 }
 
 /* ===== v105 checker + progress header ===== */
@@ -1792,6 +1863,23 @@ td small{margin-top:4px;color:#527161}
   }
   .smaregi-progress-area{
     grid-column:1;
+  }
+}
+
+/* ===== v106 final accuracy visibility ===== */
+.grid.smaregi-mode > section:not(#smaregiStockCheckCard):not(#smaregiAccuracyPanel):not(#smaregiDiffOnlyPanel):not(#smaregiReasonSummaryPanel){
+  display:none !important;
+}
+.grid.smaregi-mode > #smaregiAccuracyPanel:not([hidden]),
+.grid.smaregi-mode > #smaregiDiffOnlyPanel:not([hidden]),
+.grid.smaregi-mode > #smaregiReasonSummaryPanel:not([hidden]){
+  display:block !important;
+}
+@media(max-width:800px){
+  #smaregiAccuracyPanel,
+  #smaregiDiffOnlyPanel,
+  #smaregiReasonSummaryPanel{
+    display:none !important;
   }
 }
 

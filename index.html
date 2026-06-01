@@ -42,12 +42,13 @@
   </div>
 </section>
 
-<section class="card pc-only-section csv-admin-section"><h2>CSV取り込み</h2><p class="section-note">商品マスターをまとめて登録・更新できます</p><div class="csv-feature-grid">
-  <div class="csv-feature-card"><strong>簡単インポート</strong><span>CSVを選ぶだけで商品を一括登録・更新</span></div>
-  <div class="csv-feature-card"><strong>上書き対応</strong><span>同じバーコードの商品名・現在庫・棚番を更新</span></div>
-  <div class="csv-feature-card"><strong>サンプルあり</strong><span>CSV形式をすぐ確認できます</span></div>
-</div>
-<div class="button-row"><label class="file-button">⬆ 追加・更新で取り込み<input type="file" id="csvFile" accept=".csv,text/csv"/></label><button id="downloadSampleCsvBtn" class="secondary">サンプルCSVをダウンロード</button><button type="button" id="importSmaregiProductsBtn" class="secondary">スマレジ商品マスター取込</button></div></section>
+<section class="card pc-only-section csv-admin-section"><h2>商品データ取り込み</h2><p class="section-note">スマレジの商品データを取り込みます</p>
+<button type="button" id="importSmaregiProductsBtn">スマレジ商品マスター取込</button>
+<details class="csv-admin-details">
+  <summary>管理者向け機能</summary>
+  <p class="section-note">例外対応用のCSV取り込みです。通常はスマレジ商品マスター取込を使用してください。</p>
+  <div class="button-row"><label class="file-button">⬆ CSV追加・更新<input type="file" id="csvFile" accept=".csv,text/csv"/></label><button id="downloadSampleCsvBtn" class="secondary">サンプルCSVをダウンロード</button></div>
+</details></section>
 
 
 <section class="card wide mobile-history-section" id="productHistoryCard"><div class="section-title"><h2>商品別履歴</h2><button type="button" id="productHistoryToggleBtn" class="secondary">商品別履歴を開く</button></div><div id="productHistoryContent" hidden><div id="historyRangeBadge" class="badge muted">商品を選択してください</div><div class="history-search-box"><label>商品履歴検索<input id="productHistoryBarcodeInput" placeholder="バーコードを入力またはスキャン" />
@@ -95,6 +96,28 @@
       <tbody id="smaregiStockCheckBody"></tbody>
     </table>
   </div>
+  </section>
+  <section id="smaregiAccuracyPanel" class="card wide smaregi-work-card" hidden>
+    <div class="section-title">
+      <div>
+        <h2>棚卸精度</h2>
+        <p class="section-note">差異を減らせているか、今月と先月を比較します。</p>
+      </div>
+      <div id="smaregiAccuracyBadge" class="badge muted">今月</div>
+    </div>
+    <div id="smaregiAccuracyMessage" class="message">棚卸精度を集計中...</div>
+    <div class="smaregi-accuracy-grid">
+      <div class="smaregi-accuracy-main">
+        <span>棚卸精度</span>
+        <strong id="smaregiAccuracyPercent">-</strong>
+        <div class="smaregi-accuracy-bar"><div id="smaregiAccuracyFill" style="width:0%"></div></div>
+      </div>
+      <div class="smaregi-accuracy-metric"><span>チェック商品数</span><strong id="smaregiAccuracyChecked">0件</strong></div>
+      <div class="smaregi-accuracy-metric"><span>差異商品数</span><strong id="smaregiAccuracyDifference">0件</strong></div>
+      <div class="smaregi-accuracy-metric"><span>差異率</span><strong id="smaregiDifferenceRate">0%</strong></div>
+      <div class="smaregi-accuracy-metric"><span>先月</span><strong id="smaregiPreviousAccuracy">-</strong></div>
+      <div class="smaregi-accuracy-metric"><span>改善</span><strong id="smaregiAccuracyChange">-</strong></div>
+    </div>
   </section>
   <section id="smaregiDiffOnlyPanel" class="card wide smaregi-diff-panel smaregi-work-card" hidden>
     <div class="section-title">
