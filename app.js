@@ -87,9 +87,11 @@ async function startInventoryApp(){
   if(!await checkAuthOrRedirect())return;
   inventoryAuthReady=true;
   renderInventoryAppMenu();
+  showInventoryScreen("inventory");
   bindEvents();
   bindSmaregiStockCheckEvents();
   await reloadAll();
+  await refreshSmaregiCheckStateSilently();
   await loadSmaregiAccuracy();
 }
 
@@ -150,11 +152,8 @@ window.addEventListener("DOMContentLoaded",()=>{
 });
 async function showSmaregiStockCheck(){
   const card=el("smaregiStockCheckCard");
-  const main=document.querySelector("main.grid");
-  if(!card||!main)return;
-  main.classList.add("smaregi-mode");
-  card.hidden=false;
-  setInventoryAppMenuActive("smaregi");
+  if(!card)return;
+  showInventoryScreen("smaregi");
   renderSmaregiStockChecks();
   startSmaregiAutoRefresh();
   window.scrollTo({top:0,behavior:"smooth"});
@@ -164,15 +163,11 @@ async function showSmaregiStockCheck(){
 
 function hideSmaregiStockCheck(){
   const card=el("smaregiStockCheckCard");
-  const main=document.querySelector("main.grid");
-  if(!card||!main)return;
+  if(!card)return;
   card.hidden=true;
   if(el("smaregiDiffOnlyPanel"))el("smaregiDiffOnlyPanel").hidden=true;
   if(el("smaregiReasonSummaryPanel"))el("smaregiReasonSummaryPanel").hidden=true;
-  main.classList.remove("smaregi-mode");
-  setInventoryAppMenuActive("inventory");
-  stopSmaregiAutoRefresh();
-  window.scrollTo({top:0,behavior:"smooth"});
+  showInventoryScreen("inventory");
 }
 
 function toggleSmaregiStockCheck(){
@@ -202,7 +197,6 @@ function bindSmaregiStockCheckEvents(){
   on("completeSmaregiStockCheckBtn","click",e=>runWithSmaregiAutoRefreshPaused(completeSmaregiStockCheck,{button:e.currentTarget}));
   on("resetSmaregiCompletionBtn","click",e=>runWithSmaregiAutoRefreshPaused(resetSmaregiStockCheckCompletion,{button:e.currentTarget}));
   on("aggregateSmaregiReasonSummaryBtn","click",showSmaregiReasonSummary);
-  on("openSmaregiReasonSummaryMenuBtn","click",showSmaregiReasonSummary);
   on("exportSmaregiDiffCardCsvBtn","click",()=>exportSmaregiCheckCsv(true));
   on("exportSmaregiReasonSummaryCsvBtn","click",exportSmaregiReasonSummaryCsv);
   on("smaregiCheckerName","change",e=>{

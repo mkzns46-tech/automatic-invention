@@ -16,12 +16,17 @@ const el=(id)=>document.getElementById(id);
 const INVENTORY_APP_MENU_ITEMS=[
   {key:"inventory",label:"在庫変動登録",action:"inventory"},
   {key:"smaregi",label:"変動商品チェック",id:"openSmaregiStockCheckBtn"},
-  {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
+  {key:"booth",label:"ブース管理",action:"booth",title:"準備中"},
+  {key:"analytics",label:"分析",action:"analytics"},
+  {key:"settings",label:"設定",action:"settings"}
 ];
 const INVENTORY_APP_MENU_FOOTER_ITEMS=[
-  {key:"portal",label:"トップに戻る",action:"portal"},
   {key:"logout",label:"ログアウト",action:"logout"}
 ];
+const INVENTORY_SETTINGS_PASSWORD="Sedc##530.";
+const INVENTORY_ANALYTICS_PASSWORD="S3edc##530.";
+const INVENTORY_SETTINGS_UNLOCK_KEY="arico_inventory_settings_unlocked";
+const INVENTORY_ANALYTICS_UNLOCK_KEY="arico_inventory_analytics_unlocked";
 
 function getInventoryAppMenuItemHtml(item){
   const attrs=`class="inventory-app-menu-item" data-menu-key="${esc(item.key)}" ${item.disabled?"disabled":""} ${item.title?`title="${esc(item.title)}"`:""}`;
@@ -47,12 +52,14 @@ function renderInventoryAppMenu(){
   menu.querySelectorAll(".inventory-app-menu-item:not([disabled])").forEach(item=>{
     item.addEventListener("click",closeInventoryMenuDrawer);
   });
-  const portalButton=menu.querySelector('[data-menu-action="portal"]');
-  if(portalButton)portalButton.addEventListener("click",goToPortal);
   const inventoryButton=menu.querySelector('[data-menu-action="inventory"]');
   if(inventoryButton)inventoryButton.addEventListener("click",showInventoryRegistration);
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
   if(boothButton)boothButton.addEventListener("click",()=>showPopup("ブース管理","準備中です。"));
+  const analyticsButton=menu.querySelector('[data-menu-action="analytics"]');
+  if(analyticsButton)analyticsButton.addEventListener("click",showInventoryAnalytics);
+  const settingsButton=menu.querySelector('[data-menu-action="settings"]');
+  if(settingsButton)settingsButton.addEventListener("click",showInventorySettings);
   const logoutButton=menu.querySelector('[data-menu-action="logout"]');
   if(logoutButton)logoutButton.addEventListener("click",logout);
   bindInventoryMenuDrawer();
@@ -71,8 +78,58 @@ function setInventoryAppMenuActive(key){
 }
 
 function showInventoryRegistration(){
-  if(typeof hideSmaregiStockCheck==="function")hideSmaregiStockCheck();
-  setInventoryAppMenuActive("inventory");
+  showInventoryScreen("inventory");
+}
+
+function hasInventorySettingsAccess(){
+  return sessionStorage.getItem(INVENTORY_SETTINGS_UNLOCK_KEY)==="1";
+}
+
+function hasInventoryAnalyticsAccess(){
+  return sessionStorage.getItem(INVENTORY_ANALYTICS_UNLOCK_KEY)==="1";
+}
+
+function hasInventoryPrivilegedAccess(){
+  return hasInventorySettingsAccess()||hasInventoryAnalyticsAccess();
+}
+
+function unlockInventoryScreen(screen){
+  const isSettings=screen==="settings";
+  const unlocked=isSettings ? hasInventorySettingsAccess() : hasInventoryAnalyticsAccess();
+  if(unlocked)return true;
+  const password=prompt(`${isSettings?"設定":"分析"}画面のパスワードを入力してください。`);
+  const expected=isSettings ? INVENTORY_SETTINGS_PASSWORD : INVENTORY_ANALYTICS_PASSWORD;
+  if(password!==expected){
+    if(password!==null)showPopup("認証エラー","パスワードが違います。");
+    return false;
+  }
+  sessionStorage.setItem(isSettings?INVENTORY_SETTINGS_UNLOCK_KEY:INVENTORY_ANALYTICS_UNLOCK_KEY,"1");
+  return true;
+}
+
+function showInventorySettings(){
+  if(!unlockInventoryScreen("settings"))return;
+  showInventoryScreen("settings");
+}
+
+function showInventoryAnalytics(){
+  if(!unlockInventoryScreen("analytics"))return;
+  showInventoryScreen("analytics");
+  if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();
+  if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
+  if(typeof showSmaregiReasonSummary==="function")showSmaregiReasonSummary({scroll:false});
+}
+
+function showInventoryScreen(screen){
+  document.body.dataset.inventoryScreen=screen;
+  document.querySelector("main.grid")?.classList.remove("smaregi-mode");
+  document.querySelectorAll("[data-inventory-screen]").forEach(panel=>{
+    panel.hidden=panel.dataset.inventoryScreen!==screen;
+  });
+  if((screen==="inventory"||screen==="smaregi")&&typeof startSmaregiAutoRefresh==="function")startSmaregiAutoRefresh();
+  else if(typeof stopSmaregiAutoRefresh==="function")stopSmaregiAutoRefresh();
+  if(typeof updateSmaregiManagerControls==="function")updateSmaregiManagerControls();
+  setInventoryAppMenuActive(screen);
   closeInventoryMenuDrawer();
 }
 

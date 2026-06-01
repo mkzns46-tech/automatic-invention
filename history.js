@@ -387,6 +387,14 @@ function renderGlobalHistory(){
   bindEquipmentConfirmButtons();
 }
 
+function renderRecentRegistrationHistory(){
+  const body=el("recentRegistrationHistoryBody");
+  if(!body)return;
+  body.innerHTML=buildGlobalHistoryRows(logs.slice(0,10));
+  bindMemoEditButtons();
+  bindEquipmentConfirmButtons();
+}
+
 function buildGlobalHistoryRows(sourceLogs=logs){
   return sourceLogs.map(log=>{
     const q=Number(log.quantity||0);

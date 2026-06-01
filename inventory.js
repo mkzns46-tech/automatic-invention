@@ -19,6 +19,7 @@ function render(){
   renderStaffOptions();
   renderStaffList();
   renderProductCount();
+  renderRecentRegistrationHistory();
   renderGlobalHistory();
   renderSelectedProductHistory();
   if(typeof applyLang==='function')setTimeout(applyLang,0);
@@ -108,10 +109,16 @@ function renderStaffList(){
   body.innerHTML=staffMembers.map(s=>`
     <tr>
       <td>${esc(s.name)}</td>
-      <td><button type="button" class="staff-delete-btn" data-staff-id="${s.id}">削除</button></td>
+      <td>
+        <button type="button" class="staff-edit-btn secondary" data-staff-id="${s.id}" data-staff-name="${esc(s.name)}">編集</button>
+        <button type="button" class="staff-delete-btn" data-staff-id="${s.id}">削除</button>
+      </td>
     </tr>
   `).join("");
 
+  document.querySelectorAll(".staff-edit-btn").forEach(btn=>{
+    btn.onclick=()=>editStaff(btn.dataset.staffId,btn.dataset.staffName);
+  });
   document.querySelectorAll(".staff-delete-btn").forEach(btn=>{
     btn.onclick=()=>deleteStaff(btn.dataset.staffId);
   });
@@ -151,6 +158,22 @@ async function deleteStaff(id){
     await reloadAll();
   }catch(e){
     showMessage("担当者削除エラー。\n"+e.message,"err");
+  }
+}
+
+async function editStaff(id,currentName){
+  try{
+    const name=String(prompt("変更後の担当者名を入力してください。",currentName||"")||"").trim();
+    if(!name||name===currentName)return;
+    await sb(`staff_members?id=eq.${encodeURIComponent(id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({name})
+    });
+    showMessage(`担当者名を変更しました：${name}`,"ok");
+    await reloadAll();
+  }catch(e){
+    showMessage("担当者編集エラー。\n"+e.message,"err");
   }
 }
 

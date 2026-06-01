@@ -6,7 +6,7 @@
 </aside>
 <button type="button" id="inventoryMenuOverlay" class="inventory-menu-overlay" aria-label="メニューを閉じる"></button>
 <main class="grid">
-<section class="card scanner" id="inventoryRegistrationCard"><div class="section-title compact-title"><div><h2>在庫変動登録</h2><p class="section-note">持ち出し・入荷・在庫修正・備品転用を記録します</p></div></div><div class="row"><label>区分<select id="type"><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option></select></label><label>担当者 <span class="required">必須</span><select id="staff"><option value="">担当者を選択</option></select><div id="staffPicker" class="staff-picker"></div></label><label>数量 <span class="required">必須</span><input id="qty" type="number" min="1" step="1" placeholder="数量" required/></label></div><label><span id="memoLabelText">備考（自由入力・連続スキャン中は保持）</span><span id="equipmentMemoRequired" class="required equipment-memo-required" hidden>備品転用時は理由入力必須</span><input id="memo" placeholder="例：棚卸差異、サンプル使用、不良返品など"/></label><div class="button-row"><button id="startCameraBtn">カメラ読取</button><div class="camera-zoom-row">
+<section class="card scanner" id="inventoryRegistrationCard" data-inventory-screen="inventory"><div class="section-title compact-title"><div><h2>在庫変動登録</h2><p class="section-note">持ち出し・入荷・在庫修正・備品転用を記録します</p></div></div><div class="row"><label>区分<select id="type"><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option></select></label><label>担当者 <span class="required">必須</span><select id="staff"><option value="">担当者を選択</option></select><div id="staffPicker" class="staff-picker"></div></label><label>数量 <span class="required">必須</span><input id="qty" type="number" min="1" step="1" placeholder="数量" required/></label></div><label><span id="memoLabelText">備考（自由入力・連続スキャン中は保持）</span><span id="equipmentMemoRequired" class="required equipment-memo-required" hidden>備品転用時は理由入力必須</span><input id="memo" placeholder="例：棚卸差異、サンプル使用、不良返品など"/></label><div class="button-row"><button id="startCameraBtn">カメラ読取</button><div class="camera-zoom-row">
   <label>カメラズーム
     <input id="cameraZoomRange" type="range" min="1" max="3" step="0.1" value="1.5">
     <span id="cameraZoomValue">1.5x</span>
@@ -21,9 +21,19 @@
     <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
   </div>
 </div><div id="qr-reader"></div><form id="manualForm"><label class="product-name-search-label">商品名検索<input id="inventoryProductNameSearchInput" autocomplete="off" placeholder="商品名の一部を入力"/></label><div id="inventoryProductSearchResults" class="product-search-results"></div><label>バーコード入力<input id="barcodeInput" autocomplete="off" placeholder="バーコードをスキャン、または手入力"/></label><div id="scanProductInfo" class="message"></div><button type="submit">登録</button></form><div id="message" class="message">起動中...</div></section>
-<section class="card pc-only-section staff-admin-section" id="staffSettingsCard">
+<section class="card" id="inventoryGeneralProgressCard" data-inventory-screen="inventory">
+  <h2>棚卸進捗</h2>
+  <p class="section-note">変動商品チェックの進捗を表示します。</p>
+  <div id="inventoryGeneralProgressBadge" class="badge muted inventory-general-progress">チェック済み：0 / 0</div>
+</section>
+<section class="card wide" id="recentRegistrationHistoryCard" data-inventory-screen="inventory">
+  <h2>最近の登録履歴</h2>
+  <p class="section-note">直近10件の在庫変動を表示します。</p>
+  <div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="recentRegistrationHistoryBody"></tbody></table></div>
+</section>
+<section class="card pc-only-section staff-admin-section" id="staffSettingsCard" data-inventory-screen="settings" hidden>
   <div class="section-title">
-    <h2>担当者設定</h2><p class="section-note">スマホ側の担当者プルダウンに反映されます</p>
+    <h2>担当者管理</h2><p class="section-note">担当者の追加・編集・削除を行います。スマホ側の担当者プルダウンにも反映されます</p>
     <div id="staffCountBadge" class="badge">担当者：0人</div>
   </div>
 
@@ -47,14 +57,15 @@
   </div>
 </section>
 
-<section class="card csv-admin-section" id="productImportCard"><h2>商品データ取り込み</h2><p class="section-note">スマレジの商品データを取り込みます</p>
+<section class="card csv-admin-section" id="productImportCard" data-inventory-screen="settings" hidden><h2>データ取り込み</h2><p class="section-note">商品データとスマレジ変動商品データを取り込みます</p>
 <button type="button" id="importSmaregiProductsBtn">スマレジ商品マスター取込</button>
+<button type="button" id="syncSmaregiStockBtn">スマレジ変動商品データ取り込み</button>
 <details class="csv-admin-details">
   <summary>管理者向け機能</summary>
   <p class="section-note">例外対応用のCSV取り込みです。通常はスマレジ商品マスター取込を使用してください。</p>
   <div class="button-row"><label class="file-button">⬆ CSV追加・更新<input type="file" id="csvFile" accept=".csv,text/csv"/></label><button id="downloadSampleCsvBtn" class="secondary">サンプルCSVをダウンロード</button></div>
 </details></section>
-<section id="smaregiAccuracyPanel" class="card smaregi-accuracy-card">
+<section id="smaregiAccuracyPanel" class="card smaregi-accuracy-card" data-inventory-screen="analytics" hidden>
   <div class="section-title">
     <div>
       <h2>棚卸精度</h2>
@@ -81,14 +92,14 @@
 </section>
 
 
-<section class="card wide mobile-history-section" id="productHistoryCard"><div class="section-title"><h2>商品別履歴</h2><button type="button" id="productHistoryToggleBtn" class="secondary">商品別履歴を開く</button></div><div id="productHistoryContent" hidden><div id="historyRangeBadge" class="badge muted">商品を選択してください</div><div class="history-search-box"><label>商品履歴検索<input id="productHistoryBarcodeInput" placeholder="バーコードを入力またはスキャン" />
+<section class="card wide mobile-history-section" id="productHistoryCard" data-inventory-screen="analytics" hidden><div class="section-title"><h2>商品別履歴</h2><button type="button" id="productHistoryToggleBtn" class="secondary">商品別履歴を開く</button></div><div id="productHistoryContent" hidden><div id="historyRangeBadge" class="badge muted">商品を選択してください</div><div class="history-search-box"><label>商品履歴検索<input id="productHistoryBarcodeInput" placeholder="バーコードを入力またはスキャン" />
 <label class="product-name-search-label">商品名検索
   <input id="productNameSearchInput" placeholder="商品名の一部を入力" />
 </label>
 <div id="productSearchResults" class="product-search-results"></div></label></div><div class="history-camera-row"><button type="button" id="historyCameraBtn">カメラ読取</button></div><div class="button-row"><button id="productHistoryCsvBtn" type="button">商品履歴CSV</button>
 <button id="showAllSelectedHistoryBtn" class="secondary">全履歴を表示</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="selectedHistoryBody"></tbody></table></div></div></section>
-<section class="mobile-force-history card wide pc-only-section" id="globalHistoryCard"><h2>全体履歴</h2><div class="history-filter-grid"><label>区分検索<select id="historyTypeFilter"><option value="">すべて</option><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option></select></label><label>商品名検索<input id="historyProductFilter" placeholder="商品名キーワード"/></label><label>担当者検索<input id="historyStaffFilter" placeholder="担当者キーワード"/></label><label>備考検索<input id="historyMemoFilter" placeholder="備考キーワード"/></label></div><div class="button-row"><button id="allDataCsvBtn" class="secondary">全履歴CSV</button><button id="clearFilterBtn" class="secondary">検索をクリア</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
-<section class="card wide smaregi-stock-check-section" id="smaregiStockCheckCard" hidden>
+<section class="mobile-force-history card wide pc-only-section" id="globalHistoryCard" data-inventory-screen="analytics" hidden><h2>全体履歴</h2><div class="history-filter-grid"><label>区分検索<select id="historyTypeFilter"><option value="">すべて</option><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option></select></label><label>商品名検索<input id="historyProductFilter" placeholder="商品名キーワード"/></label><label>担当者検索<input id="historyStaffFilter" placeholder="担当者キーワード"/></label><label>備考検索<input id="historyMemoFilter" placeholder="備考キーワード"/></label></div><div class="button-row"><button id="allDataCsvBtn" class="secondary">全履歴CSV</button><button id="clearFilterBtn" class="secondary">検索をクリア</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
+<section class="card wide smaregi-stock-check-section" id="smaregiStockCheckCard" data-inventory-screen="smaregi" hidden>
   <div class="section-title">
     <div>
       <h2>スマレジ変動商品チェック</h2>
@@ -105,14 +116,13 @@
   </div>
   <div id="smaregiMessage" class="message"></div>
   <div class="smaregi-toolbar smaregi-action-grid">
-    <button type="button" id="syncSmaregiStockBtn">スマレジデータ取り込み</button>
     <button type="button" id="refreshSmaregiChecksBtn" class="secondary">最新状態に更新</button>
     <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
     <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
   </div>
   <div class="smaregi-reset-panel">
     <label>チェック完了解除日時<input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
-    <button type="button" id="resetSmaregiCompletionBtn" class="secondary">チェック完了解除（責任者のみ）</button>
+    <button type="button" id="resetSmaregiCompletionBtn" class="secondary">チェック完了解除（管理者のみ）</button>
   </div>
   <div class="table-wrap">
     <table class="smaregi-check-table">
@@ -121,7 +131,7 @@
     </table>
   </div>
   </section>
-  <section id="smaregiDiffOnlyPanel" class="card wide smaregi-diff-panel smaregi-work-card" hidden>
+  <section id="smaregiDiffOnlyPanel" class="card wide smaregi-diff-panel smaregi-work-card" data-inventory-screen="analytics" hidden>
     <div class="section-title">
       <div>
         <h2>差異一覧</h2>
@@ -142,7 +152,7 @@
     </div>
     <div id="smaregiCauseDetail" class="smaregi-cause-detail" hidden></div>
   </section>
-  <section id="smaregiReasonSummaryPanel" class="card wide smaregi-diff-panel smaregi-work-card" hidden>
+  <section id="smaregiReasonSummaryPanel" class="card wide smaregi-diff-panel smaregi-work-card" data-inventory-screen="analytics" hidden>
     <div class="section-title">
       <div>
         <h2>原因集計</h2>

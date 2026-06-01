@@ -4,7 +4,6 @@
 let smaregiSnapshot=null;
 let smaregiStockItems=[];
 let smaregiStockChecks=[];
-const SMAREGI_MANAGER_NAME="田中";
 const SMAREGI_DIFFERENCE_REASON_CATEGORIES=["入力ミス","出荷処理漏れ","入荷処理漏れ","備品転用","サンプル使用","商品持ち出し","返品処理漏れ","スマレジ登録ミス","棚違い","不明"];
 let smaregiAutoRefreshTimer=null;
 let smaregiAutoRefreshBusy=false;
@@ -88,17 +87,19 @@ function getSmaregiItemGroup(item){
 }
 
 function isSmaregiManager(){
-  return getSmaregiCheckerName()===SMAREGI_MANAGER_NAME;
+  return typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
 }
 
 function updateSmaregiManagerControls(){
   const manager=isSmaregiManager();
+  const settingsAccess=typeof hasInventorySettingsAccess==="function"&&hasInventorySettingsAccess();
+  const analyticsActive=document.body.dataset.inventoryScreen==="analytics";
   const sync=el("syncSmaregiStockBtn");
   const complete=el("completeSmaregiStockCheckBtn");
   const reset=el("resetSmaregiCompletionBtn");
   if(sync){
-    sync.disabled=!manager;
-    sync.hidden=!manager;
+    sync.disabled=!settingsAccess;
+    sync.hidden=!settingsAccess;
     sync.classList.add("smaregi-manager-control");
   }
   if(complete){
@@ -108,9 +109,9 @@ function updateSmaregiManagerControls(){
     complete.textContent="今回のチェックを完了";
   }
   const diffPanel=el("smaregiDiffOnlyPanel");
-  if(diffPanel)diffPanel.hidden=!manager;
+  if(diffPanel)diffPanel.hidden=!(manager&&analyticsActive);
   const reasonSummaryPanel=el("smaregiReasonSummaryPanel");
-  if(reasonSummaryPanel)reasonSummaryPanel.hidden=!manager;
+  if(reasonSummaryPanel)reasonSummaryPanel.hidden=!(manager&&analyticsActive);
   if(reset){
     reset.disabled=!manager;
     reset.hidden=!manager;
@@ -164,6 +165,21 @@ function getSmaregiProgressHtml(){
     </div>`;
 }
 
+function getSmaregiGeneralProgressHtml(){
+  const stats=getSmaregiStats();
+  return `
+    <div class="smaregi-progress-card-inner">
+      <div class="smaregi-progress-main">チェック済み <span>${stats.completed} / ${stats.total}</span></div>
+      <div class="smaregi-progress-sub">除外 ${stats.excluded}　残り ${stats.unchecked}件</div>
+      <div class="smaregi-progress-area">
+        <div class="smaregi-progress-graph" role="progressbar" aria-label="棚卸進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stats.percent}">
+          <div class="smaregi-progress-fill" style="width:${stats.percent}%"></div>
+        </div>
+        <div class="smaregi-progress-text">進捗 ${stats.percent}%</div>
+      </div>
+    </div>`;
+}
+
 function updateSmaregiProgressGraph(){
   const stats=getSmaregiStats();
   const graph=el("smaregiProgressGraph");
@@ -203,6 +219,8 @@ function renderSmaregiStockChecks(){
   }
   const progress=el("smaregiProgressBadge");
   if(progress)progress.innerHTML=getSmaregiProgressHtml();
+  const generalProgress=el("inventoryGeneralProgressBadge");
+  if(generalProgress)generalProgress.innerHTML=getSmaregiGeneralProgressHtml();
   updateSmaregiProgressGraph();
   updateSmaregiManagerControls();
   const resetInput=el("resetSmaregiCompletedAtInput");
@@ -348,7 +366,7 @@ function renderSmaregiDiffOnlyPanel(){
 
 function showSmaregiDiffOnlyPanel(){
   if(!isSmaregiManager()){
-    showMessage("今回の差異一覧は責任者のみ確認できます。","err");
+    showMessage("差異一覧は分析画面のパスワード認証後に確認できます。","err");
     return;
   }
   const panel=el("smaregiDiffOnlyPanel");
@@ -371,7 +389,7 @@ async function handleSmaregiRowSave(button){
 
 async function handleSmaregiDiffSave(button){
   if(!isSmaregiManager()){
-    showMessage("差異一覧の数量修正は責任者「田中」のみ操作できます。","err");
+    showMessage("差異一覧の数量修正はパスワード認証済みの管理者のみ操作できます。","err");
     return;
   }
   const barcode=String(button.dataset.barcode||"");
@@ -385,7 +403,7 @@ async function handleSmaregiDiffSave(button){
 
 async function markSmaregiDifferenceNoIssue(barcode,button=null){
   if(!isSmaregiManager()){
-    showMessage("差異の問題なし処理は責任者「田中」のみ操作できます。","err");
+    showMessage("差異の問題なし処理はパスワード認証済みの管理者のみ操作できます。","err");
     return;
   }
   if(!smaregiSnapshot||!confirm("この差異を問題なしとして処理しますか？"))return;
@@ -441,8 +459,8 @@ async function loadLatestSmaregiSnapshot(){
 }
 
 async function syncSmaregiStockFromApi(){
-  if(!isSmaregiManager()){
-    showMessage("スマレジデータ取り込みは責任者「田中」のみ操作できます。","err");
+  if(!(typeof hasInventorySettingsAccess==="function"&&hasInventorySettingsAccess())){
+    showMessage("スマレジ変動商品データ取り込みは設定画面のパスワード認証後に操作できます。","err");
     return;
   }
   try{
@@ -505,7 +523,7 @@ async function applySmaregiActualStocksToSheet(completedBy){
 
 async function completeSmaregiStockCheck(){
   if(!isSmaregiManager()){
-    showMessage("責任者「田中」のみ操作できます。","err");
+    showMessage("パスワード認証済みの管理者のみ操作できます。","err");
     return;
   }
   if(!smaregiSnapshot){
@@ -552,7 +570,7 @@ async function completeSmaregiStockCheck(){
 
 async function resetSmaregiStockCheckCompletion(){
   if(!isSmaregiManager()){
-    showMessage("責任者「田中」のみ操作できます。","err");
+    showMessage("パスワード認証済みの管理者のみ操作できます。","err");
     return;
   }
   if(!smaregiSnapshot){
@@ -692,7 +710,7 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
 
 async function excludeSmaregiStockItem(barcode){
   if(!isSmaregiManager()){
-    showMessage("除外は責任者のみ操作できます。","err");
+    showMessage("除外はパスワード認証済みの管理者のみ操作できます。","err");
     return false;
   }
   if(!smaregiSnapshot)return false;
@@ -754,7 +772,7 @@ async function excludeSmaregiStockItem(barcode){
 
 async function clearSmaregiStockCheck(barcode){
   if(!isSmaregiManager()){
-    showMessage("除外解除は責任者のみ操作できます。","err");
+    showMessage("除外解除はパスワード認証済みの管理者のみ操作できます。","err");
     return false;
   }
   const item=smaregiStockItems.find(row=>String(row.barcode)===String(barcode));
@@ -891,7 +909,7 @@ async function smaregiHistoricalDifferenceCsvRows(){
 
 async function exportSmaregiCheckCsv(differenceOnly=false){
   if(differenceOnly&&!isSmaregiManager()){
-    showMessage("差異のみCSVは責任者「田中」のみダウンロードできます。","err");
+    showMessage("差異のみCSVはパスワード認証済みの管理者のみダウンロードできます。","err");
     return;
   }
   if(!differenceOnly&&!smaregiSnapshot){
@@ -912,6 +930,20 @@ async function refreshSmaregiChecksFromSupabase(){
   const snapshotId=encodeURIComponent(smaregiSnapshot.id);
   smaregiStockChecks=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=eq.${snapshotId}&order=checked_at.desc`,1000,20000);
   await fetchProductsByBarcodes(smaregiStockItems.map(item=>item.barcode));
+  renderSmaregiStockChecks();
+}
+
+async function loadLatestSmaregiProgressStateSilently(){
+  const snapshots=await sb("smaregi_stock_snapshots?select=*&order=imported_at.desc&limit=1");
+  smaregiSnapshot=Array.isArray(snapshots)&&snapshots.length ? snapshots[0] : null;
+  smaregiStockItems=[];
+  smaregiStockChecks=[];
+  if(smaregiSnapshot){
+    const snapshotId=encodeURIComponent(smaregiSnapshot.id);
+    smaregiStockItems=await sbAll(`smaregi_stock_items?select=*&snapshot_id=eq.${snapshotId}&order=product_name.asc`,1000,20000);
+    smaregiStockChecks=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=eq.${snapshotId}&order=checked_at.desc`,1000,20000);
+    await fetchProductsByBarcodes(smaregiStockItems.map(item=>item.barcode));
+  }
   renderSmaregiStockChecks();
 }
 
@@ -939,11 +971,14 @@ async function runWithSmaregiAutoRefreshPaused(task,{button=null,refresh=true}={
 }
 
 async function refreshSmaregiCheckStateSilently(){
-  if(smaregiMutationBusy||smaregiAutoRefreshBusy||!smaregiSnapshot||el("smaregiStockCheckCard")?.hidden)return;
+  const smaregiVisible=!el("smaregiStockCheckCard")?.hidden;
+  const generalProgressVisible=!el("inventoryGeneralProgressCard")?.hidden;
+  if(smaregiMutationBusy||smaregiAutoRefreshBusy||(!smaregiVisible&&!generalProgressVisible))return;
   smaregiAutoRefreshBusy=true;
-  const focused=getFocusedSmaregiInputState();
+  const focused=smaregiVisible ? getFocusedSmaregiInputState() : null;
   try{
-    await refreshSmaregiChecksFromSupabase();
+    if(smaregiSnapshot)await refreshSmaregiChecksFromSupabase();
+    else await loadLatestSmaregiProgressStateSilently();
     restoreFocusedSmaregiInputState(focused);
     if(!el("smaregiAccuracyPanel")?.hidden)await loadSmaregiAccuracy();
     console.log("[Smaregi Auto Refresh]",getSmaregiStats());

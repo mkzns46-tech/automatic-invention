@@ -51,7 +51,7 @@ function buildSmaregiChangeRows(smaregiChanges,appLogs){
 
 async function showSmaregiCauseDetail(barcode){
   if(!isSmaregiManager()){
-    showMessage("原因確認は責任者のみ操作できます。","err");
+    showMessage("原因確認は分析画面のパスワード認証後に操作できます。","err");
     return;
   }
   const detail=el("smaregiCauseDetail");
@@ -125,7 +125,7 @@ async function showSmaregiCauseDetail(barcode){
 
 async function saveSmaregiDifferenceReason(barcode,button=null){
   if(!isSmaregiManager()){
-    showMessage("原因登録は責任者のみ操作できます。","err");
+    showMessage("原因登録は分析画面のパスワード認証後に操作できます。","err");
     return;
   }
   const check=getSmaregiCheck(barcode);
@@ -270,9 +270,9 @@ function renderSmaregiReasonSummary(){
   if(message)message.textContent=`原因カテゴリ：${smaregiReasonSummaryRows.length}件`;
 }
 
-async function showSmaregiReasonSummary(){
+async function showSmaregiReasonSummary({scroll=true}={}){
   if(!isSmaregiManager()){
-    showMessage("差異原因集計は責任者のみ確認できます。","err");
+    showMessage("差異原因集計は分析画面のパスワード認証後に確認できます。","err");
     return;
   }
   const panel=el("smaregiReasonSummaryPanel");
@@ -283,7 +283,7 @@ async function showSmaregiReasonSummary(){
   try{
     smaregiReasonSummaryRows=getSmaregiReasonSummaryRows(await loadSmaregiHistoricalDifferenceRows());
     renderSmaregiReasonSummary();
-    panel.scrollIntoView({behavior:"smooth",block:"start"});
+    if(scroll)panel.scrollIntoView({behavior:"smooth",block:"start"});
   }catch(e){
     if(message)message.textContent="差異原因集計エラー。\n"+e.message;
   }
