@@ -1698,6 +1698,7 @@ body[data-inventory-screen="inventory"] .grid > [data-inventory-screen="inventor
 body[data-inventory-screen="history"] .grid > [data-inventory-screen="history"]:not([hidden]),
 body[data-inventory-screen="smaregi"] .grid > [data-inventory-screen="smaregi"]:not([hidden]),
 body[data-inventory-screen="analytics"] .grid > [data-inventory-screen="analytics"]:not([hidden]),
+body[data-inventory-screen="booth-analytics"] .grid > [data-inventory-screen="booth-analytics"]:not([hidden]),
 body[data-inventory-screen="settings"] .grid > [data-inventory-screen="settings"]:not([hidden]){
   display:block !important;
   visibility:visible !important;
@@ -1711,6 +1712,24 @@ body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden])
   display:block !important;
   visibility:visible !important;
   height:auto !important;
+}
+.booth-analytics-placeholder-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.booth-analytics-placeholder-grid div{
+  padding:18px;
+  border:1px solid #dcebe1;
+  border-radius:14px;
+  background:#f8fbf9;
+  color:var(--main-dark);
+  font-weight:800;
+}
+@media(max-width:800px){
+  .booth-analytics-placeholder-grid{
+    grid-template-columns:1fr;
+  }
 }
 .staff-admin-section .staff-edit-btn{
   margin-right:6px;
@@ -3342,5 +3361,16 @@ body[data-inventory-screen="settings"] #productImportCard:not([hidden]){
   }
   .smaregi-progress-card-inner{
     padding:14px !important;
+  }
+}
+
+/* ===== inventory analytics administrator actions ===== */
+@media(max-width:800px){
+  body[data-inventory-screen="analytics"] #smaregiCompletionPanel .smaregi-action-grid button:not([hidden]){
+    display:block !important;
+    width:100% !important;
+  }
+  body[data-inventory-screen="analytics"] #smaregiCompletionPanel .smaregi-reset-panel:not([hidden]){
+    display:grid !important;
   }
 }

@@ -25,8 +25,8 @@ const INVENTORY_APP_MENU_SECTIONS=[
     {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
   ]},
   {label:"分析",items:[
-    {key:"accuracy",label:"棚卸精度",action:"accuracy"},
-    {key:"reasons",label:"原因集計",action:"reasons"}
+    {key:"inventory-analytics",label:"棚卸分析",action:"inventory-analytics"},
+    {key:"booth-analytics",label:"ブース分析",action:"booth-analytics"}
   ]},
   {label:"設定",items:[
     {key:"settings",label:"設定",action:"settings"}
@@ -80,10 +80,10 @@ function renderInventoryAppMenu(){
   if(boothButton)boothButton.addEventListener("click",()=>showPopup("ブース管理","準備中です。"));
   const adminAuthButton=menu.querySelector('[data-menu-action="admin-auth"]');
   if(adminAuthButton)adminAuthButton.addEventListener("click",authenticateInventoryAdmin);
-  const accuracyButton=menu.querySelector('[data-menu-action="accuracy"]');
-  if(accuracyButton)accuracyButton.addEventListener("click",()=>showInventoryAnalyticsSection("accuracy","smaregiAccuracyPanel"));
-  const reasonsButton=menu.querySelector('[data-menu-action="reasons"]');
-  if(reasonsButton)reasonsButton.addEventListener("click",()=>showInventoryAnalyticsSection("reasons","smaregiReasonSummaryPanel"));
+  const inventoryAnalyticsButton=menu.querySelector('[data-menu-action="inventory-analytics"]');
+  if(inventoryAnalyticsButton)inventoryAnalyticsButton.addEventListener("click",showInventoryAnalytics);
+  const boothAnalyticsButton=menu.querySelector('[data-menu-action="booth-analytics"]');
+  if(boothAnalyticsButton)boothAnalyticsButton.addEventListener("click",showBoothAnalytics);
   const portalButton=menu.querySelector('[data-menu-action="portal"]');
   if(portalButton)portalButton.addEventListener("click",goToPortal);
   const settingsButton=menu.querySelector('[data-menu-action="settings"]');
@@ -180,11 +180,16 @@ function showInventorySettingsSection(menuKey,targetId){
 
 function showInventoryAnalytics(){
   if(!unlockInventoryScreen("analytics"))return;
-  showInventoryScreen("analytics");
+  showInventoryScreen("analytics","inventory-analytics");
   if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();
   if(typeof loadSmaregiDifferenceRanking==="function")loadSmaregiDifferenceRanking();
   if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
   if(typeof showSmaregiReasonSummary==="function")showSmaregiReasonSummary({scroll:false});
+}
+
+function showBoothAnalytics(){
+  if(!unlockInventoryScreen("analytics"))return;
+  showInventoryScreen("booth-analytics");
 }
 
 function showInventoryAnalyticsSection(menuKey,targetId){
