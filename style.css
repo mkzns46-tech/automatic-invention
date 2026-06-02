@@ -3375,18 +3375,21 @@ body[data-inventory-screen="settings"] #productImportCard:not([hidden]){
   .smaregi-date-filter,
   .smaregi-ranking-filter{
     display:grid !important;
-    grid-template-columns:1fr !important;
-    gap:8px !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:6px 8px !important;
     width:100% !important;
     max-width:100% !important;
     box-sizing:border-box !important;
+    margin:8px 0 !important;
   }
   .smaregi-date-filter label,
   .smaregi-ranking-filter label{
     width:100% !important;
+    min-width:0 !important;
     max-width:100% !important;
     margin:0 !important;
     font-size:12px !important;
+    line-height:1.2 !important;
   }
   .smaregi-date-filter input[type="date"],
   .smaregi-date-filter input[type="datetime-local"],
@@ -3394,23 +3397,40 @@ body[data-inventory-screen="settings"] #productImportCard:not([hidden]){
   .smaregi-ranking-filter input[type="datetime-local"]{
     display:block !important;
     width:100% !important;
+    min-width:0 !important;
     max-width:100% !important;
     height:42px !important;
     min-height:42px !important;
-    padding:6px 10px !important;
+    max-height:42px !important;
+    padding:4px 6px !important;
     box-sizing:border-box !important;
     font-size:14px !important;
+    line-height:1.2 !important;
   }
   .smaregi-date-filter button,
   .smaregi-ranking-filter button{
+    grid-column:1 / -1 !important;
     width:100% !important;
+    min-width:0 !important;
     max-width:100% !important;
     height:42px !important;
     min-height:42px !important;
+    max-height:42px !important;
     margin:0 !important;
-    padding:6px 10px !important;
+    padding:4px 8px !important;
     box-sizing:border-box !important;
     font-size:14px !important;
+  }
+  #smaregiDifferenceRankingPanel,
+  #smaregiDiffOnlyPanel,
+  #smaregiReasonSummaryPanel{
+    padding:12px !important;
+  }
+}
+@media(max-width:360px){
+  .smaregi-date-filter,
+  .smaregi-ranking-filter{
+    grid-template-columns:1fr !important;
   }
 }
 
