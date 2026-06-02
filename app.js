@@ -60,6 +60,8 @@ function bindEvents(){
   on("allDataCsvBtn","click",exportAllDataCsv);
   on("exportAllCsvBtn","click",exportAllDataCsv);
   on("productHistoryCsvBtn","click",exportProductHistoryCsv);
+  on("globalHistoryTabBtn","click",()=>showInventoryHistoryTab("global"));
+  on("productHistoryTabBtn","click",()=>showInventoryHistoryTab("product"));
   on("csvFile","change",e=>importCsvFile(e.target.files&&e.target.files[0]));
   on("downloadSampleCsvBtn","click",downloadSampleCsv);
   on("importSmaregiProductsBtn","click",importSmaregiProducts);

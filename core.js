@@ -16,8 +16,7 @@ const el=(id)=>document.getElementById(id);
 const INVENTORY_APP_MENU_SECTIONS=[
   {label:"在庫管理",items:[
     {key:"inventory",label:"在庫変動登録",action:"inventory"},
-    {key:"history",label:"全体履歴",action:"history"},
-    {key:"product-history",label:"商品別履歴",action:"product-history"}
+    {key:"history",label:"履歴確認",action:"history"}
   ]},
   {label:"棚卸作業",items:[
     {key:"smaregi",label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"}
@@ -30,8 +29,7 @@ const INVENTORY_APP_MENU_SECTIONS=[
     {key:"reasons",label:"原因集計",action:"reasons"}
   ]},
   {label:"設定",items:[
-    {key:"product-import",label:"商品データ取り込み",action:"product-import"},
-    {key:"staff-settings",label:"担当者設定",action:"staff-settings"}
+    {key:"settings",label:"設定",action:"settings"}
   ]}
 ];
 const INVENTORY_APP_MENU_FOOTER_ITEMS=[
@@ -78,8 +76,6 @@ function renderInventoryAppMenu(){
   if(inventoryButton)inventoryButton.addEventListener("click",showInventoryRegistration);
   const historyButton=menu.querySelector('[data-menu-action="history"]');
   if(historyButton)historyButton.addEventListener("click",showInventoryHistory);
-  const productHistoryButton=menu.querySelector('[data-menu-action="product-history"]');
-  if(productHistoryButton)productHistoryButton.addEventListener("click",showInventoryProductHistory);
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
   if(boothButton)boothButton.addEventListener("click",()=>showPopup("ブース管理","準備中です。"));
   const adminAuthButton=menu.querySelector('[data-menu-action="admin-auth"]');
@@ -90,10 +86,8 @@ function renderInventoryAppMenu(){
   if(reasonsButton)reasonsButton.addEventListener("click",()=>showInventoryAnalyticsSection("reasons","smaregiReasonSummaryPanel"));
   const portalButton=menu.querySelector('[data-menu-action="portal"]');
   if(portalButton)portalButton.addEventListener("click",goToPortal);
-  const productImportButton=menu.querySelector('[data-menu-action="product-import"]');
-  if(productImportButton)productImportButton.addEventListener("click",()=>showInventorySettingsSection("product-import","productImportCard"));
-  const staffSettingsButton=menu.querySelector('[data-menu-action="staff-settings"]');
-  if(staffSettingsButton)staffSettingsButton.addEventListener("click",()=>showInventorySettingsSection("staff-settings","staffSettingsCard"));
+  const settingsButton=menu.querySelector('[data-menu-action="settings"]');
+  if(settingsButton)settingsButton.addEventListener("click",showInventorySettings);
   const logoutButton=menu.querySelector('[data-menu-action="logout"]');
   if(logoutButton)logoutButton.addEventListener("click",logout);
   bindInventoryMenuDrawer();
@@ -118,13 +112,27 @@ function showInventoryRegistration(){
 
 function showInventoryHistory(){
   showInventoryScreen("history");
+  showInventoryHistoryTab("global");
   if(typeof renderGlobalHistory==="function")renderGlobalHistory();
 }
 
 function showInventoryProductHistory(){
-  setInventoryAppMenuActive("product-history");
+  showInventoryScreen("history");
+  showInventoryHistoryTab("product");
   scrollInventoryPanelIntoView("productHistoryCard");
-  closeInventoryMenuDrawer();
+}
+
+function showInventoryHistoryTab(tab){
+  const productSelected=tab==="product";
+  const globalCard=el("globalHistoryCard");
+  const productCard=el("productHistoryCard");
+  if(globalCard)globalCard.hidden=productSelected;
+  if(productCard)productCard.hidden=!productSelected;
+  document.querySelectorAll("[data-history-tab]").forEach(button=>{
+    const active=button.dataset.historyTab===tab;
+    button.classList.toggle("is-active",active);
+    button.setAttribute("aria-selected",String(active));
+  });
 }
 
 function hasInventoryPrivilegedAccess(){

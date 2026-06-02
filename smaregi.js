@@ -798,6 +798,7 @@ async function clearSmaregiStockCheck(barcode){
 async function openHistoryFromSmaregi(barcode){
   const input=el("productHistoryBarcodeInput");
   if(input)input.value=barcode;
+  showInventoryProductHistory();
   await showProductHistoryForBarcode(barcode);
   el("productHistoryCard")?.scrollIntoView({behavior:"smooth",block:"start"});
 }
