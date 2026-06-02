@@ -101,7 +101,7 @@ function unlockInventoryScreen(screen){
   if(unlocked)return true;
   const password=prompt(`${isSettings?"設定":"分析"}画面のパスワードを入力してください。`);
   if(String(password||"").trim()!==INVENTORY_ADMIN_PASSWORD){
-    if(password!==null)showPopup("認証エラー","パスワードが違います。");
+    if(password!==null)showMessage("パスワードが違います。","err");
     return false;
   }
   sessionStorage.setItem(isSettings?INVENTORY_SETTINGS_UNLOCK_KEY:INVENTORY_ANALYTICS_UNLOCK_KEY,"1");
@@ -174,6 +174,7 @@ function hidePopup(){
 }
 
 function showMessage(text,type="",options={}){
+  if(type==="ok")playSuccessSound();
   if(type==="err"){
     playErrorSound();
     if(options.popup!==false)showPopup("エラー",text);
@@ -188,69 +189,50 @@ function showMessage(text,type="",options={}){
   m.className="message "+type;
 }
 
+function playSuccessSound(){
+  try{
+    const audio=new Audio("/sounds/success.mp3");
+    audio.volume=0.6;
+    audio.play().catch(()=>playFallbackNotificationTone("success"));
+  }catch(_){
+    playFallbackNotificationTone("success");
+  }
+}
+
 function playErrorSound(){
+  try{
+    const audio=new Audio("/sounds/error.mp3");
+    audio.volume=0.7;
+    audio.play().catch(()=>playFallbackNotificationTone("error"));
+  }catch(_){
+    playFallbackNotificationTone("error");
+  }
+}
+
+function playFallbackNotificationTone(type){
   try{
     const AudioContextClass=window.AudioContext||window.webkitAudioContext;
     if(!AudioContextClass)return;
     const ctx=new AudioContextClass();
+    const osc=ctx.createOscillator();
     const gain=ctx.createGain();
-    const first=ctx.createOscillator();
-    const second=ctx.createOscillator();
     const now=ctx.currentTime;
+    const isError=type==="error";
 
-    gain.gain.setValueAtTime(0.0001,now);
-    gain.gain.exponentialRampToValueAtTime(0.1,now+0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001,now+0.32);
-
-    first.type="sawtooth";
-    first.frequency.setValueAtTime(240,now);
-    first.frequency.exponentialRampToValueAtTime(150,now+0.18);
-    second.type="square";
-    second.frequency.setValueAtTime(120,now+0.12);
-
-    first.connect(gain);
-    second.connect(gain);
-    gain.connect(ctx.destination);
-    first.start(now);
-    first.stop(now+0.2);
-    second.start(now+0.12);
-    second.stop(now+0.3);
-
-    setTimeout(()=>{
-      try{ctx.close();}catch(_){}
-    },360);
-  }catch(_){}
-}
-
-
-function beep(ok=true){
-  try{
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = "square";
-    osc.frequency.value = ok ? 880 : 220;
-
-    gain.gain.setValueAtTime(ok ? 0.14 : 0.08, ctx.currentTime);
-
+    osc.type=isError?"square":"sine";
+    osc.frequency.setValueAtTime(isError?220:740,now);
+    if(isError)osc.frequency.setValueAtTime(160,now+0.12);
+    else osc.frequency.setValueAtTime(980,now+0.08);
+    gain.gain.setValueAtTime(isError?0.08:0.06,now);
+    gain.gain.exponentialRampToValueAtTime(0.0001,now+(isError?0.24:0.16));
     osc.connect(gain);
     gain.connect(ctx.destination);
-
-    osc.start();
-
-    gain.gain.exponentialRampToValueAtTime(
-      0.0001,
-      ctx.currentTime + (ok ? 0.12 : 0.22)
-    );
-
-    setTimeout(() => {
-      try{ osc.stop(); }catch(_){}
-      try{ ctx.close(); }catch(_){}
-    }, ok ? 140 : 240);
-
-  } catch (_) {}
+    osc.start(now);
+    osc.stop(now+(isError?0.25:0.17));
+    setTimeout(()=>{
+      try{ctx.close();}catch(_){}
+    },isError?280:200);
+  }catch(_){}
 }
 
 

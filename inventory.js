@@ -200,6 +200,7 @@ async function renderScanPreview(){
     if(!p){
       info.textContent=`未登録バーコード：${barcode}`;
       info.className="message err";
+      showMessage(`未登録バーコード：${barcode}`,"err");
       return;
     }
 
@@ -208,6 +209,7 @@ async function renderScanPreview(){
   }catch(e){
     info.textContent="商品確認エラー。\n"+e.message;
     info.className="message err";
+    showMessage("商品確認エラー。\n"+e.message,"err");
   }
 }
 
@@ -382,7 +384,6 @@ async function registerBarcode(barcode){
       memo
     });
 
-    beep(true);
     showMessage(type==="在庫修正"
       ?`在庫修正：${p.name} / 現在庫を ${qty} に上書き / 担当者：${staff}`
       :`${type}登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock}`
@@ -571,7 +572,6 @@ async function handleScannedCode(code){
   if(el("productNameSearchInput"))el("productNameSearchInput").value="";
   if(el("productSearchResults"))el("productSearchResults").classList.remove("is-active");
   await syncHistoryFromScanBarcode();
-  beep(true);
   await stopCamera();
 }
 
