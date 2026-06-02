@@ -1696,6 +1696,7 @@ td small{margin-top:4px;color:#527161}
 }
 body[data-inventory-screen="inventory"] .grid > [data-inventory-screen="inventory"]:not([hidden]),
 body[data-inventory-screen="history"] .grid > [data-inventory-screen="history"]:not([hidden]),
+body[data-inventory-screen="product-history"] .grid > [data-inventory-screen="product-history"]:not([hidden]),
 body[data-inventory-screen="smaregi"] .grid > [data-inventory-screen="smaregi"]:not([hidden]),
 body[data-inventory-screen="analytics"] .grid > [data-inventory-screen="analytics"]:not([hidden]),
 body[data-inventory-screen="settings"] .grid > [data-inventory-screen="settings"]:not([hidden]){
@@ -2246,25 +2247,6 @@ body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden])
   padding:8px 10px !important;
   font-size:13px;
 }
-#productHistoryToggleBtn{
-  width:auto;
-  margin:0;
-}
-#productHistoryContent[hidden]{
-  display:none !important;
-}
-@media(max-width:800px){
-  #productHistoryCard.mobile-history-section{
-    display:none !important;
-    visibility:hidden !important;
-    height:0 !important;
-    padding:0 !important;
-    margin:0 !important;
-    border:0 !important;
-    overflow:hidden !important;
-  }
-}
-
 /* ===== v98 PC差異一覧専用レイアウト ===== */
 .smaregi-diff-table{
   width:100%;

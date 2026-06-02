@@ -73,13 +73,6 @@ function bindEvents(){
   });
 
   on("showAllSelectedHistoryBtn","click",()=>showProductHistoryForBarcode(selectedBarcode));
-  on("productHistoryToggleBtn","click",()=>{
-    const content=el("productHistoryContent");
-    const toggle=el("productHistoryToggleBtn");
-    if(!content||!toggle)return;
-    content.hidden=!content.hidden;
-    toggle.textContent=content.hidden ? "商品別履歴を開く" : "商品別履歴を閉じる";
-  });
   updateEquipmentMemoUi();
 }
 

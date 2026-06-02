@@ -16,7 +16,8 @@ const el=(id)=>document.getElementById(id);
 const INVENTORY_APP_MENU_SECTIONS=[
   {label:"在庫管理",items:[
     {key:"inventory",label:"在庫変動登録",action:"inventory"},
-    {key:"history",label:"全体履歴",action:"history"}
+    {key:"history",label:"全体履歴",action:"history"},
+    {key:"product-history",label:"商品別履歴",action:"product-history"}
   ]},
   {label:"棚卸作業",items:[
     {key:"smaregi",label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"}
@@ -28,7 +29,7 @@ const INVENTORY_APP_MENU_SECTIONS=[
   {label:"イベント販売",items:[
     {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
   ]},
-  {label:"管理",items:[
+  {label:"設定",items:[
     {key:"product-import",label:"商品データ取り込み",action:"product-import"},
     {key:"staff-settings",label:"担当者設定",action:"staff-settings"}
   ]}
@@ -76,6 +77,8 @@ function renderInventoryAppMenu(){
   if(inventoryButton)inventoryButton.addEventListener("click",showInventoryRegistration);
   const historyButton=menu.querySelector('[data-menu-action="history"]');
   if(historyButton)historyButton.addEventListener("click",showInventoryHistory);
+  const productHistoryButton=menu.querySelector('[data-menu-action="product-history"]');
+  if(productHistoryButton)productHistoryButton.addEventListener("click",showInventoryProductHistory);
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
   if(boothButton)boothButton.addEventListener("click",()=>showPopup("ブース管理","準備中です。"));
   const accuracyButton=menu.querySelector('[data-menu-action="accuracy"]');
@@ -112,6 +115,10 @@ function showInventoryRegistration(){
 function showInventoryHistory(){
   showInventoryScreen("history");
   if(typeof renderGlobalHistory==="function")renderGlobalHistory();
+}
+
+function showInventoryProductHistory(){
+  showInventoryScreen("product-history");
 }
 
 function hasInventorySettingsAccess(){
