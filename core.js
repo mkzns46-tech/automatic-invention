@@ -112,27 +112,12 @@ function showInventoryRegistration(){
 
 function showInventoryHistory(){
   showInventoryScreen("history");
-  showInventoryHistoryTab("global");
   if(typeof renderGlobalHistory==="function")renderGlobalHistory();
 }
 
 function showInventoryProductHistory(){
   showInventoryScreen("history");
-  showInventoryHistoryTab("product");
   scrollInventoryPanelIntoView("productHistoryCard");
-}
-
-function showInventoryHistoryTab(tab){
-  const productSelected=tab==="product";
-  const globalCard=el("globalHistoryCard");
-  const productCard=el("productHistoryCard");
-  if(globalCard)globalCard.hidden=productSelected;
-  if(productCard)productCard.hidden=!productSelected;
-  document.querySelectorAll("[data-history-tab]").forEach(button=>{
-    const active=button.dataset.historyTab===tab;
-    button.classList.toggle("is-active",active);
-    button.setAttribute("aria-selected",String(active));
-  });
 }
 
 function hasInventoryPrivilegedAccess(){

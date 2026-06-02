@@ -3344,29 +3344,3 @@ body[data-inventory-screen="settings"] #productImportCard:not([hidden]){
     padding:14px !important;
   }
 }
-
-/* ===== history confirmation tabs ===== */
-.history-tabs-card{
-  padding:10px !important;
-}
-.history-tabs{
-  display:flex;
-  gap:8px;
-}
-.history-tab{
-  width:auto;
-  flex:1;
-  margin:0;
-  background:#dcebe1;
-  color:var(--main-dark);
-}
-.history-tab.is-active{
-  background:var(--main);
-  color:#fff;
-}
-.history-tab-panel[hidden],
-#productHistoryCard.history-tab-panel[hidden],
-#globalHistoryCard.history-tab-panel[hidden]{
-  display:none !important;
-  visibility:hidden !important;
-}
