@@ -3294,3 +3294,43 @@ body[data-inventory-screen="settings"] #productImportCard:not([hidden]){
     max-height:12px !important;
   }
 }
+
+/* ===== Smaregi progress card height reset ===== */
+.smaregi-progress-row{
+  align-items:start !important;
+}
+#smaregiProgressBadge,
+.smaregi-progress-card-inner,
+.smaregi-progress-area{
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  align-self:flex-start !important;
+  flex:0 0 auto !important;
+  animation:none !important;
+}
+#smaregiProgressBadge{
+  align-items:flex-start !important;
+}
+.smaregi-progress-card-inner{
+  display:block !important;
+  padding:16px !important;
+  overflow:hidden !important;
+}
+@media(max-width:800px){
+  #smaregiProgressBadge,
+  .smaregi-progress-card-inner,
+  .smaregi-progress-area{
+    height:auto !important;
+    min-height:0 !important;
+    max-height:none !important;
+    flex:none !important;
+    align-self:flex-start !important;
+  }
+  .smaregi-progress-row{
+    align-items:start !important;
+  }
+  .smaregi-progress-card-inner{
+    padding:14px !important;
+  }
+}
