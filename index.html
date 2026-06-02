@@ -86,21 +86,6 @@
     </div>
   </div>
 </section>
-<section id="smaregiCompletionPanel" class="card wide smaregi-completion-analysis-card" data-inventory-screen="analytics" hidden>
-  <div class="section-title">
-    <div>
-      <h2>スマレジ変動商品チェック完了</h2>
-      <p class="section-note">管理者認証済みの場合のみ、チェック完了と完了解除を操作できます。</p>
-    </div>
-  </div>
-  <div class="smaregi-toolbar smaregi-action-grid">
-    <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
-  </div>
-  <div class="smaregi-reset-panel">
-    <label>チェック完了解除日時<input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
-    <button type="button" id="resetSmaregiCompletionBtn" class="secondary">チェック完了解除（管理者のみ）</button>
-  </div>
-</section>
 <section id="smaregiDifferenceRankingPanel" class="card smaregi-difference-ranking-card" data-inventory-screen="analytics" hidden>
   <div class="section-title">
     <div>
@@ -119,6 +104,21 @@
       <thead><tr><th>順位</th><th>商品コード</th><th>商品名</th><th>差異回数</th><th>差異数量</th><th>主な原因</th></tr></thead>
       <tbody id="smaregiDifferenceRankingBody"></tbody>
     </table>
+  </div>
+</section>
+<section id="smaregiCompletionPanel" class="card wide smaregi-completion-analysis-card" data-inventory-screen="analytics" hidden>
+  <div class="section-title">
+    <div>
+      <h2>スマレジ変動商品チェック完了</h2>
+      <p class="section-note">管理者認証済みの場合のみ、チェック完了と完了解除を操作できます。</p>
+    </div>
+  </div>
+  <div class="smaregi-toolbar smaregi-action-grid">
+    <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
+  </div>
+  <div class="smaregi-reset-panel">
+    <label>チェック完了解除日時<input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
+    <button type="button" id="resetSmaregiCompletionBtn" class="secondary">チェック完了解除（管理者のみ）</button>
   </div>
 </section>
 

@@ -829,8 +829,7 @@ header h1{
 
 /* 商品別履歴はスマホでも表示 */
 @media(max-width:800px){
-  #productHistoryCard,
-  .mobile-history-section{
+  body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     display:block !important;
     visibility:visible !important;
     height:auto !important;
@@ -3372,5 +3371,49 @@ body[data-inventory-screen="settings"] #productImportCard:not([hidden]){
   }
   body[data-inventory-screen="analytics"] #smaregiCompletionPanel .smaregi-reset-panel:not([hidden]){
     display:grid !important;
+  }
+}
+
+/* ===== final history screen visibility guard ===== */
+body[data-inventory-screen]:not([data-inventory-screen="history"]) #productHistoryCard,
+body[data-inventory-screen]:not([data-inventory-screen="history"]) #globalHistoryCard{
+  display:none !important;
+  visibility:hidden !important;
+  height:0 !important;
+  min-height:0 !important;
+  max-height:0 !important;
+  overflow:hidden !important;
+  padding:0 !important;
+  margin:0 !important;
+  border:0 !important;
+}
+body[data-inventory-screen="history"] #globalHistoryCard:not([hidden]),
+body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
+  display:block !important;
+  visibility:visible !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+}
+
+/* ===== final inventory analytics layout ===== */
+@media(min-width:801px){
+  body[data-inventory-screen="analytics"] .inventory-app-layout > .grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    align-items:stretch !important;
+  }
+  body[data-inventory-screen="analytics"] #smaregiAccuracyPanel:not([hidden]){
+    grid-column:1 !important;
+    grid-row:1 !important;
+    height:100% !important;
+  }
+  body[data-inventory-screen="analytics"] #smaregiDifferenceRankingPanel:not([hidden]){
+    grid-column:2 !important;
+    grid-row:1 !important;
+    height:100% !important;
+  }
+  body[data-inventory-screen="analytics"] #smaregiCompletionPanel:not([hidden]){
+    grid-column:1 / -1 !important;
+    grid-row:2 !important;
   }
 }
