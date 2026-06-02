@@ -714,21 +714,18 @@ async function excludeSmaregiStockItem(barcode){
     const checked_at=new Date().toISOString();
     const old=getSmaregiCheck(barcode);
     const hasExistingActualStock=old?.actual_stock!==null&&old?.actual_stock!==undefined&&String(old.actual_stock)!=="";
-    const hasSmaregiStock=item.smaregi_stock!==null&&item.smaregi_stock!==undefined&&String(item.smaregi_stock)!=="";
-    const actual_stock=hasExistingActualStock
-      ? Number(old.actual_stock)
-      : (hasSmaregiStock ? Number(item.smaregi_stock) : 0);
+    const actual_stock=hasExistingActualStock ? Number(old.actual_stock) : 0;
+    const difference=hasExistingActualStock&&old?.difference!==null&&old?.difference!==undefined
+      ? Number(old.difference)
+      : 0;
     const next={
       snapshot_id:smaregiSnapshot.id,
       barcode,
       actual_stock:Number.isFinite(actual_stock) ? actual_stock : 0,
-      difference:old?.difference??null,
+      difference:Number.isFinite(difference) ? difference : 0,
       checked_by:`除外:${checked_by}`,
       checked_at,
       excluded:true,
-      excluded_by:checked_by,
-      excluded_at:checked_at,
-      excluded_reason:old?.excluded_reason||"",
       no_issue:old?.no_issue===true,
       no_issue_by:old?.no_issue_by||null,
       no_issue_at:old?.no_issue_at||null,
