@@ -22,12 +22,12 @@ const INVENTORY_APP_MENU_SECTIONS=[
   {label:"棚卸作業",items:[
     {key:"smaregi",label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"}
   ]},
+  {label:"イベント販売",items:[
+    {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
+  ]},
   {label:"分析",items:[
     {key:"accuracy",label:"棚卸精度",action:"accuracy"},
     {key:"reasons",label:"原因集計",action:"reasons"}
-  ]},
-  {label:"イベント販売",items:[
-    {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
   ]},
   {label:"設定",items:[
     {key:"product-import",label:"商品データ取り込み",action:"product-import"},
@@ -35,12 +35,13 @@ const INVENTORY_APP_MENU_SECTIONS=[
   ]}
 ];
 const INVENTORY_APP_MENU_FOOTER_ITEMS=[
+  {key:"admin-auth",label:"管理者認証",action:"admin-auth"},
   {key:"portal",label:"トップへ戻る",action:"portal"},
   {key:"logout",label:"ログアウト",action:"logout"}
 ];
 const INVENTORY_ADMIN_PASSWORD="S3edc##530.";
-const INVENTORY_SETTINGS_UNLOCK_KEY="arico_inventory_settings_unlocked";
-const INVENTORY_ANALYTICS_UNLOCK_KEY="arico_inventory_analytics_unlocked";
+const INVENTORY_ADMIN_AUTHENTICATED_AT_KEY="arico_inventory_admin_authenticated_at";
+const INVENTORY_ADMIN_AUTH_DURATION_MS=12*60*60*1000;
 
 function getInventoryAppMenuItemHtml(item){
   const attrs=`class="inventory-app-menu-item" data-menu-key="${esc(item.key)}" ${item.disabled?"disabled":""} ${item.title?`title="${esc(item.title)}"`:""}`;
@@ -81,6 +82,8 @@ function renderInventoryAppMenu(){
   if(productHistoryButton)productHistoryButton.addEventListener("click",showInventoryProductHistory);
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
   if(boothButton)boothButton.addEventListener("click",()=>showPopup("ブース管理","準備中です。"));
+  const adminAuthButton=menu.querySelector('[data-menu-action="admin-auth"]');
+  if(adminAuthButton)adminAuthButton.addEventListener("click",authenticateInventoryAdmin);
   const accuracyButton=menu.querySelector('[data-menu-action="accuracy"]');
   if(accuracyButton)accuracyButton.addEventListener("click",()=>showInventoryAnalyticsSection("accuracy","smaregiAccuracyPanel"));
   const reasonsButton=menu.querySelector('[data-menu-action="reasons"]');
@@ -94,6 +97,7 @@ function renderInventoryAppMenu(){
   const logoutButton=menu.querySelector('[data-menu-action="logout"]');
   if(logoutButton)logoutButton.addEventListener("click",logout);
   bindInventoryMenuDrawer();
+  updateInventoryAdminAuthControl();
   setInventoryAppMenuActive("inventory");
 }
 
@@ -118,32 +122,56 @@ function showInventoryHistory(){
 }
 
 function showInventoryProductHistory(){
-  showInventoryScreen("product-history");
-}
-
-function hasInventorySettingsAccess(){
-  return sessionStorage.getItem(INVENTORY_SETTINGS_UNLOCK_KEY)==="1";
-}
-
-function hasInventoryAnalyticsAccess(){
-  return sessionStorage.getItem(INVENTORY_ANALYTICS_UNLOCK_KEY)==="1";
+  setInventoryAppMenuActive("product-history");
+  scrollInventoryPanelIntoView("productHistoryCard");
+  closeInventoryMenuDrawer();
 }
 
 function hasInventoryPrivilegedAccess(){
-  return hasInventorySettingsAccess()||hasInventoryAnalyticsAccess();
+  return isInventoryAdminAuthenticated();
 }
 
-function unlockInventoryScreen(screen){
-  const isSettings=screen==="settings";
-  const unlocked=isSettings ? hasInventorySettingsAccess() : hasInventoryAnalyticsAccess();
-  if(unlocked)return true;
-  const password=prompt(`${isSettings?"設定":"分析"}画面のパスワードを入力してください。`);
+function isInventoryAdminAuthenticated(){
+  const authenticatedAt=Number(localStorage.getItem(INVENTORY_ADMIN_AUTHENTICATED_AT_KEY)||0);
+  const now=Date.now();
+  const valid=authenticatedAt>0&&authenticatedAt<=now&&now-authenticatedAt<INVENTORY_ADMIN_AUTH_DURATION_MS;
+  if(!valid)localStorage.removeItem(INVENTORY_ADMIN_AUTHENTICATED_AT_KEY);
+  return valid;
+}
+
+function authenticateInventoryAdmin(){
+  if(isInventoryAdminAuthenticated()){
+    showPopup("管理者認証","認証済みです。認証後12時間は再入力不要です。");
+    return true;
+  }
+  const password=prompt("管理者パスワードを入力してください。");
   if(String(password||"").trim()!==INVENTORY_ADMIN_PASSWORD){
     if(password!==null)showMessage("パスワードが違います。","err");
     return false;
   }
-  sessionStorage.setItem(isSettings?INVENTORY_SETTINGS_UNLOCK_KEY:INVENTORY_ANALYTICS_UNLOCK_KEY,"1");
+  localStorage.setItem(INVENTORY_ADMIN_AUTHENTICATED_AT_KEY,String(Date.now()));
+  updateInventoryAdminAuthControl();
+  if(typeof updateSmaregiManagerControls==="function")updateSmaregiManagerControls();
+  showMessage("管理者認証が完了しました。12時間は再入力不要です。","ok");
   return true;
+}
+
+function updateInventoryAdminAuthControl(){
+  const button=el("inventoryAppMenu")?.querySelector('[data-menu-action="admin-auth"]');
+  if(!button)return;
+  const authenticated=isInventoryAdminAuthenticated();
+  button.classList.toggle("is-authenticated",authenticated);
+  button.textContent=authenticated?"管理者認証済み":"管理者認証";
+}
+
+function unlockInventoryScreen(){
+  return requireInventoryPrivilegedAccess();
+}
+
+function requireInventoryPrivilegedAccess(){
+  if(hasInventoryPrivilegedAccess())return true;
+  showMessage("先にメニューの「管理者認証」ボタンから認証してください。","err");
+  return false;
 }
 
 function showInventorySettings(){
@@ -190,6 +218,7 @@ function showInventoryScreen(screen,menuKey=screen){
   if(screen==="smaregi"&&typeof startSmaregiAutoRefresh==="function")startSmaregiAutoRefresh();
   else if(typeof stopSmaregiAutoRefresh==="function")stopSmaregiAutoRefresh();
   if(typeof updateSmaregiManagerControls==="function")updateSmaregiManagerControls();
+  updateInventoryAdminAuthControl();
   setInventoryAppMenuActive(menuKey);
   closeInventoryMenuDrawer();
 }

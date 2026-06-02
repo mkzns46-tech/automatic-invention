@@ -92,7 +92,7 @@ function isSmaregiManager(){
 
 function updateSmaregiManagerControls(){
   const manager=isSmaregiManager();
-  const settingsAccess=typeof hasInventorySettingsAccess==="function"&&hasInventorySettingsAccess();
+  const settingsAccess=typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
   const analyticsActive=document.body.dataset.inventoryScreen==="analytics";
   const sync=el("syncSmaregiStockBtn");
   const complete=el("completeSmaregiStockCheckBtn");
@@ -443,7 +443,7 @@ async function loadLatestSmaregiSnapshot(){
 }
 
 async function syncSmaregiStockFromApi(){
-  if(!(typeof hasInventorySettingsAccess==="function"&&hasInventorySettingsAccess())){
+  if(!(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())){
     showMessage("スマレジ変動商品データ取り込みは設定画面のパスワード認証後に操作できます。","err");
     return;
   }

@@ -128,6 +128,7 @@ function renderStaffList(){
 
 async function saveStaff(e){
   e.preventDefault();
+  if(!requireInventoryPrivilegedAccess())return;
   try{
     const name=el("staffNameInput").value.trim();
     if(!name){
@@ -150,6 +151,7 @@ async function saveStaff(e){
 }
 
 async function deleteStaff(id){
+  if(!requireInventoryPrivilegedAccess())return;
   try{
     if(!confirm("この担当者を削除しますか？"))return;
     await sb(`staff_members?id=eq.${encodeURIComponent(id)}`,{
@@ -164,6 +166,7 @@ async function deleteStaff(id){
 }
 
 async function editStaff(id,currentName){
+  if(!requireInventoryPrivilegedAccess())return;
   try{
     const name=String(prompt("変更後の担当者名を入力してください。",currentName||"")||"").trim();
     if(!name||name===currentName)return;

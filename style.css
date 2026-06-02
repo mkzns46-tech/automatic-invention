@@ -1696,7 +1696,6 @@ td small{margin-top:4px;color:#527161}
 }
 body[data-inventory-screen="inventory"] .grid > [data-inventory-screen="inventory"]:not([hidden]),
 body[data-inventory-screen="history"] .grid > [data-inventory-screen="history"]:not([hidden]),
-body[data-inventory-screen="product-history"] .grid > [data-inventory-screen="product-history"]:not([hidden]),
 body[data-inventory-screen="smaregi"] .grid > [data-inventory-screen="smaregi"]:not([hidden]),
 body[data-inventory-screen="analytics"] .grid > [data-inventory-screen="analytics"]:not([hidden]),
 body[data-inventory-screen="settings"] .grid > [data-inventory-screen="settings"]:not([hidden]){
@@ -1707,8 +1706,6 @@ body[data-inventory-screen="settings"] .grid > [data-inventory-screen="settings"
 body[data-inventory-screen="settings"] #staffSettingsCard:not([hidden]),
 body[data-inventory-screen="analytics"] #smaregiAccuracyPanel:not([hidden]),
 body[data-inventory-screen="analytics"] #smaregiDifferenceRankingPanel:not([hidden]),
-body[data-inventory-screen="analytics"] #productHistoryCard:not([hidden]),
-body[data-inventory-screen="analytics"] #globalHistoryCard:not([hidden]),
 body[data-inventory-screen="analytics"] #smaregiDiffOnlyPanel:not([hidden]),
 body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden]){
   display:block !important;
@@ -2860,6 +2857,11 @@ body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden])
   background:#eaf6ee;
   color:#0b5d40;
 }
+.inventory-app-menu-item.is-authenticated{
+  border-color:#bbf7d0;
+  background:#dcfce7;
+  color:#166534;
+}
 .inventory-app-menu-icon{
   flex:0 0 22px;
   width:22px;
@@ -2924,6 +2926,15 @@ body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden])
     white-space:nowrap;
     scroll-snap-align:start;
   }
+}
+
+/* ===== product history permanently expanded card ===== */
+#productHistoryCard{
+  display:block !important;
+  visibility:visible !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
 }
 
 /* ===== simplified desktop sidebar and mobile drawer ===== */
@@ -3161,8 +3172,6 @@ header h1{
 }
 body[data-inventory-screen="analytics"] #smaregiAccuracyPanel:not([hidden]),
 body[data-inventory-screen="analytics"] #smaregiDifferenceRankingPanel:not([hidden]),
-body[data-inventory-screen="analytics"] #productHistoryCard:not([hidden]),
-body[data-inventory-screen="analytics"] #globalHistoryCard:not([hidden]),
 body[data-inventory-screen="analytics"] #smaregiDiffOnlyPanel:not([hidden]),
 body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden]),
 body[data-inventory-screen="settings"] #staffSettingsCard:not([hidden]),
@@ -3212,8 +3221,6 @@ body[data-inventory-screen="settings"] #productImportCard:not([hidden]){
   body[data-inventory-screen="analytics"] #smaregiDifferenceRankingPanel:not([hidden]){
     grid-column:auto !important;
   }
-  body[data-inventory-screen="analytics"] #productHistoryCard:not([hidden]),
-  body[data-inventory-screen="analytics"] #globalHistoryCard:not([hidden]),
   body[data-inventory-screen="analytics"] #smaregiDiffOnlyPanel:not([hidden]),
   body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden]){
     grid-column:1 / -1 !important;

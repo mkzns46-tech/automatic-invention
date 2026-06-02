@@ -16,6 +16,7 @@ async function upsertProducts(rows){
 }
 
 async function importSmaregiProducts(){
+  if(!requireInventoryPrivilegedAccess())return;
   if(!confirm("スマレジの商品マスターを取得し、商品情報を更新します。在庫数は変更しません。よろしいですか？"))return;
   try{
     console.log("[Smaregi product master import] start");
@@ -202,6 +203,7 @@ function csvToRows(text){
 
 async function importCsvFile(file){
   try{
+    if(!requireInventoryPrivilegedAccess())return;
     if(!file)return;
     showMessage("CSV取り込み中...");
 
