@@ -1695,6 +1695,7 @@ td small{margin-top:4px;color:#527161}
   display:none !important;
 }
 body[data-inventory-screen="inventory"] .grid > [data-inventory-screen="inventory"]:not([hidden]),
+body[data-inventory-screen="history"] .grid > [data-inventory-screen="history"]:not([hidden]),
 body[data-inventory-screen="smaregi"] .grid > [data-inventory-screen="smaregi"]:not([hidden]),
 body[data-inventory-screen="analytics"] .grid > [data-inventory-screen="analytics"]:not([hidden]),
 body[data-inventory-screen="settings"] .grid > [data-inventory-screen="settings"]:not([hidden]){
@@ -2827,6 +2828,25 @@ body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden])
   display:grid;
   gap:5px;
 }
+.inventory-app-menu-main{
+  gap:14px;
+}
+.inventory-app-menu-section{
+  display:grid;
+  gap:5px;
+}
+.inventory-app-menu-heading{
+  margin:0;
+  padding:0 9px;
+  color:#6b7280;
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+.inventory-app-menu-section-items{
+  display:grid;
+  gap:5px;
+}
 .inventory-app-menu-footer{
   padding-top:12px;
   border-top:1px solid #e5e7eb;
@@ -2902,6 +2922,16 @@ body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden])
     gap:8px;
     padding:0;
     border:0;
+  }
+  .inventory-app-menu-main{
+    display:grid;
+    gap:14px;
+  }
+  .inventory-app-menu-section,
+  .inventory-app-menu-section-items{
+    display:grid;
+    gap:5px;
+    width:100%;
   }
   .inventory-app-menu-item{
     flex:0 0 auto;

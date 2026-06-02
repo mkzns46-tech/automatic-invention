@@ -13,14 +13,27 @@ window.addEventListener("unhandledrejection",(e)=>{
 });
 const el=(id)=>document.getElementById(id);
 
-const INVENTORY_APP_MENU_ITEMS=[
-  {key:"inventory",label:"在庫変動登録",action:"inventory"},
-  {key:"smaregi",label:"変動商品チェック",id:"openSmaregiStockCheckBtn"},
-  {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
+const INVENTORY_APP_MENU_SECTIONS=[
+  {label:"在庫管理",items:[
+    {key:"inventory",label:"在庫変動登録",action:"inventory"},
+    {key:"history",label:"全体履歴",action:"history"}
+  ]},
+  {label:"棚卸作業",items:[
+    {key:"smaregi",label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"}
+  ]},
+  {label:"分析",items:[
+    {key:"accuracy",label:"棚卸精度",action:"accuracy"},
+    {key:"reasons",label:"原因集計",action:"reasons"}
+  ]},
+  {label:"イベント販売",items:[
+    {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
+  ]},
+  {label:"管理",items:[
+    {key:"product-import",label:"商品データ取り込み",action:"product-import"},
+    {key:"staff-settings",label:"担当者設定",action:"staff-settings"}
+  ]}
 ];
 const INVENTORY_APP_MENU_FOOTER_ITEMS=[
-  {key:"analytics",label:"分析",action:"analytics"},
-  {key:"settings",label:"設定",action:"settings"},
   {key:"portal",label:"トップへ戻る",action:"portal"},
   {key:"logout",label:"ログアウト",action:"logout"}
 ];
@@ -35,12 +48,19 @@ function getInventoryAppMenuItemHtml(item){
   return `<button type="button" ${attrs} ${item.id?`id="${esc(item.id)}"`:""} data-menu-action="${esc(item.action||"")}">${body}</button>`;
 }
 
+function getInventoryAppMenuSectionHtml(section){
+  return `<section class="inventory-app-menu-section">
+    <h2 class="inventory-app-menu-heading">${esc(section.label)}</h2>
+    <div class="inventory-app-menu-section-items">${section.items.map(getInventoryAppMenuItemHtml).join("")}</div>
+  </section>`;
+}
+
 function renderInventoryAppMenu(){
   const menu=el("inventoryAppMenu");
   if(!menu)return;
   menu.hidden=false;
   menu.innerHTML=`
-    <div class="inventory-app-menu-main">${INVENTORY_APP_MENU_ITEMS.map(getInventoryAppMenuItemHtml).join("")}</div>
+    <div class="inventory-app-menu-main">${INVENTORY_APP_MENU_SECTIONS.map(getInventoryAppMenuSectionHtml).join("")}</div>
     <div class="inventory-app-menu-footer">${INVENTORY_APP_MENU_FOOTER_ITEMS.map(getInventoryAppMenuItemHtml).join("")}</div>`;
   menu.querySelectorAll(".inventory-app-menu-item[href]").forEach(link=>{
     link.addEventListener("click",()=>{
@@ -54,14 +74,20 @@ function renderInventoryAppMenu(){
   });
   const inventoryButton=menu.querySelector('[data-menu-action="inventory"]');
   if(inventoryButton)inventoryButton.addEventListener("click",showInventoryRegistration);
+  const historyButton=menu.querySelector('[data-menu-action="history"]');
+  if(historyButton)historyButton.addEventListener("click",showInventoryHistory);
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
   if(boothButton)boothButton.addEventListener("click",()=>showPopup("ブース管理","準備中です。"));
-  const analyticsButton=menu.querySelector('[data-menu-action="analytics"]');
-  if(analyticsButton)analyticsButton.addEventListener("click",showInventoryAnalytics);
+  const accuracyButton=menu.querySelector('[data-menu-action="accuracy"]');
+  if(accuracyButton)accuracyButton.addEventListener("click",()=>showInventoryAnalyticsSection("accuracy","smaregiAccuracyPanel"));
+  const reasonsButton=menu.querySelector('[data-menu-action="reasons"]');
+  if(reasonsButton)reasonsButton.addEventListener("click",()=>showInventoryAnalyticsSection("reasons","smaregiReasonSummaryPanel"));
   const portalButton=menu.querySelector('[data-menu-action="portal"]');
   if(portalButton)portalButton.addEventListener("click",goToPortal);
-  const settingsButton=menu.querySelector('[data-menu-action="settings"]');
-  if(settingsButton)settingsButton.addEventListener("click",showInventorySettings);
+  const productImportButton=menu.querySelector('[data-menu-action="product-import"]');
+  if(productImportButton)productImportButton.addEventListener("click",()=>showInventorySettingsSection("product-import","productImportCard"));
+  const staffSettingsButton=menu.querySelector('[data-menu-action="staff-settings"]');
+  if(staffSettingsButton)staffSettingsButton.addEventListener("click",()=>showInventorySettingsSection("staff-settings","staffSettingsCard"));
   const logoutButton=menu.querySelector('[data-menu-action="logout"]');
   if(logoutButton)logoutButton.addEventListener("click",logout);
   bindInventoryMenuDrawer();
@@ -81,6 +107,11 @@ function setInventoryAppMenuActive(key){
 
 function showInventoryRegistration(){
   showInventoryScreen("inventory");
+}
+
+function showInventoryHistory(){
+  showInventoryScreen("history");
+  if(typeof renderGlobalHistory==="function")renderGlobalHistory();
 }
 
 function hasInventorySettingsAccess(){
@@ -113,6 +144,12 @@ function showInventorySettings(){
   showInventoryScreen("settings");
 }
 
+function showInventorySettingsSection(menuKey,targetId){
+  if(!unlockInventoryScreen("settings"))return;
+  showInventoryScreen("settings",menuKey);
+  scrollInventoryPanelIntoView(targetId);
+}
+
 function showInventoryAnalytics(){
   if(!unlockInventoryScreen("analytics"))return;
   showInventoryScreen("analytics");
@@ -122,7 +159,22 @@ function showInventoryAnalytics(){
   if(typeof showSmaregiReasonSummary==="function")showSmaregiReasonSummary({scroll:false});
 }
 
-function showInventoryScreen(screen){
+function showInventoryAnalyticsSection(menuKey,targetId){
+  if(!unlockInventoryScreen("analytics"))return;
+  showInventoryScreen("analytics",menuKey);
+  if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();
+  if(typeof loadSmaregiDifferenceRanking==="function")loadSmaregiDifferenceRanking();
+  if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
+  if(typeof showSmaregiReasonSummary==="function")showSmaregiReasonSummary({scroll:false});
+  scrollInventoryPanelIntoView(targetId);
+}
+
+function scrollInventoryPanelIntoView(targetId){
+  const target=el(targetId);
+  if(target)target.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function showInventoryScreen(screen,menuKey=screen){
   document.body.dataset.inventoryScreen=screen;
   document.querySelector("main.grid")?.classList.remove("smaregi-mode");
   document.querySelectorAll("[data-inventory-screen]").forEach(panel=>{
@@ -131,7 +183,7 @@ function showInventoryScreen(screen){
   if(screen==="smaregi"&&typeof startSmaregiAutoRefresh==="function")startSmaregiAutoRefresh();
   else if(typeof stopSmaregiAutoRefresh==="function")stopSmaregiAutoRefresh();
   if(typeof updateSmaregiManagerControls==="function")updateSmaregiManagerControls();
-  setInventoryAppMenuActive(screen);
+  setInventoryAppMenuActive(menuKey);
   closeInventoryMenuDrawer();
 }
 
