@@ -173,8 +173,11 @@ function hidePopup(){
   if(popup)popup.style.display="none";
 }
 
-function showMessage(text,type=""){
-  if(type==="err")playErrorSound();
+function showMessage(text,type="",options={}){
+  if(type==="err"){
+    playErrorSound();
+    if(options.popup!==false)showPopup("エラー",text);
+  }
   const smaregiCard=el("smaregiStockCheckCard");
   const productImportCard=el("productImportCard");
   const m=smaregiCard&&!smaregiCard.hidden
