@@ -134,7 +134,8 @@ function getSmaregiStats(){
   const excluded=smaregiStockItems.filter(item=>isSmaregiExcludedCheck(getSmaregiCheck(item.barcode))).length;
   const completed=smaregiStockItems.filter(item=>{
     const check=getSmaregiCheck(item.barcode);
-    return Boolean(check);
+    return isSmaregiExcludedCheck(check)
+      || (check?.actual_stock!==null&&check?.actual_stock!==undefined&&String(check.actual_stock)!=="");
   }).length;
   const unchecked=Math.max(0,total-completed);
   const diffCount=getSmaregiDiffItems().length;
@@ -712,14 +713,22 @@ async function excludeSmaregiStockItem(barcode){
   try{
     const checked_at=new Date().toISOString();
     const old=getSmaregiCheck(barcode);
+    const hasExistingActualStock=old?.actual_stock!==null&&old?.actual_stock!==undefined&&String(old.actual_stock)!=="";
+    const hasSmaregiStock=item.smaregi_stock!==null&&item.smaregi_stock!==undefined&&String(item.smaregi_stock)!=="";
+    const actual_stock=hasExistingActualStock
+      ? Number(old.actual_stock)
+      : (hasSmaregiStock ? Number(item.smaregi_stock) : 0);
     const next={
       snapshot_id:smaregiSnapshot.id,
       barcode,
-      actual_stock:old?.actual_stock??null,
+      actual_stock:Number.isFinite(actual_stock) ? actual_stock : 0,
       difference:old?.difference??null,
       checked_by:`除外:${checked_by}`,
       checked_at,
       excluded:true,
+      excluded_by:checked_by,
+      excluded_at:checked_at,
+      excluded_reason:old?.excluded_reason||"",
       no_issue:old?.no_issue===true,
       no_issue_by:old?.no_issue_by||null,
       no_issue_at:old?.no_issue_at||null,

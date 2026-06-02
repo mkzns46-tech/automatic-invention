@@ -55,6 +55,7 @@
 <section class="card csv-admin-section" id="productImportCard" data-inventory-screen="settings" hidden><h2>データ取り込み</h2><p class="section-note">商品データとスマレジ変動商品データを取り込みます</p>
 <button type="button" id="importSmaregiProductsBtn">スマレジ商品マスター取込</button>
 <button type="button" id="syncSmaregiStockBtn">スマレジ変動商品データ取り込み</button>
+<div id="productImportMessage" class="message"></div>
 <details class="csv-admin-details">
   <summary>管理者向け機能</summary>
   <p class="section-note">例外対応用のCSV取り込みです。通常はスマレジ商品マスター取込を使用してください。</p>
@@ -129,7 +130,6 @@
     </div>
     <div id="smaregiProgressBadge" class="badge muted">チェック済み：0 / 0</div>
   </div>
-  <div id="smaregiMessage" class="message"></div>
   <div class="smaregi-toolbar smaregi-action-grid">
     <button type="button" id="refreshSmaregiChecksBtn" class="secondary">最新状態に更新</button>
     <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
@@ -139,6 +139,7 @@
     <label>チェック完了解除日時<input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
     <button type="button" id="resetSmaregiCompletionBtn" class="secondary">チェック完了解除（管理者のみ）</button>
   </div>
+  <div id="smaregiMessage" class="message"></div>
   <div class="table-wrap">
     <table class="smaregi-check-table">
       <thead><tr><th>状態</th><th>商品名</th><th>実在庫入力</th><th>保存</th><th>操作</th></tr></thead>

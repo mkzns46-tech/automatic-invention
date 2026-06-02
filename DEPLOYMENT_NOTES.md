@@ -21,7 +21,11 @@
 差異原因の記録・集計機能を利用するため、デプロイ前に
 `supabase_difference_reasons.sql` も Supabase で実行してください。
 
-このSQLには差異一覧の明示的な除外状態を保存する `excluded` も含まれます。
+このSQLには差異一覧の明示的な除外状態と記録者、記録日時、理由を保存する
+`excluded`、`excluded_by`、`excluded_at`、`excluded_reason` も含まれます。
+
+すでに差異原因SQLを実行済みで、除外記録用カラムだけ不足している場合は
+`supabase_exclusion_tracking.sql` のみ実行してください。
 
 備品転用確認カラムの存在確認には
 `supabase_verify_equipment_confirmation.sql` を実行してください。

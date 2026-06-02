@@ -175,7 +175,10 @@ function hidePopup(){
 
 function showMessage(text,type=""){
   const smaregiCard=el("smaregiStockCheckCard");
-  const m=smaregiCard&&!smaregiCard.hidden ? el("smaregiMessage") : el("message");
+  const productImportCard=el("productImportCard");
+  const m=smaregiCard&&!smaregiCard.hidden
+    ? el("smaregiMessage")
+    : (productImportCard&&!productImportCard.hidden ? el("productImportMessage") : el("message"));
   if(!m)return;
   m.textContent=text;
   m.className="message "+type;
