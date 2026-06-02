@@ -319,21 +319,18 @@ async function registerBarcode(barcode){
     const memo=el("memo").value.trim();
 
     if(!staff){
-      beep(false);
       showMessage("担当者を選択してください。","err");
       el("staff").focus();
       return;
     }
 
     if(qtyRaw==="" || !Number.isFinite(qty) || (type==="在庫修正" ? qty < 0 : qty <= 0)){
-      beep(false);
       showMessage(type==="在庫修正" ? "在庫修正は0以上の数字を入力してください。" : "数量を入力してください。","err");
       el("qty").focus();
       return;
     }
 
     if(type==="備品転用"&&!memo){
-      beep(false);
       showMessage("備品転用は備考入力が必須です","err");
       el("memo").focus();
       return;
@@ -342,7 +339,6 @@ async function registerBarcode(barcode){
     const p=await fetchProductByBarcode(barcode);
 
     if(!p){
-      beep(false);
       showMessage(`未登録バーコード：${barcode}。PCで商品登録してください。`,"err");
       return;
     }
@@ -356,7 +352,6 @@ async function registerBarcode(barcode){
     if(type==="在庫修正")newStock=qty;
 
     if((type==="出荷"||type==="備品転用")&&newStock<0){
-      beep(false);
       showMessage(`在庫不足：${p.name} / 現在庫 ${currentStock} / ${type}数 ${qty}`,"err");
       return;
     }
@@ -405,7 +400,6 @@ async function registerBarcode(barcode){
     await showProductHistoryForBarcode(barcode);
     el("barcodeInput").focus();
   }catch(e){
-    beep(false);
     showMessage("登録エラー。\n"+e.message,"err");
   }
 }

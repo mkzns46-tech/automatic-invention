@@ -174,6 +174,7 @@ function hidePopup(){
 }
 
 function showMessage(text,type=""){
+  if(type==="err")playErrorSound();
   const smaregiCard=el("smaregiStockCheckCard");
   const productImportCard=el("productImportCard");
   const m=smaregiCard&&!smaregiCard.hidden
@@ -182,6 +183,40 @@ function showMessage(text,type=""){
   if(!m)return;
   m.textContent=text;
   m.className="message "+type;
+}
+
+function playErrorSound(){
+  try{
+    const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+    if(!AudioContextClass)return;
+    const ctx=new AudioContextClass();
+    const gain=ctx.createGain();
+    const first=ctx.createOscillator();
+    const second=ctx.createOscillator();
+    const now=ctx.currentTime;
+
+    gain.gain.setValueAtTime(0.0001,now);
+    gain.gain.exponentialRampToValueAtTime(0.1,now+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001,now+0.32);
+
+    first.type="sawtooth";
+    first.frequency.setValueAtTime(240,now);
+    first.frequency.exponentialRampToValueAtTime(150,now+0.18);
+    second.type="square";
+    second.frequency.setValueAtTime(120,now+0.12);
+
+    first.connect(gain);
+    second.connect(gain);
+    gain.connect(ctx.destination);
+    first.start(now);
+    first.stop(now+0.2);
+    second.start(now+0.12);
+    second.stop(now+0.3);
+
+    setTimeout(()=>{
+      try{ctx.close();}catch(_){}
+    },360);
+  }catch(_){}
 }
 
 
