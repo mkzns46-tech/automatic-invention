@@ -3534,3 +3534,28 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     min-height:42px !important;
   }
 }
+
+/* ===== final iPhone analytics date input force compact ===== */
+@media(max-width:800px){
+  #smaregiRankingFromDate,
+  #smaregiRankingToDate,
+  #smaregiDiffCsvFromDate,
+  #smaregiDiffCsvToDate,
+  #smaregiReasonFromDate,
+  #smaregiReasonToDate{
+    -webkit-appearance:none !important;
+    appearance:none !important;
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    height:34px !important;
+    min-height:34px !important;
+    max-height:34px !important;
+    padding:3px 8px !important;
+    font-size:13px !important;
+    line-height:34px !important;
+    box-sizing:border-box !important;
+    border-radius:8px !important;
+  }
+}
