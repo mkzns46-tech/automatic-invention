@@ -44,18 +44,18 @@ function renderBoothShell(){
             <input id="boothEventName" autocomplete="off" placeholder="例：インターハイ" required>
           </label>
           <div class="booth-form-grid">
-            <label>会場
+            <label>会場<span class="required">必須</span>
               <input id="boothEventVenue" autocomplete="off" placeholder="例：夢の島">
             </label>
-            <label>作成者
+            <label>作成者<span class="required">必須</span>
               <input id="boothEventCreatedBy" list="boothStaffList" autocomplete="off" placeholder="担当者名">
             </label>
           </div>
           <div class="booth-form-grid">
-            <label>開始日
+            <label>開始日<span class="required">必須</span>
               <input id="boothEventStart" type="date">
             </label>
-            <label>終了日
+            <label>終了日<span class="required">必須</span>
               <input id="boothEventEnd" type="date">
             </label>
           </div>
@@ -135,12 +135,24 @@ async function createBoothEvent(){
   const created_by=String(el("boothEventCreatedBy")?.value||"").trim();
   const memo=String(el("boothEventMemo")?.value||"").trim();
 
-  if(!name){
+  if(!name||!venue||!event_start||!event_end||!created_by){
+    const errorText="イベント名、会場、開始日、終了日、作成者は必須です。";
     if(message){
-      message.textContent="イベント名を入力してください。";
+      message.textContent=errorText;
       message.className="message err";
     }
-    el("boothEventName")?.focus();
+    try{
+      if(typeof playErrorSound==="function")playErrorSound();
+      if(typeof showPopup==="function")showPopup("イベント作成エラー",errorText);
+    }catch(_){}
+    const firstEmpty=[
+      ["boothEventName",name],
+      ["boothEventVenue",venue],
+      ["boothEventStart",event_start],
+      ["boothEventEnd",event_end],
+      ["boothEventCreatedBy",created_by]
+    ].find(([,value])=>!value);
+    if(firstEmpty)el(firstEmpty[0])?.focus();
     return;
   }
 
@@ -167,6 +179,7 @@ async function createBoothEvent(){
       message.textContent=`イベントを作成しました：${row.name||name}`;
       message.className="message ok";
     }
+    if(typeof playSuccessSound==="function")playSuccessSound();
   }catch(e){
     if(message){
       message.textContent="イベント作成エラー\n"+e.message;
