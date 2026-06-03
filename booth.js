@@ -101,19 +101,11 @@ function renderBoothEvents(events){
     return;
   }
   list.innerHTML=rows.map(event=>{
-    const status=String(event.status||"draft");
-    const statusLabel=({
-      draft:"下書き",
-      active:"開催中",
-      closed:"締め済み",
-      cancelled:"取消"
-    })[status]||status;
     const dateText=[event.event_start,event.event_end].filter(Boolean).join(" - ")||"日程未設定";
     return `<article class="booth-event-item ${boothCurrentEventId===event.id?"is-open":""}">
       <div class="booth-event-main">
         <div class="booth-event-title-row">
           <strong>${esc(event.name||"無題イベント")}</strong>
-          <span class="booth-status booth-status-${esc(status)}">${esc(statusLabel)}</span>
         </div>
         <div class="booth-event-meta">
           <span>会場：${esc(event.venue||"-")}</span>
