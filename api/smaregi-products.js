@@ -70,8 +70,9 @@ module.exports = async function handler(req, res) {
     const normalized = products.map(product => {
       const barcode = String(product.productCode ?? product.product_code ?? "").trim();
       const name = String(product.productName ?? product.product_name ?? "").trim();
+      const smaregi_product_id = String(product.productId ?? product.product_id ?? "").trim() || null;
       if (!barcode || !name) return null;
-      const row = { barcode, name };
+      const row = { barcode, name, smaregi_product_id };
       const category = String(product.categoryName ?? product.category_name ?? "").trim();
       const genre = String(product.genreName ?? product.genre_name ?? "").trim();
       const department = String(product.departmentName ?? product.department_name ?? "").trim();
