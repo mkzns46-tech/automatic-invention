@@ -41,11 +41,11 @@ function renderBoothShell(){
         <h3>イベント作成</h3>
         <form id="boothEventForm" class="booth-form">
           <label>イベント名<span class="required">必須</span>
-            <input id="boothEventName" autocomplete="off" placeholder="例：東京ビッグサイト 6月販売会" required>
+            <input id="boothEventName" autocomplete="off" placeholder="例：インターハイ" required>
           </label>
           <div class="booth-form-grid">
             <label>会場
-              <input id="boothEventVenue" autocomplete="off" placeholder="例：東京ビッグサイト">
+              <input id="boothEventVenue" autocomplete="off" placeholder="例：夢の島">
             </label>
             <label>作成者
               <input id="boothEventCreatedBy" list="boothStaffList" autocomplete="off" placeholder="担当者名">
@@ -59,12 +59,6 @@ function renderBoothShell(){
               <input id="boothEventEnd" type="date">
             </label>
           </div>
-          <label>ステータス
-            <select id="boothEventStatus">
-              <option value="draft">下書き</option>
-              <option value="active">開催中</option>
-            </select>
-          </label>
           <label>メモ
             <textarea id="boothEventMemo" class="booth-textarea" placeholder="搬入メモ、注意事項など"></textarea>
           </label>
@@ -148,7 +142,6 @@ async function createBoothEvent(){
   const event_end=String(el("boothEventEnd")?.value||"").trim()||null;
   const created_by=String(el("boothEventCreatedBy")?.value||"").trim();
   const memo=String(el("boothEventMemo")?.value||"").trim();
-  const status=String(el("boothEventStatus")?.value||"draft").trim();
 
   if(!name){
     if(message){
@@ -167,7 +160,7 @@ async function createBoothEvent(){
       event_end,
       created_by,
       memo,
-      status:status==="active"?"active":"draft"
+      status:"draft"
     };
     const created=await sb("booth_events",{
       method:"POST",
