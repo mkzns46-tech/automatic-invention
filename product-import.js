@@ -25,7 +25,7 @@ async function importSmaregiProducts(){
     const data=await res.json().catch(()=>({}));
     if(!res.ok)throw new Error(data.error||`APIエラー ${res.status}`);
     const rows=Array.isArray(data.products)?data.products:[];
-    const existingRows=await sbAll("products?select=barcode,name,category,genre,department,location",1000,50000);
+    const existingRows=await sbAll("products?select=barcode,name,category,genre,department,location,smaregi_product_id",1000,50000);
     const existingBarcodes=new Set((existingRows||[]).map(row=>String(row.barcode||"")));
     const existingProductsByBarcode=new Map((existingRows||[]).map(row=>[String(row.barcode||""),row]));
     const normalizeProductInfo=(row,current={})=>({
@@ -34,7 +34,8 @@ async function importSmaregiProducts(){
       category:String(row.category||current.category||""),
       genre:String(row.genre||current.genre||""),
       department:String(row.department||current.department||""),
-      location:String(row.location||current.location||"")
+      location:String(row.location||current.location||""),
+      smaregi_product_id:String(row.smaregi_product_id||current.smaregi_product_id||"").trim()||null
     });
     const existingProductRows=[];
     const newProductRows=[];
