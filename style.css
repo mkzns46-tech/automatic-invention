@@ -3502,3 +3502,35 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     grid-row:2 !important;
   }
 }
+
+/* ===== final mobile analytics date input override ===== */
+@media(max-width:800px){
+
+  body[data-inventory-screen="inventory-analysis"] input[type="date"],
+  body[data-inventory-screen="analytics"] input[type="date"],
+  body[data-inventory-screen="inventory-analysis"] input[type="datetime-local"],
+  body[data-inventory-screen="analytics"] input[type="datetime-local"]{
+    height:40px !important;
+    min-height:40px !important;
+    max-height:40px !important;
+    font-size:14px !important;
+    line-height:1.2 !important;
+    padding:4px 10px !important;
+    width:100% !important;
+    max-width:100% !important;
+    box-sizing:border-box !important;
+    border-radius:10px !important;
+  }
+
+  body[data-inventory-screen="inventory-analysis"] label,
+  body[data-inventory-screen="analytics"] label{
+    margin:8px 0 4px !important;
+    font-size:13px !important;
+    line-height:1.2 !important;
+  }
+
+  body[data-inventory-screen="inventory-analysis"] button,
+  body[data-inventory-screen="analytics"] button{
+    min-height:42px !important;
+  }
+}
