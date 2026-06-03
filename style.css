@@ -3808,6 +3808,21 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     width:100%;
     margin-top:10px;
   }
+  .booth-filter-row input[type="date"]{
+    -webkit-appearance:none !important;
+    appearance:none !important;
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    height:42px !important;
+    min-height:42px !important;
+    max-height:42px !important;
+    padding:6px 10px !important;
+    font-size:14px !important;
+    line-height:1.2 !important;
+    box-sizing:border-box !important;
+  }
   .booth-event-actions{
     display:grid;
     grid-template-columns:1fr 1fr;
