@@ -48,7 +48,10 @@ function renderBoothShell(){
               <input id="boothEventVenue" autocomplete="off" placeholder="例：夢の島">
             </label>
             <label>作成者<span class="required">必須</span>
-              <input id="boothEventCreatedBy" autocomplete="off" placeholder="担当者名">
+              <select id="boothEventCreatedBy">
+                <option value="">担当者を選択</option>
+                ${(staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join("")}
+              </select>
             </label>
           </div>
           <div class="booth-form-grid">

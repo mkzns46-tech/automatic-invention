@@ -3614,6 +3614,7 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   min-width:0;
   overflow:hidden;
   text-overflow:ellipsis;
+  white-space:nowrap;
 }
 .booth-list-header{
   display:flex;
@@ -3780,8 +3781,6 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   #boothEventCreatedBy,
   #boothEventStart,
   #boothEventEnd{
-    -webkit-appearance:none !important;
-    appearance:none !important;
     display:block !important;
     height:44px !important;
     min-height:44px !important;
@@ -3789,6 +3788,17 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     line-height:1.2 !important;
     padding:8px 12px !important;
     overflow:hidden !important;
+  }
+  #boothEventCreatedBy{
+    -webkit-appearance:menulist !important;
+    appearance:auto !important;
+    white-space:nowrap !important;
+    text-overflow:ellipsis !important;
+  }
+  #boothEventStart,
+  #boothEventEnd{
+    -webkit-appearance:none !important;
+    appearance:none !important;
   }
   .booth-list-header{
     display:block;
