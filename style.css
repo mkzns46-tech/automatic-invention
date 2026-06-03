@@ -3601,6 +3601,20 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   outline:3px solid var(--main-light);
   border-color:var(--main);
 }
+.booth-form input,
+.booth-form select,
+.booth-form textarea{
+  max-width:100%;
+  min-width:0;
+  box-sizing:border-box;
+}
+#boothEventCreatedBy{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
 .booth-list-header{
   display:flex;
   gap:10px;
@@ -3753,6 +3767,7 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   .booth-form,
   .booth-form label,
   .booth-form input,
+  .booth-form select,
   .booth-form textarea,
   .booth-filter-row,
   .booth-filter-row label,
@@ -3761,6 +3776,19 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     max-width:100% !important;
     min-width:0 !important;
     box-sizing:border-box !important;
+  }
+  #boothEventCreatedBy,
+  #boothEventStart,
+  #boothEventEnd{
+    -webkit-appearance:none !important;
+    appearance:none !important;
+    display:block !important;
+    height:44px !important;
+    min-height:44px !important;
+    max-height:44px !important;
+    line-height:1.2 !important;
+    padding:8px 12px !important;
+    overflow:hidden !important;
   }
   .booth-list-header{
     display:block;
