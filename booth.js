@@ -9,26 +9,24 @@ function showBoothManagement(){
   loadBoothEvents();
 }
 
-async function loadBoothEvents(){
+function showBoothLocalMessage(text,type=""){
   const message=el("boothMessage");
+  if(message){
+    message.textContent=text;
+    message.className="message "+type;
+  }
+}
+
+async function loadBoothEvents(){
   try{
-    if(message){
-      message.textContent="ブースイベントを読み込み中...";
-      message.className="message";
-    }
+    showBoothLocalMessage("ブースイベントを読み込み中...");
     const events=await sb("booth_events?select=*&order=created_at.desc&limit=200");
     boothEvents=Array.isArray(events)?events:[];
     renderBoothEvents(boothEvents);
-    if(message){
-      message.textContent=boothEvents.length?`イベント ${boothEvents.length}件を表示しています。`:"イベントはまだありません。";
-      message.className="message ok";
-    }
+    showBoothLocalMessage(boothEvents.length?`イベント ${boothEvents.length}件を表示しています。`:"イベントはまだありません。","ok");
   }catch(e){
-    if(message){
-      message.textContent="ブースイベント読み込みエラー\n"+e.message;
-      message.className="message err";
-    }
     if(typeof showMessage==="function")showMessage("ブースイベント読み込みエラー\n"+e.message,"err");
+    else showBoothLocalMessage("ブースイベント読み込みエラー\n"+e.message,"err");
   }
 }
 
@@ -126,7 +124,6 @@ function renderBoothEvents(events){
 }
 
 async function createBoothEvent(){
-  const message=el("boothMessage");
   if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
   const name=String(el("boothEventName")?.value||"").trim();
   const venue=String(el("boothEventVenue")?.value||"").trim();
@@ -137,14 +134,9 @@ async function createBoothEvent(){
 
   if(!name||!venue||!event_start||!event_end||!created_by){
     const errorText="イベント名、会場、開始日、終了日、作成者は必須です。";
-    if(message){
-      message.textContent=errorText;
-      message.className="message err";
-    }
-    try{
-      if(typeof playErrorSound==="function")playErrorSound();
-      if(typeof showPopup==="function")showPopup("イベント作成エラー",errorText);
-    }catch(_){}
+    showBoothLocalMessage(errorText,"err");
+    if(typeof showMessage==="function")showMessage(errorText,"err",{popup:false});
+    if(typeof showPopup==="function")showPopup("イベント作成エラー",errorText);
     const firstEmpty=[
       ["boothEventName",name],
       ["boothEventVenue",venue],
@@ -175,17 +167,13 @@ async function createBoothEvent(){
     boothEvents=[row,...boothEvents];
     renderBoothEvents(boothEvents);
     el("boothEventForm")?.reset();
-    if(message){
-      message.textContent=`イベントを作成しました：${row.name||name}`;
-      message.className="message ok";
-    }
-    if(typeof playSuccessSound==="function")playSuccessSound();
+    const successText=`イベントを作成しました：${row.name||name}`;
+    showBoothLocalMessage(successText,"ok");
+    if(typeof showMessage==="function")showMessage(successText,"ok");
+    if(typeof showPopup==="function")showPopup("イベント作成完了",`イベント名：${row.name||name}\n会場：${row.venue||venue}\n日程：${row.event_start||event_start} - ${row.event_end||event_end}`);
   }catch(e){
-    if(message){
-      message.textContent="イベント作成エラー\n"+e.message;
-      message.className="message err";
-    }
     if(typeof showMessage==="function")showMessage("イベント作成エラー\n"+e.message,"err");
+    else showBoothLocalMessage("イベント作成エラー\n"+e.message,"err");
   }
 }
 
