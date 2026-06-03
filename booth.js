@@ -123,6 +123,12 @@ function renderBoothEvents(events){
   });
 }
 
+function showBoothEventCreateError(text){
+  showBoothLocalMessage(text,"err");
+  if(typeof playErrorSound==="function")playErrorSound();
+  if(typeof showPopup==="function")showPopup("イベント作成エラー",text);
+}
+
 async function createBoothEvent(){
   if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
   const name=String(el("boothEventName")?.value||"").trim();
@@ -134,9 +140,7 @@ async function createBoothEvent(){
 
   if(!name||!venue||!event_start||!event_end||!created_by){
     const errorText="イベント名、会場、開始日、終了日、作成者は必須です。";
-    showBoothLocalMessage(errorText,"err");
-    if(typeof showMessage==="function")showMessage(errorText,"err",{popup:false});
-    if(typeof showPopup==="function")showPopup("イベント作成エラー",errorText);
+    showBoothEventCreateError(errorText);
     const firstEmpty=[
       ["boothEventName",name],
       ["boothEventVenue",venue],
@@ -145,6 +149,13 @@ async function createBoothEvent(){
       ["boothEventCreatedBy",created_by]
     ].find(([,value])=>!value);
     if(firstEmpty)el(firstEmpty[0])?.focus();
+    return;
+  }
+
+  if(event_start>event_end){
+    const errorText="終了日は開始日以降の日付を入力してください。";
+    showBoothEventCreateError(errorText);
+    el("boothEventEnd")?.focus();
     return;
   }
 
