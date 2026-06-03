@@ -77,7 +77,10 @@ function renderInventoryAppMenu(){
   const historyButton=menu.querySelector('[data-menu-action="history"]');
   if(historyButton)historyButton.addEventListener("click",showInventoryHistory);
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
-  if(boothButton)boothButton.addEventListener("click",()=>showPopup("ブース管理","準備中です。"));
+  if(boothButton)boothButton.addEventListener("click",()=>{
+    if(typeof showBoothManagement==="function")showBoothManagement();
+    else showPopup("ブース管理","準備中です。");
+  });
   const adminAuthButton=menu.querySelector('[data-menu-action="admin-auth"]');
   if(adminAuthButton)adminAuthButton.addEventListener("click",authenticateInventoryAdmin);
   const inventoryAnalyticsButton=menu.querySelector('[data-menu-action="inventory-analytics"]');
