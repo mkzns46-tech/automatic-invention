@@ -2,6 +2,8 @@
 
 let boothEvents=[];
 let boothCurrentEventId="";
+let boothFilterFrom="";
+let boothFilterTo="";
 
 function showBoothManagement(){
   showInventoryScreen("booth");
@@ -69,6 +71,16 @@ function renderBoothShell(){
           <h3>イベント一覧</h3>
           <button type="button" id="reloadBoothEventsBtn" class="secondary">再読み込み</button>
         </div>
+        <div class="booth-filter-row">
+          <label>開始日
+            <input id="boothFilterFromDate" type="date">
+          </label>
+          <label>終了日
+            <input id="boothFilterToDate" type="date">
+          </label>
+          <button type="button" id="filterBoothEventsBtn" class="secondary">絞り込み</button>
+          <button type="button" id="resetBoothEventsFilterBtn" class="secondary">リセット</button>
+        </div>
         <div id="boothEventList" class="booth-event-list">
           <div class="booth-empty">読み込み中...</div>
         </div>
@@ -88,12 +100,61 @@ function renderBoothShell(){
     reload.dataset.bound="1";
     reload.addEventListener("click",loadBoothEvents);
   }
+  const filter=el("filterBoothEventsBtn");
+  if(filter&&!filter.dataset.bound){
+    filter.dataset.bound="1";
+    filter.addEventListener("click",applyBoothEventFilter);
+  }
+  const reset=el("resetBoothEventsFilterBtn");
+  if(reset&&!reset.dataset.bound){
+    reset.dataset.bound="1";
+    reset.addEventListener("click",resetBoothEventFilter);
+  }
+}
+
+function getFilteredBoothEvents(events){
+  const rows=Array.isArray(events)?events:[];
+  if(!boothFilterFrom&&!boothFilterTo)return rows;
+  return rows.filter(event=>{
+    const start=String(event.event_start||event.event_end||"");
+    const end=String(event.event_end||event.event_start||"");
+    if(boothFilterFrom&&end&&end<boothFilterFrom)return false;
+    if(boothFilterTo&&start&&start>boothFilterTo)return false;
+    return true;
+  });
+}
+
+function applyBoothEventFilter(){
+  const from=String(el("boothFilterFromDate")?.value||"").trim();
+  const to=String(el("boothFilterToDate")?.value||"").trim();
+  if(from&&to&&from>to){
+    const errorText="終了日は開始日以降の日付を入力してください。";
+    showBoothLocalMessage(errorText,"err");
+    if(typeof playErrorSound==="function")playErrorSound();
+    if(typeof showPopup==="function")showPopup("イベント絞り込みエラー",errorText);
+    el("boothFilterToDate")?.focus();
+    return;
+  }
+  boothFilterFrom=from;
+  boothFilterTo=to;
+  renderBoothEvents(boothEvents);
+  const count=getFilteredBoothEvents(boothEvents).length;
+  showBoothLocalMessage(`絞り込み結果：${count}件`,"ok");
+}
+
+function resetBoothEventFilter(){
+  boothFilterFrom="";
+  boothFilterTo="";
+  if(el("boothFilterFromDate"))el("boothFilterFromDate").value="";
+  if(el("boothFilterToDate"))el("boothFilterToDate").value="";
+  renderBoothEvents(boothEvents);
+  showBoothLocalMessage(boothEvents.length?`イベント ${boothEvents.length}件を表示しています。`:"イベントはまだありません。","ok");
 }
 
 function renderBoothEvents(events){
   const list=el("boothEventList");
   if(!list)return;
-  const rows=Array.isArray(events)?events:[];
+  const rows=getFilteredBoothEvents(events);
   if(!rows.length){
     list.innerHTML='<div class="booth-empty">イベントはまだありません。</div>';
     return;
@@ -114,12 +175,16 @@ function renderBoothEvents(events){
       </div>
       <div class="booth-event-actions">
         <button type="button" class="secondary booth-open-event-btn" data-event-id="${esc(event.id)}">開く</button>
+        <button type="button" class="booth-delete-event-btn" data-event-id="${esc(event.id)}">削除</button>
       </div>
     </article>`;
   }).join("");
 
   list.querySelectorAll(".booth-open-event-btn").forEach(button=>{
     button.addEventListener("click",()=>openBoothEvent(button.dataset.eventId));
+  });
+  list.querySelectorAll(".booth-delete-event-btn").forEach(button=>{
+    button.addEventListener("click",()=>deleteBoothEvent(button.dataset.eventId));
   });
 }
 
@@ -199,4 +264,63 @@ function openBoothEvent(eventId){
       : "イベントが見つかりません。";
     message.className=event?"message ok":"message err";
   }
+}
+
+function showBoothConfirmPopup(title,body,onOk){
+  const popup=document.createElement("div");
+  popup.className="app-popup booth-confirm-popup";
+  popup.style.display="flex";
+  popup.innerHTML=`<div class="app-popup-card">
+    <div class="app-popup-title">${esc(title)}</div>
+    <div class="app-popup-body">${esc(body)}</div>
+    <div class="booth-confirm-actions">
+      <button type="button" class="secondary booth-confirm-cancel-btn">キャンセル</button>
+      <button type="button" class="booth-confirm-ok-btn">OK</button>
+    </div>
+  </div>`;
+  document.body.appendChild(popup);
+  const close=()=>{try{document.body.removeChild(popup);}catch(_){}};
+  popup.querySelector(".booth-confirm-cancel-btn")?.addEventListener("click",close);
+  popup.querySelector(".booth-confirm-ok-btn")?.addEventListener("click",()=>{
+    close();
+    if(typeof onOk==="function")onOk();
+  });
+}
+
+async function boothEventHasWorkLogs(eventId){
+  const id=encodeURIComponent(eventId);
+  const checks=await Promise.all([
+    sb(`booth_stock_movements?select=id&event_id=eq.${id}&limit=1`),
+    sb(`booth_smaregi_sync_logs?select=id&event_id=eq.${id}&limit=1`),
+    sb(`booth_sales_imports?select=id&event_id=eq.${id}&limit=1`)
+  ]);
+  return checks.some(rows=>Array.isArray(rows)&&rows.length>0);
+}
+
+async function deleteBoothEvent(eventId){
+  eventId=String(eventId||"");
+  if(!eventId)return;
+  if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
+  const event=boothEvents.find(row=>String(row.id)===eventId);
+  showBoothConfirmPopup("イベント削除確認","このイベントを削除します。よろしいですか？",async()=>{
+    try{
+      if(await boothEventHasWorkLogs(eventId)){
+        const errorText="このイベントには作業履歴があるため削除できません。";
+        showBoothLocalMessage(errorText,"err");
+        if(typeof playErrorSound==="function")playErrorSound();
+        if(typeof showPopup==="function")showPopup("イベント削除エラー",errorText);
+        return;
+      }
+      await sb(`booth_events?id=eq.${encodeURIComponent(eventId)}`,{
+        method:"DELETE",
+        headers:{Prefer:"return=minimal"}
+      });
+      if(boothCurrentEventId===eventId)boothCurrentEventId="";
+      if(typeof showMessage==="function")showMessage(`イベントを削除しました：${event?.name||eventId}`,"ok");
+      await loadBoothEvents();
+    }catch(e){
+      if(typeof showMessage==="function")showMessage("イベント削除エラー\n"+e.message,"err");
+      else showBoothLocalMessage("イベント削除エラー\n"+e.message,"err");
+    }
+  });
 }

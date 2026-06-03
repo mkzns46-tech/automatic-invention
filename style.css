@@ -3616,6 +3616,25 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   min-width:120px;
   margin:0;
 }
+.booth-filter-row{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(120px,1fr)) auto auto;
+  gap:10px;
+  align-items:end;
+  margin:0 0 14px;
+  padding:12px;
+  border:1px solid #dcebe1;
+  border-radius:14px;
+  background:#fff;
+}
+.booth-filter-row label,
+.booth-filter-row button{
+  margin:0;
+}
+.booth-filter-row button{
+  width:auto;
+  min-width:96px;
+}
 .booth-event-list{
   display:grid;
   gap:10px;
@@ -3697,18 +3716,67 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   min-width:88px;
   margin:0;
 }
+.booth-event-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.booth-delete-event-btn{
+  width:auto;
+  min-width:64px !important;
+  border:1px solid #fecaca !important;
+  background:#fff !important;
+  color:#b91c1c !important;
+  box-shadow:none !important;
+}
+.booth-delete-event-btn:hover{
+  background:#fee2e2 !important;
+  color:#991b1b !important;
+}
+.booth-confirm-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:16px;
+}
+.booth-confirm-actions button{
+  margin:0;
+}
 @media(max-width:800px){
   .booth-layout,
   .booth-form-grid,
+  .booth-filter-row,
   .booth-event-item{
     grid-template-columns:1fr;
+  }
+  .booth-card,
+  .booth-form,
+  .booth-form label,
+  .booth-form input,
+  .booth-form textarea,
+  .booth-filter-row,
+  .booth-filter-row label,
+  .booth-filter-row input{
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
   }
   .booth-list-header{
     display:block;
   }
   .booth-list-header button,
-  .booth-event-actions button{
+  .booth-filter-row button{
     width:100%;
+    margin-top:10px;
+  }
+  .booth-event-actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    width:100%;
+  }
+  .booth-event-actions button{
+    width:100% !important;
     margin-top:10px;
   }
 }
