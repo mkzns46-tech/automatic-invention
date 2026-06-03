@@ -37,9 +37,9 @@ function renderBoothShell(){
     <div class="booth-layout">
       <section class="booth-card booth-create-card">
         <h3>イベント作成</h3>
-        <form id="boothEventForm" class="booth-form">
+        <form id="boothEventForm" class="booth-form" novalidate>
           <label>イベント名<span class="required">必須</span>
-            <input id="boothEventName" autocomplete="off" placeholder="例：インターハイ" required>
+            <input id="boothEventName" autocomplete="off" placeholder="例：インターハイ">
           </label>
           <div class="booth-form-grid">
             <label>会場<span class="required">必須</span>
