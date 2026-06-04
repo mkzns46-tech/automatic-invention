@@ -319,6 +319,7 @@ function renderBoothEventDetail(event){
       <div><span>状態</span><strong>${esc(getBoothStatusLabel(event.status))}</strong></div>
       <div class="booth-detail-memo"><span>メモ</span><strong>${esc(event.memo||"-")}</strong></div>
     </div>
+    <div class="booth-work-menu-title">作業内容を選んでください</div>
     <div class="booth-event-menu" aria-label="イベント内メニュー">
       <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">持ち出しスキャン</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
@@ -440,11 +441,9 @@ async function deleteBoothEvent(eventId){
   const event=boothEvents.find(row=>String(row.id)===eventId);
   showBoothConfirmPopup("イベント削除確認","このイベントを削除します。よろしいですか？",async()=>{
     try{
-      if(await boothEventHasWorkLogs(eventId)){
-        const errorText="このイベントには作業履歴があるため削除できません。";
-        showBoothLocalMessage(errorText,"err");
-        if(typeof playErrorSound==="function")playErrorSound();
-        if(typeof showPopup==="function")showPopup("イベント削除エラー",errorText);
+      if(isBoothEventClosed(event)){
+        const errorText="締め済みイベントは削除できません。";
+        boothShowError("イベント削除エラー",errorText);
         return;
       }
       await sb(`booth_events?id=eq.${encodeURIComponent(eventId)}`,{
@@ -452,7 +451,7 @@ async function deleteBoothEvent(eventId){
         headers:{Prefer:"return=minimal"}
       });
       if(boothCurrentEventId===eventId)boothCurrentEventId="";
-      if(typeof showMessage==="function")showMessage(`イベントを削除しました：${event?.name||eventId}`,"ok");
+      boothShowSuccess("イベント削除完了","イベントを削除しました。");
       await loadBoothEvents();
     }catch(e){
       if(typeof showMessage==="function")showMessage("イベント削除エラー\n"+e.message,"err");
@@ -962,6 +961,7 @@ function renderBoothEventDetail(event){
         <button type="button" id="boothCsvDownloadBtn" class="secondary">CSVダウンロード</button>
         <button type="button" id="boothPdfDownloadBtn" class="secondary">PDFダウンロード</button>
       </div>`:""}
+    <div class="booth-work-menu-title">作業内容を選んでください</div>
     <div class="booth-event-menu" aria-label="イベント内メニュー">
       <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">持ち出しスキャン</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="gacha">ガチャ管理</button>
@@ -1031,12 +1031,7 @@ function renderBoothEventDetail(event){
   el("boothStartCameraBtn")?.addEventListener("click",startBoothCarryOutCamera);
   el("boothStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
   el("boothCameraZoomRange")?.addEventListener("input",applyBoothCameraZoom);
-  el("boothCarryOutBarcode")?.addEventListener("input",()=>{
-    clearTimeout(boothProductPreviewTimer);
-    boothProductPreviewTimer=setTimeout(previewBoothCarryOutProduct,450);
-  });
-  el("boothCarryOutBarcode")?.addEventListener("change",previewBoothCarryOutProduct);
-  el("boothCarryOutBarcode")?.addEventListener("blur",previewBoothCarryOutProduct);
+  el("boothCarryOutBarcode")?.addEventListener("input",clearBoothProductPreview);
   el("boothCsvDownloadBtn")?.addEventListener("click",showBoothReportPreparing);
   el("boothPdfDownloadBtn")?.addEventListener("click",showBoothReportPreparing);
   updateBoothCameraZoomLabel();
@@ -1111,7 +1106,17 @@ async function loadBoothCarryOutHistory(eventId){
   }
 }
 
-async function previewBoothCarryOutProduct(){
+function clearBoothProductPreview(){
+  clearTimeout(boothProductPreviewTimer);
+  const preview=el("boothProductPreview");
+  if(preview){
+    preview.hidden=true;
+    preview.innerHTML="";
+  }
+}
+
+async function previewBoothCarryOutProduct(options={}){
+  const popupOnError=options.popupOnError===true;
   const preview=el("boothProductPreview");
   const barcode=String(el("boothCarryOutBarcode")?.value||"").trim();
   if(!preview)return;
@@ -1125,7 +1130,7 @@ async function previewBoothCarryOutProduct(){
     if(!product){
       preview.hidden=true;
       preview.innerHTML="";
-      boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");
+      if(popupOnError)boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");
       return;
     }
     const hasSmaregiId=!(product.smaregi_product_id===null||product.smaregi_product_id===undefined||String(product.smaregi_product_id).trim()==="");
@@ -1133,11 +1138,13 @@ async function previewBoothCarryOutProduct(){
     preview.innerHTML=`<div><span>商品名：</span><strong>${esc(product.name||"-")}</strong></div>
       <div><span>現在の東京在庫：</span><strong>${esc(product.base_stock??0)}</strong></div>
       <div><span>スマレジ商品ID：</span><strong>${hasSmaregiId?"あり":"なし"}</strong></div>`;
-    if(!hasSmaregiId){
+    if(!hasSmaregiId&&popupOnError){
       boothShowError("スマレジ商品ID未登録","商品マスターを再取り込みしてください。","boothCarryOutBarcode");
     }
   }catch(e){
-    boothShowError("商品検索エラー","商品検索に失敗しました。\n"+e.message);
+    preview.hidden=true;
+    preview.innerHTML="";
+    if(popupOnError)boothShowError("商品検索エラー","商品検索に失敗しました。\n"+e.message);
   }
 }
 
@@ -1152,7 +1159,7 @@ async function handleBoothScannedCode(code){
   if(input)input.value=code;
   await stopBoothCarryOutCamera(false);
   boothCameraSuccess("バーコードを読み取りました。");
-  await previewBoothCarryOutProduct();
+  await previewBoothCarryOutProduct({popupOnError:false});
 }
 
 async function registerBoothCarryOut(){
@@ -1237,8 +1244,8 @@ async function deleteBoothEvent(eventId){
   const event=boothEvents.find(row=>String(row.id)===eventId);
   showBoothConfirmPopup("イベント削除確認","このイベントを削除します。よろしいですか？",async()=>{
     try{
-      if(isBoothEventClosed(event)||await boothEventHasWorkLogs(eventId)){
-        boothShowError("イベント削除エラー","このイベントには作業履歴があるため削除できません。");
+      if(isBoothEventClosed(event)){
+        boothShowError("イベント削除エラー","締め済みイベントは削除できません。");
         return;
       }
       await sb(`booth_events?id=eq.${encodeURIComponent(eventId)}`,{
@@ -1246,7 +1253,7 @@ async function deleteBoothEvent(eventId){
         headers:{Prefer:"return=minimal"}
       });
       if(boothCurrentEventId===eventId)boothCurrentEventId="";
-      if(typeof showMessage==="function")showMessage(`イベントを削除しました：${event?.name||eventId}`,"ok");
+      boothShowSuccess("イベント削除完了","イベントを削除しました。");
       await loadBoothEvents();
     }catch(e){
       if(typeof showMessage==="function")showMessage("イベント削除エラー\n"+e.message,"err");

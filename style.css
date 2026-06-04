@@ -3824,6 +3824,11 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   gap:8px;
   margin:16px 0;
 }
+.booth-work-menu-title{
+  margin:16px 0 8px;
+  font-weight:900;
+  color:#1b4332;
+}
 .booth-event-menu-btn{
   width:100%;
   min-height:42px;
@@ -4075,21 +4080,34 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   .booth-scan-row{
     grid-template-columns:1fr !important;
   }
+  .booth-work-menu-title{
+    display:block !important;
+    margin:12px 0 8px !important;
+    font-size:14px !important;
+    line-height:1.3 !important;
+  }
   .booth-event-menu{
-    display:flex !important;
-    overflow-x:auto !important;
+    display:grid !important;
+    grid-template-columns:1fr !important;
     gap:8px !important;
-    padding:2px 0 10px !important;
+    max-height:280px !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    padding:8px !important;
     margin:12px 0 !important;
-    scroll-snap-type:x proximity;
+    border:1px solid #dcebe1 !important;
+    border-radius:12px !important;
+    background:#f8fcf9 !important;
+    scroll-snap-type:none !important;
     -webkit-overflow-scrolling:touch;
   }
   .booth-event-menu-btn{
-    flex:0 0 auto !important;
-    width:auto !important;
-    min-width:132px !important;
-    white-space:nowrap !important;
-    scroll-snap-align:start;
+    flex:none !important;
+    width:100% !important;
+    min-width:0 !important;
+    white-space:normal !important;
+    text-align:left !important;
+    scroll-snap-align:none !important;
   }
   .booth-report-actions{
     grid-template-columns:1fr !important;
