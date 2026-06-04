@@ -4,6 +4,15 @@ let boothEvents=[];
 let boothCurrentEventId="";
 let boothFilterFrom="";
 let boothFilterTo="";
+let boothCameraStream=null;
+let boothBarcodeDetector=null;
+let boothCameraScanning=false;
+let boothZXingReader=null;
+let boothZXingRunning=false;
+let boothLastScan="";
+let boothLastScanAt=0;
+let boothNoScanTimer=null;
+let boothCurrentVideoTrack=null;
 
 function showBoothManagement(){
   showInventoryScreen("booth");
@@ -505,6 +514,25 @@ function renderBoothEventDetail(event){
       <section class="booth-work-card booth-carry-out-card">
         <h4>持ち出しスキャン</h4>
         <p class="section-note">今回はスマレジAPIを呼ばず、event_id: ${esc(event.id)} に持ち出し履歴だけ保存します。</p>
+        <div class="button-row booth-camera-button-row">
+          <button type="button" id="boothStartCameraBtn">カメラ読取</button>
+          <div class="camera-zoom-row booth-camera-zoom-row">
+            <label>カメラズーム
+              <input id="boothCameraZoomRange" type="range" min="1" max="3" step="0.1" value="1.5">
+              <span id="boothCameraZoomValue">1.5x</span>
+            </label>
+          </div>
+          <button type="button" id="boothStopCameraBtn" class="secondary">停止</button>
+        </div>
+        <div class="camera-area booth-camera-area">
+          <video id="boothCarryOutVideo" muted playsinline></video>
+          <div id="boothCameraGuideOverlay" class="camera-guide-overlay">
+            <div class="camera-guide-box">
+              <div class="camera-guide-line"></div>
+            </div>
+            <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
+          </div>
+        </div>
         <div class="booth-scan-row">
           <label>バーコード
             <input id="boothCarryOutBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力">
@@ -537,6 +565,10 @@ function renderBoothEventDetail(event){
   });
   el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOut);
   el("reloadBoothCarryOutHistoryBtn")?.addEventListener("click",()=>loadBoothCarryOutHistory(event.id));
+  el("boothStartCameraBtn")?.addEventListener("click",startBoothCarryOutCamera);
+  el("boothStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
+  el("boothCameraZoomRange")?.addEventListener("input",applyBoothCameraZoom);
+  updateBoothCameraZoomLabel();
   loadBoothCarryOutHistory(event.id);
 }
 
@@ -576,6 +608,212 @@ function formatBoothDateTime(value){
   const date=new Date(value);
   if(Number.isNaN(date.getTime()))return String(value);
   return date.toLocaleString("ja-JP",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+}
+
+function showBoothCameraGuide(){
+  el("boothCameraGuideOverlay")?.classList.add("is-active");
+}
+
+function hideBoothCameraGuide(){
+  el("boothCameraGuideOverlay")?.classList.remove("is-active");
+}
+
+function getBoothCameraZoomValue(){
+  const range=el("boothCameraZoomRange");
+  const v=range?Number(range.value||1.5):1.5;
+  return Number.isFinite(v)?v:1.5;
+}
+
+function updateBoothCameraZoomLabel(){
+  const value=el("boothCameraZoomValue");
+  if(value)value.textContent=getBoothCameraZoomValue().toFixed(1)+"x";
+}
+
+async function applyBoothCameraZoom(){
+  try{
+    updateBoothCameraZoomLabel();
+    if(!boothCurrentVideoTrack||!boothCurrentVideoTrack.getCapabilities)return;
+    const caps=boothCurrentVideoTrack.getCapabilities();
+    if(!caps.zoom)return;
+    const desired=getBoothCameraZoomValue();
+    const zoom=Math.min(caps.zoom.max,Math.max(caps.zoom.min,desired));
+    await boothCurrentVideoTrack.applyConstraints({advanced:[{zoom}]});
+  }catch(_){}
+}
+
+async function improveBoothCameraTrack(videoEl){
+  try{
+    const stream=videoEl&&videoEl.srcObject;
+    const track=stream&&stream.getVideoTracks&&stream.getVideoTracks()[0];
+    if(!track)return;
+    boothCurrentVideoTrack=track;
+    const caps=track.getCapabilities?track.getCapabilities():{};
+    const advanced=[];
+    if(caps.focusMode&&caps.focusMode.includes("continuous"))advanced.push({focusMode:"continuous"});
+    if(caps.exposureMode&&caps.exposureMode.includes("continuous"))advanced.push({exposureMode:"continuous"});
+    if(caps.whiteBalanceMode&&caps.whiteBalanceMode.includes("continuous"))advanced.push({whiteBalanceMode:"continuous"});
+    if(caps.zoom){
+      const desired=getBoothCameraZoomValue();
+      advanced.push({zoom:Math.min(caps.zoom.max,Math.max(caps.zoom.min,desired))});
+    }
+    if(advanced.length)await track.applyConstraints({advanced});
+    updateBoothCameraZoomLabel();
+  }catch(_){}
+}
+
+function boothCameraError(title,text){
+  showBoothLocalMessage(text,"err");
+  if(typeof playErrorSound==="function")playErrorSound();
+  if(typeof showPopup==="function")showPopup(title,text);
+}
+
+function boothCameraSuccess(text){
+  showBoothLocalMessage(text,"ok");
+  if(typeof playSuccessSound==="function")playSuccessSound();
+}
+
+function startBoothNoScanTimer(){
+  clearTimeout(boothNoScanTimer);
+  boothNoScanTimer=setTimeout(async()=>{
+    if(!boothCameraScanning&&!boothZXingRunning)return;
+    await stopBoothCarryOutCamera(false);
+    boothCameraError("読み取りエラー","バーコードを読み取れませんでした。");
+  },15000);
+}
+
+async function startBoothCarryOutCamera(){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    boothCameraError("カメラ起動エラー","イベントを開いてからカメラを起動してください。");
+    return;
+  }
+  try{
+    await stopBoothCarryOutCamera(false);
+    showBoothLocalMessage("カメラを起動しています...");
+    const video=el("boothCarryOutVideo");
+    if(!video)throw new Error("カメラ表示エリアが見つかりません。");
+    video.style.display="block";
+    showBoothCameraGuide();
+
+    if(typeof ensureZXing==="function"){
+      await ensureZXing();
+    }
+    if(window.ZXing){
+      if(!boothZXingReader){
+        const hints=new Map();
+        const formats=[
+          ZXing.BarcodeFormat.EAN_13,
+          ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.UPC_A,
+          ZXing.BarcodeFormat.UPC_E,
+          ZXing.BarcodeFormat.CODE_128,
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.ITF
+        ];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,formats);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+        boothZXingReader=new ZXing.BrowserMultiFormatReader(hints,50);
+      }
+      boothZXingRunning=true;
+      startBoothNoScanTimer();
+      await boothZXingReader.decodeFromConstraints(
+        {video:{
+          facingMode:{ideal:"environment"},
+          width:{ideal:2560},
+          height:{ideal:1440},
+          focusMode:{ideal:"continuous"},
+          exposureMode:{ideal:"continuous"}
+        }},
+        video,
+        async(result)=>{
+          if(result&&boothZXingRunning){
+            await handleBoothScannedCode(result.getText());
+          }
+        }
+      );
+      improveBoothCameraTrack(video);
+      showBoothLocalMessage("カメラ読取中です。赤枠にバーコードを合わせてください。","ok");
+      return;
+    }
+
+    if("BarcodeDetector"in window){
+      boothBarcodeDetector=new BarcodeDetector({formats:["ean_13","ean_8","code_128","code_39","qr_code"]});
+      boothCameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+      video.srcObject=boothCameraStream;
+      await video.play();
+      boothCameraScanning=true;
+      startBoothNoScanTimer();
+      improveBoothCameraTrack(video);
+      showBoothLocalMessage("カメラ読取中です。赤枠にバーコードを合わせてください。","ok");
+      boothScanLoop();
+      return;
+    }
+
+    boothCameraError("カメラ起動エラー","カメラを起動できませんでした。");
+  }catch(e){
+    await stopBoothCarryOutCamera(false);
+    boothCameraError("カメラ起動エラー","カメラを起動できませんでした。");
+  }
+}
+
+async function stopBoothCarryOutCamera(showOk=true){
+  clearTimeout(boothNoScanTimer);
+  boothCameraScanning=false;
+  boothZXingRunning=false;
+  boothCurrentVideoTrack=null;
+  if(boothZXingReader){
+    try{boothZXingReader.reset();}catch(_){}
+  }
+  if(boothCameraStream){
+    boothCameraStream.getTracks().forEach(track=>track.stop());
+    boothCameraStream=null;
+  }
+  const video=el("boothCarryOutVideo");
+  if(video){
+    try{video.pause();}catch(_){}
+    video.srcObject=null;
+    video.style.display="none";
+  }
+  hideBoothCameraGuide();
+  if(showOk)showBoothLocalMessage("カメラを停止しました。","ok");
+}
+
+async function boothScanLoop(){
+  if(!boothCameraScanning||!boothBarcodeDetector)return;
+  try{
+    const video=el("boothCarryOutVideo");
+    const codes=video?await boothBarcodeDetector.detect(video):[];
+    if(codes.length)await handleBoothScannedCode(codes[0].rawValue);
+  }catch(_){}
+  if(boothCameraScanning)requestAnimationFrame(boothScanLoop);
+}
+
+async function handleBoothScannedCode(code){
+  code=String(code||"").trim();
+  if(!code)return;
+  const t=Date.now();
+  if(code===boothLastScan&&t-boothLastScanAt<1800)return;
+  boothLastScan=code;
+  boothLastScanAt=t;
+  const input=el("boothCarryOutBarcode");
+  if(input)input.value=code;
+  await stopBoothCarryOutCamera(false);
+  boothCameraSuccess("バーコードを読み取りました。");
+
+  try{
+    const product=await findBoothProductByBarcode(code);
+    if(!product){
+      boothCameraError("商品未登録","このバーコードの商品は登録されていません。");
+      return;
+    }
+    if(product.smaregi_product_id===null||product.smaregi_product_id===undefined||String(product.smaregi_product_id).trim()===""){
+      boothCameraError("スマレジ商品ID未登録","商品マスターを再取り込みしてください。");
+      return;
+    }
+    showBoothLocalMessage(`読み取り成功：${product.name||code}`,"ok");
+  }catch(e){
+    boothCameraError("読み取りエラー","バーコードを読み取れませんでした。");
+  }
 }
 
 async function upsertBoothEventItem(event,product,qty){

@@ -3839,6 +3839,24 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   margin:0 0 10px;
   color:#1b4332;
 }
+.booth-camera-button-row{
+  margin-bottom:10px;
+}
+.booth-camera-area{
+  margin:8px 0 12px;
+}
+.booth-camera-area #boothCarryOutVideo{
+  display:none;
+  width:100% !important;
+  max-height:360px;
+  margin:12px 0;
+  border:2px solid var(--main,#2d6a4f);
+  border-radius:16px;
+  background:#000;
+}
+.booth-camera-zoom-row{
+  flex:1;
+}
 .booth-scan-row{
   display:grid;
   grid-template-columns:minmax(180px,1fr) 120px minmax(160px,220px) auto;
@@ -3977,6 +3995,12 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   .booth-event-menu,
   .booth-scan-row{
     grid-template-columns:1fr !important;
+  }
+  .booth-camera-button-row{
+    flex-direction:column;
+  }
+  .booth-camera-zoom-row{
+    width:100%;
   }
   .booth-event-menu-btn,
   .booth-scan-row input,
