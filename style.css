@@ -3757,6 +3757,102 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 .booth-confirm-actions button{
   margin:0;
 }
+.booth-detail-card{
+  margin-top:16px;
+}
+.booth-detail-header{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+  margin-bottom:14px;
+}
+.booth-detail-header h3{
+  margin:0;
+  color:#1b4332;
+}
+.booth-detail-label{
+  margin:0 0 4px;
+  color:#527161;
+  font-size:13px;
+  font-weight:700;
+}
+.booth-detail-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.booth-detail-grid > div{
+  border:1px solid #dcebe1;
+  border-radius:12px;
+  background:#fff;
+  padding:10px 12px;
+}
+.booth-detail-grid span{
+  display:block;
+  color:#527161;
+  font-size:12px;
+  font-weight:700;
+  margin-bottom:4px;
+}
+.booth-detail-grid strong{
+  display:block;
+  color:#1b4332;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+.booth-detail-memo{
+  grid-column:1 / -1;
+}
+.booth-event-menu{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin:16px 0;
+}
+.booth-event-menu-btn{
+  width:100%;
+  min-height:42px;
+  margin:0;
+  padding:8px 10px;
+  border:1px solid #b7d7c4;
+  background:#fff;
+  color:#1b4332;
+  font-size:14px;
+}
+.booth-event-menu-btn.is-active{
+  background:#2d6a4f;
+  border-color:#2d6a4f;
+  color:#fff;
+}
+.booth-work-area{
+  display:grid;
+  gap:12px;
+}
+.booth-work-card{
+  border:1px solid #dcebe1;
+  border-radius:14px;
+  background:#fff;
+  padding:14px;
+}
+.booth-work-card h4{
+  margin:0 0 10px;
+  color:#1b4332;
+}
+.booth-scan-row{
+  display:grid;
+  grid-template-columns:minmax(180px,1fr) 120px auto;
+  gap:10px;
+  align-items:end;
+}
+.booth-scan-row label,
+.booth-scan-row button{
+  margin:0;
+}
+.booth-scan-row button{
+  width:auto;
+  min-width:140px;
+}
 @media(max-width:800px){
   .booth-layout,
   .booth-form-grid,
@@ -3831,5 +3927,27 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   .booth-event-actions button{
     width:100% !important;
     margin-top:10px;
+  }
+  .booth-detail-header{
+    display:block;
+  }
+  .booth-detail-grid,
+  .booth-event-menu,
+  .booth-scan-row{
+    grid-template-columns:1fr !important;
+  }
+  .booth-event-menu-btn,
+  .booth-scan-row input,
+  .booth-scan-row button{
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+  }
+  .booth-scan-row input{
+    height:42px !important;
+    min-height:42px !important;
+    padding:6px 10px !important;
+    font-size:14px !important;
   }
 }

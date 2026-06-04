@@ -87,7 +87,8 @@ function renderBoothShell(){
           <div class="booth-empty">読み込み中...</div>
         </div>
       </section>
-    </div>`;
+    </div>
+    <section id="boothEventDetailRoot" class="booth-card booth-detail-card" hidden></section>`;
 
   const form=el("boothEventForm");
   if(form&&!form.dataset.bound){
@@ -163,7 +164,7 @@ function renderBoothEvents(events){
   }
   list.innerHTML=rows.map(event=>{
     const dateText=[event.event_start,event.event_end].filter(Boolean).join(" - ")||"日程未設定";
-    return `<article class="booth-event-item ${boothCurrentEventId===event.id?"is-open":""}">
+    return `<article class="booth-event-item ${String(boothCurrentEventId)===String(event.id)?"is-open":""}">
       <div class="booth-event-main">
         <div class="booth-event-title-row">
           <strong>${esc(event.name||"無題イベント")}</strong>
@@ -265,6 +266,129 @@ function openBoothEvent(eventId){
       ? `イベントを開きました：${event.name}\n持ち出しスキャン、戻り棚卸、スマレジ在庫連携は次フェーズで実装します。`
       : "イベントが見つかりません。";
     message.className=event?"message ok":"message err";
+  }
+}
+
+function getBoothStatusLabel(status){
+  const map={
+    draft:"下書き",
+    active:"開催中",
+    closed:"締め済み",
+    cancelled:"取消"
+  };
+  return map[status]||status||"-";
+}
+
+function getBoothCurrentEvent(){
+  return boothEvents.find(row=>String(row.id)===String(boothCurrentEventId||""))||null;
+}
+
+function renderBoothEventDetail(event){
+  const detail=el("boothEventDetailRoot");
+  if(!detail)return;
+  if(!event){
+    detail.hidden=true;
+    detail.innerHTML="";
+    return;
+  }
+  detail.hidden=false;
+  detail.innerHTML=`
+    <div class="booth-detail-header">
+      <div>
+        <p class="booth-detail-label">イベント詳細</p>
+        <h3>${esc(event.name||"無題イベント")}</h3>
+      </div>
+      <span class="booth-status booth-status-${esc(event.status||"draft")}">${esc(getBoothStatusLabel(event.status))}</span>
+    </div>
+    <div class="booth-detail-grid">
+      <div><span>イベント名</span><strong>${esc(event.name||"-")}</strong></div>
+      <div><span>会場</span><strong>${esc(event.venue||"-")}</strong></div>
+      <div><span>開始日</span><strong>${esc(event.event_start||"-")}</strong></div>
+      <div><span>終了日</span><strong>${esc(event.event_end||"-")}</strong></div>
+      <div><span>担当者</span><strong>${esc(event.created_by||"-")}</strong></div>
+      <div><span>状態</span><strong>${esc(getBoothStatusLabel(event.status))}</strong></div>
+      <div class="booth-detail-memo"><span>メモ</span><strong>${esc(event.memo||"-")}</strong></div>
+    </div>
+    <div class="booth-event-menu" aria-label="イベント内メニュー">
+      <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">持ち出しスキャン</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="return">戻り棚卸</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">ブース保管</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="gacha">ガチャ管理</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="sales">販売取込</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="diff">差異確認</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="close">イベント締め</button>
+    </div>
+    <div id="boothEventWorkArea" class="booth-work-area">
+      <section class="booth-work-card booth-carry-out-card">
+        <h4>持ち出しスキャン</h4>
+        <p class="section-note">event_id: ${esc(event.id)} に紐づける前提の入力エリアです。スマレジAPI連携はまだ行いません。</p>
+        <div class="booth-scan-row">
+          <label>バーコード
+            <input id="boothCarryOutBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力">
+          </label>
+          <label>数量
+            <input id="boothCarryOutQty" type="number" min="1" step="1" value="1">
+          </label>
+          <button type="button" id="boothCarryOutRegisterBtn">持ち出し登録</button>
+        </div>
+      </section>
+      <section class="booth-work-card booth-carry-history-card">
+        <h4>持ち出し履歴</h4>
+        <div class="booth-empty">まだ持ち出し履歴はありません。</div>
+      </section>
+    </div>`;
+
+  detail.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
+    button.addEventListener("click",()=>switchBoothEventMenu(button.dataset.boothMenu));
+  });
+  el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOutDraft);
+}
+
+function switchBoothEventMenu(menu){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    if(typeof showMessage==="function")showMessage("イベントを開いてから操作してください。","err");
+    return;
+  }
+  if(menu==="carry-out"){
+    renderBoothEventDetail(event);
+    return;
+  }
+  document.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
+    button.classList.toggle("is-active",button.dataset.boothMenu===menu);
+  });
+  showBoothLocalMessage("準備中です","ok");
+  if(typeof showPopup==="function")showPopup("準備中","準備中です");
+}
+
+function registerBoothCarryOutDraft(){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    if(typeof showMessage==="function")showMessage("イベントを開いてから持ち出し登録してください。","err");
+    return;
+  }
+  const barcode=String(el("boothCarryOutBarcode")?.value||"").trim();
+  const qty=Number(el("boothCarryOutQty")?.value||0);
+  if(!barcode||!qty||qty<1){
+    if(typeof showMessage==="function")showMessage("バーコードと数量を入力してください。","err");
+    return;
+  }
+  showBoothLocalMessage(`持ち出し登録の土台確認OK：${event.name} / ${barcode} / ${qty}点`,"ok");
+  if(typeof showMessage==="function")showMessage("持ち出し登録画面は準備できています。スマレジAPI連携は次フェーズです。","ok");
+}
+
+function openBoothEvent(eventId){
+  boothCurrentEventId=String(eventId||"");
+  const event=getBoothCurrentEvent();
+  renderBoothEvents(boothEvents);
+  renderBoothEventDetail(event);
+  if(event){
+    showBoothLocalMessage(`イベントを開きました：${event.name}`,"ok");
+  }else if(typeof showMessage==="function"){
+    showMessage("イベントが見つかりません。","err");
+  }else{
+    showBoothLocalMessage("イベントが見つかりません。","err");
   }
 }
 
