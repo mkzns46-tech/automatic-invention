@@ -13,6 +13,7 @@ let boothLastScan="";
 let boothLastScanAt=0;
 let boothNoScanTimer=null;
 let boothCurrentVideoTrack=null;
+let boothProductPreviewTimer=null;
 
 function showBoothManagement(){
   showInventoryScreen("booth");
@@ -911,4 +912,345 @@ async function registerBoothCarryOut(){
   }catch(e){
     boothShowError("持ち出し登録エラー","持ち出し登録に失敗しました。\n"+e.message);
   }
+}
+
+function isBoothEventClosed(event){
+  return String(event?.status||"").toLowerCase()==="closed";
+}
+
+function showBoothClosedError(){
+  boothShowError("イベント操作エラー","このイベントは締め済みです。編集できません。");
+}
+
+function showBoothReportPreparing(){
+  if(typeof showPopup==="function")showPopup("準備中","イベントレポート出力は次フェーズで実装します。");
+}
+
+function renderBoothEventDetail(event){
+  const detail=el("boothEventDetailRoot");
+  if(!detail)return;
+  if(!event){
+    detail.hidden=true;
+    detail.innerHTML="";
+    return;
+  }
+  detail.hidden=false;
+  const closed=isBoothEventClosed(event);
+  const dateText=[event.event_start,event.event_end].filter(Boolean).join(" - ")||"-";
+  const staffOptions='<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+  const detailOpen=window.innerWidth>800?" open":"";
+  detail.innerHTML=`
+    <div class="booth-detail-header booth-detail-title-only">
+      <div>
+        <p class="booth-detail-label">イベント名</p>
+        <h3>${esc(event.name||"無題イベント")}</h3>
+      </div>
+      <span class="booth-status booth-status-${esc(event.status||"draft")}">${esc(getBoothStatusLabel(event.status))}</span>
+    </div>
+    <details class="booth-event-detail-collapse"${detailOpen}>
+      <summary>イベント詳細</summary>
+      <div class="booth-detail-grid">
+        <div><span>会場</span><strong>${esc(event.venue||"-")}</strong></div>
+        <div><span>日程</span><strong>${esc(dateText)}</strong></div>
+        <div><span>作成者</span><strong>${esc(event.created_by||"-")}</strong></div>
+        <div><span>状態</span><strong>${esc(getBoothStatusLabel(event.status))}</strong></div>
+        <div class="booth-detail-memo"><span>メモ</span><strong>${esc(event.memo||"-")}</strong></div>
+      </div>
+    </details>
+    ${closed?`<div class="message err booth-closed-notice">このイベントは締め済みです。編集できません。</div>
+      <div class="booth-report-actions">
+        <button type="button" id="boothCsvDownloadBtn" class="secondary">CSVダウンロード</button>
+        <button type="button" id="boothPdfDownloadBtn" class="secondary">PDFダウンロード</button>
+      </div>`:""}
+    <div class="booth-event-menu" aria-label="イベント内メニュー">
+      <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">持ち出しスキャン</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="gacha">ガチャ管理</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="sales">販売取り込み</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="return">棚戻し棚卸し</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">ブース保管</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="diff">差異確認</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="close">イベント締め</button>
+    </div>
+    <div id="boothEventWorkArea" class="booth-work-area">
+      <section class="booth-work-card booth-carry-out-card">
+        <h4>持ち出しスキャン</h4>
+        <p class="section-note">今回はスマレジAPIを呼ばず、event_id: ${esc(event.id)} に持ち出し履歴だけ保存します。</p>
+        <div class="button-row booth-camera-button-row">
+          <button type="button" id="boothStartCameraBtn">カメラ読取</button>
+          <div class="camera-zoom-row booth-camera-zoom-row">
+            <label>カメラズーム
+              <input id="boothCameraZoomRange" type="range" min="1" max="3" step="0.1" value="1.5">
+              <span id="boothCameraZoomValue">1.5x</span>
+            </label>
+          </div>
+          <button type="button" id="boothStopCameraBtn" class="secondary">停止</button>
+        </div>
+        <div class="camera-area booth-camera-area">
+          <video id="boothCarryOutVideo" muted playsinline></video>
+          <div id="boothCameraGuideOverlay" class="camera-guide-overlay">
+            <div class="camera-guide-box">
+              <div class="camera-guide-line"></div>
+            </div>
+            <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
+          </div>
+        </div>
+        <div class="booth-scan-row">
+          <label>バーコード
+            <input id="boothCarryOutBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力" ${closed?"disabled":""}>
+          </label>
+          <label>数量
+            <input id="boothCarryOutQty" type="number" min="1" step="1" placeholder="数量" ${closed?"disabled":""}>
+          </label>
+          <label>担当者<span class="required">必須</span>
+            <select id="boothCarryOutStaff" ${closed?"disabled":""}>${staffOptions}</select>
+          </label>
+          <button type="button" id="boothCarryOutRegisterBtn" ${closed?"disabled":""}>持ち出し登録</button>
+        </div>
+        <div id="boothProductPreview" class="booth-product-preview" hidden></div>
+        <label class="booth-carry-memo-label">メモ
+          <input id="boothCarryOutMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}>
+        </label>
+      </section>
+      <section class="booth-work-card booth-carry-history-card">
+        <div class="booth-list-header">
+          <h4>持ち出し履歴</h4>
+          <button type="button" id="reloadBoothCarryOutHistoryBtn" class="secondary">再読み込み</button>
+        </div>
+        <div id="boothCarryOutHistoryList" class="booth-carry-history-list">
+          <div class="booth-empty">読み込み中...</div>
+        </div>
+      </section>
+    </div>`;
+
+  detail.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
+    button.addEventListener("click",()=>switchBoothEventMenu(button.dataset.boothMenu));
+  });
+  el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOut);
+  el("reloadBoothCarryOutHistoryBtn")?.addEventListener("click",()=>loadBoothCarryOutHistory(event.id));
+  el("boothStartCameraBtn")?.addEventListener("click",startBoothCarryOutCamera);
+  el("boothStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
+  el("boothCameraZoomRange")?.addEventListener("input",applyBoothCameraZoom);
+  el("boothCarryOutBarcode")?.addEventListener("input",()=>{
+    clearTimeout(boothProductPreviewTimer);
+    boothProductPreviewTimer=setTimeout(previewBoothCarryOutProduct,450);
+  });
+  el("boothCarryOutBarcode")?.addEventListener("change",previewBoothCarryOutProduct);
+  el("boothCarryOutBarcode")?.addEventListener("blur",previewBoothCarryOutProduct);
+  el("boothCsvDownloadBtn")?.addEventListener("click",showBoothReportPreparing);
+  el("boothPdfDownloadBtn")?.addEventListener("click",showBoothReportPreparing);
+  updateBoothCameraZoomLabel();
+  loadBoothCarryOutHistory(event.id);
+}
+
+function switchBoothEventMenu(menu){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    if(typeof showMessage==="function")showMessage("イベントを開いてから操作してください。","err");
+    return;
+  }
+  const lockedMenus=["gacha","sales","return","storage","close"];
+  if(isBoothEventClosed(event)&&lockedMenus.includes(menu)){
+    showBoothClosedError();
+    return;
+  }
+  if(menu==="carry-out"){
+    renderBoothEventDetail(event);
+    return;
+  }
+  document.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
+    button.classList.toggle("is-active",button.dataset.boothMenu===menu);
+  });
+  showBoothLocalMessage("準備中です","ok");
+  if(typeof showPopup==="function")showPopup("準備中","準備中です");
+}
+
+function formatBoothDateTimeShort(value){
+  if(!value)return "-";
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime()))return String(value);
+  return `${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,"0")}:${String(date.getMinutes()).padStart(2,"0")}`;
+}
+
+async function loadBoothCarryOutHistory(eventId){
+  const list=el("boothCarryOutHistoryList");
+  if(!list)return;
+  try{
+    list.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff&event_id=eq.${encodeURIComponent(eventId)}&movement_type=eq.take_out&item_type=eq.normal&order=created_at.desc&limit=50`);
+    if(!Array.isArray(rows)||!rows.length){
+      list.innerHTML='<div class="booth-empty">まだ持ち出し履歴はありません。</div>';
+      return;
+    }
+    list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table">
+      <thead><tr><th>日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>担当者</th></tr></thead>
+      <tbody>${rows.map(row=>`<tr>
+        <td>${esc(formatBoothDateTime(row.created_at))}</td>
+        <td>${esc(row.product_name||"-")}</td>
+        <td>${esc(row.barcode||"-")}</td>
+        <td>${esc(row.quantity??"-")}</td>
+        <td>${esc(row.staff||"-")}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <div class="booth-history-cards">
+      ${rows.map(row=>`<article class="booth-history-card">
+        <div class="booth-history-card-top">
+          <strong>${esc(row.product_name||"-")}</strong>
+          <span>${esc(formatBoothDateTimeShort(row.created_at))}</span>
+        </div>
+        <div class="booth-history-card-meta">
+          <span>バーコード：${esc(row.barcode||"-")}</span>
+          <span>数量：${esc(row.quantity??"-")}</span>
+          <span>担当者：${esc(row.staff||"-")}</span>
+        </div>
+      </article>`).join("")}
+    </div>`;
+  }catch(e){
+    list.innerHTML='<div class="booth-empty">持ち出し履歴を読み込めませんでした。</div>';
+    boothShowError("持ち出し履歴エラー","持ち出し履歴の読み込みに失敗しました。\n"+e.message);
+  }
+}
+
+async function previewBoothCarryOutProduct(){
+  const preview=el("boothProductPreview");
+  const barcode=String(el("boothCarryOutBarcode")?.value||"").trim();
+  if(!preview)return;
+  if(!barcode){
+    preview.hidden=true;
+    preview.innerHTML="";
+    return;
+  }
+  try{
+    const product=await findBoothProductByBarcode(barcode);
+    if(!product){
+      preview.hidden=true;
+      preview.innerHTML="";
+      boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");
+      return;
+    }
+    const hasSmaregiId=!(product.smaregi_product_id===null||product.smaregi_product_id===undefined||String(product.smaregi_product_id).trim()==="");
+    preview.hidden=false;
+    preview.innerHTML=`<div><span>商品名：</span><strong>${esc(product.name||"-")}</strong></div>
+      <div><span>現在の東京在庫：</span><strong>${esc(product.base_stock??0)}</strong></div>
+      <div><span>スマレジ商品ID：</span><strong>${hasSmaregiId?"あり":"なし"}</strong></div>`;
+    if(!hasSmaregiId){
+      boothShowError("スマレジ商品ID未登録","商品マスターを再取り込みしてください。","boothCarryOutBarcode");
+    }
+  }catch(e){
+    boothShowError("商品検索エラー","商品検索に失敗しました。\n"+e.message);
+  }
+}
+
+async function handleBoothScannedCode(code){
+  code=String(code||"").trim();
+  if(!code)return;
+  const t=Date.now();
+  if(code===boothLastScan&&t-boothLastScanAt<1800)return;
+  boothLastScan=code;
+  boothLastScanAt=t;
+  const input=el("boothCarryOutBarcode");
+  if(input)input.value=code;
+  await stopBoothCarryOutCamera(false);
+  boothCameraSuccess("バーコードを読み取りました。");
+  await previewBoothCarryOutProduct();
+}
+
+async function registerBoothCarryOut(){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    boothShowError("持ち出し登録エラー","イベントを開いてから持ち出し登録してください。");
+    return;
+  }
+  if(isBoothEventClosed(event)){
+    showBoothClosedError();
+    return;
+  }
+  const barcode=String(el("boothCarryOutBarcode")?.value||"").trim();
+  const qtyText=String(el("boothCarryOutQty")?.value||"").trim();
+  const staff=String(el("boothCarryOutStaff")?.value||"").trim();
+  const memo=String(el("boothCarryOutMemo")?.value||"").trim();
+
+  if(!barcode){
+    boothShowError("持ち出し登録エラー","バーコードを入力してください。","boothCarryOutBarcode");
+    return;
+  }
+  if(!/^[1-9]\d*$/.test(qtyText)){
+    boothShowError("持ち出し登録エラー","数量は1以上の整数を入力してください。","boothCarryOutQty");
+    return;
+  }
+  const quantity=Number(qtyText);
+  if(!staff){
+    boothShowError("持ち出し登録エラー","担当者を選択してください。","boothCarryOutStaff");
+    return;
+  }
+
+  try{
+    const product=await findBoothProductByBarcode(barcode);
+    if(!product){
+      boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");
+      return;
+    }
+    if(product.smaregi_product_id===null||product.smaregi_product_id===undefined||String(product.smaregi_product_id).trim()===""){
+      boothShowError("スマレジ商品ID未登録","商品マスターを再取り込みしてください。","boothCarryOutBarcode");
+      return;
+    }
+
+    await sb("booth_stock_movements",{
+      method:"POST",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify([{
+        event_id:event.id,
+        barcode:product.barcode,
+        product_name:product.name||"",
+        item_type:"normal",
+        movement_type:"take_out",
+        quantity,
+        staff,
+        memo,
+        affects_smaregi:false,
+        smaregi_delta:0
+      }])
+    });
+
+    await upsertBoothEventItem(event,product,quantity);
+
+    el("boothCarryOutBarcode").value="";
+    el("boothCarryOutQty").value="";
+    if(el("boothCarryOutMemo"))el("boothCarryOutMemo").value="";
+    const preview=el("boothProductPreview");
+    if(preview){
+      preview.hidden=true;
+      preview.innerHTML="";
+    }
+    await loadBoothCarryOutHistory(event.id);
+    boothShowSuccess("持ち出し登録完了","持ち出しを登録しました。");
+    el("boothCarryOutBarcode")?.focus();
+  }catch(e){
+    boothShowError("持ち出し登録エラー","持ち出し登録に失敗しました。\n"+e.message);
+  }
+}
+
+async function deleteBoothEvent(eventId){
+  eventId=String(eventId||"");
+  if(!eventId)return;
+  if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
+  const event=boothEvents.find(row=>String(row.id)===eventId);
+  showBoothConfirmPopup("イベント削除確認","このイベントを削除します。よろしいですか？",async()=>{
+    try{
+      if(isBoothEventClosed(event)||await boothEventHasWorkLogs(eventId)){
+        boothShowError("イベント削除エラー","このイベントには作業履歴があるため削除できません。");
+        return;
+      }
+      await sb(`booth_events?id=eq.${encodeURIComponent(eventId)}`,{
+        method:"DELETE",
+        headers:{Prefer:"return=minimal"}
+      });
+      if(boothCurrentEventId===eventId)boothCurrentEventId="";
+      if(typeof showMessage==="function")showMessage(`イベントを削除しました：${event?.name||eventId}`,"ok");
+      await loadBoothEvents();
+    }catch(e){
+      if(typeof showMessage==="function")showMessage("イベント削除エラー\n"+e.message,"err");
+      else showBoothLocalMessage("イベント削除エラー\n"+e.message,"err");
+    }
+  });
 }
