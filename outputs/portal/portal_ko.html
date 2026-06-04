@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARICO PORTAL</title>
+<link rel="manifest" href="/manifest.json?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=2">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+<meta name="theme-color" content="#2d6a4f">
+<link rel="stylesheet" href="style.css">
+<script src="auth.js"></script>
+<script>
+const ARICO_PORTAL_LOGIN_KEY = "arico_portal_login";
+const ARICO_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
+const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
+const ARICO_INVENTORY_URL = "https://automatic-invention-eight.vercel.app/";
+
+(function(){
+  localStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
+  if(!checkAuthOrRedirect("index_ko.html"))return;
+})();
+
+function aricoLogout(){
+  clearAuthSession();
+  localStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
+  sessionStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
+  location.href = "index_ko.html";
+}
+
+function createPortalToken(){
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+function openInventory(){
+  location.href = buildInventoryAuthUrl(ARICO_INVENTORY_URL);
+}
+</script>
+</head>
+<body>
+<main class="wrap">
+<section class="card">
+<div class="topbar">
+<div>
+<div class="brand">ARICO TOKYO</div>
+<h1>시스템 입구</h1>
+</div>
+<div class="top-actions">
+<a class="pill" href="portal.html">日本語</a>
+<a class="pill active" href="portal_ko.html">한국어</a>
+<a class="pill" href="#" onclick="aricoLogout(); return false;">로그아웃</a>
+</div>
+</div>
+
+<div class="grid">
+<a class="box" href="#" onclick="openInventory(); return false;">
+<h3>재고 확인 앱</h3>
+<p>재고 관리・재고 조사・스마레지 연동</p>
+</a>
+
+<a class="box disabled" href="#" onclick="alert('렌탈림 관리는 현재 작성 중입니다.'); return false;">
+<h3>렌탈림 관리</h3>
+<p>작성 중</p>
+</a>
+
+<a class="box disabled" href="#" onclick="alert('출하 전 검품은 현재 작성 중입니다.'); return false;">
+<h3>출하 전 검품</h3>
+<p>작성 중</p>
+</a>
+</div>
+</section>
+</main>
+</body>
+</html>
