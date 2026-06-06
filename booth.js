@@ -238,6 +238,17 @@ async function createBoothEvent(){
     return;
   }
 
+  if(typeof confirmAppAction==="function"){
+    const ok=await confirmAppAction(
+      "????????",
+      typeof getSmaregiOperationContextText==="function"
+        ? getSmaregiOperationContextText(`??????${name}\n???${venue}\n?????${event_start} ? ${event_end}`)
+        : `??????${name}\n???${venue}\n?????${event_start} ? ${event_end}`,
+      {okText:"??"}
+    );
+    if(!ok)return;
+  }
+
   try{
     const payload={
       name,
@@ -374,8 +385,43 @@ function switchBoothEventMenu(menu){
     renderBoothReturnPanel(event);
     return;
   }
+  if(menu==="sales"){
+    confirmBoothSalesImportPreparing(event);
+    return;
+  }
+  if(menu==="close"){
+    confirmBoothEventClosePreparing(event);
+    return;
+  }
   showBoothLocalMessage("準備中です","ok");
   if(typeof showPopup==="function")showPopup("準備中","準備中です");
+}
+
+async function confirmBoothSalesImportPreparing(event){
+  const period=[event?.event_start,event?.event_end].filter(Boolean).join(" ～ ")||"-";
+  const body=[
+    `イベント名：\n${event?.name||"-"}`,
+    typeof getSmaregiOperationContextText==="function"
+      ? getSmaregiOperationContextText(`対象期間：\n${period}\n\nこの条件で販売データを取得します。`)
+      : `対象期間：\n${period}\n\nこの条件で販売データを取得します。`
+  ].join("\n\n");
+  const ok=typeof confirmAppAction==="function"
+    ? await confirmAppAction("販売取り込み確認",body,{okText:"仮取り込み"})
+    : true;
+  if(!ok)return;
+  if(typeof showPopup==="function")showPopup("準備中","販売取り込みは次フェーズで実装します。");
+}
+
+async function confirmBoothEventClosePreparing(event){
+  const period=[event?.event_start,event?.event_end].filter(Boolean).join(" ～ ")||"-";
+  const body=typeof getSmaregiOperationContextText==="function"
+    ? getSmaregiOperationContextText(`イベント名：${event?.name||"-"}\n対象期間：${period}\n\nイベントを締めます。`)
+    : `イベント名：${event?.name||"-"}\n対象期間：${period}\n\nイベントを締めます。`;
+  const ok=typeof confirmAppAction==="function"
+    ? await confirmAppAction("イベント締め確認",body,{okText:"締め"})
+    : true;
+  if(!ok)return;
+  if(typeof showPopup==="function")showPopup("準備中","イベント締めは次フェーズで実装します。");
 }
 
 function registerBoothCarryOutDraft(){
@@ -1060,6 +1106,14 @@ function switchBoothEventMenu(menu){
   });
   if(menu==="return"){
     renderBoothReturnPanel(event);
+    return;
+  }
+  if(menu==="sales"){
+    confirmBoothSalesImportPreparing(event);
+    return;
+  }
+  if(menu==="close"){
+    confirmBoothEventClosePreparing(event);
     return;
   }
   showBoothLocalMessage("準備中です","ok");

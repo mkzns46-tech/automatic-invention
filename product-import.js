@@ -17,11 +17,20 @@ async function upsertProducts(rows){
 
 async function importSmaregiProducts(){
   if(!requireInventoryPrivilegedAccess())return;
-  if(!confirm("スマレジの商品マスターを取得し、商品情報を更新します。在庫数は変更しません。よろしいですか？"))return;
+  const smaregiContext=typeof getSmaregiRequestContext==="function" ? getSmaregiRequestContext() : {};
+  if(typeof confirmAppAction==="function"){
+    const ok=await confirmAppAction(
+      "商品マスター取込確認",
+      typeof getSmaregiOperationContextText==="function"
+        ? getSmaregiOperationContextText("スマレジの商品マスターを取得し、商品情報を更新します。\n在庫数は変更しません。")
+        : "スマレジの商品マスターを取得し、商品情報を更新します。在庫数は変更しません。",
+      {okText:"取込"}
+    );
+    if(!ok)return;
+  }
   try{
     console.log("[Smaregi product master import] start");
     showMessage("スマレジ商品マスターを取り込み中...");
-    const smaregiContext=typeof getSmaregiRequestContext==="function" ? getSmaregiRequestContext() : {};
     console.log("[Smaregi product master import] context",smaregiContext);
     const res=await fetch("/api/smaregi-products",{
       method:"POST",

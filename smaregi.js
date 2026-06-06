@@ -447,6 +447,17 @@ async function syncSmaregiStockFromApi(){
     showMessage("スマレジ変動商品データ取り込みは設定画面のパスワード認証後に操作できます。","err");
     return;
   }
+  if(typeof confirmAppAction==="function"){
+    const ok=await confirmAppAction(
+      "??????????????",
+      typeof getSmaregiOperationContextText==="function"
+        ? getSmaregiOperationContextText("????????????????????")
+        : "????????????????????",
+      {okText:"??"}
+    );
+    if(!ok)return;
+  }
+
   try{
     showMessage("スマレジデータを取り込み中...");
     const smaregiContext=typeof getSmaregiRequestContext==="function" ? getSmaregiRequestContext() : {};
@@ -532,7 +543,16 @@ async function completeSmaregiStockCheck(){
     "このままチェック完了しますか？",
     warning
   ].join("\n");
-  if(!confirm(message))return;
+  if(typeof confirmAppAction==="function"){
+    const ok=await confirmAppAction(
+      "チェック完了確認",
+      typeof getSmaregiOperationContextText==="function"
+        ? getSmaregiOperationContextText(message)
+        : message,
+      {okText:"完了"}
+    );
+    if(!ok)return;
+  }else if(!confirm(message))return;
   try{
     const completedBy=getSmaregiCheckerName();
     const appliedCount=await applySmaregiActualStocksToSheet(completedBy);
@@ -639,6 +659,16 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
       showMessage("担当者を選択してください","err");
       el("smaregiCheckerName")?.focus();
       return false;
+    }
+    if(typeof confirmAppAction==="function"){
+      const ok=await confirmAppAction(
+        "???????",
+        typeof getSmaregiOperationContextText==="function"
+          ? getSmaregiOperationContextText(`???${item.product_name||barcode}\n??????${barcode}\n????${actual_stock}`)
+          : `???${item.product_name||barcode}\n????${actual_stock}`,
+        {okText:"??"}
+      );
+      if(!ok)return false;
     }
     const checked_at=new Date().toISOString();
     const correctedNow=markCorrected||isUpdate;

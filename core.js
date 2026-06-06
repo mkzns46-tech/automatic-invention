@@ -110,6 +110,17 @@ function getSmaregiContextLabel(context=getCurrentSmaregiContext()){
   return `${context.accountName} / ${context.storeName}`;
 }
 
+function getSmaregiOperationContextText(extraText=""){
+  const context=getCurrentSmaregiContext();
+  return [
+    `接続先：${context.accountName}`,
+    `店舗：${context.storeName}`,
+    extraText ? `\n${extraText}` : "",
+    "\nこの店舗のデータを更新します。",
+    "よろしいですか？"
+  ].filter(Boolean).join("\n");
+}
+
 function updateSmaregiContextSelector(){
   const context=getCurrentSmaregiContext();
   const account=el("smaregiAccountSelect");
@@ -117,13 +128,23 @@ function updateSmaregiContextSelector(){
   const badge=el("smaregiContextBadge");
   if(account)account.value=context.accountKey;
   if(store)store.value=context.storeCode;
-  if(badge)badge.textContent=getSmaregiContextLabel(context);
+  if(badge){
+    const storeBadge=context.storeCode==="aichi" ? "AICHI" : "TOKYO";
+    badge.classList.toggle("is-old",context.accountKey==="old");
+    badge.classList.toggle("is-new",context.accountKey==="new");
+    badge.classList.toggle("is-tokyo",context.storeCode==="tokyo");
+    badge.classList.toggle("is-aichi",context.storeCode==="aichi");
+    badge.innerHTML=`<span>接続先：${esc(context.accountName)}</span><strong>${esc(storeBadge)}</strong><span>店舗：${esc(context.storeName)}</span>`;
+  }
 }
 
 function renderSmaregiConnectionSelector(){
   const root=el("smaregiContextBar");
   if(!root)return;
   const context=getCurrentSmaregiContext();
+  const accountClass=context.accountKey==="new" ? "is-new" : "is-old";
+  const storeClass=context.storeCode==="aichi" ? "is-aichi" : "is-tokyo";
+  const storeBadge=context.storeCode==="aichi" ? "AICHI" : "TOKYO";
   root.innerHTML=`
     <label>スマレジ接続
       <select id="smaregiAccountSelect" aria-label="スマレジ接続">
@@ -135,7 +156,11 @@ function renderSmaregiConnectionSelector(){
         ${SMAREGI_CONTEXT_OPTIONS.stores.map(item=>`<option value="${esc(item.key)}">${esc(item.label)}</option>`).join("")}
       </select>
     </label>
-    <div id="smaregiContextBadge" class="smaregi-context-badge">${esc(getSmaregiContextLabel(context))}</div>`;
+    <div id="smaregiContextBadge" class="smaregi-context-badge ${accountClass} ${storeClass}">
+      <span>接続先：${esc(context.accountName)}</span>
+      <strong>${esc(storeBadge)}</strong>
+      <span>店舗：${esc(context.storeName)}</span>
+    </div>`;
   updateSmaregiContextSelector();
   ["smaregiAccountSelect","smaregiStoreSelect"].forEach(id=>{
     const input=el(id);
@@ -368,6 +393,32 @@ function hidePopup(){
   if(popup)popup.style.display="none";
 }
 
+function confirmAppAction(title,body,{okText="実行",cancelText="キャンセル"}={}){
+  return new Promise(resolve=>{
+    const popup=document.createElement("div");
+    popup.className="app-popup app-confirm-popup";
+    popup.style.display="flex";
+    popup.innerHTML=`<div class="app-popup-card">
+      <div class="app-popup-title">${esc(title||"確認")}</div>
+      <div class="app-popup-body">${esc(body||"")}</div>
+      <div class="app-confirm-actions">
+        <button type="button" class="secondary app-confirm-cancel-btn">${esc(cancelText)}</button>
+        <button type="button" class="app-confirm-ok-btn">${esc(okText)}</button>
+      </div>
+    </div>`;
+    const close=value=>{
+      try{document.body.removeChild(popup);}catch(_){}
+      resolve(value);
+    };
+    popup.querySelector(".app-confirm-cancel-btn")?.addEventListener("click",()=>close(false));
+    popup.querySelector(".app-confirm-ok-btn")?.addEventListener("click",()=>close(true));
+    popup.addEventListener("click",event=>{
+      if(event.target===popup)close(false);
+    });
+    document.body.appendChild(popup);
+  });
+}
+
 function showMessage(text,type="",options={}){
   if(type==="ok")playSuccessSound();
   if(type==="err"){
@@ -540,7 +591,8 @@ function on(id,event,fn){
 /* ===== v50 Japanese / Korean UI toggle ===== */
 const I18N = {
   ja: {
-    "ARICO TOKYO 在庫管理":"ARICO TOKYO 在庫管理",
+    "ARICO TOKYO 在庫管理":"ARICO ARCHERY 在庫管理",
+    "ARICO ARCHERY 在庫管理":"ARICO ARCHERY 在庫管理",
     
     "再読み込み":"再読み込み",
     "在庫変動登録":"在庫変動登録",
@@ -595,7 +647,8 @@ const I18N = {
     "検索をクリア":"検索をクリア"
   },
   ko: {
-    "ARICO TOKYO 在庫管理":"ARICO TOKYO 재고 관리",
+    "ARICO TOKYO 在庫管理":"ARICO ARCHERY 재고 관리",
+    "ARICO ARCHERY 在庫管理":"ARICO ARCHERY 재고 관리",
     
     "再読み込み":"다시 불러오기",
     "在庫変動登録":"재고 변동 등록",

@@ -4235,6 +4235,7 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 }
 .smaregi-context-badge{
   display:flex;
+  gap:8px;
   align-items:center;
   min-height:38px;
   width:fit-content;
@@ -4246,6 +4247,36 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   font-size:13px;
   font-weight:900;
   white-space:nowrap;
+}
+.smaregi-context-badge.is-old{
+  background:#fee2e2;
+  color:#991b1b;
+  border:1px solid #fecaca;
+}
+.smaregi-context-badge.is-new{
+  background:#d8f3dc;
+  color:#1b4332;
+  border:1px solid #95d5b2;
+}
+.smaregi-context-badge strong{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:3px 8px;
+  color:#fff;
+  font-size:12px;
+  letter-spacing:.04em;
+}
+.smaregi-context-badge.is-tokyo strong{background:#2563eb}
+.smaregi-context-badge.is-aichi strong{background:#7c3aed}
+.app-confirm-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:18px;
+}
+.app-confirm-actions button{
+  margin-top:0;
 }
 
 @media(max-width:800px){
@@ -4272,5 +4303,9 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     width:100%;
     justify-content:center;
     font-size:12px;
+    flex-wrap:wrap;
+  }
+  .app-confirm-actions{
+    grid-template-columns:1fr;
   }
 }
