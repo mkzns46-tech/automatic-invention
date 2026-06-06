@@ -240,11 +240,11 @@ async function createBoothEvent(){
 
   if(typeof confirmAppAction==="function"){
     const ok=await confirmAppAction(
-      "????????",
+      "イベント作成確認",
       typeof getSmaregiOperationContextText==="function"
-        ? getSmaregiOperationContextText(`??????${name}\n???${venue}\n?????${event_start} ? ${event_end}`)
-        : `??????${name}\n???${venue}\n?????${event_start} ? ${event_end}`,
-      {okText:"??"}
+        ? getSmaregiOperationContextText(`イベント名：${name}\n会場：${venue}\n対象期間：${event_start} ～ ${event_end}`)
+        : `イベント名：${name}\n会場：${venue}\n対象期間：${event_start} ～ ${event_end}`,
+      {okText:"作成"}
     );
     if(!ok)return;
   }

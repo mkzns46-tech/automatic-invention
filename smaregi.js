@@ -449,11 +449,11 @@ async function syncSmaregiStockFromApi(){
   }
   if(typeof confirmAppAction==="function"){
     const ok=await confirmAppAction(
-      "??????????????",
+      "スマレジ変動商品チェック確認",
       typeof getSmaregiOperationContextText==="function"
-        ? getSmaregiOperationContextText("????????????????????")
-        : "????????????????????",
-      {okText:"??"}
+        ? getSmaregiOperationContextText("前回チェック以降の変動商品を取得します。")
+        : "前回チェック以降の変動商品を取得します。",
+      {okText:"取込"}
     );
     if(!ok)return;
   }
@@ -662,11 +662,11 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
     }
     if(typeof confirmAppAction==="function"){
       const ok=await confirmAppAction(
-        "???????",
+        "実在庫保存確認",
         typeof getSmaregiOperationContextText==="function"
-          ? getSmaregiOperationContextText(`???${item.product_name||barcode}\n??????${barcode}\n????${actual_stock}`)
-          : `???${item.product_name||barcode}\n????${actual_stock}`,
-        {okText:"??"}
+          ? getSmaregiOperationContextText(`商品：${item.product_name||barcode}\nバーコード：${barcode}\n実在庫：${actual_stock}`)
+          : `商品：${item.product_name||barcode}\n実在庫：${actual_stock}`,
+        {okText:"保存"}
       );
       if(!ok)return false;
     }
