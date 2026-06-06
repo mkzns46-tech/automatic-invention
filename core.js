@@ -42,16 +42,12 @@ const INVENTORY_ADMIN_AUTHENTICATED_AT_KEY="arico_inventory_admin_authenticated_
 const INVENTORY_ADMIN_AUTH_DURATION_MS=12*60*60*1000;
 const SMAREGI_CONTEXT_STORAGE_KEY="arico_current_smaregi_context";
 const SMAREGI_CONTEXT_OPTIONS={
-  accounts:[
-    {key:"old",label:"旧スマレジ"},
-    {key:"new",label:"新スマレジ"}
-  ],
   stores:[
     {key:"tokyo",label:"東京"},
     {key:"aichi",label:"愛知"}
   ]
 };
-window.currentSmaregiAccount="old";
+window.currentSmaregiAccount="production";
 window.currentStore="tokyo";
 
 function getSmaregiContextOption(list,key,fallbackKey){
@@ -65,31 +61,28 @@ function getCurrentSmaregiContext(){
   }catch(_){
     saved={};
   }
-  const account=getSmaregiContextOption(SMAREGI_CONTEXT_OPTIONS.accounts,saved.accountKey||window.currentSmaregiAccount,"old");
   const store=getSmaregiContextOption(SMAREGI_CONTEXT_OPTIONS.stores,saved.storeCode||window.currentStore,"tokyo");
-  window.currentSmaregiAccount=account.key;
+  window.currentSmaregiAccount="production";
   window.currentStore=store.key;
   return {
-    accountKey:account.key,
-    accountName:account.label,
+    accountKey:"production",
+    accountName:"スマレジ本番接続",
     storeCode:store.key,
     storeName:store.label
   };
 }
 
-function setCurrentSmaregiContext(accountKey,storeCode){
-  const account=getSmaregiContextOption(SMAREGI_CONTEXT_OPTIONS.accounts,accountKey,"old");
+function setCurrentSmaregiContext(storeCode){
   const store=getSmaregiContextOption(SMAREGI_CONTEXT_OPTIONS.stores,storeCode,"tokyo");
   const context={
-    accountKey:account.key,
-    accountName:account.label,
+    accountKey:"production",
+    accountName:"スマレジ本番接続",
     storeCode:store.key,
     storeName:store.label
   };
   window.currentSmaregiAccount=context.accountKey;
   window.currentStore=context.storeCode;
   localStorage.setItem(SMAREGI_CONTEXT_STORAGE_KEY,JSON.stringify({
-    accountKey:context.accountKey,
     storeCode:context.storeCode
   }));
   updateSmaregiContextSelector();
@@ -123,15 +116,12 @@ function getSmaregiOperationContextText(extraText=""){
 
 function updateSmaregiContextSelector(){
   const context=getCurrentSmaregiContext();
-  const account=el("smaregiAccountSelect");
   const store=el("smaregiStoreSelect");
   const badge=el("smaregiContextBadge");
-  if(account)account.value=context.accountKey;
   if(store)store.value=context.storeCode;
   if(badge){
     const storeBadge=context.storeCode==="aichi" ? "AICHI" : "TOKYO";
-    badge.classList.toggle("is-old",context.accountKey==="old");
-    badge.classList.toggle("is-new",context.accountKey==="new");
+    badge.classList.toggle("is-production",true);
     badge.classList.toggle("is-tokyo",context.storeCode==="tokyo");
     badge.classList.toggle("is-aichi",context.storeCode==="aichi");
     badge.innerHTML=`<span>接続先：${esc(context.accountName)}</span><strong>${esc(storeBadge)}</strong><span>店舗：${esc(context.storeName)}</span>`;
@@ -142,34 +132,27 @@ function renderSmaregiConnectionSelector(){
   const root=el("smaregiContextBar");
   if(!root)return;
   const context=getCurrentSmaregiContext();
-  const accountClass=context.accountKey==="new" ? "is-new" : "is-old";
   const storeClass=context.storeCode==="aichi" ? "is-aichi" : "is-tokyo";
   const storeBadge=context.storeCode==="aichi" ? "AICHI" : "TOKYO";
   root.innerHTML=`
-    <label>スマレジ接続
-      <select id="smaregiAccountSelect" aria-label="スマレジ接続">
-        ${SMAREGI_CONTEXT_OPTIONS.accounts.map(item=>`<option value="${esc(item.key)}">${esc(item.label)}</option>`).join("")}
-      </select>
-    </label>
+    <div id="smaregiContextBadge" class="smaregi-context-badge is-production ${storeClass}">
+      <span>接続先：${esc(context.accountName)}</span>
+      <strong>${esc(storeBadge)}</strong>
+      <span>店舗：${esc(context.storeName)}</span>
+    </div>
     <label>店舗
       <select id="smaregiStoreSelect" aria-label="店舗">
         ${SMAREGI_CONTEXT_OPTIONS.stores.map(item=>`<option value="${esc(item.key)}">${esc(item.label)}</option>`).join("")}
       </select>
-    </label>
-    <div id="smaregiContextBadge" class="smaregi-context-badge ${accountClass} ${storeClass}">
-      <span>接続先：${esc(context.accountName)}</span>
-      <strong>${esc(storeBadge)}</strong>
-      <span>店舗：${esc(context.storeName)}</span>
-    </div>`;
+    </label>`;
   updateSmaregiContextSelector();
-  ["smaregiAccountSelect","smaregiStoreSelect"].forEach(id=>{
-    const input=el(id);
-    if(!input)return;
+  const input=el("smaregiStoreSelect");
+  if(input){
     input.addEventListener("change",()=>{
-      const next=setCurrentSmaregiContext(el("smaregiAccountSelect")?.value,el("smaregiStoreSelect")?.value);
-      if(typeof showMessage==="function")showMessage(`スマレジ接続先を ${getSmaregiContextLabel(next)} に切り替えました。`);
+      const next=setCurrentSmaregiContext(input.value);
+      if(typeof showMessage==="function")showMessage(`店舗を ${next.storeName} に切り替えました。接続先は環境変数で設定されたスマレジ本番接続です。`);
     });
-  });
+  }
 }
 
 function getInventoryAppMenuItemHtml(item){
