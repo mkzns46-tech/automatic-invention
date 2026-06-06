@@ -806,10 +806,6 @@ async function handleBoothScannedCode(code){
       boothCameraError("商品未登録","このバーコードの商品は登録されていません。");
       return;
     }
-    if(product.smaregi_product_id===null||product.smaregi_product_id===undefined||String(product.smaregi_product_id).trim()===""){
-      boothCameraError("スマレジ商品ID未登録","商品マスターを再取り込みしてください。");
-      return;
-    }
     showBoothLocalMessage(`読み取り成功：${product.name||code}`,"ok");
   }catch(e){
     boothCameraError("読み取りエラー","バーコードを読み取れませんでした。");
@@ -878,11 +874,6 @@ async function registerBoothCarryOut(){
       boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");
       return;
     }
-    if(product.smaregi_product_id===null||product.smaregi_product_id===undefined||String(product.smaregi_product_id).trim()===""){
-      boothShowError("スマレジ商品ID未登録","この商品はスマレジ商品IDが未登録です。商品マスターを再取り込みしてください。","boothCarryOutBarcode");
-      return;
-    }
-
     await sb("booth_stock_movements",{
       method:"POST",
       headers:{Prefer:"return=minimal"},
@@ -1133,14 +1124,10 @@ async function previewBoothCarryOutProduct(options={}){
       if(popupOnError)boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");
       return;
     }
-    const hasSmaregiId=!(product.smaregi_product_id===null||product.smaregi_product_id===undefined||String(product.smaregi_product_id).trim()==="");
     preview.hidden=false;
     preview.innerHTML=`<div><span>商品名：</span><strong>${esc(product.name||"-")}</strong></div>
       <div><span>現在の東京在庫：</span><strong>${esc(product.base_stock??0)}</strong></div>
-      <div><span>スマレジ商品ID：</span><strong>${hasSmaregiId?"あり":"なし"}</strong></div>`;
-    if(!hasSmaregiId&&popupOnError){
-      boothShowError("スマレジ商品ID未登録","商品マスターを再取り込みしてください。","boothCarryOutBarcode");
-    }
+      <div><span>スマレジ在庫：</span><strong>変更しません</strong></div>`;
   }catch(e){
     preview.hidden=true;
     preview.innerHTML="";
@@ -1197,11 +1184,6 @@ async function registerBoothCarryOut(){
       boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");
       return;
     }
-    if(product.smaregi_product_id===null||product.smaregi_product_id===undefined||String(product.smaregi_product_id).trim()===""){
-      boothShowError("スマレジ商品ID未登録","商品マスターを再取り込みしてください。","boothCarryOutBarcode");
-      return;
-    }
-
     await sb("booth_stock_movements",{
       method:"POST",
       headers:{Prefer:"return=minimal"},
