@@ -1247,7 +1247,7 @@ function renderBoothReturnPanel(event){
           <select id="boothReturnStaff" ${closed?"disabled":""}>${staffOptions}</select>
         </label>
         <button type="button" id="boothReturnPreviewBtn" class="secondary" ${closed?"disabled":""}>商品確認</button>
-        <button type="button" id="boothReturnRegisterBtn" ${closed?"disabled":""}>戻り登録</button>
+        <button type="button" id="boothReturnRegisterBtn" ${closed?"disabled":""}>棚戻し登録</button>
       </div>
       <div id="boothReturnProductPreview" class="booth-product-preview" hidden></div>
       <label class="booth-carry-memo-label">メモ
