@@ -14,6 +14,7 @@ let boothLastScanAt=0;
 let boothNoScanTimer=null;
 let boothCurrentVideoTrack=null;
 let boothProductPreviewTimer=null;
+let boothScanTarget="carry-out";
 
 function showBoothManagement(){
   showInventoryScreen("booth");
@@ -369,6 +370,10 @@ function switchBoothEventMenu(menu){
   document.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
     button.classList.toggle("is-active",button.dataset.boothMenu===menu);
   });
+  if(menu==="return"){
+    renderBoothReturnPanel(event);
+    return;
+  }
   showBoothLocalMessage("準備中です","ok");
   if(typeof showPopup==="function")showPopup("準備中","準備中です");
 }
@@ -565,7 +570,10 @@ function renderBoothEventDetail(event){
   });
   el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOut);
   el("reloadBoothCarryOutHistoryBtn")?.addEventListener("click",()=>loadBoothCarryOutHistory(event.id));
-  el("boothStartCameraBtn")?.addEventListener("click",startBoothCarryOutCamera);
+  el("boothStartCameraBtn")?.addEventListener("click",()=>{
+    boothScanTarget="carry-out";
+    startBoothCarryOutCamera();
+  });
   el("boothStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
   el("boothCameraZoomRange")?.addEventListener("input",applyBoothCameraZoom);
   updateBoothCameraZoomLabel();
@@ -1019,7 +1027,10 @@ function renderBoothEventDetail(event){
   });
   el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOut);
   el("reloadBoothCarryOutHistoryBtn")?.addEventListener("click",()=>loadBoothCarryOutHistory(event.id));
-  el("boothStartCameraBtn")?.addEventListener("click",startBoothCarryOutCamera);
+  el("boothStartCameraBtn")?.addEventListener("click",()=>{
+    boothScanTarget="carry-out";
+    startBoothCarryOutCamera();
+  });
   el("boothStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
   el("boothCameraZoomRange")?.addEventListener("input",applyBoothCameraZoom);
   el("boothCarryOutBarcode")?.addEventListener("input",clearBoothProductPreview);
@@ -1135,6 +1146,116 @@ async function previewBoothCarryOutProduct(options={}){
   }
 }
 
+function clearBoothReturnPreview(){
+  const preview=el("boothReturnProductPreview");
+  if(preview){
+    preview.hidden=true;
+    preview.innerHTML="";
+  }
+}
+
+async function findBoothEventItemByBarcode(eventId,barcode){
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,difference_qty,consumed_qty&event_id=eq.${encodeURIComponent(eventId)}&barcode=eq.${encodeURIComponent(barcode)}&item_type=eq.normal&limit=1`);
+  return Array.isArray(rows)&&rows[0]?rows[0]:null;
+}
+
+async function previewBoothReturnProduct(options={}){
+  const popupOnError=options.popupOnError===true;
+  const event=getBoothCurrentEvent();
+  const preview=el("boothReturnProductPreview");
+  const barcode=String(el("boothReturnBarcode")?.value||"").trim();
+  if(!preview)return;
+  if(!event||!barcode){
+    clearBoothReturnPreview();
+    return null;
+  }
+  try{
+    const item=await findBoothEventItemByBarcode(event.id,barcode);
+    if(!item){
+      clearBoothReturnPreview();
+      if(popupOnError)boothShowError("棚戻し棚卸しエラー","この商品はこのイベントで持ち出し登録されていません。","boothReturnBarcode");
+      return null;
+    }
+    const taken=Number(item.taken_qty||0);
+    const sold=Number(item.sold_qty||0);
+    const returned=Number(item.returned_qty||0);
+    const remaining=Math.max(taken-sold-returned,0);
+    preview.hidden=false;
+    preview.innerHTML=`<div><span>商品名：</span><strong>${esc(item.product_name||"-")}</strong></div>
+      <div><span>持ち出し数：</span><strong>${esc(taken)}</strong></div>
+      <div><span>販売数：</span><strong>${esc(sold)}</strong></div>
+      <div><span>戻り登録済み：</span><strong>${esc(returned)}</strong></div>
+      <div><span>戻り登録可能目安：</span><strong>${esc(remaining)}</strong></div>
+      <div><span>スマレジ在庫：</span><strong>変更しません</strong></div>`;
+    return item;
+  }catch(e){
+    clearBoothReturnPreview();
+    if(popupOnError)boothShowError("棚戻し棚卸しエラー","商品確認に失敗しました。\n"+e.message);
+    return null;
+  }
+}
+
+function renderBoothReturnPanel(event){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  const closed=isBoothEventClosed(event);
+  const staffOptions='<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+  area.innerHTML=`
+    <section class="booth-work-card booth-return-card">
+      <h4>棚戻し棚卸し</h4>
+      <p class="section-note">持ち出し済み商品を対象に戻り数を登録します。スマレジ在庫・東京在庫は変更しません。</p>
+      <div class="button-row booth-camera-button-row">
+        <button type="button" id="boothReturnStartCameraBtn" ${closed?"disabled":""}>カメラ読取</button>
+        <button type="button" id="boothReturnStopCameraBtn" class="secondary">停止</button>
+      </div>
+      <div class="camera-area booth-camera-area">
+        <video id="boothCarryOutVideo" muted playsinline></video>
+        <div id="boothCameraGuideOverlay" class="camera-guide-overlay">
+          <div class="camera-guide-box">
+            <div class="camera-guide-line"></div>
+          </div>
+          <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
+        </div>
+      </div>
+      <div class="booth-scan-row booth-return-row">
+        <label>バーコード
+          <input id="boothReturnBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力" ${closed?"disabled":""}>
+        </label>
+        <label>戻り数量
+          <input id="boothReturnQty" type="number" min="1" step="1" placeholder="数量" ${closed?"disabled":""}>
+        </label>
+        <label>担当者<span class="required">必須</span>
+          <select id="boothReturnStaff" ${closed?"disabled":""}>${staffOptions}</select>
+        </label>
+        <button type="button" id="boothReturnPreviewBtn" class="secondary" ${closed?"disabled":""}>商品確認</button>
+        <button type="button" id="boothReturnRegisterBtn" ${closed?"disabled":""}>戻り登録</button>
+      </div>
+      <div id="boothReturnProductPreview" class="booth-product-preview" hidden></div>
+      <label class="booth-carry-memo-label">メモ
+        <input id="boothReturnMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}>
+      </label>
+    </section>
+    <section class="booth-work-card booth-return-history-card">
+      <div class="booth-list-header">
+        <h4>棚戻し履歴</h4>
+        <button type="button" id="reloadBoothReturnHistoryBtn" class="secondary">再読み込み</button>
+      </div>
+      <div id="boothReturnHistoryList" class="booth-carry-history-list">
+        <div class="booth-empty">読み込み中...</div>
+      </div>
+    </section>`;
+  el("boothReturnBarcode")?.addEventListener("input",clearBoothReturnPreview);
+  el("boothReturnPreviewBtn")?.addEventListener("click",()=>previewBoothReturnProduct({popupOnError:true}));
+  el("boothReturnRegisterBtn")?.addEventListener("click",registerBoothReturn);
+  el("reloadBoothReturnHistoryBtn")?.addEventListener("click",()=>loadBoothReturnHistory(event.id));
+  el("boothReturnStartCameraBtn")?.addEventListener("click",()=>{
+    boothScanTarget="return";
+    startBoothCarryOutCamera();
+  });
+  el("boothReturnStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
+  loadBoothReturnHistory(event.id);
+}
+
 async function handleBoothScannedCode(code){
   code=String(code||"").trim();
   if(!code)return;
@@ -1142,11 +1263,12 @@ async function handleBoothScannedCode(code){
   if(code===boothLastScan&&t-boothLastScanAt<1800)return;
   boothLastScan=code;
   boothLastScanAt=t;
-  const input=el("boothCarryOutBarcode");
+  const input=el(boothScanTarget==="return"?"boothReturnBarcode":"boothCarryOutBarcode");
   if(input)input.value=code;
   await stopBoothCarryOutCamera(false);
   boothCameraSuccess("バーコードを読み取りました。");
-  await previewBoothCarryOutProduct({popupOnError:false});
+  if(boothScanTarget==="return")await previewBoothReturnProduct({popupOnError:false});
+  else await previewBoothCarryOutProduct({popupOnError:false});
 }
 
 async function registerBoothCarryOut(){
@@ -1216,6 +1338,129 @@ async function registerBoothCarryOut(){
     el("boothCarryOutBarcode")?.focus();
   }catch(e){
     boothShowError("持ち出し登録エラー","持ち出し登録に失敗しました。\n"+e.message);
+  }
+}
+
+async function loadBoothReturnHistory(eventId){
+  const list=el("boothReturnHistoryList");
+  if(!list)return;
+  try{
+    list.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff&event_id=eq.${encodeURIComponent(eventId)}&movement_type=eq.return&item_type=eq.normal&order=created_at.desc&limit=50`);
+    if(!Array.isArray(rows)||!rows.length){
+      list.innerHTML='<div class="booth-empty">まだ棚戻し履歴はありません。</div>';
+      return;
+    }
+    list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table">
+      <thead><tr><th>日時</th><th>商品名</th><th>バーコード</th><th>戻り数</th><th>担当者</th></tr></thead>
+      <tbody>${rows.map(row=>`<tr>
+        <td>${esc(formatBoothDateTime(row.created_at))}</td>
+        <td>${esc(row.product_name||"-")}</td>
+        <td>${esc(row.barcode||"-")}</td>
+        <td>${esc(row.quantity??"-")}</td>
+        <td>${esc(row.staff||"-")}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <div class="booth-history-cards">
+      ${rows.map(row=>`<article class="booth-history-card">
+        <div class="booth-history-card-top">
+          <strong>${esc(row.product_name||"-")}</strong>
+          <span>${esc(formatBoothDateTimeShort(row.created_at))}</span>
+        </div>
+        <div class="booth-history-card-meta">
+          <span>バーコード：${esc(row.barcode||"-")}</span>
+          <span>戻り数：${esc(row.quantity??"-")}</span>
+          <span>担当者：${esc(row.staff||"-")}</span>
+        </div>
+      </article>`).join("")}
+    </div>`;
+  }catch(e){
+    list.innerHTML='<div class="booth-empty">棚戻し履歴を読み込めませんでした。</div>';
+    boothShowError("棚戻し履歴エラー","棚戻し履歴の読み込みに失敗しました。\n"+e.message);
+  }
+}
+
+async function updateBoothReturnedQty(item,quantity){
+  const current=Number(item.returned_qty||0);
+  await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+    method:"PATCH",
+    body:JSON.stringify({
+      returned_qty:current+quantity,
+      updated_at:new Date().toISOString()
+    })
+  });
+}
+
+async function registerBoothReturn(){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    boothShowError("棚戻し棚卸しエラー","イベントを開いてから戻り登録してください。");
+    return;
+  }
+  if(isBoothEventClosed(event)){
+    showBoothClosedError();
+    return;
+  }
+  const barcode=String(el("boothReturnBarcode")?.value||"").trim();
+  const qtyText=String(el("boothReturnQty")?.value||"").trim();
+  const staff=String(el("boothReturnStaff")?.value||"").trim();
+  const memo=String(el("boothReturnMemo")?.value||"").trim();
+
+  if(!barcode){
+    boothShowError("棚戻し棚卸しエラー","バーコードを入力してください。","boothReturnBarcode");
+    return;
+  }
+  if(!/^[1-9]\d*$/.test(qtyText)){
+    boothShowError("棚戻し棚卸しエラー","戻り数量は1以上の整数を入力してください。","boothReturnQty");
+    return;
+  }
+  const quantity=Number(qtyText);
+  if(!staff){
+    boothShowError("棚戻し棚卸しエラー","担当者を選択してください。","boothReturnStaff");
+    return;
+  }
+
+  try{
+    const item=await findBoothEventItemByBarcode(event.id,barcode);
+    if(!item){
+      boothShowError("棚戻し棚卸しエラー","この商品はこのイベントで持ち出し登録されていません。","boothReturnBarcode");
+      return;
+    }
+    const taken=Number(item.taken_qty||0);
+    const returned=Number(item.returned_qty||0);
+    if(returned+quantity>taken){
+      boothShowError("棚戻し棚卸しエラー","戻り数量が持ち出し数を超えています。","boothReturnQty");
+      return;
+    }
+
+    await sb("booth_stock_movements",{
+      method:"POST",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify([{
+        event_id:event.id,
+        barcode:item.barcode,
+        product_name:item.product_name||"",
+        item_type:"normal",
+        movement_type:"return",
+        quantity,
+        staff,
+        memo,
+        affects_smaregi:false,
+        smaregi_delta:0
+      }])
+    });
+
+    await updateBoothReturnedQty(item,quantity);
+
+    el("boothReturnBarcode").value="";
+    el("boothReturnQty").value="";
+    if(el("boothReturnMemo"))el("boothReturnMemo").value="";
+    clearBoothReturnPreview();
+    await loadBoothReturnHistory(event.id);
+    boothShowSuccess("棚戻し登録完了","戻り数量を登録しました。");
+    el("boothReturnBarcode")?.focus();
+  }catch(e){
+    boothShowError("棚戻し棚卸しエラー","戻り登録に失敗しました。\n"+e.message);
   }
 }
 
