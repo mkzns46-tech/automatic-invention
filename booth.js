@@ -325,7 +325,7 @@ function renderBoothEventDetail(event){
       <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">持ち出しスキャン</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="return">戻り棚卸</button>
-      <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">ブース保管</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">イベント保管</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="gacha">ガチャ管理</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="sales">販売取込</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="diff">差異確認</button>
@@ -509,7 +509,7 @@ function renderBoothEventDetail(event){
       <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">持ち出しスキャン</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="return">戻り棚卸</button>
-      <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">ブース保管</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">イベント保管</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="gacha">ガチャ管理</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="sales">販売取込</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="diff">差異確認</button>
@@ -967,7 +967,7 @@ function renderBoothEventDetail(event){
       <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="sales">販売取り込み</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="return">棚戻し棚卸し</button>
-      <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">ブース保管</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">イベント保管</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="diff">差異確認</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="close">イベント締め</button>
     </div>
@@ -1159,6 +1159,34 @@ async function findBoothEventItemByBarcode(eventId,barcode){
   return Array.isArray(rows)&&rows[0]?rows[0]:null;
 }
 
+function calculateBoothDifference(item,returnInput=0){
+  const taken=Number(item?.taken_qty||0);
+  const sold=Number(item?.sold_qty||0);
+  const returned=Number(item?.returned_qty||0)+Number(returnInput||0);
+  const consumed=Number(item?.consumed_qty||0);
+  return taken-sold-returned-consumed;
+}
+
+function renderBoothReturnPreview(item,returnInput=0){
+  const preview=el("boothReturnProductPreview");
+  if(!preview||!item)return;
+  const taken=Number(item.taken_qty||0);
+  const sold=Number(item.sold_qty||0);
+  const returned=Number(item.returned_qty||0);
+  const consumed=Number(item.consumed_qty||0);
+  const difference=calculateBoothDifference(item,returnInput);
+  preview.hidden=false;
+  preview.innerHTML=`<div><span>商品名：</span><strong>${esc(item.product_name||"-")}</strong></div>
+    <div><span>バーコード：</span><strong>${esc(item.barcode||"-")}</strong></div>
+    <div><span>持ち出し数：</span><strong>${esc(taken)}</strong></div>
+    <div><span>販売数：</span><strong>${esc(sold)}</strong></div>
+    <div><span>戻り登録済み：</span><strong>${esc(returned)}</strong></div>
+    <div><span>消化数：</span><strong>${esc(consumed)}</strong></div>
+    <div><span>今回戻り入力：</span><strong>${esc(Number(returnInput||0))}</strong></div>
+    <div><span>差異数：</span><strong>${esc(difference)}</strong></div>
+    <div><span>スマレジ在庫：</span><strong>変更しません</strong></div>`;
+}
+
 async function previewBoothReturnProduct(options={}){
   const popupOnError=options.popupOnError===true;
   const event=getBoothCurrentEvent();
@@ -1176,17 +1204,8 @@ async function previewBoothReturnProduct(options={}){
       if(popupOnError)boothShowError("棚戻し棚卸しエラー","この商品はこのイベントで持ち出し登録されていません。","boothReturnBarcode");
       return null;
     }
-    const taken=Number(item.taken_qty||0);
-    const sold=Number(item.sold_qty||0);
-    const returned=Number(item.returned_qty||0);
-    const remaining=Math.max(taken-sold-returned,0);
-    preview.hidden=false;
-    preview.innerHTML=`<div><span>商品名：</span><strong>${esc(item.product_name||"-")}</strong></div>
-      <div><span>持ち出し数：</span><strong>${esc(taken)}</strong></div>
-      <div><span>販売数：</span><strong>${esc(sold)}</strong></div>
-      <div><span>戻り登録済み：</span><strong>${esc(returned)}</strong></div>
-      <div><span>戻り登録可能目安：</span><strong>${esc(remaining)}</strong></div>
-      <div><span>スマレジ在庫：</span><strong>変更しません</strong></div>`;
+    const returnInput=Number(el("boothReturnQty")?.value||0);
+    renderBoothReturnPreview(item,returnInput);
     return item;
   }catch(e){
     clearBoothReturnPreview();
@@ -1245,6 +1264,7 @@ function renderBoothReturnPanel(event){
       </div>
     </section>`;
   el("boothReturnBarcode")?.addEventListener("input",clearBoothReturnPreview);
+  el("boothReturnQty")?.addEventListener("input",()=>previewBoothReturnProduct({popupOnError:false}));
   el("boothReturnPreviewBtn")?.addEventListener("click",()=>previewBoothReturnProduct({popupOnError:true}));
   el("boothReturnRegisterBtn")?.addEventListener("click",registerBoothReturn);
   el("reloadBoothReturnHistoryBtn")?.addEventListener("click",()=>loadBoothReturnHistory(event.id));
@@ -1382,10 +1402,13 @@ async function loadBoothReturnHistory(eventId){
 
 async function updateBoothReturnedQty(item,quantity){
   const current=Number(item.returned_qty||0);
+  const nextReturned=current+quantity;
+  const difference=calculateBoothDifference({...item,returned_qty:nextReturned},0);
   await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
     method:"PATCH",
     body:JSON.stringify({
-      returned_qty:current+quantity,
+      returned_qty:nextReturned,
+      difference_qty:difference,
       updated_at:new Date().toISOString()
     })
   });
@@ -1426,10 +1449,9 @@ async function registerBoothReturn(){
       boothShowError("棚戻し棚卸しエラー","この商品はこのイベントで持ち出し登録されていません。","boothReturnBarcode");
       return;
     }
-    const taken=Number(item.taken_qty||0);
-    const returned=Number(item.returned_qty||0);
-    if(returned+quantity>taken){
-      boothShowError("棚戻し棚卸しエラー","戻り数量が持ち出し数を超えています。","boothReturnQty");
+    const differenceAfterReturn=calculateBoothDifference(item,quantity);
+    if(differenceAfterReturn<0){
+      boothShowError("棚戻し棚卸しエラー","戻り数量が持ち出し残数を超えています。","boothReturnQty");
       return;
     }
 
