@@ -32,14 +32,14 @@ function showBoothLocalMessage(text,type=""){
 
 async function loadBoothEvents(){
   try{
-    showBoothLocalMessage("ブースイベントを読み込み中...");
+    showBoothLocalMessage("イベントを読み込み中...");
     const events=await sb("booth_events?select=*&order=created_at.desc&limit=200");
     boothEvents=Array.isArray(events)?events:[];
     renderBoothEvents(boothEvents);
     showBoothLocalMessage(boothEvents.length?`イベント ${boothEvents.length}件を表示しています。`:"イベントはまだありません。","ok");
   }catch(e){
-    if(typeof showMessage==="function")showMessage("ブースイベント読み込みエラー\n"+e.message,"err");
-    else showBoothLocalMessage("ブースイベント読み込みエラー\n"+e.message,"err");
+    if(typeof showMessage==="function")showMessage("イベント読み込みエラー\n"+e.message,"err");
+    else showBoothLocalMessage("イベント読み込みエラー\n"+e.message,"err");
   }
 }
 

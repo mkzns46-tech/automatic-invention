@@ -22,11 +22,11 @@ const INVENTORY_APP_MENU_SECTIONS=[
     {key:"smaregi",label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"}
   ]},
   {label:"イベント販売",items:[
-    {key:"booth",label:"ブース管理",action:"booth",title:"準備中"}
+    {key:"booth",label:"イベント管理",action:"booth",title:"準備中"}
   ]},
   {label:"分析",items:[
     {key:"inventory-analytics",label:"棚卸分析",action:"inventory-analytics"},
-    {key:"booth-analytics",label:"ブース分析",action:"booth-analytics"}
+    {key:"booth-analytics",label:"イベント分析",action:"booth-analytics"}
   ]},
   {label:"設定",items:[
     {key:"settings",label:"設定",action:"settings"}
@@ -79,7 +79,7 @@ function renderInventoryAppMenu(){
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
   if(boothButton)boothButton.addEventListener("click",()=>{
     if(typeof showBoothManagement==="function")showBoothManagement();
-    else showPopup("ブース管理","準備中です。");
+    else showPopup("イベント管理","準備中です。");
   });
   const adminAuthButton=menu.querySelector('[data-menu-action="admin-auth"]');
   if(adminAuthButton)adminAuthButton.addEventListener("click",authenticateInventoryAdmin);
