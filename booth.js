@@ -1058,6 +1058,10 @@ function switchBoothEventMenu(menu){
   document.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
     button.classList.toggle("is-active",button.dataset.boothMenu===menu);
   });
+  if(menu==="return"){
+    renderBoothReturnPanel(event);
+    return;
+  }
   showBoothLocalMessage("準備中です","ok");
   if(typeof showPopup==="function")showPopup("準備中","準備中です");
 }
