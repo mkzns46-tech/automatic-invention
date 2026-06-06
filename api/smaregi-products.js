@@ -2,9 +2,63 @@ const DEFAULT_LIMIT = 1000;
 
 function env(...names) {
   for (const name of names) {
-    if (process.env[name]) return process.env[name];
+    if (name && process.env[name]) return process.env[name];
   }
   return "";
+}
+
+function normalizeKey(value, fallback) {
+  return String(value || fallback || "").trim().toLowerCase();
+}
+
+function parseBody(req) {
+  if (!req.body) return {};
+  if (typeof req.body === "object") return req.body;
+  try {
+    return JSON.parse(req.body);
+  } catch (_) {
+    return {};
+  }
+}
+
+function resolveSmaregiContext(body = {}) {
+  const requestedAccountKey = normalizeKey(body.accountKey || body.currentSmaregiAccount, "old");
+  const requestedStoreCode = normalizeKey(body.storeCode || body.currentStore, "tokyo");
+  const accountKey = requestedAccountKey === "new" ? "new" : "old";
+  const storeCode = requestedStoreCode === "aichi" ? "aichi" : "tokyo";
+  const accountPrefix = accountKey === "new" ? "NEW" : "OLD";
+  const storePrefix = storeCode === "aichi" ? "AICHI" : "TOKYO";
+
+  const clientId = accountKey === "new"
+    ? env("SMAREGI_NEW_CLIENT_ID", "NEW_SMAREGI_CLIENT_ID")
+    : env("SMAREGI_OLD_CLIENT_ID", "OLD_SMAREGI_CLIENT_ID", "SMAREGI_CLIENT_ID");
+  const clientSecret = accountKey === "new"
+    ? env("SMAREGI_NEW_CLIENT_SECRET", "NEW_SMAREGI_CLIENT_SECRET")
+    : env("SMAREGI_OLD_CLIENT_SECRET", "OLD_SMAREGI_CLIENT_SECRET", "SMAREGI_CLIENT_SECRET");
+  const contractId = accountKey === "new"
+    ? env("SMAREGI_NEW_CONTRACT_ID", "SMAREGI_NEW_CONTRACTID", "NEW_SMAREGI_CONTRACT_ID", "NEW_SMAREGI_CONTRACTID")
+    : env("SMAREGI_OLD_CONTRACT_ID", "SMAREGI_OLD_CONTRACTID", "OLD_SMAREGI_CONTRACT_ID", "OLD_SMAREGI_CONTRACTID", "SMAREGI_CONTRACT_ID", "SMAREGI_CONTRACTID");
+  const apiBase = accountKey === "new"
+    ? env("SMAREGI_NEW_POS_API_BASE_URL", "NEW_SMAREGI_POS_API_BASE_URL")
+    : env("SMAREGI_OLD_POS_API_BASE_URL", "OLD_SMAREGI_POS_API_BASE_URL", "SMAREGI_POS_API_BASE_URL");
+  const storeId = env(
+    `SMAREGI_${accountPrefix}_${storePrefix}_STORE_ID`,
+    `${accountPrefix}_SMAREGI_${storePrefix}_STORE_ID`,
+    `SMAREGI_${storePrefix}_STORE_ID`,
+    storeCode === "tokyo" ? "SMAREGI_STORE_ID" : ""
+  );
+
+  return {
+    accountKey,
+    accountName: accountKey === "new" ? "新スマレジ" : "旧スマレジ",
+    storeCode,
+    storeName: storeCode === "aichi" ? "愛知" : "東京",
+    storeId,
+    clientId,
+    clientSecret,
+    contractId,
+    apiBase
+  };
 }
 
 async function fetchAll(baseUrl, path, token) {
@@ -27,11 +81,10 @@ async function fetchAll(baseUrl, path, token) {
   return rows;
 }
 
-async function getAccessToken(contractId) {
-  const clientId = env("SMAREGI_CLIENT_ID");
-  const clientSecret = env("SMAREGI_CLIENT_SECRET");
+async function getAccessToken(context) {
+  const { contractId, clientId, clientSecret } = context;
   if (!contractId || !clientId || !clientSecret) {
-    throw new Error("スマレジ変動商品チェックと同じOAuth認証設定を読み込めません。/api/smaregi-sync.js と同じ環境変数設定を確認してください。");
+    throw new Error(`スマレジOAuth設定が不足しています: ${context.accountName} / ${context.storeName}`);
   }
 
   const tokenUrl = `https://id.smaregi.jp/app/${contractId}/token`;
@@ -61,10 +114,9 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const contractId = env("SMAREGI_CONTRACT_ID", "SMAREGI_CONTRACTID");
-    const token = await getAccessToken(contractId);
-
-    const apiBase = env("SMAREGI_POS_API_BASE_URL") || `https://api.smaregi.jp/${contractId}/pos`;
+    const context = resolveSmaregiContext(parseBody(req));
+    const token = await getAccessToken(context);
+    const apiBase = context.apiBase || `https://api.smaregi.jp/${context.contractId}/pos`;
     const products = await fetchAll(apiBase, "/products", token);
 
     const normalized = products.map(product => {
@@ -82,7 +134,18 @@ module.exports = async function handler(req, res) {
       return row;
     }).filter(Boolean);
 
-    return res.status(200).json({ products: normalized, count: normalized.length });
+    return res.status(200).json({
+      products: normalized,
+      count: normalized.length,
+      context: {
+        accountKey: context.accountKey,
+        accountName: context.accountName,
+        storeCode: context.storeCode,
+        storeName: context.storeName,
+        storeId: context.storeId || null,
+        contractId: context.contractId
+      }
+    });
   } catch (error) {
     return res.status(500).json({ error: error.message || String(error) });
   }

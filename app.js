@@ -80,6 +80,7 @@ async function startInventoryApp(){
   if(!await checkAuthOrRedirect())return;
   inventoryAuthReady=true;
   renderInventoryAppMenu();
+  renderSmaregiConnectionSelector();
   showInventoryScreen("inventory");
   bindEvents();
   bindSmaregiStockCheckEvents();

@@ -40,6 +40,112 @@ const INVENTORY_APP_MENU_FOOTER_ITEMS=[
 const INVENTORY_ADMIN_PASSWORD="S3edc##530.";
 const INVENTORY_ADMIN_AUTHENTICATED_AT_KEY="arico_inventory_admin_authenticated_at";
 const INVENTORY_ADMIN_AUTH_DURATION_MS=12*60*60*1000;
+const SMAREGI_CONTEXT_STORAGE_KEY="arico_current_smaregi_context";
+const SMAREGI_CONTEXT_OPTIONS={
+  accounts:[
+    {key:"old",label:"旧スマレジ"},
+    {key:"new",label:"新スマレジ"}
+  ],
+  stores:[
+    {key:"tokyo",label:"東京"},
+    {key:"aichi",label:"愛知"}
+  ]
+};
+window.currentSmaregiAccount="old";
+window.currentStore="tokyo";
+
+function getSmaregiContextOption(list,key,fallbackKey){
+  return list.find(item=>item.key===key)||list.find(item=>item.key===fallbackKey)||list[0];
+}
+
+function getCurrentSmaregiContext(){
+  let saved={};
+  try{
+    saved=JSON.parse(localStorage.getItem(SMAREGI_CONTEXT_STORAGE_KEY)||"{}")||{};
+  }catch(_){
+    saved={};
+  }
+  const account=getSmaregiContextOption(SMAREGI_CONTEXT_OPTIONS.accounts,saved.accountKey||window.currentSmaregiAccount,"old");
+  const store=getSmaregiContextOption(SMAREGI_CONTEXT_OPTIONS.stores,saved.storeCode||window.currentStore,"tokyo");
+  window.currentSmaregiAccount=account.key;
+  window.currentStore=store.key;
+  return {
+    accountKey:account.key,
+    accountName:account.label,
+    storeCode:store.key,
+    storeName:store.label
+  };
+}
+
+function setCurrentSmaregiContext(accountKey,storeCode){
+  const account=getSmaregiContextOption(SMAREGI_CONTEXT_OPTIONS.accounts,accountKey,"old");
+  const store=getSmaregiContextOption(SMAREGI_CONTEXT_OPTIONS.stores,storeCode,"tokyo");
+  const context={
+    accountKey:account.key,
+    accountName:account.label,
+    storeCode:store.key,
+    storeName:store.label
+  };
+  window.currentSmaregiAccount=context.accountKey;
+  window.currentStore=context.storeCode;
+  localStorage.setItem(SMAREGI_CONTEXT_STORAGE_KEY,JSON.stringify({
+    accountKey:context.accountKey,
+    storeCode:context.storeCode
+  }));
+  updateSmaregiContextSelector();
+  return context;
+}
+
+function getSmaregiRequestContext(){
+  const context=getCurrentSmaregiContext();
+  return {
+    accountKey:context.accountKey,
+    accountName:context.accountName,
+    storeCode:context.storeCode,
+    storeName:context.storeName
+  };
+}
+
+function getSmaregiContextLabel(context=getCurrentSmaregiContext()){
+  return `${context.accountName} / ${context.storeName}`;
+}
+
+function updateSmaregiContextSelector(){
+  const context=getCurrentSmaregiContext();
+  const account=el("smaregiAccountSelect");
+  const store=el("smaregiStoreSelect");
+  const badge=el("smaregiContextBadge");
+  if(account)account.value=context.accountKey;
+  if(store)store.value=context.storeCode;
+  if(badge)badge.textContent=getSmaregiContextLabel(context);
+}
+
+function renderSmaregiConnectionSelector(){
+  const root=el("smaregiContextBar");
+  if(!root)return;
+  const context=getCurrentSmaregiContext();
+  root.innerHTML=`
+    <label>スマレジ接続
+      <select id="smaregiAccountSelect" aria-label="スマレジ接続">
+        ${SMAREGI_CONTEXT_OPTIONS.accounts.map(item=>`<option value="${esc(item.key)}">${esc(item.label)}</option>`).join("")}
+      </select>
+    </label>
+    <label>店舗
+      <select id="smaregiStoreSelect" aria-label="店舗">
+        ${SMAREGI_CONTEXT_OPTIONS.stores.map(item=>`<option value="${esc(item.key)}">${esc(item.label)}</option>`).join("")}
+      </select>
+    </label>
+    <div id="smaregiContextBadge" class="smaregi-context-badge">${esc(getSmaregiContextLabel(context))}</div>`;
+  updateSmaregiContextSelector();
+  ["smaregiAccountSelect","smaregiStoreSelect"].forEach(id=>{
+    const input=el(id);
+    if(!input)return;
+    input.addEventListener("change",()=>{
+      const next=setCurrentSmaregiContext(el("smaregiAccountSelect")?.value,el("smaregiStoreSelect")?.value);
+      if(typeof showMessage==="function")showMessage(`スマレジ接続先を ${getSmaregiContextLabel(next)} に切り替えました。`);
+    });
+  });
+}
 
 function getInventoryAppMenuItemHtml(item){
   const attrs=`class="inventory-app-menu-item" data-menu-key="${esc(item.key)}" ${item.disabled?"disabled":""} ${item.title?`title="${esc(item.title)}"`:""}`;

@@ -21,7 +21,13 @@ async function importSmaregiProducts(){
   try{
     console.log("[Smaregi product master import] start");
     showMessage("スマレジ商品マスターを取り込み中...");
-    const res=await fetch("/api/smaregi-products",{method:"POST",headers:{"Content-Type":"application/json"}});
+    const smaregiContext=typeof getSmaregiRequestContext==="function" ? getSmaregiRequestContext() : {};
+    console.log("[Smaregi product master import] context",smaregiContext);
+    const res=await fetch("/api/smaregi-products",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(smaregiContext)
+    });
     const data=await res.json().catch(()=>({}));
     if(!res.ok)throw new Error(data.error||`APIエラー ${res.status}`);
     const rows=Array.isArray(data.products)?data.products:[];

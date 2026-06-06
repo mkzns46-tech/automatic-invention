@@ -449,7 +449,13 @@ async function syncSmaregiStockFromApi(){
   }
   try{
     showMessage("スマレジデータを取り込み中...");
-    const res=await fetch("/api/smaregi-sync",{method:"POST",headers:{"Content-Type":"application/json"}});
+    const smaregiContext=typeof getSmaregiRequestContext==="function" ? getSmaregiRequestContext() : {};
+    console.log("[Smaregi stock sync] context",smaregiContext);
+    const res=await fetch("/api/smaregi-sync",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(smaregiContext)
+    });
     const data=await res.json().catch(()=>({}));
     if(!res.ok)throw new Error(data.error||`APIエラー ${res.status}`);
     await loadLatestSmaregiSnapshot();
