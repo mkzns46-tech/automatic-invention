@@ -874,15 +874,19 @@ async function handleBoothScannedCode(code){
 async function upsertBoothEventItem(event,product,qty){
   const eventId=encodeURIComponent(event.id);
   const barcode=encodeURIComponent(product.barcode);
-  const rows=await sb(`booth_event_items?select=id,taken_qty&event_id=eq.${eventId}&barcode=eq.${barcode}&item_type=eq.normal&limit=1`);
+  const source=getBoothCarryOutSource();
+  const sourceField=source==="storage"?"storage_takeout_qty":"normal_takeout_qty";
+  const rows=await sb(`booth_event_items?select=id,taken_qty,normal_takeout_qty,storage_takeout_qty&event_id=eq.${eventId}&barcode=eq.${barcode}&item_type=eq.normal&limit=1`);
   const now=new Date().toISOString();
   if(Array.isArray(rows)&&rows[0]){
     const current=Number(rows[0].taken_qty||0);
+    const sourceCurrent=Number(rows[0][sourceField]||0);
     await sb(`booth_event_items?id=eq.${encodeURIComponent(rows[0].id)}`,{
       method:"PATCH",
       body:JSON.stringify({
         product_name:product.name||"",
         taken_qty:current+qty,
+        [sourceField]:sourceCurrent+qty,
         updated_at:now
       })
     });
@@ -897,9 +901,65 @@ async function upsertBoothEventItem(event,product,qty){
       product_name:product.name||"",
       item_type:"normal",
       taken_qty:qty,
+      normal_takeout_qty:source==="storage"?0:qty,
+      storage_takeout_qty:source==="storage"?qty:0,
       updated_at:now
     }])
   });
+}
+
+function getBoothCarryOutSource(){
+  const value=String(el("boothCarryOutSource")?.value||"normal");
+  return value==="storage"?"storage":"normal";
+}
+
+function getBoothCarryOutSourceLabel(source){
+  return source==="storage"?"イベント保管在庫":"通常棚";
+}
+
+function getBoothCurrentStoreCode(){
+  const context=getBoothSalesContext();
+  return String(context?.storeCode||"tokyo");
+}
+
+async function findBoothEventStorageStock(storeCode,barcode){
+  const rows=await sb(`event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty&store_code=eq.${encodeURIComponent(storeCode)}&barcode=eq.${encodeURIComponent(barcode)}&limit=1`);
+  return Array.isArray(rows)&&rows[0]?rows[0]:null;
+}
+
+async function applyBoothStorageOut(event,product,quantity,staff,memo){
+  const storeCode=getBoothCurrentStoreCode();
+  const stock=await findBoothEventStorageStock(storeCode,product.barcode);
+  const currentQty=Number(stock?.storage_qty||0);
+  if(!stock||currentQty<quantity){
+    boothShowError("持ち出し登録エラー","イベント保管在庫が不足しています。","boothCarryOutSource");
+    return false;
+  }
+  const now=new Date().toISOString();
+  await sb(`event_storage_stocks?id=eq.${encodeURIComponent(stock.id)}`,{
+    method:"PATCH",
+    body:JSON.stringify({
+      product_name:product.name||stock.product_name||"",
+      storage_qty:currentQty-quantity,
+      updated_at:now
+    })
+  });
+  await sb("event_storage_movements",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      event_id:event.id,
+      store_code:storeCode,
+      smaregi_product_id:product.smaregi_product_id?String(product.smaregi_product_id):null,
+      barcode:product.barcode,
+      product_name:product.name||"",
+      movement_type:"storage_out",
+      quantity,
+      staff,
+      memo
+    }])
+  });
+  return true;
 }
 
 async function registerBoothCarryOut(){
@@ -912,6 +972,7 @@ async function registerBoothCarryOut(){
   const qtyText=String(el("boothCarryOutQty")?.value||"").trim();
   const staff=String(el("boothCarryOutStaff")?.value||"").trim();
   const memo=String(el("boothCarryOutMemo")?.value||"").trim();
+  const source=getBoothCarryOutSource();
 
   if(!barcode){
     boothShowError("持ち出し登録エラー","バーコードを入力してください。","boothCarryOutBarcode");
@@ -933,6 +994,10 @@ async function registerBoothCarryOut(){
       boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");
       return;
     }
+    if(source==="storage"){
+      const storageOk=await applyBoothStorageOut(event,product,quantity,staff,memo);
+      if(!storageOk)return;
+    }
     await sb("booth_stock_movements",{
       method:"POST",
       headers:{Prefer:"return=minimal"},
@@ -944,7 +1009,7 @@ async function registerBoothCarryOut(){
         movement_type:"take_out",
         quantity,
         staff,
-        memo,
+        memo:source==="storage"?`持ち出し元: イベント保管在庫${memo?` / ${memo}`:""}`:memo,
         affects_smaregi:false,
         smaregi_delta:0
       }])
@@ -1052,6 +1117,12 @@ function renderBoothEventDetail(event){
           <label>数量
             <input id="boothCarryOutQty" type="number" min="1" step="1" placeholder="数量" ${closed?"disabled":""}>
           </label>
+          <label>持ち出し元
+            <select id="boothCarryOutSource" ${closed?"disabled":""}>
+              <option value="normal">通常棚</option>
+              <option value="storage">イベント保管在庫</option>
+            </select>
+          </label>
           <label>担当者<span class="required">必須</span>
             <select id="boothCarryOutStaff" ${closed?"disabled":""}>${staffOptions}</select>
           </label>
@@ -1085,6 +1156,7 @@ function renderBoothEventDetail(event){
   el("boothStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
   el("boothCameraZoomRange")?.addEventListener("input",applyBoothCameraZoom);
   el("boothCarryOutBarcode")?.addEventListener("input",clearBoothProductPreview);
+  el("boothCarryOutSource")?.addEventListener("change",()=>previewBoothCarryOutProduct({popupOnError:false}));
   el("boothCsvDownloadBtn")?.addEventListener("click",showBoothReportPreparing);
   el("boothPdfDownloadBtn")?.addEventListener("click",showBoothReportPreparing);
   updateBoothCameraZoomLabel();
@@ -1202,9 +1274,17 @@ async function previewBoothCarryOutProduct(options={}){
       if(popupOnError)boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");
       return;
     }
+    const source=getBoothCarryOutSource();
+    let storageLine="";
+    if(source==="storage"){
+      const stock=await findBoothEventStorageStock(getBoothCurrentStoreCode(),product.barcode);
+      storageLine=`<div><span>現在のイベント保管在庫：</span><strong>${esc(stock?.storage_qty??0)}</strong></div>`;
+    }
     preview.hidden=false;
     preview.innerHTML=`<div><span>商品名：</span><strong>${esc(product.name||"-")}</strong></div>
+      <div><span>持ち出し元：</span><strong>${esc(getBoothCarryOutSourceLabel(source))}</strong></div>
       <div><span>現在の東京在庫：</span><strong>${esc(product.base_stock??0)}</strong></div>
+      ${storageLine}
       <div><span>スマレジ在庫：</span><strong>変更しません</strong></div>`;
   }catch(e){
     preview.hidden=true;
@@ -1372,6 +1452,7 @@ async function registerBoothCarryOut(){
   const qtyText=String(el("boothCarryOutQty")?.value||"").trim();
   const staff=String(el("boothCarryOutStaff")?.value||"").trim();
   const memo=String(el("boothCarryOutMemo")?.value||"").trim();
+  const source=getBoothCarryOutSource();
 
   if(!barcode){
     boothShowError("持ち出し登録エラー","バーコードを入力してください。","boothCarryOutBarcode");
@@ -1393,6 +1474,10 @@ async function registerBoothCarryOut(){
       boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");
       return;
     }
+    if(source==="storage"){
+      const storageOk=await applyBoothStorageOut(event,product,quantity,staff,memo);
+      if(!storageOk)return;
+    }
     await sb("booth_stock_movements",{
       method:"POST",
       headers:{Prefer:"return=minimal"},
@@ -1404,7 +1489,7 @@ async function registerBoothCarryOut(){
         movement_type:"take_out",
         quantity,
         staff,
-        memo,
+        memo:source==="storage"?`持ち出し元: イベント保管在庫${memo?` / ${memo}`:""}`:memo,
         affects_smaregi:false,
         smaregi_delta:0
       }])
