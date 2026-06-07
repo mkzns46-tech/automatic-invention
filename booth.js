@@ -1109,7 +1109,7 @@ function switchBoothEventMenu(menu){
     return;
   }
   if(menu==="sales"){
-    confirmBoothSalesImportPreparing(event);
+    renderBoothSalesPanel(event);
     return;
   }
   if(menu==="close"){
@@ -1571,13 +1571,13 @@ function getBoothSalesTargetRegister(){
   const storeName=context.storeName||"";
   return {
     code,
-    name:code==="event" ? `${storeName}イベント用レジ` : code
+    name:code==="event" ? `${storeName}イベントレジ` : code
   };
 }
 
 function getBoothSalesTargetRegisterOptions(){
   const context=getBoothSalesContext();
-  return `<option value="event">${esc(context.storeName||"")}イベント用レジ</option>`;
+  return `<option value="event">${esc(context.storeName||"")}イベントレジ</option>`;
 }
 
 function getBoothSalesDifference(item,soldAdd=0){
@@ -1603,7 +1603,7 @@ function renderBoothSalesPanel(event){
       <div class="booth-sales-context">
         <div><span>接続先</span><strong>${esc(context.accountName||"スマレジ本番接続")}</strong></div>
         <div><span>店舗</span><strong>${esc(context.storeName||"-")} / ${esc(storeBadge)}</strong></div>
-        <div><span>販売取込対象レジ</span><strong>${esc(context.storeName||"")}イベント用レジ</strong></div>
+        <div><span>販売取込対象レジ</span><strong>${esc(context.storeName||"")}イベントレジ</strong></div>
         <div><span>イベント名</span><strong>${esc(event.name||"-")}</strong></div>
         <div><span>対象期間</span><strong>${esc(fromDate||"-")} ～ ${esc(toDate||"-")}</strong></div>
       </div>
@@ -1627,6 +1627,7 @@ function renderBoothSalesPanel(event){
       <div id="boothSalesImportList" class="booth-sales-import-list">
         <div class="booth-empty">仮取り込み一覧を読み込み中...</div>
       </div>
+      <p class="section-note booth-sales-register-note">店舗IDだけでは取り込みません。イベント販売用レジIDが未設定の場合、仮取り込みは実行できません。</p>
     </section>`;
 
   el("boothSalesDraftImportBtn")?.addEventListener("click",importBoothSalesDraft);
@@ -1827,6 +1828,7 @@ async function importBoothSalesDraft(){
         smaregi_store_id:body.context?.storeId||null,
         target_register_code:body.context?.targetRegisterCode||register.code,
         target_register_name:body.context?.targetRegisterName||register.name,
+        smaregi_register_id:body.context?.targetRegisterId||body.context?.targetTerminalId||sale.smaregi_terminal_id||null,
         smaregi_terminal_id:sale.smaregi_terminal_id||body.context?.targetTerminalId||null,
         import_status:"pending",
         imported_by:staff,

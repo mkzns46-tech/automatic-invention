@@ -12,6 +12,7 @@ create table if not exists public.event_sales_imports (
   smaregi_store_id text,
   target_register_code text,
   target_register_name text,
+  smaregi_register_id text,
   smaregi_terminal_id text,
   import_status text not null default 'pending'
     check (import_status in ('pending','confirmed','cancelled')),
@@ -27,6 +28,7 @@ create table if not exists public.event_sales_imports (
 alter table public.event_sales_imports
   add column if not exists target_register_code text,
   add column if not exists target_register_name text,
+  add column if not exists smaregi_register_id text,
   add column if not exists smaregi_terminal_id text;
 
 create index if not exists event_sales_imports_event_status_idx
@@ -40,5 +42,8 @@ create index if not exists event_sales_imports_store_sold_at_idx
 
 create index if not exists event_sales_imports_terminal_idx
   on public.event_sales_imports(store_code, smaregi_terminal_id, sold_at);
+
+create index if not exists event_sales_imports_register_idx
+  on public.event_sales_imports(store_code, smaregi_register_id, sold_at);
 
 grant select, insert, update on public.event_sales_imports to anon, authenticated;

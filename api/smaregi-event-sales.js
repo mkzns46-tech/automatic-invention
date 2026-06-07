@@ -27,8 +27,11 @@ function resolveSmaregiContext(body = {}) {
   const storePrefix = storeCode === "aichi" ? "AICHI" : "TOKYO";
   const storeName = storeCode === "aichi" ? "愛知" : "東京";
   const targetRegisterCode = normalizeKey(body.targetRegisterCode || body.registerCode, "event");
-  const eventRegisterId = env(`SMAREGI_${storePrefix}_EVENT_TERMINAL_ID`);
-  const eventRegisterName = env(`SMAREGI_${storePrefix}_EVENT_REGISTER_NAME`) || `${storeName}イベント用レジ`;
+  const eventRegisterId = env(
+    `SMAREGI_${storePrefix}_EVENT_REGISTER_ID`,
+    `SMAREGI_${storePrefix}_EVENT_TERMINAL_ID`
+  );
+  const eventRegisterName = env(`SMAREGI_${storePrefix}_EVENT_REGISTER_NAME`) || `${storeName}イベントレジ`;
   const storeId = env(
     `SMAREGI_${storePrefix}_STORE_ID`,
     storeCode === "tokyo" ? "SMAREGI_STORE_ID" : ""
@@ -42,6 +45,7 @@ function resolveSmaregiContext(body = {}) {
     storeId,
     targetRegisterCode: targetRegisterCode === "event" ? "event" : targetRegisterCode,
     targetRegisterName: eventRegisterName,
+    targetRegisterId: eventRegisterId,
     targetTerminalId: eventRegisterId,
     clientId: env("SMAREGI_CLIENT_ID"),
     clientSecret: env("SMAREGI_CLIENT_SECRET"),
@@ -211,7 +215,7 @@ module.exports = async function handler(req, res) {
 
     const context = resolveSmaregiContext(body);
     if (!context.storeId) throw new Error(`店舗IDが未設定です。${context.storeName} の環境変数を確認してください。`);
-    if (!context.targetTerminalId) throw new Error(`${context.targetRegisterName} の端末IDが未設定です。SMAREGI_${context.storeCode === "aichi" ? "AICHI" : "TOKYO"}_EVENT_TERMINAL_ID を設定してください。`);
+    if (!context.targetTerminalId) throw new Error("イベント販売用レジIDが未設定です");
     const token = await getAccessToken(context);
     const apiBase = context.apiBase || `https://api.smaregi.jp/${context.contractId}/pos`;
     const transactions = await fetchTransactions(apiBase, token, context, fromDate, toDate, productIds);
@@ -229,6 +233,7 @@ module.exports = async function handler(req, res) {
         storeId: context.storeId,
         targetRegisterCode: context.targetRegisterCode,
         targetRegisterName: context.targetRegisterName,
+        targetRegisterId: context.targetRegisterId,
         targetTerminalId: context.targetTerminalId,
         contractId: context.contractId
       }
