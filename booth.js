@@ -1425,7 +1425,7 @@ async function loadBoothReturnHistory(eventId){
   if(!list)return;
   try{
     list.innerHTML='<div class="booth-empty">読み込み中...</div>';
-    const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff&event_id=eq.${encodeURIComponent(eventId)}&movement_type=eq.return&item_type=eq.normal&order=created_at.desc&limit=50`);
+    const rows=await sb(`booth_stock_movements?select=id,created_at,product_name,barcode,quantity,staff,memo&event_id=eq.${encodeURIComponent(eventId)}&movement_type=eq.return&item_type=eq.normal&order=created_at.desc&limit=50`);
     if(!Array.isArray(rows)||!rows.length){
       list.innerHTML='<div class="booth-empty">まだ棚戻し履歴はありません。</div>';
       return;
@@ -1436,8 +1436,9 @@ async function loadBoothReturnHistory(eventId){
         <td>${esc(formatBoothDateTime(row.created_at))}</td>
         <td>${esc(row.product_name||"-")}</td>
         <td>${esc(row.barcode||"-")}</td>
-        <td>${esc(row.quantity??"-")}</td>
+        <td><input class="booth-history-qty-input" id="boothReturnQtyEdit_${esc(row.id)}" type="number" min="1" step="1" value="${esc(row.quantity??"")}"></td>
         <td>${esc(row.staff||"-")}</td>
+        <td><button type="button" class="secondary booth-history-edit-btn" data-return-edit-id="${esc(row.id)}" data-return-edit-barcode="${esc(row.barcode||"")}">修正</button></td>
       </tr>`).join("")}</tbody>
     </table></div>
     <div class="booth-history-cards">
@@ -1453,6 +1454,9 @@ async function loadBoothReturnHistory(eventId){
         </div>
       </article>`).join("")}
     </div>`;
+    list.querySelectorAll("[data-return-edit-id]").forEach(button=>{
+      button.addEventListener("click",()=>updateBoothReturnHistoryQuantity(button.dataset.returnEditId,button.dataset.returnEditBarcode));
+    });
   }catch(e){
     list.innerHTML='<div class="booth-empty">棚戻し履歴を読み込めませんでした。</div>';
     boothShowError("棚戻し履歴エラー","棚戻し履歴の読み込みに失敗しました。\n"+e.message);
@@ -1471,6 +1475,66 @@ async function updateBoothReturnedQty(item,quantity){
       updated_at:new Date().toISOString()
     })
   });
+}
+
+async function recalculateBoothReturnedQty(eventId,barcode){
+  const [item,returns]=await Promise.all([
+    findBoothEventItemByBarcode(eventId,barcode),
+    sb(`booth_stock_movements?select=quantity&event_id=eq.${encodeURIComponent(eventId)}&barcode=eq.${encodeURIComponent(barcode)}&movement_type=eq.return&item_type=eq.normal&limit=1000`)
+  ]);
+  if(!item)return null;
+  const nextReturned=(Array.isArray(returns)?returns:[]).reduce((sum,row)=>sum+Number(row.quantity||0),0);
+  const difference=Number(item.taken_qty||0)-Number(item.sold_qty||0)-nextReturned-Number(item.consumed_qty||0);
+  await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+    method:"PATCH",
+    body:JSON.stringify({
+      returned_qty:nextReturned,
+      difference_qty:difference,
+      updated_at:new Date().toISOString()
+    })
+  });
+  return {...item,returned_qty:nextReturned,difference_qty:difference};
+}
+
+async function updateBoothReturnHistoryQuantity(movementId,barcode){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    boothShowError("戻し履歴修正エラー","イベントを開いてから修正してください。");
+    return;
+  }
+  if(isBoothEventClosed(event)){
+    showBoothClosedError();
+    return;
+  }
+  movementId=String(movementId||"").trim();
+  barcode=String(barcode||"").trim();
+  const input=el(`boothReturnQtyEdit_${movementId}`)||el(`boothReturnQtyEditCard_${movementId}`);
+  const qtyText=String(input?.value||"").trim();
+  if(!movementId||!barcode){
+    boothShowError("戻し履歴修正エラー","修正対象の履歴が見つかりません。");
+    return;
+  }
+  if(!/^[1-9]\d*$/.test(qtyText)){
+    boothShowError("戻し履歴修正エラー","戻り数は1以上の整数を入力してください。",input?.id||"");
+    return;
+  }
+  const quantity=Number(qtyText);
+  try{
+    await sb(`booth_stock_movements?id=eq.${encodeURIComponent(movementId)}`,{
+      method:"PATCH",
+      body:JSON.stringify({
+        quantity,
+        updated_at:new Date().toISOString()
+      })
+    });
+    await recalculateBoothReturnedQty(event.id,barcode);
+    await loadBoothReturnHistory(event.id);
+    const currentBarcode=String(el("boothReturnBarcode")?.value||"").trim();
+    if(currentBarcode&&currentBarcode===barcode)await previewBoothReturnProduct({popupOnError:false});
+    boothShowSuccess("戻し履歴修正完了","戻り数を修正しました。");
+  }catch(e){
+    boothShowError("戻し履歴修正エラー","戻し履歴の修正に失敗しました。\n"+e.message);
+  }
 }
 
 async function registerBoothReturn(){
@@ -1508,12 +1572,6 @@ async function registerBoothReturn(){
       boothShowError("棚戻し棚卸しエラー","この商品はこのイベントで持ち出し登録されていません。","boothReturnBarcode");
       return;
     }
-    const differenceAfterReturn=calculateBoothDifference(item,quantity);
-    if(differenceAfterReturn<0){
-      boothShowError("棚戻し棚卸しエラー","戻り数量が持ち出し残数を超えています。","boothReturnQty");
-      return;
-    }
-
     await sb("booth_stock_movements",{
       method:"POST",
       headers:{Prefer:"return=minimal"},

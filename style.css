@@ -4360,6 +4360,22 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 .booth-sales-register-status{
   margin-top:10px;
 }
+.booth-history-qty-input{
+  width:86px !important;
+  min-width:70px !important;
+  max-width:100% !important;
+  height:34px !important;
+  min-height:34px !important;
+  padding:4px 8px !important;
+  font-size:13px !important;
+  box-sizing:border-box !important;
+}
+.booth-history-edit-btn{
+  min-height:34px !important;
+  padding:4px 12px !important;
+  font-size:13px !important;
+  white-space:nowrap;
+}
 
 @media(max-width:800px){
   .smaregi-context-bar{
@@ -4418,5 +4434,12 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   }
   .event-register-settings-grid{
     grid-template-columns:1fr !important;
+  }
+  .booth-return-history-card .booth-history-table{
+    display:table !important;
+    min-width:680px;
+  }
+  .booth-return-history-card .booth-history-cards{
+    display:none !important;
   }
 }
