@@ -394,6 +394,10 @@ function switchBoothEventMenu(menu){
     renderBoothDiffPanel(event);
     return;
   }
+  if(menu==="storage"){
+    renderBoothStoragePanel(event);
+    return;
+  }
   if(menu==="close"){
     confirmBoothEventClosePreparing(event);
     return;
@@ -1198,6 +1202,10 @@ function switchBoothEventMenu(menu){
   }
   if(menu==="diff"){
     renderBoothDiffPanel(event);
+    return;
+  }
+  if(menu==="storage"){
+    renderBoothStoragePanel(event);
     return;
   }
   if(menu==="close"){
@@ -2131,6 +2139,261 @@ async function saveBoothDiffMemo(itemId){
     boothShowSuccess("差異メモ保存完了","差異確認メモを保存しました。");
   }catch(e){
     boothShowError("差異メモ保存エラー","差異確認メモの保存に失敗しました。\n"+e.message);
+  }
+}
+
+async function fetchBoothStorageEventItems(eventId){
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,shelf_return_qty,event_storage_qty,updated_at&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&order=product_name.asc`);
+  return Array.isArray(rows)?rows:[];
+}
+
+async function fetchBoothStorageStocksForItems(items){
+  const storeCode=getBoothCurrentStoreCode();
+  const barcodes=[...new Set((items||[]).map(item=>String(item.barcode||"").trim()).filter(Boolean))];
+  if(!barcodes.length)return [];
+  const rows=await sb(`event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(storeCode)}&barcode=in.(${buildInFilter(barcodes)})`);
+  return Array.isArray(rows)?rows:[];
+}
+
+function renderBoothStoragePanel(event){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  area.innerHTML=`
+    <section class="booth-work-card booth-storage-card">
+      <h4>イベント保管</h4>
+      <p class="section-note">棚戻し棚卸しで確認した戻り数を、通常棚へ戻す分と次回用のイベント保管分に振り分けます。スマレジ在庫・products.base_stock・inventory_logs は変更しません。</p>
+      <div class="booth-diff-filters">
+        <label>商品名・バーコード検索
+          <input id="boothStorageSearch" autocomplete="off" placeholder="商品名またはバーコード">
+        </label>
+        <button type="button" id="boothStorageReloadBtn" class="secondary">再読み込み</button>
+      </div>
+      <div id="boothStorageList" class="booth-storage-list">
+        <div class="booth-empty">読み込み中...</div>
+      </div>
+    </section>`;
+  el("boothStorageSearch")?.addEventListener("input",()=>loadBoothStorageList(event.id));
+  el("boothStorageReloadBtn")?.addEventListener("click",()=>loadBoothStorageList(event.id));
+  loadBoothStorageList(event.id);
+}
+
+async function loadBoothStorageList(eventId){
+  const list=el("boothStorageList");
+  if(!list)return;
+  try{
+    list.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    const items=await fetchBoothStorageEventItems(eventId);
+    const [products,stocks]=await Promise.all([
+      fetchBoothProductsForItems(items),
+      fetchBoothStorageStocksForItems(items)
+    ]);
+    const productMap=new Map((products||[]).map(product=>[String(product.barcode||""),product]));
+    const stockMap=new Map((stocks||[]).map(stock=>[String(stock.barcode||""),stock]));
+    const keyword=String(el("boothStorageSearch")?.value||"").trim().toLowerCase();
+    let rows=(items||[]).map(item=>{
+      const product=productMap.get(String(item.barcode||""))||{};
+      const stock=stockMap.get(String(item.barcode||""))||{};
+      return {
+        ...item,
+        smaregi_product_id:product.smaregi_product_id||"",
+        current_storage_qty:Number(stock.storage_qty||0)
+      };
+    });
+    if(keyword){
+      rows=rows.filter(row=>{
+        return String(row.product_name||"").toLowerCase().includes(keyword)
+          || String(row.barcode||"").toLowerCase().includes(keyword)
+          || String(row.smaregi_product_id||"").toLowerCase().includes(keyword);
+      });
+    }
+    renderBoothStorageList(rows);
+  }catch(e){
+    list.innerHTML='<div class="booth-empty">イベント保管を読み込めませんでした。</div>';
+    boothShowError("イベント保管エラー","イベント保管の読み込みに失敗しました。\n"+e.message);
+  }
+}
+
+function getBoothStorageStaffOptions(){
+  return '<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+}
+
+function renderBoothStorageList(rows){
+  const list=el("boothStorageList");
+  if(!list)return;
+  if(!rows.length){
+    list.innerHTML='<div class="booth-empty">表示対象の商品はありません。</div>';
+    return;
+  }
+  const staffOptions=getBoothStorageStaffOptions();
+  const buildInputs=(row,suffix)=>`
+    <label>通常棚へ戻す
+      <input id="boothShelfReturn_${esc(row.id)}_${esc(suffix)}" type="number" min="0" step="1" value="${esc(row.shelf_return_qty??0)}">
+    </label>
+    <label>イベント保管
+      <input id="boothEventStorage_${esc(row.id)}_${esc(suffix)}" type="number" min="0" step="1" value="${esc(row.event_storage_qty??0)}">
+    </label>
+    <label>担当者<span class="required">必須</span>
+      <select id="boothStorageStaff_${esc(row.id)}_${esc(suffix)}">${staffOptions}</select>
+    </label>
+    <label>メモ
+      <input id="boothStorageMemo_${esc(row.id)}_${esc(suffix)}" autocomplete="off" placeholder="任意メモ">
+    </label>
+    <button type="button" class="booth-storage-save-btn" data-storage-item-id="${esc(row.id)}" data-storage-suffix="${esc(suffix)}">登録</button>`;
+  const tableRows=rows.map(row=>`<tr>
+    <td>${esc(row.product_name||"-")}</td>
+    <td>${esc(row.barcode||"-")}</td>
+    <td>${esc(row.taken_qty??0)}</td>
+    <td>${esc(row.sold_qty??0)}</td>
+    <td>${esc(row.returned_qty??0)}</td>
+    <td>${esc(row.shelf_return_qty??0)}</td>
+    <td>${esc(row.event_storage_qty??0)}</td>
+    <td>${esc(row.current_storage_qty??0)}</td>
+    <td><div class="booth-storage-inputs">${buildInputs(row,"table")}</div></td>
+  </tr>`).join("");
+  const cardRows=rows.map(row=>`<article class="booth-history-card booth-storage-item-card">
+    <div class="booth-history-card-top">
+      <strong>${esc(row.product_name||"-")}</strong>
+      <span>保管在庫 ${esc(row.current_storage_qty??0)}</span>
+    </div>
+    <div class="booth-history-card-meta">
+      <span>バーコード：${esc(row.barcode||"-")}</span>
+      <span>スマレジ商品ID：${esc(row.smaregi_product_id||"-")}</span>
+      <span>持ち出し：${esc(row.taken_qty??0)} / 販売：${esc(row.sold_qty??0)} / 戻り：${esc(row.returned_qty??0)} / 消費：${esc(row.consumed_qty??0)}</span>
+      <span>通常棚戻し：${esc(row.shelf_return_qty??0)} / イベント保管：${esc(row.event_storage_qty??0)}</span>
+      <span>現在のイベント保管在庫：${esc(row.current_storage_qty??0)}</span>
+    </div>
+    <div class="booth-storage-inputs">${buildInputs(row,"card")}</div>
+  </article>`).join("");
+  list.innerHTML=`
+    <div class="booth-diff-summary">表示 ${esc(rows.length)} 件。通常棚戻し + イベント保管 は戻り数を超えない範囲で登録します。</div>
+    <div class="booth-history-table-wrap"><table class="booth-history-table booth-storage-table">
+      <thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し</th><th>販売</th><th>戻り</th><th>通常棚戻し</th><th>イベント保管</th><th>現在保管在庫</th><th>登録</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table></div>
+    <div class="booth-history-cards">${cardRows}</div>`;
+  list.querySelectorAll("[data-storage-item-id]").forEach(button=>{
+    button.addEventListener("click",()=>saveBoothStorageSplit(button.dataset.storageItemId,button.dataset.storageSuffix));
+  });
+}
+
+function parseBoothStorageQty(inputId,label){
+  const raw=String(el(inputId)?.value||"").trim();
+  if(raw===""||!/^\d+$/.test(raw)){
+    boothShowError("イベント保管エラー",`${label}は0以上の整数を入力してください。`,inputId);
+    return null;
+  }
+  return Number(raw);
+}
+
+async function upsertBoothEventStorageStock(storeCode,item,delta){
+  if(delta===0)return;
+  const stock=await findBoothEventStorageStock(storeCode,item.barcode);
+  const currentQty=Number(stock?.storage_qty||0);
+  const nextQty=currentQty+delta;
+  if(nextQty<0){
+    boothShowError("イベント保管エラー","イベント保管在庫が不足するため修正できません。");
+    throw new Error("event_storage_stocks.storage_qty would be negative");
+  }
+  const now=new Date().toISOString();
+  if(stock){
+    await sb(`event_storage_stocks?id=eq.${encodeURIComponent(stock.id)}`,{
+      method:"PATCH",
+      body:JSON.stringify({
+        product_name:item.product_name||stock.product_name||"",
+        storage_qty:nextQty,
+        updated_at:now
+      })
+    });
+    return;
+  }
+  if(delta<0){
+    boothShowError("イベント保管エラー","イベント保管在庫が不足するため修正できません。");
+    throw new Error("event_storage_stocks row not found");
+  }
+  await sb("event_storage_stocks",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      store_code:storeCode,
+      barcode:item.barcode,
+      product_name:item.product_name||"",
+      storage_qty:delta,
+      updated_at:now
+    }])
+  });
+}
+
+async function saveBoothStorageSplit(itemId,suffix){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    boothShowError("イベント保管エラー","イベントを開いてから操作してください。");
+    return;
+  }
+  if(isBoothEventClosed(event)){
+    showBoothClosedError();
+    return;
+  }
+  itemId=String(itemId||"").trim();
+  suffix=String(suffix||"table");
+  const shelfQty=parseBoothStorageQty(`boothShelfReturn_${itemId}_${suffix}`,"通常棚へ戻す数");
+  if(shelfQty===null)return;
+  const storageQty=parseBoothStorageQty(`boothEventStorage_${itemId}_${suffix}`,"イベント保管に残す数");
+  if(storageQty===null)return;
+  const staff=String(el(`boothStorageStaff_${itemId}_${suffix}`)?.value||"").trim();
+  const memo=String(el(`boothStorageMemo_${itemId}_${suffix}`)?.value||"").trim();
+  if(!staff){
+    boothShowError("イベント保管エラー","担当者を選択してください。",`boothStorageStaff_${itemId}_${suffix}`);
+    return;
+  }
+  try{
+    const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,shelf_return_qty,event_storage_qty&event_id=eq.${encodeURIComponent(event.id)}&id=eq.${encodeURIComponent(itemId)}&limit=1`);
+    const item=Array.isArray(rows)&&rows[0]?rows[0]:null;
+    if(!item){
+      boothShowError("イベント保管エラー","保存対象の商品が見つかりません。");
+      return;
+    }
+    const returnedQty=Number(item.returned_qty||0);
+    if(shelfQty+storageQty>returnedQty){
+      boothShowError("イベント保管エラー","通常棚へ戻す数とイベント保管に残す数の合計が戻り数を超えています。");
+      return;
+    }
+    const previousStorageQty=Number(item.event_storage_qty||0);
+    const delta=storageQty-previousStorageQty;
+    const products=await fetchBoothProductsForItems([item]);
+    const product=Array.isArray(products)&&products[0]?products[0]:{};
+    const itemForStorage={...item,smaregi_product_id:product.smaregi_product_id||""};
+    const storeCode=getBoothCurrentStoreCode();
+    await upsertBoothEventStorageStock(storeCode,itemForStorage,delta);
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+      method:"PATCH",
+      body:JSON.stringify({
+        shelf_return_qty:shelfQty,
+        event_storage_qty:storageQty,
+        updated_at:new Date().toISOString()
+      })
+    });
+    if(delta!==0){
+      await sb("event_storage_movements",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify([{
+          event_id:event.id,
+          store_code:storeCode,
+          smaregi_product_id:itemForStorage.smaregi_product_id?String(itemForStorage.smaregi_product_id):null,
+          barcode:item.barcode,
+          product_name:item.product_name||"",
+          movement_type:delta>0?"storage_in":"adjustment",
+          quantity:Math.abs(delta),
+          staff,
+          memo:delta>0?memo:`イベント保管数修正 ${previousStorageQty} -> ${storageQty}${memo?` / ${memo}`:""}`
+        }])
+      });
+    }
+    boothShowSuccess("イベント保管登録完了","イベント保管の振り分けを保存しました。");
+    await loadBoothStorageList(event.id);
+  }catch(e){
+    if(String(e?.message||"").includes("event_storage_stocks"))return;
+    boothShowError("イベント保管エラー","イベント保管の保存に失敗しました。\n"+e.message);
   }
 }
 
