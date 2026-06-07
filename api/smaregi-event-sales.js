@@ -1,4 +1,4 @@
-const DEFAULT_LIMIT = 1000;
+const DEFAULT_LIMIT = 100;
 
 function env(...names) {
   for (const name of names) {
