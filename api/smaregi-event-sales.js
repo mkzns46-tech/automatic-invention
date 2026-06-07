@@ -1,4 +1,4 @@
-const DEFAULT_LIMIT = 1000;
+const DEFAULT_LIMIT = 100;
 
 function env(...names) {
   for (const name of names) {
@@ -177,9 +177,6 @@ async function fetchTransactions(apiBase, token, context, fromDate, toDate, prod
     url.searchParams.set("store_id", context.storeId);
     url.searchParams.set("terminal_tran_date_time-from", `${fromDate}T00:00:00+09:00`);
     url.searchParams.set("terminal_tran_date_time-to", `${toDate}T23:59:59+09:00`);
-    if (Array.isArray(productIds) && productIds.length === 1) {
-      url.searchParams.set("product_id", productIds[0]);
-    }
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }
     });
