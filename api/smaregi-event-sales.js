@@ -26,6 +26,9 @@ function resolveSmaregiContext(body = {}) {
   const storeCode = requestedStoreCode === "aichi" ? "aichi" : "tokyo";
   const storePrefix = storeCode === "aichi" ? "AICHI" : "TOKYO";
   const storeName = storeCode === "aichi" ? "愛知" : "東京";
+  const targetRegisterCode = normalizeKey(body.targetRegisterCode || body.registerCode, "event");
+  const eventRegisterId = env(`SMAREGI_${storePrefix}_EVENT_TERMINAL_ID`);
+  const eventRegisterName = env(`SMAREGI_${storePrefix}_EVENT_REGISTER_NAME`) || `${storeName}イベント用レジ`;
   const storeId = env(
     `SMAREGI_${storePrefix}_STORE_ID`,
     storeCode === "tokyo" ? "SMAREGI_STORE_ID" : ""
@@ -37,6 +40,9 @@ function resolveSmaregiContext(body = {}) {
     storeCode,
     storeName,
     storeId,
+    targetRegisterCode: targetRegisterCode === "event" ? "event" : targetRegisterCode,
+    targetRegisterName: eventRegisterName,
+    targetTerminalId: eventRegisterId,
     clientId: env("SMAREGI_CLIENT_ID"),
     clientSecret: env("SMAREGI_CLIENT_SECRET"),
     contractId: env("SMAREGI_CONTRACT_ID", "SMAREGI_CONTRACTID"),
@@ -111,10 +117,12 @@ function getDetails(row) {
   return Array.isArray(details) ? details : [];
 }
 
-function normalizeSales(transactions, productIdSet) {
+function normalizeSales(transactions, productIdSet, targetTerminalId) {
   const sales = [];
   for (const transaction of transactions) {
     if (!transaction || isCancelledTransaction(transaction)) continue;
+    const terminalId = String(pick(transaction, ["terminalId", "terminal_id"], "") || "").trim();
+    if (String(targetTerminalId || "").trim() && terminalId !== String(targetTerminalId || "").trim()) continue;
     const transactionId = String(pick(transaction, [
       "transactionHeadId",
       "transaction_head_id",
@@ -147,6 +155,7 @@ function normalizeSales(transactions, productIdSet) {
         smaregi_transaction_id: transactionId,
         smaregi_detail_id: detailId,
         smaregi_product_id: productId,
+        smaregi_terminal_id: terminalId,
         quantity,
         sold_at: soldAt,
         product_name: String(pick(detail, ["productName", "product_name"], "") || "").trim()
@@ -202,11 +211,12 @@ module.exports = async function handler(req, res) {
 
     const context = resolveSmaregiContext(body);
     if (!context.storeId) throw new Error(`店舗IDが未設定です。${context.storeName} の環境変数を確認してください。`);
+    if (!context.targetTerminalId) throw new Error(`${context.targetRegisterName} の端末IDが未設定です。SMAREGI_${context.storeCode === "aichi" ? "AICHI" : "TOKYO"}_EVENT_TERMINAL_ID を設定してください。`);
     const token = await getAccessToken(context);
     const apiBase = context.apiBase || `https://api.smaregi.jp/${context.contractId}/pos`;
     const transactions = await fetchTransactions(apiBase, token, context, fromDate, toDate, productIds);
     const productIdSet = new Set(productIds);
-    const sales = normalizeSales(transactions, productIdSet);
+    const sales = normalizeSales(transactions, productIdSet, context.targetTerminalId);
 
     return res.status(200).json({
       sales,
@@ -217,6 +227,9 @@ module.exports = async function handler(req, res) {
         storeCode: context.storeCode,
         storeName: context.storeName,
         storeId: context.storeId,
+        targetRegisterCode: context.targetRegisterCode,
+        targetRegisterName: context.targetRegisterName,
+        targetTerminalId: context.targetTerminalId,
         contractId: context.contractId
       }
     });

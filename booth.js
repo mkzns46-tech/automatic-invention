@@ -1555,12 +1555,29 @@ function getBoothSalesContext(){
 
 function getBoothSalesContextSummary(event,fromDate,toDate){
   const context=getBoothSalesContext();
+  const register=getBoothSalesTargetRegister();
   return [
     `接続先：${context.accountName||"スマレジ本番接続"}`,
     `店舗：${context.storeName||"-"}`,
+    `販売取込対象レジ：${register.name}`,
     `イベント名：${event?.name||"-"}`,
     `対象期間：${fromDate||event?.event_start||"-"} ～ ${toDate||event?.event_end||"-"}`
   ].join("\n");
+}
+
+function getBoothSalesTargetRegister(){
+  const context=getBoothSalesContext();
+  const code=String(el("boothSalesTargetRegister")?.value||"event").trim()||"event";
+  const storeName=context.storeName||"";
+  return {
+    code,
+    name:code==="event" ? `${storeName}イベント用レジ` : code
+  };
+}
+
+function getBoothSalesTargetRegisterOptions(){
+  const context=getBoothSalesContext();
+  return `<option value="event">${esc(context.storeName||"")}イベント用レジ</option>`;
 }
 
 function getBoothSalesDifference(item,soldAdd=0){
@@ -1586,10 +1603,14 @@ function renderBoothSalesPanel(event){
       <div class="booth-sales-context">
         <div><span>接続先</span><strong>${esc(context.accountName||"スマレジ本番接続")}</strong></div>
         <div><span>店舗</span><strong>${esc(context.storeName||"-")} / ${esc(storeBadge)}</strong></div>
+        <div><span>販売取込対象レジ</span><strong>${esc(context.storeName||"")}イベント用レジ</strong></div>
         <div><span>イベント名</span><strong>${esc(event.name||"-")}</strong></div>
         <div><span>対象期間</span><strong>${esc(fromDate||"-")} ～ ${esc(toDate||"-")}</strong></div>
       </div>
       <div class="booth-sales-form">
+        <label>販売取込対象レジ<span class="required">必須</span>
+          <select id="boothSalesTargetRegister" ${closed?"disabled":""}>${getBoothSalesTargetRegisterOptions()}</select>
+        </label>
         <label>開始日
           <input id="boothSalesFromDate" type="date" value="${esc(fromDate)}" ${closed?"disabled":""}>
         </label>
@@ -1672,6 +1693,7 @@ function renderBoothSalesImports(rows,items){
       <td>${esc(row.product_name||"-")}</td>
       <td>${esc(row.barcode||"-")}</td>
       <td>${esc(row.smaregi_product_id||"-")}</td>
+      <td>${esc(row.target_register_name||"-")}</td>
       <td>${esc(item.taken_qty??0)}</td>
       <td>${esc(imported)}</td>
       <td>${esc(item.returned_qty??0)}</td>
@@ -1691,6 +1713,7 @@ function renderBoothSalesImports(rows,items){
       <div class="booth-history-card-meta">
         <span>バーコード：${esc(row.barcode||"-")}</span>
         <span>スマレジ商品ID：${esc(row.smaregi_product_id||"-")}</span>
+        <span>対象レジ：${esc(row.target_register_name||"-")}</span>
         <span>持ち出し：${esc(item.taken_qty??0)} / 販売候補：${esc(imported)} / 戻り：${esc(item.returned_qty??0)}</span>
         <span>差異見込み：${esc(diff)}</span>
         <span>取引：${esc(row.smaregi_transaction_id||"-")} / ${esc(row.smaregi_detail_id||"-")}</span>
@@ -1700,7 +1723,7 @@ function renderBoothSalesImports(rows,items){
   list.innerHTML=`
     <div class="booth-sales-import-summary">未確定 ${esc(rows.length)} 行。確認後に「確定して販売数へ反映」を押してください。</div>
     <div class="booth-history-table-wrap"><table class="booth-history-table booth-sales-table">
-      <thead><tr><th>販売日時</th><th>商品名</th><th>バーコード</th><th>商品ID</th><th>持ち出し</th><th>販売候補</th><th>戻り</th><th>差異見込み</th><th>取引ID</th></tr></thead>
+      <thead><tr><th>販売日時</th><th>商品名</th><th>バーコード</th><th>商品ID</th><th>対象レジ</th><th>持ち出し</th><th>販売候補</th><th>戻り</th><th>差異見込み</th><th>取引ID</th></tr></thead>
       <tbody>${tableRows}</tbody>
     </table></div>
     <div class="booth-history-cards">${cardRows}</div>`;
@@ -1719,6 +1742,11 @@ function validateBoothSalesForm(){
   const fromDate=String(el("boothSalesFromDate")?.value||"").trim();
   const toDate=String(el("boothSalesToDate")?.value||"").trim();
   const staff=String(el("boothSalesStaff")?.value||"").trim();
+  const register=getBoothSalesTargetRegister();
+  if(!register.code){
+    boothShowError("販売取り込みエラー","販売取込対象レジを選択してください。","boothSalesTargetRegister");
+    return null;
+  }
   if(!fromDate||!toDate){
     boothShowError("販売取り込みエラー","開始日と終了日を入力してください。");
     return null;
@@ -1731,13 +1759,13 @@ function validateBoothSalesForm(){
     boothShowError("販売取り込みエラー","担当者を選択してください。","boothSalesStaff");
     return null;
   }
-  return {event,fromDate,toDate,staff};
+  return {event,fromDate,toDate,staff,register};
 }
 
 async function importBoothSalesDraft(){
   const form=validateBoothSalesForm();
   if(!form)return;
-  const {event,fromDate,toDate,staff}=form;
+  const {event,fromDate,toDate,staff,register}=form;
   const context=getBoothSalesContext();
   const ok=typeof confirmAppAction==="function"
     ? await confirmAppAction("販売データ仮取り込み確認",`${getBoothSalesContextSummary(event,fromDate,toDate)}\n\nこの条件で販売データを取得します。`,{okText:"仮取り込み"})
@@ -1770,6 +1798,7 @@ async function importBoothSalesDraft(){
       body:JSON.stringify({
         ...(typeof getSmaregiRequestContext==="function"?getSmaregiRequestContext():context),
         storeCode:context.storeCode,
+        targetRegisterCode:register.code,
         fromDate,
         toDate,
         smaregiProductIds:productIds
@@ -1796,6 +1825,9 @@ async function importBoothSalesDraft(){
         sold_at:sale.sold_at||null,
         store_code:context.storeCode,
         smaregi_store_id:body.context?.storeId||null,
+        target_register_code:body.context?.targetRegisterCode||register.code,
+        target_register_name:body.context?.targetRegisterName||register.name,
+        smaregi_terminal_id:sale.smaregi_terminal_id||body.context?.targetTerminalId||null,
         import_status:"pending",
         imported_by:staff,
         imported_at:now,
