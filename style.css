@@ -3917,6 +3917,19 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   min-width:0;
   box-sizing:border-box;
 }
+.booth-fixed-field{
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  width:100%;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#ecfdf5;
+  color:#064e3b;
+  font-weight:800;
+  box-sizing:border-box;
+}
 .booth-carry-memo-label{
   display:block;
   margin-top:10px;
@@ -4502,7 +4515,7 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 .booth-storage-history-table input{
   width:120px !important;
 }
-.booth-storage-history-table select{
+.booth-storage-history-table input[id^="boothStorageStaffEdit_"]{
   width:160px !important;
 }
 

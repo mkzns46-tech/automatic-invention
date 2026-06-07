@@ -6,6 +6,7 @@ let staffMembers=[];
 let selectedBarcode="";
 let dataLoaded=false;
 let dataLoadError=false;
+let eventPickEvents=[];
 
 let videoStream=null;
 let detector=null;
@@ -17,6 +18,7 @@ let zxingRunning=false;
 
 function render(){
   renderStaffOptions();
+  renderEventPickOptions();
   renderStaffList();
   renderProductCount();
   renderRecentRegistrationHistory();
@@ -29,8 +31,43 @@ function updateEquipmentMemoUi(){
   const required=el("equipmentMemoRequired");
   const memo=el("memo");
   const isEquipment=el("type")?.value==="備品転用";
+  const isEventPick=el("type")?.value==="event_pick";
   if(required)required.hidden=!isEquipment;
   if(memo)memo.required=isEquipment;
+  const eventLabel=el("eventPickEventLabel");
+  if(eventLabel)eventLabel.hidden=!isEventPick;
+  if(isEventPick&&typeof loadEventPickEvents==="function"&&!eventPickEvents.length){
+    loadEventPickEvents().then(renderEventPickOptions).catch(()=>{});
+  }
+}
+
+async function loadEventPickEvents(){
+  try{
+    eventPickEvents=await sb("booth_events?select=id,name,venue,event_start,event_end,status&status=neq.closed&order=event_start.desc&limit=200");
+    if(!Array.isArray(eventPickEvents))eventPickEvents=[];
+  }catch(e){
+    console.warn("[event pick events load failed]",e);
+    eventPickEvents=[];
+  }
+}
+
+function formatEventPickEventLabel(event){
+  const name=event?.name||"無題イベント";
+  const date=[event?.event_start,event?.event_end].filter(Boolean).join(" - ");
+  const venue=event?.venue?` / ${event.venue}`:"";
+  return `${name}${date?`（${date}）`:""}${venue}`;
+}
+
+function renderEventPickOptions(){
+  const select=el("eventPickEventSelect");
+  if(!select)return;
+  const current=select.value;
+  select.innerHTML='<option value="">イベントを選択</option>'+(eventPickEvents||[]).map(event=>`<option value="${esc(event.id)}">${esc(formatEventPickEventLabel(event))}</option>`).join("");
+  if(current)select.value=current;
+}
+
+function findEventPickEvent(eventId){
+  return (eventPickEvents||[]).find(event=>String(event.id)===String(eventId))||null;
 }
 
 function renderProductCount(){
@@ -312,6 +349,128 @@ async function updateProductCurrentStock(barcode,newStock){
   if(p)p.base_stock=newStock;
 }
 
+async function upsertEventPickEventItem(event,product,qty){
+  const eventId=encodeURIComponent(event.id);
+  const barcode=encodeURIComponent(product.barcode);
+  const rows=await sb(`booth_event_items?select=id,taken_qty,normal_takeout_qty,storage_takeout_qty&event_id=eq.${eventId}&barcode=eq.${barcode}&item_type=eq.normal&limit=1`);
+  const now=new Date().toISOString();
+  if(Array.isArray(rows)&&rows[0]){
+    const currentTaken=Number(rows[0].taken_qty||0);
+    const currentNormal=Number(rows[0].normal_takeout_qty||0);
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(rows[0].id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        product_name:product.name||"",
+        taken_qty:currentTaken+qty,
+        normal_takeout_qty:currentNormal+qty,
+        updated_at:now
+      })
+    });
+    return;
+  }
+  await sb("booth_event_items",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      event_id:event.id,
+      barcode:product.barcode,
+      product_name:product.name||"",
+      item_type:"normal",
+      taken_qty:qty,
+      normal_takeout_qty:qty,
+      storage_takeout_qty:0,
+      updated_at:now
+    }])
+  });
+}
+
+async function insertEventPickMovement(event,product,qty,staff,memo){
+  await sb("booth_stock_movements",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      event_id:event.id,
+      barcode:product.barcode,
+      product_name:product.name||"",
+      item_type:"normal",
+      movement_type:"event_pick",
+      quantity:qty,
+      staff,
+      memo,
+      takeout_source:"normal",
+      affects_smaregi:false,
+      smaregi_delta:0
+    }])
+  });
+}
+
+async function registerEventPickFromInventory({event,product,barcode,qty,staff,memo,currentStock,newStock}){
+  let productUpdated=false;
+  let insertedLogId="";
+  let insertedLog=null;
+  try{
+    await updateProductCurrentStock(barcode,newStock);
+    productUpdated=true;
+
+    insertedLog=await sb("inventory_logs",{
+      method:"POST",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify({
+        type:"event_pick",
+        staff,
+        barcode,
+        product_name:product.name,
+        quantity:qty,
+        memo,
+        event_id:event.id,
+        affects_smaregi:false,
+        smaregi_delta:0
+      })
+    });
+    insertedLogId=Array.isArray(insertedLog)&&insertedLog[0]?String(insertedLog[0].id||""):"";
+
+    await insertEventPickMovement(event,product,qty,staff,memo);
+    await upsertEventPickEventItem(event,product,qty);
+
+    logs.unshift({
+      id:insertedLogId,
+      created_at:Array.isArray(insertedLog)&&insertedLog[0]?insertedLog[0].created_at:new Date().toISOString(),
+      type:"event_pick",
+      staff,
+      barcode,
+      product_name:product.name,
+      quantity:qty,
+      memo,
+      event_id:event.id,
+      affects_smaregi:false,
+      smaregi_delta:0
+    });
+
+    showMessage(`イベントピック登録：${product.name} / イベント：${event.name||"-"} / 数量 ${qty} / 通常棚在庫 ${newStock}`,"ok");
+    showPopup("イベントピック登録完了",`イベント名：${event.name||"-"}\n商品名：${product.name}\n数量：${qty}\n通常棚在庫：${newStock}\n担当者：${staff}\nスマレジ在庫：変更しません`);
+
+    el("barcodeInput").value="";
+    el("qty").value="";
+    await renderScanPreview();
+    await showProductHistoryForBarcode(barcode);
+    el("barcodeInput").focus();
+  }catch(e){
+    if(productUpdated){
+      try{await updateProductCurrentStock(barcode,currentStock);}catch(_){}
+    }
+    if(insertedLogId){
+      try{
+        await sb(`inventory_logs?id=eq.${encodeURIComponent(insertedLogId)}`,{
+          method:"DELETE",
+          headers:{Prefer:"return=minimal"}
+        });
+      }catch(_){}
+    }
+    throw e;
+  }
+}
+
 async function registerBarcode(barcode){
   try{
     barcode=String(barcode||"").trim();
@@ -322,10 +481,19 @@ async function registerBarcode(barcode){
     const qtyRaw=el("qty").value.trim();
     const qty=Number(qtyRaw);
     const memo=el("memo").value.trim();
+    const isEventPick=type==="event_pick";
+    const eventPickEventId=String(el("eventPickEventSelect")?.value||"").trim();
+    const eventPickEvent=isEventPick?findEventPickEvent(eventPickEventId):null;
 
     if(!staff){
       showMessage("担当者を選択してください。","err");
       el("staff").focus();
+      return;
+    }
+
+    if(isEventPick&&!eventPickEvent){
+      showMessage("イベントピックするイベントを選択してください。","err");
+      el("eventPickEventSelect")?.focus();
       return;
     }
 
@@ -355,9 +523,24 @@ async function registerBarcode(barcode){
     if(type==="出荷")newStock=currentStock-qty;
     if(type==="備品転用")newStock=currentStock-qty;
     if(type==="在庫修正")newStock=qty;
+    if(isEventPick)newStock=currentStock-qty;
 
-    if((type==="出荷"||type==="備品転用")&&newStock<0){
+    if((type==="出荷"||type==="備品転用"||isEventPick)&&newStock<0){
       showMessage(`在庫不足：${p.name} / 現在庫 ${currentStock} / ${type}数 ${qty}`,"err");
+      return;
+    }
+
+    if(isEventPick){
+      await registerEventPickFromInventory({
+        event:eventPickEvent,
+        product:p,
+        barcode,
+        qty,
+        staff,
+        memo,
+        currentStock,
+        newStock
+      });
       return;
     }
 

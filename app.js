@@ -20,6 +20,10 @@ async function reloadAll(){
       staffMembers=[];
     }
 
+    if(typeof loadEventPickEvents==="function"){
+      await loadEventPickEvents();
+    }
+
     await enrichRecentLogProductNames();
     dataLoaded=true;
     dataLoadError=false;

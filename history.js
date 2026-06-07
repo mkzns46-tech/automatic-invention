@@ -1,5 +1,13 @@
 /* ARICO TOKYO inventory app: history.js */
 
+function inventoryTypeLabel(type){
+  return type==="event_pick"?"イベントピック":String(type||"");
+}
+
+function isInventoryOutType(type){
+  return type==="出荷"||type==="備品転用"||type==="event_pick";
+}
+
 async function loadProductHistoryByBarcode(barcode){
   const productLogs=await sbAll(`inventory_logs?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=created_at.desc`,1000,10000);
   console.log("[Product History Equipment State]",productLogs
@@ -323,7 +331,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
       beforeStock=running-q;
       inQty=q;
       running-=q;
-    }else if(log.type==="出荷"||log.type==="備品転用"){
+    }else if(isInventoryOutType(log.type)){
       beforeStock=running+q;
       outQty=q;
       running+=q;
@@ -351,7 +359,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
 
     return `<tr>
       <td>${fmt(r.log.created_at)}</td>
-      <td>${esc(r.log.type)}</td>
+      <td>${esc(inventoryTypeLabel(r.log.type))}</td>
       <td>${esc(r.log.staff)}</td>
       <td>${esc(p?.name||r.log.product_name||"")}</td>
       <td>${r.beforeStock}</td>
@@ -410,7 +418,7 @@ function buildGlobalHistoryRows(sourceLogs=logs){
       beforeStock=current-q;
       afterStock=current;
       inQty=q;
-    }else if(log.type==="出荷"||log.type==="備品転用"){
+    }else if(isInventoryOutType(log.type)){
       beforeStock=current+q;
       afterStock=current;
       outQty=q;
@@ -421,7 +429,7 @@ function buildGlobalHistoryRows(sourceLogs=logs){
 
     return `<tr>
       <td>${fmt(log.created_at)}</td>
-      <td>${esc(log.type)}</td>
+      <td>${esc(inventoryTypeLabel(log.type))}</td>
       <td>${esc(log.staff)}</td>
       <td>${esc(gp(log.barcode)?.name||log.product_name||"")}</td>
       <td>${beforeStock}</td>
@@ -466,7 +474,7 @@ function buildHistoryExportRows(sourceLogs){
         beforeStock=running-q;
         inQty=q;
         running-=q;
-      }else if(log.type==="出荷"||log.type==="備品転用"){
+      }else if(isInventoryOutType(log.type)){
         beforeStock=running+q;
         outQty=q;
         running+=q;
@@ -479,7 +487,7 @@ function buildHistoryExportRows(sourceLogs){
         created_at:log.created_at,
         row:[
           fmt(log.created_at),
-          log.type||"",
+          inventoryTypeLabel(log.type),
           log.staff||"",
           gp(log.barcode)?.name || log.product_name || "",
           beforeStock,
