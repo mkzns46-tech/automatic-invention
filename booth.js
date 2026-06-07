@@ -641,19 +641,20 @@ async function loadBoothCarryOutHistory(eventId){
   if(!list)return;
   try{
     list.innerHTML='<div class="booth-empty">読み込み中...</div>';
-    const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff&event_id=eq.${encodeURIComponent(eventId)}&movement_type=eq.take_out&item_type=eq.normal&order=created_at.desc&limit=50`);
+    const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,takeout_source&event_id=eq.${encodeURIComponent(eventId)}&movement_type=eq.take_out&item_type=eq.normal&order=created_at.desc&limit=50`);
     if(!Array.isArray(rows)||!rows.length){
       list.innerHTML='<div class="booth-empty">まだ持ち出し履歴はありません。</div>';
       return;
     }
     list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table">
-      <thead><tr><th>日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>担当者</th></tr></thead>
+      <thead><tr><th>日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>担当者</th><th>持ち出し元</th></tr></thead>
       <tbody>${rows.map(row=>`<tr>
         <td>${esc(formatBoothDateTime(row.created_at))}</td>
         <td>${esc(row.product_name||"-")}</td>
         <td>${esc(row.barcode||"-")}</td>
         <td>${esc(row.quantity??"-")}</td>
         <td>${esc(row.staff||"-")}</td>
+        <td>${esc(getBoothCarryOutSourceLabel(getBoothMovementTakeoutSource(row)))}</td>
       </tr>`).join("")}</tbody>
     </table></div>`;
   }catch(e){
@@ -917,6 +918,11 @@ function getBoothCarryOutSourceLabel(source){
   return source==="storage"?"イベント保管在庫":"通常棚";
 }
 
+function getBoothMovementTakeoutSource(row){
+  const value=String(row?.takeout_source||"normal");
+  return value==="storage"?"storage":"normal";
+}
+
 function getBoothCurrentStoreCode(){
   const context=getBoothSalesContext();
   return String(context?.storeCode||"tokyo");
@@ -1009,7 +1015,8 @@ async function registerBoothCarryOut(){
         movement_type:"take_out",
         quantity,
         staff,
-        memo:source==="storage"?`持ち出し元: イベント保管在庫${memo?` / ${memo}`:""}`:memo,
+        memo,
+        takeout_source:source,
         affects_smaregi:false,
         smaregi_delta:0
       }])
@@ -1213,19 +1220,20 @@ async function loadBoothCarryOutHistory(eventId){
   if(!list)return;
   try{
     list.innerHTML='<div class="booth-empty">読み込み中...</div>';
-    const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff&event_id=eq.${encodeURIComponent(eventId)}&movement_type=eq.take_out&item_type=eq.normal&order=created_at.desc&limit=50`);
+    const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,takeout_source&event_id=eq.${encodeURIComponent(eventId)}&movement_type=eq.take_out&item_type=eq.normal&order=created_at.desc&limit=50`);
     if(!Array.isArray(rows)||!rows.length){
       list.innerHTML='<div class="booth-empty">まだ持ち出し履歴はありません。</div>';
       return;
     }
     list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table">
-      <thead><tr><th>日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>担当者</th></tr></thead>
+      <thead><tr><th>日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>担当者</th><th>持ち出し元</th></tr></thead>
       <tbody>${rows.map(row=>`<tr>
         <td>${esc(formatBoothDateTime(row.created_at))}</td>
         <td>${esc(row.product_name||"-")}</td>
         <td>${esc(row.barcode||"-")}</td>
         <td>${esc(row.quantity??"-")}</td>
         <td>${esc(row.staff||"-")}</td>
+        <td>${esc(getBoothCarryOutSourceLabel(getBoothMovementTakeoutSource(row)))}</td>
       </tr>`).join("")}</tbody>
     </table></div>
     <div class="booth-history-cards">
@@ -1238,6 +1246,7 @@ async function loadBoothCarryOutHistory(eventId){
           <span>バーコード：${esc(row.barcode||"-")}</span>
           <span>数量：${esc(row.quantity??"-")}</span>
           <span>担当者：${esc(row.staff||"-")}</span>
+          <span>持ち出し元：${esc(getBoothCarryOutSourceLabel(getBoothMovementTakeoutSource(row)))}</span>
         </div>
       </article>`).join("")}
     </div>`;
@@ -1489,7 +1498,8 @@ async function registerBoothCarryOut(){
         movement_type:"take_out",
         quantity,
         staff,
-        memo:source==="storage"?`持ち出し元: イベント保管在庫${memo?` / ${memo}`:""}`:memo,
+        memo,
+        takeout_source:source,
         affects_smaregi:false,
         smaregi_delta:0
       }])
