@@ -4274,6 +4274,68 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   margin-top:0;
 }
 
+/* Event sales import */
+.booth-sales-context{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin:12px 0;
+}
+.booth-sales-context>div{
+  border:1px solid #dcebe1;
+  border-radius:12px;
+  background:#f8fcf9;
+  padding:10px 12px;
+}
+.booth-sales-context span{
+  display:block;
+  color:#527161;
+  font-size:12px;
+  font-weight:800;
+  margin-bottom:4px;
+}
+.booth-sales-context strong{
+  display:block;
+  color:#073b2a;
+  font-size:14px;
+  overflow-wrap:anywhere;
+}
+.booth-sales-form{
+  display:grid;
+  grid-template-columns:150px 150px minmax(160px,1fr) auto auto auto;
+  gap:10px;
+  align-items:end;
+  margin:12px 0;
+}
+.booth-sales-form label{
+  margin:0;
+}
+.booth-sales-form input,
+.booth-sales-form select{
+  height:40px;
+  min-height:40px;
+  padding:6px 10px;
+  font-size:14px;
+  box-sizing:border-box;
+}
+.booth-sales-form button{
+  min-height:40px;
+  padding:7px 14px;
+  white-space:nowrap;
+}
+.booth-sales-import-summary{
+  margin:10px 0;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#fff7d6;
+  color:#6b4e00;
+  font-weight:900;
+}
+.booth-sales-table th,
+.booth-sales-table td{
+  white-space:nowrap;
+}
+
 @media(max-width:800px){
   .smaregi-context-bar{
     grid-template-columns:1fr;
@@ -4302,5 +4364,31 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   }
   .app-confirm-actions{
     grid-template-columns:1fr;
+  }
+  .booth-sales-context{
+    grid-template-columns:1fr !important;
+    gap:8px !important;
+  }
+  .booth-sales-form{
+    grid-template-columns:1fr !important;
+    gap:8px !important;
+  }
+  .booth-sales-form input,
+  .booth-sales-form select,
+  .booth-sales-form button{
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
+  }
+  .booth-sales-form input,
+  .booth-sales-form select{
+    height:40px !important;
+    min-height:40px !important;
+    font-size:14px !important;
+    padding:6px 10px !important;
+  }
+  .booth-sales-form button{
+    min-height:42px !important;
   }
 }

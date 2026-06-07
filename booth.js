@@ -386,7 +386,7 @@ function switchBoothEventMenu(menu){
     return;
   }
   if(menu==="sales"){
-    confirmBoothSalesImportPreparing(event);
+    renderBoothSalesPanel(event);
     return;
   }
   if(menu==="close"){
@@ -1541,6 +1541,331 @@ async function registerBoothReturn(){
     el("boothReturnBarcode")?.focus();
   }catch(e){
     boothShowError("棚戻し棚卸しエラー","戻り登録に失敗しました。\n"+e.message);
+  }
+}
+
+function getBoothSalesStaffOptions(){
+  return '<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+}
+
+function getBoothSalesContext(){
+  if(typeof getCurrentSmaregiContext==="function")return getCurrentSmaregiContext();
+  return {accountKey:"production",accountName:"スマレジ本番接続",storeCode:"tokyo",storeName:"東京"};
+}
+
+function getBoothSalesContextSummary(event,fromDate,toDate){
+  const context=getBoothSalesContext();
+  return [
+    `接続先：${context.accountName||"スマレジ本番接続"}`,
+    `店舗：${context.storeName||"-"}`,
+    `イベント名：${event?.name||"-"}`,
+    `対象期間：${fromDate||event?.event_start||"-"} ～ ${toDate||event?.event_end||"-"}`
+  ].join("\n");
+}
+
+function getBoothSalesDifference(item,soldAdd=0){
+  const taken=Number(item?.taken_qty||0);
+  const sold=Number(item?.sold_qty||0)+Number(soldAdd||0);
+  const returned=Number(item?.returned_qty||0);
+  const consumed=Number(item?.consumed_qty||0);
+  return taken-sold-returned-consumed;
+}
+
+function renderBoothSalesPanel(event){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  const closed=isBoothEventClosed(event);
+  const context=getBoothSalesContext();
+  const fromDate=String(event.event_start||"").slice(0,10);
+  const toDate=String(event.event_end||event.event_start||"").slice(0,10);
+  const storeBadge=context.storeCode==="aichi"?"AICHI":"TOKYO";
+  area.innerHTML=`
+    <section class="booth-work-card booth-sales-card">
+      <h4>販売取り込み</h4>
+      <p class="section-note">スマレジ販売データを仮取り込みし、確認後にイベント販売数へ反映します。在庫数は変更しません。</p>
+      <div class="booth-sales-context">
+        <div><span>接続先</span><strong>${esc(context.accountName||"スマレジ本番接続")}</strong></div>
+        <div><span>店舗</span><strong>${esc(context.storeName||"-")} / ${esc(storeBadge)}</strong></div>
+        <div><span>イベント名</span><strong>${esc(event.name||"-")}</strong></div>
+        <div><span>対象期間</span><strong>${esc(fromDate||"-")} ～ ${esc(toDate||"-")}</strong></div>
+      </div>
+      <div class="booth-sales-form">
+        <label>開始日
+          <input id="boothSalesFromDate" type="date" value="${esc(fromDate)}" ${closed?"disabled":""}>
+        </label>
+        <label>終了日
+          <input id="boothSalesToDate" type="date" value="${esc(toDate)}" ${closed?"disabled":""}>
+        </label>
+        <label>担当者<span class="required">必須</span>
+          <select id="boothSalesStaff" ${closed?"disabled":""}>${getBoothSalesStaffOptions()}</select>
+        </label>
+        <button type="button" id="boothSalesDraftImportBtn" ${closed?"disabled":""}>仮取り込み</button>
+        <button type="button" id="boothSalesConfirmBtn" class="secondary" ${closed?"disabled":""}>確定して販売数へ反映</button>
+        <button type="button" id="reloadBoothSalesImportBtn" class="secondary">再読み込み</button>
+      </div>
+      <div id="boothSalesImportList" class="booth-sales-import-list">
+        <div class="booth-empty">仮取り込み一覧を読み込み中...</div>
+      </div>
+    </section>`;
+
+  el("boothSalesDraftImportBtn")?.addEventListener("click",importBoothSalesDraft);
+  el("boothSalesConfirmBtn")?.addEventListener("click",confirmBoothSalesImport);
+  el("reloadBoothSalesImportBtn")?.addEventListener("click",()=>loadBoothSalesImports(event.id));
+  loadBoothSalesImports(event.id);
+}
+
+async function fetchBoothEventItems(eventId){
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&order=product_name.asc`);
+  return Array.isArray(rows)?rows:[];
+}
+
+function buildInFilter(values){
+  return values.map(value=>String(value||"").replace(/[(),]/g,"")).filter(Boolean).join(",");
+}
+
+async function fetchBoothProductsForItems(items){
+  const barcodes=[...new Set(items.map(item=>String(item.barcode||"").trim()).filter(Boolean))];
+  if(!barcodes.length)return [];
+  const rows=await sb(`products?select=barcode,name,smaregi_product_id&barcode=in.(${buildInFilter(barcodes)})`);
+  return Array.isArray(rows)?rows:[];
+}
+
+async function fetchExistingBoothSalesImportKeys(eventId){
+  const rows=await sb(`event_sales_imports?select=smaregi_transaction_id,smaregi_detail_id&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed)`);
+  const keys=new Set();
+  (Array.isArray(rows)?rows:[]).forEach(row=>{
+    keys.add(`${row.smaregi_transaction_id}::${row.smaregi_detail_id}`);
+  });
+  return keys;
+}
+
+async function loadBoothSalesImports(eventId){
+  const list=el("boothSalesImportList");
+  if(!list)return;
+  try{
+    list.innerHTML='<div class="booth-empty">仮取り込み一覧を読み込み中...</div>';
+    const [imports,items]=await Promise.all([
+      sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=eq.pending&order=sold_at.asc&limit=500`),
+      fetchBoothEventItems(eventId)
+    ]);
+    renderBoothSalesImports(Array.isArray(imports)?imports:[],items);
+  }catch(e){
+    list.innerHTML='<div class="booth-empty">販売取り込み一覧を読み込めませんでした。</div>';
+    boothShowError("販売取り込みエラー","販売取り込み一覧の読み込みに失敗しました。\nevent_sales_imports SQLが未実行の場合は先に実行してください。\n"+e.message);
+  }
+}
+
+function renderBoothSalesImports(rows,items){
+  const list=el("boothSalesImportList");
+  if(!list)return;
+  const itemMap=new Map((items||[]).map(item=>[String(item.barcode||""),item]));
+  if(!rows.length){
+    list.innerHTML='<div class="booth-empty">未確定の仮取り込みデータはありません。</div>';
+    return;
+  }
+  const tableRows=rows.map(row=>{
+    const item=itemMap.get(String(row.barcode||""))||{};
+    const imported=Number(row.quantity||0);
+    const diff=getBoothSalesDifference(item,imported);
+    return `<tr>
+      <td>${esc(formatBoothDateTime(row.sold_at))}</td>
+      <td>${esc(row.product_name||"-")}</td>
+      <td>${esc(row.barcode||"-")}</td>
+      <td>${esc(row.smaregi_product_id||"-")}</td>
+      <td>${esc(item.taken_qty??0)}</td>
+      <td>${esc(imported)}</td>
+      <td>${esc(item.returned_qty??0)}</td>
+      <td>${esc(diff)}</td>
+      <td>${esc(row.smaregi_transaction_id||"-")} / ${esc(row.smaregi_detail_id||"-")}</td>
+    </tr>`;
+  }).join("");
+  const cardRows=rows.map(row=>{
+    const item=itemMap.get(String(row.barcode||""))||{};
+    const imported=Number(row.quantity||0);
+    const diff=getBoothSalesDifference(item,imported);
+    return `<article class="booth-history-card booth-sales-card-row">
+      <div class="booth-history-card-top">
+        <strong>${esc(row.product_name||"-")}</strong>
+        <span>${esc(formatBoothDateTimeShort(row.sold_at))}</span>
+      </div>
+      <div class="booth-history-card-meta">
+        <span>バーコード：${esc(row.barcode||"-")}</span>
+        <span>スマレジ商品ID：${esc(row.smaregi_product_id||"-")}</span>
+        <span>持ち出し：${esc(item.taken_qty??0)} / 販売候補：${esc(imported)} / 戻り：${esc(item.returned_qty??0)}</span>
+        <span>差異見込み：${esc(diff)}</span>
+        <span>取引：${esc(row.smaregi_transaction_id||"-")} / ${esc(row.smaregi_detail_id||"-")}</span>
+      </div>
+    </article>`;
+  }).join("");
+  list.innerHTML=`
+    <div class="booth-sales-import-summary">未確定 ${esc(rows.length)} 行。確認後に「確定して販売数へ反映」を押してください。</div>
+    <div class="booth-history-table-wrap"><table class="booth-history-table booth-sales-table">
+      <thead><tr><th>販売日時</th><th>商品名</th><th>バーコード</th><th>商品ID</th><th>持ち出し</th><th>販売候補</th><th>戻り</th><th>差異見込み</th><th>取引ID</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table></div>
+    <div class="booth-history-cards">${cardRows}</div>`;
+}
+
+function validateBoothSalesForm(){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    boothShowError("販売取り込みエラー","イベントを開いてから販売取り込みを行ってください。");
+    return null;
+  }
+  if(isBoothEventClosed(event)){
+    showBoothClosedError();
+    return null;
+  }
+  const fromDate=String(el("boothSalesFromDate")?.value||"").trim();
+  const toDate=String(el("boothSalesToDate")?.value||"").trim();
+  const staff=String(el("boothSalesStaff")?.value||"").trim();
+  if(!fromDate||!toDate){
+    boothShowError("販売取り込みエラー","開始日と終了日を入力してください。");
+    return null;
+  }
+  if(fromDate>toDate){
+    boothShowError("販売取り込みエラー","終了日は開始日以降の日付を入力してください。");
+    return null;
+  }
+  if(!staff){
+    boothShowError("販売取り込みエラー","担当者を選択してください。","boothSalesStaff");
+    return null;
+  }
+  return {event,fromDate,toDate,staff};
+}
+
+async function importBoothSalesDraft(){
+  const form=validateBoothSalesForm();
+  if(!form)return;
+  const {event,fromDate,toDate,staff}=form;
+  const context=getBoothSalesContext();
+  const ok=typeof confirmAppAction==="function"
+    ? await confirmAppAction("販売データ仮取り込み確認",`${getBoothSalesContextSummary(event,fromDate,toDate)}\n\nこの条件で販売データを取得します。`,{okText:"仮取り込み"})
+    : true;
+  if(!ok)return;
+
+  try{
+    const items=await fetchBoothEventItems(event.id);
+    if(!items.length){
+      boothShowError("販売取り込みエラー","このイベントには持ち出し済み商品がありません。");
+      return;
+    }
+    const products=await fetchBoothProductsForItems(items);
+    const itemByBarcode=new Map(items.map(item=>[String(item.barcode||""),item]));
+    const itemByProductId=new Map();
+    products.forEach(product=>{
+      const productId=String(product.smaregi_product_id||"").trim();
+      const item=itemByBarcode.get(String(product.barcode||""));
+      if(productId&&item)itemByProductId.set(productId,{...item,smaregi_product_id:productId,product_name:item.product_name||product.name||""});
+    });
+    const productIds=[...itemByProductId.keys()];
+    if(!productIds.length){
+      boothShowError("販売取り込みエラー","持ち出し済み商品のスマレジ商品IDが見つかりません。商品マスターを再取り込みしてください。");
+      return;
+    }
+
+    const response=await fetch("/api/smaregi-event-sales",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        ...(typeof getSmaregiRequestContext==="function"?getSmaregiRequestContext():context),
+        storeCode:context.storeCode,
+        fromDate,
+        toDate,
+        smaregiProductIds:productIds
+      })
+    });
+    const body=await response.json().catch(()=>null);
+    if(!response.ok)throw new Error(body?.error||`スマレジ販売データ取得エラー ${response.status}`);
+
+    const existingKeys=await fetchExistingBoothSalesImportKeys(event.id);
+    const now=new Date().toISOString();
+    const rows=(body.sales||[]).map(sale=>{
+      const item=itemByProductId.get(String(sale.smaregi_product_id||""));
+      if(!item)return null;
+      const key=`${sale.smaregi_transaction_id}::${sale.smaregi_detail_id}`;
+      if(existingKeys.has(key))return null;
+      return {
+        event_id:event.id,
+        smaregi_transaction_id:String(sale.smaregi_transaction_id||""),
+        smaregi_detail_id:String(sale.smaregi_detail_id||""),
+        smaregi_product_id:String(sale.smaregi_product_id||""),
+        barcode:item.barcode,
+        product_name:item.product_name||sale.product_name||"",
+        quantity:Number(sale.quantity||0),
+        sold_at:sale.sold_at||null,
+        store_code:context.storeCode,
+        smaregi_store_id:body.context?.storeId||null,
+        import_status:"pending",
+        imported_by:staff,
+        imported_at:now,
+        updated_at:now
+      };
+    }).filter(row=>row&&row.smaregi_transaction_id&&row.smaregi_detail_id&&row.quantity>0);
+
+    if(rows.length){
+      await sb("event_sales_imports",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify(rows)
+      });
+    }
+    await loadBoothSalesImports(event.id);
+    boothShowSuccess("販売データ仮取り込み完了",`仮取り込み ${rows.length} 行を保存しました。確定するまで販売数には反映されません。`);
+  }catch(e){
+    boothShowError("販売取り込みエラー","販売データの仮取り込みに失敗しました。\n"+e.message);
+  }
+}
+
+async function confirmBoothSalesImport(){
+  const form=validateBoothSalesForm();
+  if(!form)return;
+  const {event,fromDate,toDate,staff}=form;
+  try{
+    const pending=await sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(event.id)}&import_status=eq.pending&order=sold_at.asc&limit=500`);
+    const rows=Array.isArray(pending)?pending:[];
+    if(!rows.length){
+      boothShowError("販売取り込みエラー","確定待ちの仮取り込みデータがありません。");
+      return;
+    }
+    const ok=typeof confirmAppAction==="function"
+      ? await confirmAppAction("販売取り込み確定確認",`${getBoothSalesContextSummary(event,fromDate,toDate)}\n\n未確定 ${rows.length} 行を販売数へ反映します。`,{okText:"確定"})
+      : true;
+    if(!ok)return;
+
+    const items=await fetchBoothEventItems(event.id);
+    const itemByBarcode=new Map(items.map(item=>[String(item.barcode||""),item]));
+    const addByBarcode=new Map();
+    rows.forEach(row=>{
+      const barcode=String(row.barcode||"");
+      addByBarcode.set(barcode,(addByBarcode.get(barcode)||0)+Number(row.quantity||0));
+    });
+    for(const [barcode,addQty] of addByBarcode.entries()){
+      const item=itemByBarcode.get(barcode);
+      if(!item)continue;
+      const nextSold=Number(item.sold_qty||0)+Number(addQty||0);
+      await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+        method:"PATCH",
+        body:JSON.stringify({
+          sold_qty:nextSold,
+          difference_qty:getBoothSalesDifference(item,addQty),
+          updated_at:new Date().toISOString()
+        })
+      });
+    }
+    await sb(`event_sales_imports?event_id=eq.${encodeURIComponent(event.id)}&import_status=eq.pending`,{
+      method:"PATCH",
+      body:JSON.stringify({
+        import_status:"confirmed",
+        confirmed_by:staff,
+        confirmed_at:new Date().toISOString(),
+        updated_at:new Date().toISOString()
+      })
+    });
+    await loadBoothSalesImports(event.id);
+    boothShowSuccess("販売取り込み確定完了","販売数をイベント集計へ反映しました。スマレジ在庫・東京在庫は変更していません。");
+  }catch(e){
+    boothShowError("販売取り込み確定エラー","販売取り込みの確定に失敗しました。\n"+e.message);
   }
 }
 

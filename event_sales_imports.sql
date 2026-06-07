@@ -1,0 +1,33 @@
+create table if not exists public.event_sales_imports (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references public.booth_events(id) on delete cascade,
+  smaregi_transaction_id text not null,
+  smaregi_detail_id text not null,
+  smaregi_product_id text not null,
+  barcode text not null,
+  product_name text not null,
+  quantity integer not null check (quantity > 0),
+  sold_at timestamptz,
+  store_code text not null,
+  smaregi_store_id text,
+  import_status text not null default 'pending'
+    check (import_status in ('pending','confirmed','cancelled')),
+  imported_by text,
+  imported_at timestamptz,
+  confirmed_by text,
+  confirmed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (event_id, smaregi_transaction_id, smaregi_detail_id)
+);
+
+create index if not exists event_sales_imports_event_status_idx
+  on public.event_sales_imports(event_id, import_status);
+
+create index if not exists event_sales_imports_event_barcode_idx
+  on public.event_sales_imports(event_id, barcode);
+
+create index if not exists event_sales_imports_store_sold_at_idx
+  on public.event_sales_imports(store_code, sold_at);
+
+grant select, insert, update on public.event_sales_imports to anon, authenticated;
