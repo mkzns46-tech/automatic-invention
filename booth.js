@@ -1523,8 +1523,7 @@ async function updateBoothReturnHistoryQuantity(movementId,barcode){
     await sb(`booth_stock_movements?id=eq.${encodeURIComponent(movementId)}`,{
       method:"PATCH",
       body:JSON.stringify({
-        quantity,
-        updated_at:new Date().toISOString()
+        quantity
       })
     });
     await recalculateBoothReturnedQty(event.id,barcode);
