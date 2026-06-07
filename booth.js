@@ -15,6 +15,7 @@ let boothNoScanTimer=null;
 let boothCurrentVideoTrack=null;
 let boothProductPreviewTimer=null;
 let boothScanTarget="carry-out";
+let boothEventRegisterSettings=[];
 
 function showBoothManagement(){
   showInventoryScreen("booth");
@@ -1553,6 +1554,105 @@ function getBoothSalesContext(){
   return {accountKey:"production",accountName:"スマレジ本番接続",storeCode:"tokyo",storeName:"東京"};
 }
 
+function getBoothStoreName(storeCode){
+  return storeCode==="aichi"?"愛知":"東京";
+}
+
+async function loadBoothEventRegisterSettings(){
+  const rows=await sb("event_register_settings?select=*&order=store_code.asc");
+  boothEventRegisterSettings=Array.isArray(rows)?rows:[];
+  return boothEventRegisterSettings;
+}
+
+function getBoothEventRegisterSetting(storeCode){
+  const code=String(storeCode||"tokyo");
+  return boothEventRegisterSettings.find(row=>String(row.store_code)===code)||{
+    store_code:code,
+    register_name:`${getBoothStoreName(code)}イベントレジ`,
+    register_id:"",
+    terminal_id:""
+  };
+}
+
+function getBoothEventRegisterValue(storeCode,key){
+  const setting=getBoothEventRegisterSetting(storeCode);
+  return String(setting?.[key]||"");
+}
+
+function setBoothEventRegisterFormValues(){
+  ["tokyo","aichi"].forEach(code=>{
+    const prefix=code==="aichi"?"aichi":"tokyo";
+    const setting=getBoothEventRegisterSetting(code);
+    const name=el(`${prefix}EventRegisterName`);
+    const registerId=el(`${prefix}EventRegisterId`);
+    const terminalId=el(`${prefix}EventTerminalId`);
+    if(name)name.value=setting.register_name||`${getBoothStoreName(code)}イベントレジ`;
+    if(registerId)registerId.value=setting.register_id||"";
+    if(terminalId)terminalId.value=setting.terminal_id||"";
+  });
+}
+
+async function renderBoothEventRegisterSettings(){
+  if(!el("eventRegisterSettingsForm"))return;
+  try{
+    await loadBoothEventRegisterSettings();
+    setBoothEventRegisterFormValues();
+  }catch(e){
+    const msg=el("eventRegisterSettingsMessage");
+    if(msg){
+      msg.textContent="イベントレジ設定を読み込めませんでした。\n"+e.message;
+      msg.className="message err";
+    }
+  }
+}
+
+async function saveBoothEventRegisterSettings(event){
+  event?.preventDefault?.();
+  if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
+  const now=new Date().toISOString();
+  const rows=[
+    {
+      store_code:"tokyo",
+      register_name:String(el("tokyoEventRegisterName")?.value||"東京イベントレジ").trim()||"東京イベントレジ",
+      register_id:String(el("tokyoEventRegisterId")?.value||"").trim(),
+      terminal_id:String(el("tokyoEventTerminalId")?.value||"").trim(),
+      updated_at:now
+    },
+    {
+      store_code:"aichi",
+      register_name:String(el("aichiEventRegisterName")?.value||"愛知イベントレジ").trim()||"愛知イベントレジ",
+      register_id:String(el("aichiEventRegisterId")?.value||"").trim(),
+      terminal_id:String(el("aichiEventTerminalId")?.value||"").trim(),
+      updated_at:now
+    }
+  ];
+  try{
+    await sb("event_register_settings?on_conflict=store_code",{
+      method:"POST",
+      headers:{Prefer:"resolution=merge-duplicates,return=representation"},
+      body:JSON.stringify(rows)
+    });
+    await loadBoothEventRegisterSettings();
+    const msg=el("eventRegisterSettingsMessage");
+    if(msg){
+      msg.textContent="イベント販売用レジ設定を保存しました。";
+      msg.className="message ok";
+    }
+    if(typeof showMessage==="function")showMessage("イベント販売用レジ設定を保存しました。","ok");
+  }catch(e){
+    if(typeof showMessage==="function")showMessage("イベント販売用レジ設定の保存に失敗しました。\n"+e.message,"err");
+  }
+}
+
+function bindBoothEventRegisterSettings(){
+  const form=el("eventRegisterSettingsForm");
+  if(form&&!form.dataset.bound){
+    form.dataset.bound="1";
+    form.addEventListener("submit",saveBoothEventRegisterSettings);
+  }
+  renderBoothEventRegisterSettings();
+}
+
 function getBoothSalesContextSummary(event,fromDate,toDate){
   const context=getBoothSalesContext();
   const register=getBoothSalesTargetRegister();
@@ -1567,17 +1667,40 @@ function getBoothSalesContextSummary(event,fromDate,toDate){
 
 function getBoothSalesTargetRegister(){
   const context=getBoothSalesContext();
-  const code=String(el("boothSalesTargetRegister")?.value||"event").trim()||"event";
-  const storeName=context.storeName||"";
+  const select=el("boothSalesTargetRegister");
+  const option=select?.selectedOptions?.[0];
+  const code=String(select?.value||"event").trim()||"event";
+  const setting=getBoothEventRegisterSetting(context.storeCode);
   return {
     code,
-    name:code==="event" ? `${storeName}イベントレジ` : code
+    name:option?.dataset.registerName||setting.register_name||`${context.storeName||""}イベントレジ`,
+    registerId:option?.dataset.registerId||setting.register_id||"",
+    terminalId:option?.dataset.terminalId||setting.terminal_id||""
   };
 }
 
 function getBoothSalesTargetRegisterOptions(){
   const context=getBoothSalesContext();
-  return `<option value="event">${esc(context.storeName||"")}イベントレジ</option>`;
+  const setting=getBoothEventRegisterSetting(context.storeCode);
+  const name=setting.register_name||`${context.storeName||""}イベントレジ`;
+  return `<option value="event" data-register-name="${esc(name)}" data-register-id="${esc(setting.register_id||"")}" data-terminal-id="${esc(setting.terminal_id||"")}">${esc(name)}</option>`;
+}
+
+function updateBoothSalesRegisterDisplay(){
+  const context=getBoothSalesContext();
+  const select=el("boothSalesTargetRegister");
+  const display=el("boothSalesTargetRegisterDisplay");
+  if(select)select.innerHTML=getBoothSalesTargetRegisterOptions();
+  const register=getBoothSalesTargetRegister();
+  if(display)display.textContent=register.name;
+  const note=el("boothSalesRegisterStatus");
+  if(note){
+    const ready=Boolean(register.terminalId||register.registerId);
+    note.textContent=ready
+      ? `対象レジID設定済み：${register.name}`
+      : `イベント販売用レジIDが未設定です：${context.storeName||"-"}`;
+    note.className=ready ? "message ok booth-sales-register-status" : "message err booth-sales-register-status";
+  }
 }
 
 function getBoothSalesDifference(item,soldAdd=0){
@@ -1603,7 +1726,7 @@ function renderBoothSalesPanel(event){
       <div class="booth-sales-context">
         <div><span>接続先</span><strong>${esc(context.accountName||"スマレジ本番接続")}</strong></div>
         <div><span>店舗</span><strong>${esc(context.storeName||"-")} / ${esc(storeBadge)}</strong></div>
-        <div><span>販売取込対象レジ</span><strong>${esc(context.storeName||"")}イベントレジ</strong></div>
+        <div><span>販売取込対象レジ</span><strong id="boothSalesTargetRegisterDisplay">${esc(getBoothEventRegisterSetting(context.storeCode).register_name||`${context.storeName||""}イベントレジ`)}</strong></div>
         <div><span>イベント名</span><strong>${esc(event.name||"-")}</strong></div>
         <div><span>対象期間</span><strong>${esc(fromDate||"-")} ～ ${esc(toDate||"-")}</strong></div>
       </div>
@@ -1627,12 +1750,14 @@ function renderBoothSalesPanel(event){
       <div id="boothSalesImportList" class="booth-sales-import-list">
         <div class="booth-empty">仮取り込み一覧を読み込み中...</div>
       </div>
+      <div id="boothSalesRegisterStatus" class="message"></div>
       <p class="section-note booth-sales-register-note">店舗IDだけでは取り込みません。イベント販売用レジIDが未設定の場合、仮取り込みは実行できません。</p>
     </section>`;
 
   el("boothSalesDraftImportBtn")?.addEventListener("click",importBoothSalesDraft);
   el("boothSalesConfirmBtn")?.addEventListener("click",confirmBoothSalesImport);
   el("reloadBoothSalesImportBtn")?.addEventListener("click",()=>loadBoothSalesImports(event.id));
+  loadBoothEventRegisterSettings().then(updateBoothSalesRegisterDisplay).catch(()=>updateBoothSalesRegisterDisplay());
   loadBoothSalesImports(event.id);
 }
 
@@ -1748,6 +1873,10 @@ function validateBoothSalesForm(){
     boothShowError("販売取り込みエラー","販売取込対象レジを選択してください。","boothSalesTargetRegister");
     return null;
   }
+  if(!register.terminalId&&!register.registerId){
+    boothShowError("販売取り込みエラー","イベント販売用レジIDが未設定です","boothSalesTargetRegister");
+    return null;
+  }
   if(!fromDate||!toDate){
     boothShowError("販売取り込みエラー","開始日と終了日を入力してください。");
     return null;
@@ -1800,6 +1929,9 @@ async function importBoothSalesDraft(){
         ...(typeof getSmaregiRequestContext==="function"?getSmaregiRequestContext():context),
         storeCode:context.storeCode,
         targetRegisterCode:register.code,
+        targetRegisterName:register.name,
+        targetRegisterId:register.registerId,
+        targetTerminalId:register.terminalId||register.registerId,
         fromDate,
         toDate,
         smaregiProductIds:productIds

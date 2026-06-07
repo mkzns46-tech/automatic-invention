@@ -287,6 +287,7 @@ function requireInventoryPrivilegedAccess(){
 function showInventorySettings(){
   if(!unlockInventoryScreen("settings"))return;
   showInventoryScreen("settings");
+  if(typeof bindBoothEventRegisterSettings==="function")bindBoothEventRegisterSettings();
 }
 
 function showInventorySettingsSection(menuKey,targetId){

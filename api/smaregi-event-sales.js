@@ -27,11 +27,9 @@ function resolveSmaregiContext(body = {}) {
   const storePrefix = storeCode === "aichi" ? "AICHI" : "TOKYO";
   const storeName = storeCode === "aichi" ? "愛知" : "東京";
   const targetRegisterCode = normalizeKey(body.targetRegisterCode || body.registerCode, "event");
-  const eventRegisterId = env(
-    `SMAREGI_${storePrefix}_EVENT_REGISTER_ID`,
-    `SMAREGI_${storePrefix}_EVENT_TERMINAL_ID`
-  );
-  const eventRegisterName = env(`SMAREGI_${storePrefix}_EVENT_REGISTER_NAME`) || `${storeName}イベントレジ`;
+  const targetRegisterId = String(body.targetRegisterId || body.registerId || "").trim();
+  const targetTerminalId = String(body.targetTerminalId || body.terminalId || targetRegisterId || "").trim();
+  const targetRegisterName = String(body.targetRegisterName || body.registerName || `${storeName}イベントレジ`).trim();
   const storeId = env(
     `SMAREGI_${storePrefix}_STORE_ID`,
     storeCode === "tokyo" ? "SMAREGI_STORE_ID" : ""
@@ -44,9 +42,9 @@ function resolveSmaregiContext(body = {}) {
     storeName,
     storeId,
     targetRegisterCode: targetRegisterCode === "event" ? "event" : targetRegisterCode,
-    targetRegisterName: eventRegisterName,
-    targetRegisterId: eventRegisterId,
-    targetTerminalId: eventRegisterId,
+    targetRegisterName,
+    targetRegisterId,
+    targetTerminalId,
     clientId: env("SMAREGI_CLIENT_ID"),
     clientSecret: env("SMAREGI_CLIENT_SECRET"),
     contractId: env("SMAREGI_CONTRACT_ID", "SMAREGI_CONTRACTID"),
