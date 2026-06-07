@@ -4336,6 +4336,30 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 .booth-sales-table td{
   white-space:nowrap;
 }
+.event-register-settings-form fieldset{
+  border:1px solid #dcebe1;
+  border-radius:14px;
+  padding:14px;
+  margin:0;
+  background:#f8fcf9;
+}
+.event-register-settings-form legend{
+  color:#073b2a;
+  font-weight:900;
+  padding:0 6px;
+}
+.event-register-settings-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+}
+.event-register-settings-form input{
+  width:100%;
+  box-sizing:border-box;
+}
+.booth-sales-register-status{
+  margin-top:10px;
+}
 
 @media(max-width:800px){
   .smaregi-context-bar{
@@ -4391,5 +4415,8 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   }
   .booth-sales-form button{
     min-height:42px !important;
+  }
+  .event-register-settings-grid{
+    grid-template-columns:1fr !important;
   }
 }

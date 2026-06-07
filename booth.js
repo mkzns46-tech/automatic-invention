@@ -1645,12 +1645,52 @@ async function saveBoothEventRegisterSettings(event){
 }
 
 function bindBoothEventRegisterSettings(){
+  ensureBoothEventRegisterSettingsCard();
   const form=el("eventRegisterSettingsForm");
   if(form&&!form.dataset.bound){
     form.dataset.bound="1";
     form.addEventListener("submit",saveBoothEventRegisterSettings);
   }
   renderBoothEventRegisterSettings();
+}
+
+function ensureBoothEventRegisterSettingsCard(){
+  if(el("eventRegisterSettingsCard"))return;
+  const productImport=el("productImportCard");
+  const parent=productImport?.parentElement||document.querySelector("main.grid");
+  if(!parent)return;
+  const section=document.createElement("section");
+  section.className="card event-register-settings-card";
+  section.id="eventRegisterSettingsCard";
+  section.dataset.inventoryScreen="settings";
+  section.innerHTML=`
+    <div class="section-title">
+      <div>
+        <h2>イベント販売用レジ設定</h2>
+        <p class="section-note">販売取り込み対象にするイベントレジを店舗ごとに設定します。未設定の場合、販売取り込みは実行できません。</p>
+      </div>
+    </div>
+    <form id="eventRegisterSettingsForm" class="event-register-settings-form">
+      <div class="event-register-settings-grid">
+        <fieldset>
+          <legend>東京イベントレジ</legend>
+          <label>レジ名<input id="tokyoEventRegisterName" placeholder="東京イベントレジ"></label>
+          <label>register_id<input id="tokyoEventRegisterId" placeholder="後で登録"></label>
+          <label>terminal_id<input id="tokyoEventTerminalId" placeholder="後で登録"></label>
+        </fieldset>
+        <fieldset>
+          <legend>愛知イベントレジ</legend>
+          <label>レジ名<input id="aichiEventRegisterName" placeholder="愛知イベントレジ"></label>
+          <label>register_id<input id="aichiEventRegisterId" placeholder="後で登録"></label>
+          <label>terminal_id<input id="aichiEventTerminalId" placeholder="後で登録"></label>
+        </fieldset>
+      </div>
+      <button type="submit">イベントレジ設定を保存</button>
+    </form>
+    <div id="eventRegisterSettingsMessage" class="message"></div>`;
+  if(productImport)productImport.insertAdjacentElement("afterend",section);
+  else parent.appendChild(section);
+  if(document.body.dataset.inventoryScreen!=="settings")section.hidden=true;
 }
 
 function getBoothSalesContextSummary(event,fromDate,toDate){

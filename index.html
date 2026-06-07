@@ -62,6 +62,32 @@
   <p class="section-note">例外対応用のCSV取り込みです。通常はスマレジ商品マスター取込を使用してください。</p>
   <div class="button-row"><label class="file-button">⬆ CSV追加・更新<input type="file" id="csvFile" accept=".csv,text/csv"/></label><button id="downloadSampleCsvBtn" class="secondary">サンプルCSVをダウンロード</button></div>
 </details></section>
+<section class="card event-register-settings-card" id="eventRegisterSettingsCard" data-inventory-screen="settings" hidden>
+  <div class="section-title">
+    <div>
+      <h2>イベント販売用レジ設定</h2>
+      <p class="section-note">販売取り込み対象にするイベントレジを店舗ごとに設定します。未設定の場合、販売取り込みは実行できません。</p>
+    </div>
+  </div>
+  <form id="eventRegisterSettingsForm" class="event-register-settings-form">
+    <div class="event-register-settings-grid">
+      <fieldset>
+        <legend>東京イベントレジ</legend>
+        <label>レジ名<input id="tokyoEventRegisterName" placeholder="東京イベントレジ"></label>
+        <label>register_id<input id="tokyoEventRegisterId" placeholder="後で登録"></label>
+        <label>terminal_id<input id="tokyoEventTerminalId" placeholder="後で登録"></label>
+      </fieldset>
+      <fieldset>
+        <legend>愛知イベントレジ</legend>
+        <label>レジ名<input id="aichiEventRegisterName" placeholder="愛知イベントレジ"></label>
+        <label>register_id<input id="aichiEventRegisterId" placeholder="後で登録"></label>
+        <label>terminal_id<input id="aichiEventTerminalId" placeholder="後で登録"></label>
+      </fieldset>
+    </div>
+    <button type="submit">イベントレジ設定を保存</button>
+  </form>
+  <div id="eventRegisterSettingsMessage" class="message"></div>
+</section>
 <section id="smaregiAccuracyPanel" class="card smaregi-accuracy-card" data-inventory-screen="analytics" hidden>
   <div class="section-title">
     <div>
