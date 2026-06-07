@@ -4376,6 +4376,83 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   font-size:13px !important;
   white-space:nowrap;
 }
+.booth-diff-filters{
+  display:grid;
+  grid-template-columns:minmax(220px,1fr) auto auto;
+  gap:10px;
+  align-items:end;
+  margin:10px 0;
+}
+.booth-diff-filters label{
+  margin:0;
+}
+.booth-diff-check{
+  display:flex !important;
+  align-items:center;
+  gap:8px;
+  min-height:40px;
+  font-weight:900;
+}
+.booth-diff-check input{
+  width:auto !important;
+  min-height:0 !important;
+}
+.booth-diff-summary{
+  margin:10px 0;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#f0f7f2;
+  color:#1b4332;
+  font-weight:800;
+}
+.booth-diff-table{
+  min-width:1120px;
+}
+.booth-diff-table th,
+.booth-diff-table td{
+  vertical-align:top;
+}
+.booth-diff-status{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  padding:4px 10px;
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.booth-diff-status.is-ok{
+  background:#dcfce7;
+  color:#166534;
+}
+.booth-diff-status.is-warn{
+  background:#fef3c7;
+  color:#92400e;
+}
+.booth-diff-status.is-over{
+  background:#fee2e2;
+  color:#991b1b;
+}
+.booth-diff-row.is-warn,
+.booth-diff-item-card.is-warn{
+  background:#fffbeb;
+}
+.booth-diff-row.is-over,
+.booth-diff-item-card.is-over{
+  background:#fff1f2;
+}
+.booth-diff-memo{
+  width:220px;
+  min-height:58px !important;
+  padding:8px 10px !important;
+  font-size:13px !important;
+  box-sizing:border-box !important;
+}
+.booth-diff-save-btn{
+  min-height:36px !important;
+  white-space:nowrap;
+}
 
 @media(max-width:800px){
   .smaregi-context-bar{
@@ -4434,6 +4511,23 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   }
   .event-register-settings-grid{
     grid-template-columns:1fr !important;
+  }
+  .booth-diff-filters{
+    grid-template-columns:1fr !important;
+    gap:8px !important;
+  }
+  .booth-diff-filters input,
+  .booth-diff-filters button{
+    width:100% !important;
+    max-width:100% !important;
+    box-sizing:border-box !important;
+  }
+  .booth-diff-memo{
+    width:100% !important;
+    min-height:72px !important;
+  }
+  .booth-diff-save-btn{
+    width:100% !important;
   }
   .booth-return-history-card .booth-history-table{
     display:table !important;

@@ -390,6 +390,10 @@ function switchBoothEventMenu(menu){
     renderBoothSalesPanel(event);
     return;
   }
+  if(menu==="diff"){
+    renderBoothDiffPanel(event);
+    return;
+  }
   if(menu==="close"){
     confirmBoothEventClosePreparing(event);
     return;
@@ -1111,6 +1115,10 @@ function switchBoothEventMenu(menu){
   }
   if(menu==="sales"){
     renderBoothSalesPanel(event);
+    return;
+  }
+  if(menu==="diff"){
+    renderBoothDiffPanel(event);
     return;
   }
   if(menu==="close"){
@@ -1863,6 +1871,11 @@ async function fetchBoothEventItems(eventId){
   return Array.isArray(rows)?rows:[];
 }
 
+async function fetchBoothDiffEventItems(eventId){
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo,updated_at&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&order=product_name.asc`);
+  return Array.isArray(rows)?rows:[];
+}
+
 function buildInFilter(values){
   return values.map(value=>String(value||"").replace(/[(),]/g,"")).filter(Boolean).join(",");
 }
@@ -1872,6 +1885,158 @@ async function fetchBoothProductsForItems(items){
   if(!barcodes.length)return [];
   const rows=await sb(`products?select=barcode,name,smaregi_product_id&barcode=in.(${buildInFilter(barcodes)})`);
   return Array.isArray(rows)?rows:[];
+}
+
+function calculateBoothItemDifference(item){
+  return Number(item?.taken_qty||0)-Number(item?.sold_qty||0)-Number(item?.returned_qty||0)-Number(item?.consumed_qty||0);
+}
+
+function getBoothDiffStatus(item){
+  const diff=calculateBoothItemDifference(item);
+  const taken=Number(item?.taken_qty||0);
+  const sold=Number(item?.sold_qty||0);
+  const returned=Number(item?.returned_qty||0);
+  if(diff===0)return {label:"差異なし",className:"is-ok"};
+  if(diff>0){
+    if(sold===0&&returned<taken)return {label:"不足 / 要確認 / 販売未取込の可能性",className:"is-warn"};
+    return {label:"不足 / 要確認",className:"is-warn"};
+  }
+  return {label:"過剰戻り / 要確認",className:"is-over"};
+}
+
+function renderBoothDiffPanel(event){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  area.innerHTML=`
+    <section class="booth-work-card booth-diff-card">
+      <h4>差異確認</h4>
+      <p class="section-note">イベント内の商品ごとに、持ち出し数・販売数・戻り数・消費数・差異数を確認します。スマレジ在庫・東京在庫は変更しません。</p>
+      <div class="booth-diff-filters">
+        <label>商品名・バーコード検索
+          <input id="boothDiffSearch" autocomplete="off" placeholder="商品名またはバーコード">
+        </label>
+        <label class="booth-diff-check">
+          <input id="boothDiffOnly" type="checkbox">
+          差異ありのみ表示
+        </label>
+        <button type="button" id="boothDiffReloadBtn" class="secondary">再読み込み</button>
+      </div>
+      <div id="boothDiffList" class="booth-diff-list">
+        <div class="booth-empty">読み込み中...</div>
+      </div>
+    </section>`;
+  el("boothDiffSearch")?.addEventListener("input",()=>loadBoothDiffList(event.id));
+  el("boothDiffOnly")?.addEventListener("change",()=>loadBoothDiffList(event.id));
+  el("boothDiffReloadBtn")?.addEventListener("click",()=>loadBoothDiffList(event.id));
+  loadBoothDiffList(event.id);
+}
+
+async function loadBoothDiffList(eventId){
+  const list=el("boothDiffList");
+  if(!list)return;
+  try{
+    list.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    const items=await fetchBoothDiffEventItems(eventId);
+    const products=await fetchBoothProductsForItems(items);
+    const productMap=new Map((products||[]).map(product=>[String(product.barcode||""),product]));
+    const keyword=String(el("boothDiffSearch")?.value||"").trim().toLowerCase();
+    const diffOnly=Boolean(el("boothDiffOnly")?.checked);
+    let rows=(items||[]).map(item=>{
+      const product=productMap.get(String(item.barcode||""))||{};
+      const diff=calculateBoothItemDifference(item);
+      return {...item,smaregi_product_id:product.smaregi_product_id||"",difference_qty:diff};
+    });
+    if(keyword){
+      rows=rows.filter(row=>{
+        return String(row.product_name||"").toLowerCase().includes(keyword)
+          || String(row.barcode||"").toLowerCase().includes(keyword)
+          || String(row.smaregi_product_id||"").toLowerCase().includes(keyword);
+      });
+    }
+    if(diffOnly)rows=rows.filter(row=>calculateBoothItemDifference(row)!==0);
+    renderBoothDiffList(rows);
+  }catch(e){
+    list.innerHTML='<div class="booth-empty">差異確認を読み込めませんでした。</div>';
+    boothShowError("差異確認エラー","差異確認の読み込みに失敗しました。\n"+e.message);
+  }
+}
+
+function renderBoothDiffList(rows){
+  const list=el("boothDiffList");
+  if(!list)return;
+  if(!rows.length){
+    list.innerHTML='<div class="booth-empty">表示対象の商品はありません。</div>';
+    return;
+  }
+  const tableRows=rows.map(row=>{
+    const status=getBoothDiffStatus(row);
+    const diff=calculateBoothItemDifference(row);
+    return `<tr class="booth-diff-row ${esc(status.className)}">
+      <td>${esc(row.product_name||"-")}</td>
+      <td>${esc(row.barcode||"-")}</td>
+      <td>${esc(row.smaregi_product_id||"-")}</td>
+      <td>${esc(row.taken_qty??0)}</td>
+      <td>${esc(row.sold_qty??0)}</td>
+      <td>${esc(row.returned_qty??0)}</td>
+      <td>${esc(row.consumed_qty??0)}</td>
+      <td><strong>${esc(diff)}</strong></td>
+      <td><span class="booth-diff-status ${esc(status.className)}">${esc(status.label)}</span></td>
+      <td><textarea id="boothDiffMemo_${esc(row.id)}" class="booth-diff-memo" placeholder="差異確認メモ">${esc(row.diff_memo||"")}</textarea></td>
+      <td>${esc(formatBoothDateTime(row.updated_at))}</td>
+      <td><button type="button" class="secondary booth-diff-save-btn" data-diff-item-id="${esc(row.id)}">メモ保存</button></td>
+    </tr>`;
+  }).join("");
+  const cardRows=rows.map(row=>{
+    const status=getBoothDiffStatus(row);
+    const diff=calculateBoothItemDifference(row);
+    return `<article class="booth-history-card booth-diff-item-card ${esc(status.className)}">
+      <div class="booth-history-card-top">
+        <strong>${esc(row.product_name||"-")}</strong>
+        <span class="booth-diff-status ${esc(status.className)}">${esc(status.label)}</span>
+      </div>
+      <div class="booth-history-card-meta">
+        <span>バーコード：${esc(row.barcode||"-")}</span>
+        <span>スマレジ商品ID：${esc(row.smaregi_product_id||"-")}</span>
+        <span>持ち出し：${esc(row.taken_qty??0)} / 販売：${esc(row.sold_qty??0)} / 戻り：${esc(row.returned_qty??0)} / 消費：${esc(row.consumed_qty??0)}</span>
+        <span>差異：${esc(diff)}</span>
+        <span>最終更新：${esc(formatBoothDateTimeShort(row.updated_at))}</span>
+      </div>
+      <textarea id="boothDiffMemoCard_${esc(row.id)}" class="booth-diff-memo" placeholder="差異確認メモ">${esc(row.diff_memo||"")}</textarea>
+      <button type="button" class="secondary booth-diff-save-btn" data-diff-item-id="${esc(row.id)}">メモ保存</button>
+    </article>`;
+  }).join("");
+  list.innerHTML=`
+    <div class="booth-diff-summary">表示 ${esc(rows.length)} 件。差異数は「持ち出し - 販売 - 戻り - 消費」で表示しています。</div>
+    <div class="booth-history-table-wrap"><table class="booth-history-table booth-diff-table">
+      <thead><tr><th>商品名</th><th>バーコード</th><th>商品ID</th><th>持ち出し</th><th>販売</th><th>戻り</th><th>消費</th><th>差異</th><th>状態</th><th>メモ</th><th>最終更新</th><th>操作</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table></div>
+    <div class="booth-history-cards">${cardRows}</div>`;
+  list.querySelectorAll("[data-diff-item-id]").forEach(button=>{
+    button.addEventListener("click",()=>saveBoothDiffMemo(button.dataset.diffItemId));
+  });
+}
+
+async function saveBoothDiffMemo(itemId){
+  itemId=String(itemId||"").trim();
+  const memoEl=el(`boothDiffMemo_${itemId}`)||el(`boothDiffMemoCard_${itemId}`);
+  const memo=String(memoEl?.value||"").trim();
+  if(!itemId){
+    boothShowError("差異メモ保存エラー","保存対象の商品が見つかりません。");
+    return;
+  }
+  try{
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(itemId)}`,{
+      method:"PATCH",
+      body:JSON.stringify({
+        diff_memo:memo,
+        updated_at:new Date().toISOString()
+      })
+    });
+    boothShowSuccess("差異メモ保存完了","差異確認メモを保存しました。");
+  }catch(e){
+    boothShowError("差異メモ保存エラー","差異確認メモの保存に失敗しました。\n"+e.message);
+  }
 }
 
 async function fetchExistingBoothSalesImportKeys(eventId){
