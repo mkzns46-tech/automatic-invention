@@ -467,6 +467,14 @@ function calculateBoothGachaConsumed(item){
   return Math.max(0,Number(item?.taken_qty||0)-Number(item?.returned_qty||0));
 }
 
+function getBoothCloseShelfReturnQty(item){
+  const shelfQty=Number(item?.shelf_return_qty||0);
+  const storageQty=Number(item?.event_storage_qty||0);
+  const returnedQty=Number(item?.returned_qty||0);
+  if(shelfQty>0||storageQty>0)return shelfQty;
+  return returnedQty;
+}
+
 function mergeBoothCloseRows(normalItems,gachaItems,products){
   const productMap=new Map((products||[]).map(product=>[String(product.barcode||""),product]));
   const rowsByBarcode=new Map();
@@ -485,6 +493,7 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
       returned_qty:Number(item.returned_qty||0),
       shelf_return_qty:Number(item.shelf_return_qty||0),
       event_storage_qty:Number(item.event_storage_qty||0),
+      shelf_return_effective_qty:getBoothCloseShelfReturnQty(item),
       consumed_qty:Number(item.consumed_qty||0),
       difference_qty:calculateBoothItemDifference(item),
       diff_memo:item.diff_memo||"",
@@ -510,6 +519,7 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
       returned_qty:0,
       shelf_return_qty:0,
       event_storage_qty:0,
+      shelf_return_effective_qty:0,
       consumed_qty:0,
       difference_qty:0,
       diff_memo:"",
@@ -533,13 +543,13 @@ async function loadBoothCloseSummary(event){
   const rows=mergeBoothCloseRows(normalItems||[],gachaItems||[],products||[]);
   const diffRows=rows.filter(row=>Number(row.difference_qty||0)!==0);
   const unconfirmedRows=diffRows.filter(row=>!String(row.diff_memo||"").trim());
-  const shelfReturnPendingRows=rows.filter(row=>Number(row.shelf_return_qty||0)>0&&!row.shelf_return_reflected);
+  const shelfReturnPendingRows=rows.filter(row=>Number(row.shelf_return_effective_qty||0)>0&&!row.shelf_return_reflected);
   return {
     rows,
     diffItemCount:diffRows.length,
     diffTotal:diffRows.reduce((sum,row)=>sum+Math.abs(Number(row.difference_qty||0)),0),
     unconfirmedCount:unconfirmedRows.length,
-    shelfReturnPendingQty:shelfReturnPendingRows.reduce((sum,row)=>sum+Number(row.shelf_return_qty||0),0),
+    shelfReturnPendingQty:shelfReturnPendingRows.reduce((sum,row)=>sum+Number(row.shelf_return_effective_qty||0),0),
     shelfReturnPendingRows
   };
 }
@@ -565,7 +575,7 @@ function renderBoothCloseConfirmPanel(event,summary){
       <td><strong>${esc(row.taken_qty)}</strong></td>
       <td>${esc(row.sold_qty)}</td>
       <td>${esc(row.returned_qty)}</td>
-      <td>${esc(row.shelf_return_qty)}</td>
+      <td>${esc(row.shelf_return_effective_qty)}</td>
       <td>${esc(row.event_storage_qty)}</td>
       <td>${esc(row.gacha_pick_qty||0)}</td>
       <td>${esc(row.gacha_return_qty||0)}</td>
@@ -579,7 +589,7 @@ function renderBoothCloseConfirmPanel(event,summary){
       <div class="booth-history-card-meta">
         <span>バーコード：${esc(row.barcode||"-")}</span>
         <span>持ち出し：${esc(row.taken_qty)}（通常 ${esc(row.normal_takeout_qty)} / 保管 ${esc(row.storage_takeout_qty)}）</span>
-        <span>販売：${esc(row.sold_qty)} / 棚戻し：${esc(row.returned_qty)} / イベント保管：${esc(row.event_storage_qty)}</span>
+        <span>販売：${esc(row.sold_qty)} / 棚戻し：${esc(row.returned_qty)} / 通常棚戻し：${esc(row.shelf_return_effective_qty)} / イベント保管：${esc(row.event_storage_qty)}</span>
         <span>ガチャ：ピック ${esc(row.gacha_pick_qty||0)} / 戻り ${esc(row.gacha_return_qty||0)} / 消費 ${esc(row.gacha_consumed_qty||0)}</span>
         <span>メモ：${esc(row.diff_memo||"-")}</span>
       </div>
@@ -668,7 +678,7 @@ async function confirmBoothEventClose(event){
 async function reflectBoothShelfReturnsOnClose(summary,staff){
   const now=new Date().toISOString();
   for(const item of summary.shelfReturnPendingRows){
-    const qty=Number(item.shelf_return_qty||0);
+    const qty=Number(item.shelf_return_effective_qty||0);
     if(qty<=0||!item.id||!item.barcode)continue;
     const product=await findBoothProductByBarcode(item.barcode);
     if(!product)throw new Error(`通常棚へ戻す商品が見つかりません：${item.barcode}`);
