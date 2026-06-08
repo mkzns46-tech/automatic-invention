@@ -792,6 +792,7 @@ async function executeEquipmentTransferConfirmation({log,product=null,quantity,c
   const logId=String(log.id||"").trim();
   let smaregiAdjusted=false;
   let productUpdated=false;
+  let currentStock=null;
 
   await runWithSmaregiAutoRefreshPaused(async()=>{
     try{
@@ -804,11 +805,11 @@ async function executeEquipmentTransferConfirmation({log,product=null,quantity,c
       quantity=Number(latestLog.quantity||quantity||0);
       if(!Number.isInteger(quantity)||quantity<=0)throw new Error("数量は1以上で入力してください。");
 
-      product=product||await fetchProductByBarcode(latestLog.barcode);
+      product=product&&product.smaregi_product_id ? product : await fetchProductByBarcode(latestLog.barcode);
       if(!product)throw new Error("商品が見つかりません。");
       if(!product.smaregi_product_id)throw new Error("スマレジ商品IDが未登録です。商品マスターを再取り込みしてください。");
 
-      const currentStock=Number(product.base_stock||0);
+      currentStock=Number(product.base_stock||0);
       const nextStock=currentStock-quantity;
       if(nextStock<0)throw new Error(`在庫不足：${product.name} / 現在庫 ${currentStock} / 備品転用数 ${quantity}`);
 
@@ -850,7 +851,7 @@ async function executeEquipmentTransferConfirmation({log,product=null,quantity,c
       if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
     }catch(e){
       if(productUpdated){
-        try{await updateProductCurrentStock(log.barcode,Number(product?.base_stock||0)+quantity);}catch(_){}
+        try{await updateProductCurrentStock(log.barcode,currentStock);}catch(_){}
       }
       if(smaregiAdjusted){
         await reverseEquipmentTransferSmaregiStock(product,quantity,`ARICO備品転用ロールバック ${log.product_name||product.name||""}`);

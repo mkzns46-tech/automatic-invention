@@ -1,11 +1,27 @@
 /* ARICO TOKYO inventory app: history.js */
 
 function inventoryTypeLabel(type){
-  return type==="event_pick"?"イベントピック":String(type||"");
+  const labels={
+    event_pick:"イベントピック",
+    equipment_transfer:"備品転用",
+    gacha_pick:"ガチャピック",
+    gacha_return:"ガチャ戻り"
+  };
+  return labels[type]||String(type||"");
 }
 
 function isInventoryOutType(type){
-  return type==="出荷"||type==="備品転用"||type==="event_pick";
+  return type==="出荷"||type==="備品転用"||type==="equipment_transfer"||type==="event_pick"||type==="gacha_pick";
+}
+
+function isInventoryInType(type){
+  return type==="入荷"||type==="gacha_return";
+}
+
+function inventoryTypeMatchesFilter(logType,filterType){
+  if(!filterType)return true;
+  if(filterType==="備品転用")return logType==="備品転用"||logType==="equipment_transfer";
+  return logType===filterType;
 }
 
 async function loadProductHistoryByBarcode(barcode){
@@ -327,7 +343,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
     let inQty="";
     let outQty="";
 
-    if(log.type==="入荷"){
+    if(isInventoryInType(log.type)){
       beforeStock=running-q;
       inQty=q;
       running-=q;
@@ -380,7 +396,7 @@ function getFilteredGlobalLogs(){
   const memo=String(el("historyMemoFilter")?.value||"").trim().toLowerCase();
   return logs.filter(log=>{
     const productName=String(gp(log.barcode)?.name||log.product_name||"").toLowerCase();
-    return (!type||log.type===type)
+    return inventoryTypeMatchesFilter(log.type,type)
       &&(!product||productName.includes(product))
       &&(!staff||String(log.staff||"").toLowerCase().includes(staff))
       &&(!memo||String(log.memo||"").toLowerCase().includes(memo));
@@ -414,7 +430,7 @@ function buildGlobalHistoryRows(sourceLogs=logs){
 
     const current=Number(gp(log.barcode)?.base_stock||0);
 
-    if(log.type==="入荷"){
+    if(isInventoryInType(log.type)){
       beforeStock=current-q;
       afterStock=current;
       inQty=q;
@@ -470,7 +486,7 @@ function buildHistoryExportRows(sourceLogs){
       let inQty="";
       let outQty="";
 
-      if(log.type==="入荷"){
+      if(isInventoryInType(log.type)){
         beforeStock=running-q;
         inQty=q;
         running-=q;
@@ -495,7 +511,7 @@ function buildHistoryExportRows(sourceLogs){
           outQty,
           afterStock,
           log.memo||"",
-          log.type==="備品転用" ? (isEquipmentTransferChecked(log) ? "確認済" : "未確認") : "",
+          (log.type==="備品転用"||log.type==="equipment_transfer") ? (isEquipmentTransferChecked(log) ? "確認済" : "未確認") : "",
           log.equipment_checked_by||"",
           log.equipment_checked_at ? fmt(log.equipment_checked_at) : ""
         ]
