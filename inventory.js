@@ -7,6 +7,7 @@ let selectedBarcode="";
 let dataLoaded=false;
 let dataLoadError=false;
 let eventPickEvents=[];
+let equipmentTransferLogCache=new Map();
 
 let videoStream=null;
 let detector=null;
@@ -674,7 +675,9 @@ function isEquipmentTransferChecked(log){
 
 function equipmentCheckHtml(log){
   if(log.type!=="備品転用"&&log.type!=="equipment_transfer")return "";
-  const logId=esc(log.id||"");
+  const rawLogId=String(log.id||"");
+  if(rawLogId)equipmentTransferLogCache.set(rawLogId,log);
+  const logId=esc(rawLogId);
   if(isEquipmentTransferChecked(log)){
     return `<div class="equipment-check-cell" data-log-id="${logId}"><span class="equipment-check-status is-checked">確認済</span><small>${esc(log.equipment_checked_by||"")} / ${fmt(log.equipment_checked_at)}</small></div>`;
   }
@@ -785,19 +788,34 @@ function showEquipmentTransferConfirmPopup({log,product,quantity,checkedBy,onOk}
   document.body.appendChild(popup);
 }
 
-async function executeEquipmentTransferConfirmation({log,product,quantity,checkedBy,button}){
+async function executeEquipmentTransferConfirmation({log,product=null,quantity,checkedBy,button}){
   const logId=String(log.id||"").trim();
-  const currentStock=Number(product.base_stock||0);
-  const nextStock=currentStock-quantity;
   let smaregiAdjusted=false;
   let productUpdated=false;
 
   await runWithSmaregiAutoRefreshPaused(async()=>{
     try{
+      const latestRows=await sb(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`);
+      const latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : null;
+      if(!latestLog)throw new Error(`備品転用履歴が見つかりません。inventory_logs.id=${logId}`);
+      if(isEquipmentTransferChecked(latestLog))throw new Error("この備品転用は確認済みです。");
+      if(latestLog.type!=="備品転用")throw new Error("備品転用の履歴ではありません。");
+
+      quantity=Number(latestLog.quantity||quantity||0);
+      if(!Number.isInteger(quantity)||quantity<=0)throw new Error("数量は1以上で入力してください。");
+
+      product=product||await fetchProductByBarcode(latestLog.barcode);
+      if(!product)throw new Error("商品が見つかりません。");
+      if(!product.smaregi_product_id)throw new Error("スマレジ商品IDが未登録です。商品マスターを再取り込みしてください。");
+
+      const currentStock=Number(product.base_stock||0);
+      const nextStock=currentStock-quantity;
+      if(nextStock<0)throw new Error(`在庫不足：${product.name} / 現在庫 ${currentStock} / 備品転用数 ${quantity}`);
+
       await adjustEquipmentTransferSmaregiStock(product,quantity,`ARICO備品転用 ${log.product_name||product.name||""}`);
       smaregiAdjusted=true;
 
-      await updateProductCurrentStock(log.barcode,nextStock);
+      await updateProductCurrentStock(latestLog.barcode,nextStock);
       productUpdated=true;
 
       const equipment_checked_at=new Date().toISOString();
@@ -818,20 +836,21 @@ async function executeEquipmentTransferConfirmation({log,product,quantity,checke
       if(!refreshedLog)throw new Error(`備品転用履歴を更新できませんでした。inventory_logs.id=${logId}`);
 
       const displayLog={...refreshedLog,type:"備品転用"};
+      equipmentTransferLogCache.set(logId,displayLog);
       replaceEquipmentConfirmationDom(logId,displayLog);
       logs=(logs||[]).some(item=>String(item.id)===String(logId))
         ? logs.map(item=>String(item.id)===String(logId) ? displayLog : item)
         : [displayLog,...logs];
 
       showMessage(`備品転用を確定しました：${product.name} / 数量 ${quantity}`,"ok");
-      showPopup("備品転用完了",`商品名：${product.name}\nバーコード：${log.barcode}\n数量：${quantity}\n現在庫：${nextStock}\nスマレジ在庫：減算済み`);
+      showPopup("備品転用完了",`商品名：${product.name}\nバーコード：${latestLog.barcode}\n数量：${quantity}\n現在庫：${nextStock}\nスマレジ在庫：減算済み`);
       renderGlobalHistory();
       if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode,displayLog);
       replaceEquipmentConfirmationDom(logId,displayLog);
       if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
     }catch(e){
       if(productUpdated){
-        try{await updateProductCurrentStock(log.barcode,currentStock);}catch(_){}
+        try{await updateProductCurrentStock(log.barcode,Number(product?.base_stock||0)+quantity);}catch(_){}
       }
       if(smaregiAdjusted){
         await reverseEquipmentTransferSmaregiStock(product,quantity,`ARICO備品転用ロールバック ${log.product_name||product.name||""}`);
@@ -856,9 +875,8 @@ async function confirmEquipmentTransfer(logId,button=null){
     return;
   }
   try{
-    const rows=await sb(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`);
-    const log=Array.isArray(rows)&&rows[0] ? rows[0] : null;
-    if(!log)throw new Error(`備品転用履歴が見つかりません。inventory_logs.id=${logId}`);
+    const log=equipmentTransferLogCache.get(logId)||null;
+    if(!log)throw new Error("画面上の備品転用履歴を取得できません。再読み込みしてください。");
     if(isEquipmentTransferChecked(log)){
       showMessage("この備品転用は確認済みです。","err");
       replaceEquipmentConfirmationDom(logId,log);
@@ -869,19 +887,12 @@ async function confirmEquipmentTransfer(logId,button=null){
     const quantity=Number(log.quantity||0);
     if(!Number.isInteger(quantity)||quantity<=0)throw new Error("数量は1以上で入力してください。");
 
-    const product=await fetchProductByBarcode(log.barcode);
-    if(!product)throw new Error("商品が見つかりません。");
-    if(!product.smaregi_product_id)throw new Error("スマレジ商品IDが未登録です。商品マスターを再取り込みしてください。");
-
-    const currentStock=Number(product.base_stock||0);
-    if(currentStock-quantity<0)throw new Error(`在庫不足：${product.name} / 現在庫 ${currentStock} / 備品転用数 ${quantity}`);
-
     showEquipmentTransferConfirmPopup({
       log,
-      product,
+      product:{name:log.product_name,barcode:log.barcode},
       quantity,
       checkedBy,
-      onOk:()=>executeEquipmentTransferConfirmation({log,product,quantity,checkedBy,button})
+      onOk:()=>executeEquipmentTransferConfirmation({log,quantity,checkedBy,button})
     });
   }catch(e){
     showMessage("備品転用確認エラー。\n"+e.message,"err");
