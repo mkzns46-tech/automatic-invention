@@ -399,7 +399,7 @@ function switchBoothEventMenu(menu){
     return;
   }
   if(menu==="storage"){
-    renderBoothStoragePanel(event);
+    renderBoothReturnPanel(event);
     return;
   }
   if(menu==="close"){
@@ -463,6 +463,45 @@ function isBoothShelfReturnReflected(item){
     || Boolean(item?.shelf_return_reflected_at);
 }
 
+function getBoothExplicitReturnProcessType(item){
+  const value=String(item?.return_process_type||"").toLowerCase().trim();
+  return value==="storage"||value==="shelf"?value:"";
+}
+
+function getBoothReturnProcessType(item){
+  const explicit=getBoothExplicitReturnProcessType(item);
+  if(explicit)return explicit;
+  if(Number(item?.event_storage_qty||0)>0)return "storage";
+  if(Number(item?.shelf_return_qty||0)>0)return "shelf";
+  return "";
+}
+
+function getBoothReturnProcessLabel(type){
+  return String(type||"")==="storage"?"イベント保管":"通常棚へ戻す";
+}
+
+function isBoothReturnReflected(item){
+  return item?.return_reflected===true
+    || String(item?.return_reflected||"").toLowerCase()==="true"
+    || Boolean(item?.return_reflected_at)
+    || isBoothShelfReturnReflected(item);
+}
+
+function getBoothReturnReflectedQty(item){
+  if(item?.return_reflected_qty!==undefined&&item?.return_reflected_qty!==null){
+    return Number(item.return_reflected_qty||0);
+  }
+  return getBoothShelfReturnReflectedQty(item);
+}
+
+function getBoothReturnReflectQty(item){
+  return Number(item?.returned_qty||0);
+}
+
+function getBoothReturnReflectDelta(item){
+  return getBoothReturnReflectQty(item)-getBoothReturnReflectedQty(item);
+}
+
 function calculateBoothGachaConsumed(item){
   return Math.max(0,Number(item?.taken_qty||0)-Number(item?.returned_qty||0));
 }
@@ -505,6 +544,11 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
       shelf_return_qty:Number(item.shelf_return_qty||0),
       event_storage_qty:Number(item.event_storage_qty||0),
       shelf_return_effective_qty:getBoothCloseShelfReturnQty(item),
+      return_process_type:getBoothReturnProcessType(item),
+      return_process_label:getBoothReturnProcessLabel(getBoothReturnProcessType(item)),
+      return_reflected:isBoothReturnReflected(item),
+      return_reflected_qty:getBoothReturnReflectedQty(item),
+      return_reflect_qty:getBoothReturnReflectQty(item),
       consumed_qty:Number(item.consumed_qty||0),
       difference_qty:calculateBoothItemDifference(item),
       diff_memo:item.diff_memo||"",
@@ -532,6 +576,11 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
       shelf_return_qty:0,
       event_storage_qty:0,
       shelf_return_effective_qty:0,
+      return_process_type:"",
+      return_process_label:"-",
+      return_reflected:false,
+      return_reflected_qty:0,
+      return_reflect_qty:0,
       consumed_qty:0,
       difference_qty:0,
       diff_memo:"",
@@ -550,20 +599,24 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
 
 async function loadBoothCloseSummary(event){
   const eventId=encodeURIComponent(event.id);
-  const normalItems=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,shelf_return_reflected_by,updated_at&event_id=eq.${eventId}&item_type=eq.normal&order=product_name.asc`);
+  const normalItems=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,shelf_return_reflected_by,return_process_type,return_reflected,return_reflected_qty,return_reflected_at,return_reflected_by,updated_at&event_id=eq.${eventId}&item_type=eq.normal&order=product_name.asc`);
   const gachaItems=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,difference_qty,updated_at&event_id=eq.${eventId}&item_type=eq.gacha_prize&order=product_name.asc`);
   const products=await fetchBoothProductsForItems([...(normalItems||[]),...(gachaItems||[])]);
   const rows=mergeBoothCloseRows(normalItems||[],gachaItems||[],products||[]);
   const diffRows=rows.filter(row=>Number(row.difference_qty||0)!==0);
   const unconfirmedRows=diffRows.filter(row=>!String(row.diff_memo||"").trim());
-  const shelfReturnPendingRows=rows.filter(row=>getBoothShelfReturnReflectDelta(row)!==0);
+  const returnPendingRows=rows.filter(row=>getBoothReturnReflectDelta(row)!==0);
+  const unprocessedReturnRows=rows.filter(row=>Number(row.returned_qty||0)>0&&!getBoothReturnProcessType(row));
   return {
     rows,
     diffItemCount:diffRows.length,
     diffTotal:diffRows.reduce((sum,row)=>sum+Math.abs(Number(row.difference_qty||0)),0),
     unconfirmedCount:unconfirmedRows.length,
-    shelfReturnPendingQty:shelfReturnPendingRows.reduce((sum,row)=>sum+getBoothShelfReturnReflectDelta(row),0),
-    shelfReturnPendingRows
+    shelfReturnPendingQty:returnPendingRows.reduce((sum,row)=>sum+getBoothReturnReflectDelta(row),0),
+    shelfReturnPendingRows:returnPendingRows,
+    returnPendingRows,
+    unprocessedReturnRows,
+    unprocessedReturnCount:unprocessedReturnRows.length
   };
 }
 
@@ -660,6 +713,10 @@ async function confirmBoothEventClose(event){
       return;
     }
     const summary=await loadBoothCloseSummary(latestEvent);
+    if(summary.unprocessedReturnCount>0){
+      boothShowError("イベント締めエラー","戻り在庫の処理方法が未選択の商品があります。先に戻り在庫処理で「通常棚へ戻す」または「イベント保管にする」を選択してください。");
+      return;
+    }
     const body=[
       "このイベントを締めます。",
       "締め後は編集・削除できません。",
@@ -689,19 +746,47 @@ async function confirmBoothEventClose(event){
 
 async function reflectBoothShelfReturnsOnClose(summary,staff){
   const now=new Date().toISOString();
-  for(const item of summary.shelfReturnPendingRows){
-    const effectiveQty=Number(item.shelf_return_effective_qty||0);
-    const delta=getBoothShelfReturnReflectDelta(item);
+  for(const item of summary.returnPendingRows||summary.shelfReturnPendingRows||[]){
+    const processType=getBoothReturnProcessType(item);
+    const effectiveQty=getBoothReturnReflectQty(item);
+    const delta=getBoothReturnReflectDelta(item);
     if(delta===0||!item.id||!item.barcode)continue;
-    await adjustBoothProductBaseStock(item.barcode,delta);
+    if(!processType)throw new Error("戻り在庫の処理方法が未選択の商品があります。");
+    if(processType==="storage"){
+      await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),item,delta);
+      await sb("event_storage_movements",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify([{
+          event_id:item.event_id||boothCurrentEventId||null,
+          store_code:getBoothCurrentStoreCode(),
+          smaregi_product_id:item.smaregi_product_id?String(item.smaregi_product_id):null,
+          barcode:item.barcode,
+          product_name:item.product_name||"",
+          movement_type:delta>0?"storage_in":"adjustment",
+          quantity:Math.abs(delta),
+          staff,
+          memo:delta>0?"イベント締め時に戻り在庫をイベント保管へ反映":`イベント締め再反映 ${delta}`
+        }])
+      });
+    }else{
+      await adjustBoothProductBaseStock(item.barcode,delta);
+    }
     await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
       method:"PATCH",
       headers:{Prefer:"return=minimal"},
       body:JSON.stringify({
-        shelf_return_reflected:effectiveQty>0,
-        shelf_return_reflected_qty:effectiveQty,
-        shelf_return_reflected_at:effectiveQty>0?now:null,
-        shelf_return_reflected_by:effectiveQty>0?staff:null,
+        return_process_type:processType,
+        return_reflected:effectiveQty>0,
+        return_reflected_qty:effectiveQty,
+        return_reflected_at:effectiveQty>0?now:null,
+        return_reflected_by:effectiveQty>0?staff:null,
+        shelf_return_qty:processType==="shelf"?effectiveQty:0,
+        event_storage_qty:processType==="storage"?effectiveQty:0,
+        shelf_return_reflected:processType==="shelf"&&effectiveQty>0,
+        shelf_return_reflected_qty:processType==="shelf"?effectiveQty:0,
+        shelf_return_reflected_at:processType==="shelf"&&effectiveQty>0?now:null,
+        shelf_return_reflected_by:processType==="shelf"&&effectiveQty>0?staff:null,
         updated_at:now
       })
     });
@@ -709,11 +794,12 @@ async function reflectBoothShelfReturnsOnClose(summary,staff){
 }
 
 async function loadBoothReflectedShelfReturnRows(eventId){
-  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,returned_qty,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&or=(shelf_return_reflected.eq.true,shelf_return_reflected_qty.gt.0)&order=product_name.asc`);
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,returned_qty,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,return_process_type,return_reflected,return_reflected_qty,return_reflected_at&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&or=(return_reflected.eq.true,return_reflected_qty.gt.0,shelf_return_reflected.eq.true,shelf_return_reflected_qty.gt.0)&order=product_name.asc`);
   return (Array.isArray(rows)?rows:[]).map(row=>({
     ...row,
     shelf_return_effective_qty:getBoothCloseShelfReturnQty(row),
-    shelf_return_reflected_qty:getBoothShelfReturnReflectedQty(row)
+    shelf_return_reflected_qty:getBoothShelfReturnReflectedQty(row),
+    return_reflected_qty:getBoothReturnReflectedQty(row)
   }));
 }
 
@@ -721,14 +807,36 @@ async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
   const now=new Date().toISOString();
   const reflectedRows=await loadBoothReflectedShelfReturnRows(eventId);
   for(const item of reflectedRows){
-    const qty=Number(item.shelf_return_reflected_qty||0);
-    if(qty>0&&item.barcode){
+    const processType=getBoothReturnProcessType(item)||"shelf";
+    const qty=getBoothReturnReflectedQty(item);
+    if(qty>0&&item.barcode&&processType==="storage"){
+      await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),item,-qty);
+      await sb("event_storage_movements",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify([{
+          event_id:eventId,
+          store_code:getBoothCurrentStoreCode(),
+          smaregi_product_id:item.smaregi_product_id?String(item.smaregi_product_id):null,
+          barcode:item.barcode,
+          product_name:item.product_name||"",
+          movement_type:"adjustment",
+          quantity:qty,
+          staff,
+          memo:"締め解除によりイベント保管反映を取消"
+        }])
+      });
+    }else if(qty>0&&item.barcode){
       await adjustBoothProductBaseStock(item.barcode,-qty);
     }
     await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
       method:"PATCH",
       headers:{Prefer:"return=minimal"},
       body:JSON.stringify({
+        return_reflected:false,
+        return_reflected_qty:0,
+        return_reflected_at:null,
+        return_reflected_by:null,
         shelf_return_reflected:false,
         shelf_return_reflected_qty:0,
         shelf_return_reflected_at:null,
@@ -737,7 +845,7 @@ async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
       })
     });
   }
-  return reflectedRows.reduce((sum,row)=>sum+Number(row.shelf_return_reflected_qty||0),0);
+  return reflectedRows.reduce((sum,row)=>sum+getBoothReturnReflectedQty(row),0);
 }
 
 async function finalizeBoothEventClose(event,summary,staff){
@@ -1553,8 +1661,7 @@ function renderBoothEventDetail(event){
       <button type="button" class="booth-event-menu-btn" data-booth-menu="gacha">ガチャ管理</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="sales">販売取り込み</button>
-      <button type="button" class="booth-event-menu-btn" data-booth-menu="return">棚戻し棚卸し</button>
-      <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">イベント保管</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="return">戻り在庫処理</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="diff">差異確認</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="close">イベント締め</button>
     </div>
@@ -1668,7 +1775,7 @@ function switchBoothEventMenu(menu){
     return;
   }
   if(menu==="storage"){
-    renderBoothStoragePanel(event);
+    renderBoothReturnPanel(event);
     return;
   }
   if(menu==="close"){
@@ -1889,18 +1996,152 @@ function renderBoothReturnPanel(event){
       <div id="boothReturnHistoryList" class="booth-carry-history-list">
         <div class="booth-empty">読み込み中...</div>
       </div>
+    </section>
+    <section class="booth-work-card booth-return-process-card">
+      <div class="booth-list-header">
+        <h4>戻り在庫処理</h4>
+        <button type="button" id="reloadBoothReturnProcessBtn" class="secondary">再読み込み</button>
+      </div>
+      <p class="section-note">戻り棚卸し数を、イベント全体で「通常棚へ戻す」または「イベント保管にする」のどちらかに決めます。実際の在庫反映はイベント締め時に行います。</p>
+      <div class="booth-scan-row booth-return-process-row">
+        <label>処理方法
+          <select id="boothReturnProcessType" ${closed?"disabled":""}>
+            <option value="">処理方法を選択</option>
+            <option value="shelf">通常棚へ戻す</option>
+            <option value="storage">イベント保管にする</option>
+          </select>
+        </label>
+        <label>担当者<span class="required">必須</span>
+          <select id="boothReturnProcessStaff" ${closed?"disabled":""}>${staffOptions}</select>
+        </label>
+        <label>メモ
+          <input id="boothReturnProcessMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}>
+        </label>
+        <button type="button" id="boothReturnProcessSaveBtn" ${closed?"disabled":""}>戻り先を保存</button>
+      </div>
+      <div id="boothReturnProcessList" class="booth-carry-history-list">
+        <div class="booth-empty">読み込み中...</div>
+      </div>
     </section>`;
   el("boothReturnBarcode")?.addEventListener("input",clearBoothReturnPreview);
   el("boothReturnQty")?.addEventListener("input",()=>previewBoothReturnProduct({popupOnError:false}));
   el("boothReturnPreviewBtn")?.addEventListener("click",()=>previewBoothReturnProduct({popupOnError:true}));
   el("boothReturnRegisterBtn")?.addEventListener("click",registerBoothReturn);
   el("reloadBoothReturnHistoryBtn")?.addEventListener("click",()=>loadBoothReturnHistory(event.id));
+  el("reloadBoothReturnProcessBtn")?.addEventListener("click",()=>loadBoothReturnProcessList(event.id));
+  el("boothReturnProcessSaveBtn")?.addEventListener("click",()=>saveBoothReturnProcess(event));
   el("boothReturnStartCameraBtn")?.addEventListener("click",()=>{
     boothScanTarget="return";
     startBoothCarryOutCamera();
   });
   el("boothReturnStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
   loadBoothReturnHistory(event.id);
+  loadBoothReturnProcessList(event.id);
+}
+
+async function loadBoothReturnProcessList(eventId){
+  const list=el("boothReturnProcessList");
+  if(!list)return;
+  try{
+    list.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,shelf_return_qty,event_storage_qty,return_process_type,return_reflected,return_reflected_qty,updated_at&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&order=product_name.asc`);
+    if(!Array.isArray(rows)||!rows.length){
+      list.innerHTML='<div class="booth-empty">戻り在庫処理の対象商品はありません。</div>';
+      return;
+    }
+    const tableRows=rows.map(row=>{
+      const processType=getBoothReturnProcessType(row);
+      const reflected=isBoothReturnReflected(row);
+      return `<tr>
+        <td>${esc(row.product_name||"-")}</td>
+        <td>${esc(row.barcode||"-")}</td>
+        <td>${esc(row.taken_qty??0)}</td>
+        <td>${esc(row.sold_qty??0)}</td>
+        <td>${esc(row.consumed_qty??0)}</td>
+        <td>${esc(row.returned_qty??0)}</td>
+        <td>${esc(calculateBoothItemDifference(row))}</td>
+        <td>${esc(processType?getBoothReturnProcessLabel(processType):"未選択")}</td>
+        <td>${esc(reflected?"反映済み":"未反映")}</td>
+      </tr>`;
+    }).join("");
+    const cardRows=rows.map(row=>{
+      const processType=getBoothReturnProcessType(row);
+      const reflected=isBoothReturnReflected(row);
+      return `<article class="booth-history-card booth-return-process-item-card">
+        <div class="booth-history-card-top">
+          <strong>${esc(row.product_name||"-")}</strong>
+          <span>${esc(reflected?"反映済み":"未反映")}</span>
+        </div>
+        <div class="booth-history-card-meta">
+          <span>バーコード：${esc(row.barcode||"-")}</span>
+          <span>持ち出し：${esc(row.taken_qty??0)} / 販売：${esc(row.sold_qty??0)} / 戻り：${esc(row.returned_qty??0)}</span>
+          <span>ガチャ消費：${esc(row.consumed_qty??0)} / 差異：${esc(calculateBoothItemDifference(row))}</span>
+          <span>処理方法：${esc(processType?getBoothReturnProcessLabel(processType):"未選択")}</span>
+        </div>
+      </article>`;
+    }).join("");
+    list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table booth-return-process-table">
+      <thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し</th><th>販売</th><th>ガチャ消費</th><th>戻り棚卸し</th><th>差異</th><th>処理方法</th><th>反映状態</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table></div>
+    <div class="booth-history-cards">${cardRows}</div>`;
+  }catch(e){
+    list.innerHTML='<div class="booth-empty">戻り在庫処理を読み込めませんでした。</div>';
+    boothShowError("戻り在庫処理エラー","戻り在庫処理の読み込みに失敗しました。\n"+e.message);
+  }
+}
+
+async function saveBoothReturnProcess(event){
+  if(!event||!event.id){
+    boothShowError("戻り在庫処理エラー","イベントを開いてから操作してください。");
+    return;
+  }
+  if(isBoothEventClosed(event)){
+    showBoothClosedError();
+    return;
+  }
+  const processType=String(el("boothReturnProcessType")?.value||"").trim();
+  const staff=String(el("boothReturnProcessStaff")?.value||"").trim();
+  const memo=String(el("boothReturnProcessMemo")?.value||"").trim();
+  if(processType!=="shelf"&&processType!=="storage"){
+    boothShowError("戻り在庫処理エラー","処理方法を選択してください。","boothReturnProcessType");
+    return;
+  }
+  if(!staff){
+    boothShowError("戻り在庫処理エラー","担当者を選択してください。","boothReturnProcessStaff");
+    return;
+  }
+  try{
+    const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,returned_qty,return_reflected,return_reflected_qty,shelf_return_reflected,shelf_return_reflected_qty&event_id=eq.${encodeURIComponent(event.id)}&item_type=eq.normal&order=product_name.asc`);
+    const items=Array.isArray(rows)?rows:[];
+    if(!items.length){
+      boothShowError("戻り在庫処理エラー","戻り在庫処理の対象商品がありません。");
+      return;
+    }
+    const alreadyReflected=items.filter(item=>isBoothReturnReflected(item));
+    if(alreadyReflected.length){
+      boothShowError("戻り在庫処理エラー","すでに締め反映済みの商品があります。修正する場合は先に締め解除してください。");
+      return;
+    }
+    const now=new Date().toISOString();
+    for(const item of items){
+      const returnedQty=Number(item.returned_qty||0);
+      await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({
+          return_process_type:processType,
+          shelf_return_qty:processType==="shelf"?returnedQty:0,
+          event_storage_qty:processType==="storage"?returnedQty:0,
+          updated_at:now
+        })
+      });
+    }
+    boothShowSuccess("戻り在庫処理完了",`戻り在庫の処理方法を「${getBoothReturnProcessLabel(processType)}」で保存しました。締め時まで在庫は変更しません。`);
+    await loadBoothReturnProcessList(event.id);
+  }catch(e){
+    boothShowError("戻り在庫処理エラー","戻り在庫処理の保存に失敗しました。\n"+e.message);
+  }
 }
 
 async function handleBoothScannedCode(code){
