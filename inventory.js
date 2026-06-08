@@ -678,6 +678,10 @@ function equipmentCheckHtml(log){
   if(isEquipmentTransferChecked(log)){
     return `<div class="equipment-check-cell" data-log-id="${logId}"><span class="equipment-check-status is-checked">確認済</span><small>${esc(log.equipment_checked_by||"")} / ${fmt(log.equipment_checked_at)}</small></div>`;
   }
+  const hasAccess=typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
+  if(!hasAccess){
+    return `<div class="equipment-check-cell" data-log-id="${logId}"><span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${logId}" disabled title="管理者認証後に操作できます">管理者認証が必要</button></div>`;
+  }
   return `<div class="equipment-check-cell" data-log-id="${logId}"><span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${logId}">確認</button></div>`;
 }
 
@@ -840,6 +844,7 @@ async function executeEquipmentTransferConfirmation({log,product,quantity,checke
 async function confirmEquipmentTransfer(logId,button=null){
   logId=String(logId||"").trim();
   console.log("[Equipment Transfer Confirm Click]",{logId});
+  if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
   const checkedBy=getEquipmentConfirmationStaff();
   if(!checkedBy){
     showMessage("確認する担当者を選択してください。","err");
