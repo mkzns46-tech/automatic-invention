@@ -3244,7 +3244,8 @@ function renderBoothStorageList(rows){
 
 function parseBoothStorageQty(inputId,label){
   const raw=String(el(inputId)?.value||"").trim();
-  if(raw===""||!/^\d+$/.test(raw)){
+  if(raw==="")return 0;
+  if(!/^\d+$/.test(raw)){
     boothShowError("イベント保管エラー",`${label}は0以上の整数を入力してください。`,inputId);
     return null;
   }
