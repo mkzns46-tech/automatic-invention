@@ -474,8 +474,6 @@ async function registerEventPickFromInventory({event,product,barcode,qty,staff,m
 async function registerBarcode(barcode){
   try{
     barcode=String(barcode||"").trim();
-    if(!barcode)return;
-
     const type=el("type").value;
     const staff=el("staff").value.trim();
     const qtyRaw=el("qty").value.trim();
@@ -484,6 +482,36 @@ async function registerBarcode(barcode){
     const isEventPick=type==="event_pick";
     const eventPickEventId=String(el("eventPickEventSelect")?.value||"").trim();
     const eventPickEvent=isEventPick?findEventPickEvent(eventPickEventId):null;
+
+    if(isEventPick){
+      if(!eventPickEvent){
+        showMessage("イベント名を選択してください","err");
+        el("eventPickEventSelect")?.focus();
+        return;
+      }
+      if(!staff){
+        showMessage("担当者を選択してください","err");
+        el("staff").focus();
+        return;
+      }
+      if(!barcode){
+        showMessage("バーコードを入力してください","err");
+        el("barcodeInput")?.focus();
+        return;
+      }
+      if(qtyRaw===""){
+        showMessage("数量を入力してください","err");
+        el("qty")?.focus();
+        return;
+      }
+      if(!Number.isFinite(qty)||qty<=0){
+        showMessage("数量は1以上で入力してください","err");
+        el("qty")?.focus();
+        return;
+      }
+    }else if(!barcode){
+      return;
+    }
 
     if(!staff){
       showMessage("担当者を選択してください。","err");
