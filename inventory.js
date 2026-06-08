@@ -35,6 +35,8 @@ function updateEquipmentMemoUi(){
   const memo=el("memo");
   const isEquipment=el("type")?.value==="備品転用";
   const isEventPick=el("type")?.value==="event_pick";
+  const isStockOut=el("type")?.value==="出荷";
+  const canChooseSource=isEventPick||isStockOut;
   if(required)required.hidden=!isEquipment;
   if(memo)memo.required=isEquipment;
   const eventLabel=el("eventPickEventLabel");
@@ -44,8 +46,8 @@ function updateEquipmentMemoUi(){
   }
   const sourceLabel=el("eventPickSourceLabel");
   if(sourceLabel){
-    sourceLabel.hidden=!isEventPick;
-    sourceLabel.style.display=isEventPick?"":"none";
+    sourceLabel.hidden=!canChooseSource;
+    sourceLabel.style.display=canChooseSource?"":"none";
   }
   if(isEventPick&&typeof loadEventPickEvents==="function"&&!eventPickEvents.length){
     loadEventPickEvents().then(renderEventPickOptions).catch(()=>{});
@@ -408,21 +410,34 @@ async function applyEventStoragePick(event,product,qty,staff,memo){
       updated_at:new Date().toISOString()
     })
   });
-  await sb("event_storage_movements",{
-    method:"POST",
-    headers:{Prefer:"return=minimal"},
-    body:JSON.stringify([{
-      event_id:event.id,
-      store_code:storeCode,
-      smaregi_product_id:product.smaregi_product_id||null,
-      barcode:product.barcode,
-      product_name:product.name||"",
-      movement_type:"storage_out",
-      quantity:qty,
-      staff,
-      memo
-    }])
-  });
+  const movementPayload={
+    event_id:event?.id||null,
+    store_code:storeCode,
+    smaregi_product_id:product.smaregi_product_id||null,
+    barcode:product.barcode,
+    product_name:product.name||"",
+    movement_type:"storage_out",
+    quantity:qty,
+    staff,
+    memo
+  };
+  if(event?.id){
+    await sb("event_storage_movements",{
+      method:"POST",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify([movementPayload])
+    });
+  }else{
+    try{
+      await sb("event_storage_movements",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify([movementPayload])
+      });
+    }catch(e){
+      console.warn("[event storage movement skipped]",e);
+    }
+  }
   return {storeCode,currentStorage,nextStorage};
 }
 
@@ -578,6 +593,9 @@ async function registerEventPickFromInventory({event,product,barcode,qty,staff,m
 }
 
 async function registerBarcode(barcode){
+  let directStorageOutResult=null;
+  let directStorageOutProduct=null;
+  let directStorageOutQty=0;
   try{
     updateEquipmentMemoUi();
     barcode=String(barcode||"").trim();
@@ -587,9 +605,11 @@ async function registerBarcode(barcode){
     const qty=Number(qtyRaw);
     const memo=el("memo").value.trim();
     const isEventPick=type==="event_pick";
+    const isStockOut=type==="出荷";
+    const canChooseSource=isEventPick||isStockOut;
     const eventPickEventId=String(el("eventPickEventSelect")?.value||"").trim();
     const eventPickEvent=isEventPick?findEventPickEvent(eventPickEventId):null;
-    const eventPickSource=isEventPick?getEventPickSource():"normal";
+    const eventPickSource=canChooseSource?getEventPickSource():"normal";
 
     if(isEventPick){
       if(!eventPickEvent){
@@ -656,12 +676,12 @@ async function registerBarcode(barcode){
     let newStock=currentStock;
 
     if(type==="入荷")newStock=currentStock+qty;
-    if(type==="出荷")newStock=currentStock-qty;
+    if(type==="出荷")newStock=eventPickSource==="storage" ? currentStock : currentStock-qty;
     if(type==="備品転用")newStock=currentStock;
     if(type==="在庫修正")newStock=qty;
     if(isEventPick&&eventPickSource!=="storage")newStock=currentStock-qty;
 
-    if((type==="出荷"||(isEventPick&&eventPickSource!=="storage"))&&newStock<0){
+    if(((type==="出荷"&&eventPickSource!=="storage")||(isEventPick&&eventPickSource!=="storage"))&&newStock<0){
       showMessage(`在庫不足：${p.name} / 現在庫 ${currentStock} / ${type}数 ${qty}`,"err");
       return;
     }
@@ -681,6 +701,16 @@ async function registerBarcode(barcode){
       return;
     }
 
+    if(type==="出荷"&&eventPickSource==="storage"){
+      directStorageOutResult=await applyEventStoragePick(null,p,qty,staff,memo);
+      directStorageOutProduct=p;
+      directStorageOutQty=qty;
+    }
+
+    const inventoryMemo=(type==="出荷"&&eventPickSource==="storage")
+      ? [memo,`持ち出し元：${getEventPickSourceLabel(eventPickSource)}`].filter(Boolean).join(" / ")
+      : memo;
+
     const insertedLog=await sb("inventory_logs",{
       method:"POST",
       headers:{Prefer:"return=representation"},
@@ -690,11 +720,13 @@ async function registerBarcode(barcode){
         barcode,
         product_name:p.name,
         quantity:qty,
-        memo
+        memo:inventoryMemo
       })
     });
 
-    await updateProductCurrentStock(barcode,newStock);
+    if(!(type==="出荷"&&eventPickSource==="storage")){
+      await updateProductCurrentStock(barcode,newStock);
+    }
 
     logs.unshift({
       id:(typeof insertedLog!=="undefined" && Array.isArray(insertedLog) && insertedLog[0]) ? insertedLog[0].id : "",
@@ -704,12 +736,15 @@ async function registerBarcode(barcode){
       barcode,
       product_name:p.name,
       quantity:qty,
-      memo
+      memo:inventoryMemo
     });
 
-    const visibleEventPickSourceLine=(!el("eventPickSourceLabel")?.hidden&&el("eventPickSourceSelect"))
+    const visibleEventPickSourceLine=canChooseSource
       ? `\n持ち出し元：${getEventPickSourceLabel(getEventPickSource())}`
       : "";
+    const stockDisplayLine=(type==="出荷"&&eventPickSource==="storage")
+      ? `\nイベント保管在庫：${directStorageOutResult?.nextStorage ?? "-"}\n通常棚在庫：${newStock}`
+      : `\n現在庫：${newStock}`;
 
     showMessage(type==="在庫修正"
       ?`在庫修正：${p.name} / 現在庫を ${qty} に上書き / 担当者：${staff}`
@@ -719,7 +754,7 @@ async function registerBarcode(barcode){
     showPopup("登録完了",
       type==="在庫修正"
         ? `在庫修正\n商品名：${p.name}\n現在庫：${newStock}\n担当者：${staff}`
-        : `${type}登録\n商品名：${p.name}${visibleEventPickSourceLine}\n数量：${qty}\n現在庫：${newStock}\n担当者：${staff}`
+        : `${type}登録\n商品名：${p.name}${visibleEventPickSourceLine}\n数量：${qty}${stockDisplayLine}\n担当者：${staff}`
     );
 
     el("barcodeInput").value="";
@@ -728,6 +763,9 @@ async function registerBarcode(barcode){
     await showProductHistoryForBarcode(barcode);
     el("barcodeInput").focus();
   }catch(e){
+    if(directStorageOutResult&&directStorageOutProduct&&directStorageOutQty){
+      try{await rollbackEventStoragePick(directStorageOutResult.storeCode,directStorageOutProduct,directStorageOutQty);}catch(_){}
+    }
     showMessage("登録エラー。\n"+e.message,"err");
   }
 }
