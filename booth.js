@@ -3889,22 +3889,71 @@ async function deleteBoothEvent(eventId){
   if(!eventId)return;
   if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
   const event=boothEvents.find(row=>String(row.id)===eventId);
-  showBoothConfirmPopup("イベント削除確認","このイベントを削除します。よろしいですか？",async()=>{
+  showBoothConfirmPopup("\u30a4\u30d9\u30f3\u30c8\u524a\u9664\u78ba\u8a8d","\u3053\u306e\u30a4\u30d9\u30f3\u30c8\u3092\u524a\u9664\u3057\u307e\u3059\u3002\n\u901a\u5e38\u68da\u30d4\u30c3\u30af\u5206\u3068\u30a4\u30d9\u30f3\u30c8\u4fdd\u7ba1\u5728\u5eab\u6301\u3061\u51fa\u3057\u5206\u306f\u5143\u306b\u623b\u3057\u307e\u3059\u3002\n\u3088\u308d\u3057\u3044\u3067\u3059\u304b\uff1f",async()=>{
     try{
       if(isBoothEventClosed(event)){
-        boothShowError("イベント削除エラー","締め済みイベントは削除できません。");
+        boothShowError("\u30a4\u30d9\u30f3\u30c8\u524a\u9664\u30a8\u30e9\u30fc","\u7de0\u3081\u6e08\u307f\u30a4\u30d9\u30f3\u30c8\u306f\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
         return;
       }
+      await rollbackBoothEventStocksBeforeDelete(eventId);
+      await sb(`event_storage_movements?event_id=eq.${encodeURIComponent(eventId)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}}).catch(()=>{});
+      await sb(`booth_stock_movements?event_id=eq.${encodeURIComponent(eventId)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}}).catch(()=>{});
+      await sb(`booth_event_items?event_id=eq.${encodeURIComponent(eventId)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}}).catch(()=>{});
       await sb(`booth_events?id=eq.${encodeURIComponent(eventId)}`,{
         method:"DELETE",
         headers:{Prefer:"return=minimal"}
       });
       if(boothCurrentEventId===eventId)boothCurrentEventId="";
-      boothShowSuccess("イベント削除完了","イベントを削除しました。");
+      boothShowSuccess("\u30a4\u30d9\u30f3\u30c8\u524a\u9664\u5b8c\u4e86","\u30a4\u30d9\u30f3\u30c8\u3092\u524a\u9664\u3057\u307e\u3057\u305f\u3002\u30d4\u30c3\u30af\u6e08\u307f\u5728\u5eab\u306f\u623b\u3057\u307e\u3057\u305f\u3002");
       await loadBoothEvents();
     }catch(e){
-      if(typeof showMessage==="function")showMessage("イベント削除エラー\n"+e.message,"err");
-      else showBoothLocalMessage("イベント削除エラー\n"+e.message,"err");
+      if(typeof showMessage==="function")showMessage("\u30a4\u30d9\u30f3\u30c8\u524a\u9664\u30a8\u30e9\u30fc\n"+e.message,"err");
+      else showBoothLocalMessage("\u30a4\u30d9\u30f3\u30c8\u524a\u9664\u30a8\u30e9\u30fc\n"+e.message,"err");
     }
   });
+}
+
+async function rollbackBoothEventStocksBeforeDelete(eventId){
+  const events=await sb(`booth_events?select=id,status&id=eq.${encodeURIComponent(eventId)}&limit=1`).catch(()=>[]);
+  const event=Array.isArray(events)&&events[0]?events[0]:boothEvents.find(row=>String(row.id)===String(eventId));
+  if(isBoothEventClosed(event))throw new Error("\u7de0\u3081\u6e08\u307f\u30a4\u30d9\u30f3\u30c8\u306f\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
+
+  const items=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,normal_takeout_qty,storage_takeout_qty,event_storage_qty,sold_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
+  const rows=Array.isArray(items)?items:[];
+  if(rows.some(row=>Number(row.sold_qty||0)>0))throw new Error("\u8ca9\u58f2\u53d6\u308a\u8fbc\u307f\u6e08\u307f\u306e\u5546\u54c1\u304c\u3042\u308b\u305f\u3081\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
+  if(rows.some(row=>String(row.item_type||"")==="gacha_prize"))throw new Error("\u30ac\u30c1\u30e3\u5c65\u6b74\u304c\u3042\u308b\u30a4\u30d9\u30f3\u30c8\u306f\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
+
+  const salesImports=await sb(`event_sales_imports?select=id&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed)&limit=1`).catch(()=>[]);
+  if(Array.isArray(salesImports)&&salesImports.length)throw new Error("\u8ca9\u58f2\u53d6\u308a\u8fbc\u307f\u5c65\u6b74\u304c\u3042\u308b\u305f\u3081\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
+
+  const gachaMovements=await sb(`booth_stock_movements?select=id&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(gacha_pick,gacha_return)&limit=1`).catch(()=>[]);
+  if(Array.isArray(gachaMovements)&&gachaMovements.length)throw new Error("\u30ac\u30c1\u30e3\u5c65\u6b74\u304c\u3042\u308b\u30a4\u30d9\u30f3\u30c8\u306f\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
+
+  const storeCode=typeof getBoothCurrentStoreCode==="function"?getBoothCurrentStoreCode():"tokyo";
+  for(const item of rows.filter(row=>String(row.item_type||"normal")==="normal")){
+    const normalQty=Number(item.normal_takeout_qty||0);
+    const storageTakeoutQty=Number(item.storage_takeout_qty||0);
+    const eventStorageQty=Number(item.event_storage_qty||0);
+    if(normalQty>0&&item.barcode){
+      await adjustBoothProductBaseStock(item.barcode,normalQty);
+    }
+    const storageDelta=storageTakeoutQty-eventStorageQty;
+    if(storageDelta!==0&&item.barcode){
+      await upsertBoothEventStorageStock(storeCode,item,storageDelta);
+    }
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        taken_qty:0,
+        normal_takeout_qty:0,
+        storage_takeout_qty:0,
+        event_storage_qty:0,
+        shelf_return_qty:0,
+        returned_qty:0,
+        difference_qty:0,
+        updated_at:new Date().toISOString()
+      })
+    });
+  }
 }
