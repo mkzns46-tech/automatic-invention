@@ -386,6 +386,10 @@ function switchBoothEventMenu(menu){
     renderBoothReturnPanel(event);
     return;
   }
+  if(menu==="gacha"){
+    renderBoothGachaPanel(event);
+    return;
+  }
   if(menu==="sales"){
     renderBoothSalesPanel(event);
     return;
@@ -1194,6 +1198,10 @@ function switchBoothEventMenu(menu){
     renderBoothReturnPanel(event);
     return;
   }
+  if(menu==="gacha"){
+    renderBoothGachaPanel(event);
+    return;
+  }
   if(menu==="sales"){
     renderBoothSalesPanel(event);
     return;
@@ -1445,12 +1453,13 @@ async function handleBoothScannedCode(code){
   if(code===boothLastScan&&t-boothLastScanAt<1800)return;
   boothLastScan=code;
   boothLastScanAt=t;
-  const input=el(boothScanTarget==="return"?"boothReturnBarcode":boothScanTarget==="storage"?"boothStorageBarcode":"boothCarryOutBarcode");
+  const input=el(boothScanTarget==="return"?"boothReturnBarcode":boothScanTarget==="storage"?"boothStorageBarcode":boothScanTarget==="gacha"?"boothGachaBarcode":"boothCarryOutBarcode");
   if(input)input.value=code;
   await stopBoothCarryOutCamera(false);
   boothCameraSuccess("バーコードを読み取りました。");
   if(boothScanTarget==="return")await previewBoothReturnProduct({popupOnError:false});
   else if(boothScanTarget==="storage")await previewBoothStorageProduct({popupOnError:false});
+  else if(boothScanTarget==="gacha")await previewBoothGachaProduct({popupOnError:false});
   else await previewBoothCarryOutProduct({popupOnError:false});
 }
 
@@ -1709,6 +1718,452 @@ async function registerBoothReturn(){
     el("boothReturnBarcode")?.focus();
   }catch(e){
     boothShowError("棚戻し棚卸しエラー","戻り登録に失敗しました。\n"+e.message);
+  }
+}
+
+async function getBoothLatestSmaregiStock(barcode){
+  try{
+    const snapshots=await sb("smaregi_stock_snapshots?select=id&order=imported_at.desc&limit=1");
+    const snapshotId=Array.isArray(snapshots)&&snapshots[0]?snapshots[0].id:"";
+    if(!snapshotId)return null;
+    const rows=await sb(`smaregi_stock_items?select=smaregi_stock&snapshot_id=eq.${encodeURIComponent(snapshotId)}&barcode=eq.${encodeURIComponent(barcode)}&limit=1`);
+    return Array.isArray(rows)&&rows[0]?Number(rows[0].smaregi_stock||0):null;
+  }catch(_){
+    return null;
+  }
+}
+
+async function findBoothGachaEventItem(eventId,barcode){
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty&event_id=eq.${encodeURIComponent(eventId)}&barcode=eq.${encodeURIComponent(barcode)}&item_type=eq.gacha_prize&limit=1`);
+  return Array.isArray(rows)&&rows[0]?rows[0]:null;
+}
+
+async function getBoothGachaSummary(eventId,barcode){
+  const item=await findBoothGachaEventItem(eventId,barcode);
+  const picked=Number(item?.taken_qty||0);
+  const returned=Number(item?.returned_qty||0);
+  return {
+    item,
+    picked,
+    returned,
+    current: picked-returned,
+    consumed: picked-returned
+  };
+}
+
+function renderBoothGachaPreview(product,smaregiStock,summary){
+  const preview=el("boothGachaProductPreview");
+  if(!preview||!product)return;
+  preview.hidden=false;
+  preview.innerHTML=`<div><span>商品名：</span><strong>${esc(product.name||"-")}</strong></div>
+    <div><span>バーコード：</span><strong>${esc(product.barcode||"-")}</strong></div>
+    <div><span>スマレジ商品ID：</span><strong>${esc(product.smaregi_product_id||"未登録")}</strong></div>
+    <div><span>スマレジ在庫：</span><strong>${smaregiStock===null?"未取込":esc(smaregiStock)}</strong></div>
+    <div><span>現在ガチャ持ち出し数：</span><strong>${esc(summary?.current??0)}</strong></div>
+    <div><span>ガチャ消費見込み：</span><strong>${esc(summary?.consumed??0)}</strong></div>`;
+}
+
+function clearBoothGachaPreview(){
+  const preview=el("boothGachaProductPreview");
+  if(preview){
+    preview.hidden=true;
+    preview.innerHTML="";
+  }
+}
+
+async function previewBoothGachaProduct(options={}){
+  const popupOnError=options.popupOnError===true;
+  const event=getBoothCurrentEvent();
+  const barcode=String(el("boothGachaBarcode")?.value||"").trim();
+  if(!event||!barcode){
+    clearBoothGachaPreview();
+    return null;
+  }
+  try{
+    const product=await findBoothProductByBarcode(barcode);
+    if(!product){
+      clearBoothGachaPreview();
+      if(popupOnError)boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothGachaBarcode");
+      return null;
+    }
+    const [smaregiStock,summary]=await Promise.all([
+      getBoothLatestSmaregiStock(barcode),
+      getBoothGachaSummary(event.id,barcode)
+    ]);
+    renderBoothGachaPreview(product,smaregiStock,summary);
+    return {product,smaregiStock,summary};
+  }catch(e){
+    clearBoothGachaPreview();
+    if(popupOnError)boothShowError("ガチャ商品確認エラー","商品確認に失敗しました。\n"+e.message);
+    return null;
+  }
+}
+
+async function updateBoothProductBaseStock(barcode,newStock){
+  await sb(`products?barcode=eq.${encodeURIComponent(barcode)}`,{
+    method:"PATCH",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify({base_stock:newStock})
+  });
+  const p=typeof gp==="function"?gp(barcode):null;
+  if(p)p.base_stock=newStock;
+}
+
+async function callBoothSmaregiStockAdjust({event,product,delta,memo}){
+  const context=getBoothSalesContext();
+  const response=await fetch("/api/smaregi-stock-adjust",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      storeCode:context.storeCode||getBoothCurrentStoreCode(),
+      smaregiProductId:product.smaregi_product_id,
+      delta,
+      eventId:event.id,
+      barcode:product.barcode,
+      productName:product.name,
+      memo
+    })
+  });
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok||body?.error){
+    throw new Error(body?.error||`スマレジ在庫更新API ${response.status}`);
+  }
+  return body;
+}
+
+async function insertBoothGachaInventoryLog(event,product,quantity,staff,memo,type,delta){
+  const inserted=await sb("inventory_logs",{
+    method:"POST",
+    headers:{Prefer:"return=representation"},
+    body:JSON.stringify({
+      type,
+      staff,
+      barcode:product.barcode,
+      product_name:product.name||"",
+      quantity,
+      memo,
+      event_id:event.id,
+      affects_smaregi:true,
+      smaregi_delta:delta
+    })
+  });
+  return Array.isArray(inserted)&&inserted[0]?inserted[0]:null;
+}
+
+async function insertBoothGachaMovement(event,product,quantity,staff,memo,movementType,delta){
+  await sb("booth_stock_movements",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      event_id:event.id,
+      barcode:product.barcode,
+      product_name:product.name||"",
+      item_type:"gacha_prize",
+      movement_type:movementType,
+      quantity,
+      staff,
+      memo,
+      affects_smaregi:true,
+      smaregi_delta:delta
+    }])
+  });
+}
+
+async function upsertBoothGachaEventItem(event,product,quantity,action){
+  const eventId=encodeURIComponent(event.id);
+  const barcode=encodeURIComponent(product.barcode);
+  const rows=await sb(`booth_event_items?select=id,taken_qty,returned_qty&event_id=eq.${eventId}&barcode=eq.${barcode}&item_type=eq.gacha_prize&limit=1`);
+  const now=new Date().toISOString();
+  if(Array.isArray(rows)&&rows[0]){
+    const currentTaken=Number(rows[0].taken_qty||0);
+    const currentReturned=Number(rows[0].returned_qty||0);
+    const nextTaken=action==="pick"?currentTaken+quantity:currentTaken;
+    const nextReturned=action==="return"?currentReturned+quantity:currentReturned;
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(rows[0].id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        product_name:product.name||"",
+        taken_qty:nextTaken,
+        returned_qty:nextReturned,
+        consumed_qty:Math.max(0,nextTaken-nextReturned),
+        difference_qty:0,
+        updated_at:now
+      })
+    });
+    return;
+  }
+  const taken=action==="pick"?quantity:0;
+  const returned=action==="return"?quantity:0;
+  await sb("booth_event_items",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      event_id:event.id,
+      barcode:product.barcode,
+      product_name:product.name||"",
+      item_type:"gacha_prize",
+      taken_qty:taken,
+      returned_qty:returned,
+      consumed_qty:Math.max(0,taken-returned),
+      difference_qty:0,
+      updated_at:now
+    }])
+  });
+}
+
+function getBoothGachaStaffOptions(){
+  return '<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+}
+
+function renderBoothGachaPanel(event){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  const closed=isBoothEventClosed(event);
+  const staffOptions=getBoothGachaStaffOptions();
+  area.innerHTML=`
+    <section class="booth-work-card booth-gacha-card">
+      <h4>ガチャ管理</h4>
+      <p class="section-note">ガチャ景品だけを管理します。ピック時はスマレジ在庫を減算し、戻り時はスマレジ在庫へ戻します。</p>
+      <div class="button-row booth-camera-button-row">
+        <button type="button" id="boothGachaStartCameraBtn" ${closed?"disabled":""}>カメラ読取</button>
+        <div class="camera-zoom-row booth-camera-zoom-row">
+          <label>カメラズーム
+            <input id="boothCameraZoomRange" type="range" min="1" max="3" step="0.1" value="1.5">
+            <span id="boothCameraZoomValue">1.5x</span>
+          </label>
+        </div>
+        <button type="button" id="boothGachaStopCameraBtn" class="secondary">停止</button>
+      </div>
+      <div class="camera-area booth-camera-area">
+        <video id="boothCarryOutVideo" muted playsinline></video>
+        <div id="boothCameraGuideOverlay" class="camera-guide-overlay">
+          <div class="camera-guide-box">
+            <div class="camera-guide-line"></div>
+          </div>
+          <div class="camera-guide-text">赤枠にバーコードを合わせてください</div>
+        </div>
+      </div>
+      <div class="booth-scan-row booth-gacha-scan-row">
+        <label>バーコード
+          <input id="boothGachaBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力" ${closed?"disabled":""}>
+        </label>
+        <label>数量
+          <input id="boothGachaQty" type="number" min="1" step="1" placeholder="数量" ${closed?"disabled":""}>
+        </label>
+        <label>担当者<span class="required">必須</span>
+          <select id="boothGachaStaff" ${closed?"disabled":""}>${staffOptions}</select>
+        </label>
+        <button type="button" id="boothGachaPreviewBtn" class="secondary" ${closed?"disabled":""}>商品確認</button>
+        <button type="button" id="boothGachaPickBtn" ${closed?"disabled":""}>ガチャピック登録</button>
+        <button type="button" id="boothGachaReturnBtn" class="secondary" ${closed?"disabled":""}>ガチャ戻り登録</button>
+      </div>
+      <div id="boothGachaProductPreview" class="booth-product-preview" hidden></div>
+      <label class="booth-carry-memo-label">メモ
+        <input id="boothGachaMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}>
+      </label>
+    </section>
+    <section class="booth-work-card booth-gacha-history-card">
+      <div class="booth-list-header">
+        <h4>ガチャ履歴</h4>
+        <button type="button" id="reloadBoothGachaHistoryBtn" class="secondary">再読み込み</button>
+      </div>
+      <div id="boothGachaHistoryList" class="booth-carry-history-list">
+        <div class="booth-empty">読み込み中...</div>
+      </div>
+    </section>`;
+  el("boothGachaBarcode")?.addEventListener("input",clearBoothGachaPreview);
+  el("boothGachaQty")?.addEventListener("input",()=>previewBoothGachaProduct({popupOnError:false}));
+  el("boothGachaPreviewBtn")?.addEventListener("click",()=>previewBoothGachaProduct({popupOnError:true}));
+  el("boothGachaPickBtn")?.addEventListener("click",()=>confirmBoothGachaPick());
+  el("boothGachaReturnBtn")?.addEventListener("click",()=>confirmBoothGachaReturn());
+  el("reloadBoothGachaHistoryBtn")?.addEventListener("click",()=>loadBoothGachaHistory(event.id));
+  el("boothGachaStartCameraBtn")?.addEventListener("click",()=>{
+    boothScanTarget="gacha";
+    startBoothCarryOutCamera();
+  });
+  el("boothGachaStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
+  el("boothCameraZoomRange")?.addEventListener("input",applyBoothCameraZoom);
+  updateBoothCameraZoomLabel();
+  loadBoothGachaHistory(event.id);
+}
+
+async function validateBoothGachaForm(action){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    boothShowError("ガチャ登録エラー","イベントを開いてから操作してください。");
+    return null;
+  }
+  if(isBoothEventClosed(event)){
+    showBoothClosedError();
+    return null;
+  }
+  const barcode=String(el("boothGachaBarcode")?.value||"").trim();
+  const qtyText=String(el("boothGachaQty")?.value||"").trim();
+  const staff=String(el("boothGachaStaff")?.value||"").trim();
+  const memo=String(el("boothGachaMemo")?.value||"").trim();
+  if(!barcode){
+    boothShowError("ガチャ登録エラー","バーコードを入力してください。","boothGachaBarcode");
+    return null;
+  }
+  if(!/^[1-9]\d*$/.test(qtyText)){
+    boothShowError("ガチャ登録エラー","数量は1以上の整数を入力してください。","boothGachaQty");
+    return null;
+  }
+  if(!staff){
+    boothShowError("ガチャ登録エラー","担当者を選択してください。","boothGachaStaff");
+    return null;
+  }
+  const product=await findBoothProductByBarcode(barcode);
+  if(!product){
+    boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothGachaBarcode");
+    return null;
+  }
+  if(!product.smaregi_product_id){
+    boothShowError("スマレジ商品ID未登録","商品マスターを再取り込みしてください。","boothGachaBarcode");
+    return null;
+  }
+  const quantity=Number(qtyText);
+  const currentStock=Number(product.base_stock||0);
+  const summary=await getBoothGachaSummary(event.id,barcode);
+  if(action==="pick"&&currentStock-quantity<0){
+    boothShowError("ガチャ登録エラー",`通常棚在庫が不足しています。\n現在庫：${currentStock}\n登録数：${quantity}`,"boothGachaQty");
+    return null;
+  }
+  if(action==="return"&&summary.current<quantity){
+    boothShowError("ガチャ戻り登録エラー",`ガチャ持ち出し数を超えて戻り登録できません。\n現在ガチャ持ち出し数：${summary.current}\n戻り数：${quantity}`,"boothGachaQty");
+    return null;
+  }
+  const smaregiStock=await getBoothLatestSmaregiStock(barcode);
+  renderBoothGachaPreview(product,smaregiStock,summary);
+  return {event,product,quantity,staff,memo,currentStock,summary};
+}
+
+async function confirmBoothGachaPick(){
+  const data=await validateBoothGachaForm("pick");
+  if(!data)return;
+  const body=[
+    `商品名：${data.product.name||"-"}`,
+    `数量：${data.quantity}`,
+    `担当者：${data.staff}`,
+    "",
+    "この商品をガチャ景品として登録します。",
+    "スマレジ在庫が減算されます。",
+    "",
+    "よろしいですか？"
+  ].join("\n");
+  showBoothConfirmPopup("ガチャピック確認",body,async()=>registerBoothGachaMovement("pick",data));
+}
+
+async function confirmBoothGachaReturn(){
+  const data=await validateBoothGachaForm("return");
+  if(!data)return;
+  const body=[
+    `商品名：${data.product.name||"-"}`,
+    `数量：${data.quantity}`,
+    `担当者：${data.staff}`,
+    "",
+    "この商品をガチャ戻りとして登録します。",
+    "スマレジ在庫が加算されます。",
+    "",
+    "よろしいですか？"
+  ].join("\n");
+  showBoothConfirmPopup("ガチャ戻り確認",body,async()=>registerBoothGachaMovement("return",data));
+}
+
+async function registerBoothGachaMovement(action,data){
+  const isPick=action==="pick";
+  const movementType=isPick?"gacha_pick":"gacha_return";
+  const delta=isPick?-data.quantity:data.quantity;
+  const nextStock=data.currentStock+delta;
+  let smaregiAdjusted=false;
+  let productUpdated=false;
+  try{
+    await callBoothSmaregiStockAdjust({
+      event:data.event,
+      product:data.product,
+      delta,
+      memo:`ARICOイベント管理 ${isPick?"ガチャピック":"ガチャ戻り"} ${data.event.name||""}`
+    });
+    smaregiAdjusted=true;
+
+    await updateBoothProductBaseStock(data.product.barcode,nextStock);
+    productUpdated=true;
+
+    await insertBoothGachaInventoryLog(data.event,data.product,data.quantity,data.staff,data.memo,movementType,delta);
+    await insertBoothGachaMovement(data.event,data.product,data.quantity,data.staff,data.memo,movementType,delta);
+    await upsertBoothGachaEventItem(data.event,data.product,data.quantity,action);
+
+    el("boothGachaBarcode").value="";
+    el("boothGachaQty").value="";
+    if(el("boothGachaMemo"))el("boothGachaMemo").value="";
+    clearBoothGachaPreview();
+    await loadBoothGachaHistory(data.event.id);
+    boothShowSuccess(isPick?"ガチャピック登録完了":"ガチャ戻り登録完了",`${data.product.name||"-"} / 数量 ${data.quantity}\nスマレジ在庫を${isPick?"減算":"加算"}しました。`);
+    el("boothGachaBarcode")?.focus();
+  }catch(e){
+    let rollbackMessage="";
+    if(smaregiAdjusted){
+      try{
+        await callBoothSmaregiStockAdjust({
+          event:data.event,
+          product:data.product,
+          delta:-delta,
+          memo:`ARICOイベント管理 ${isPick?"ガチャピック":"ガチャ戻り"} ロールバック`
+        });
+        rollbackMessage="\nスマレジ在庫は元に戻しました。";
+      }catch(rollbackError){
+        rollbackMessage="\nスマレジ在庫の自動戻しに失敗しました。手動確認してください。\n"+rollbackError.message;
+      }
+    }
+    if(productUpdated){
+      try{await updateBoothProductBaseStock(data.product.barcode,data.currentStock);}catch(_){}
+    }
+    boothShowError(isPick?"ガチャピック登録エラー":"ガチャ戻り登録エラー",`${isPick?"ガチャピック":"ガチャ戻り"}登録に失敗しました。\n${e.message}${rollbackMessage}`);
+  }
+}
+
+async function loadBoothGachaHistory(eventId){
+  const list=el("boothGachaHistoryList");
+  if(!list)return;
+  try{
+    list.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,memo,movement_type&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.gacha_prize&movement_type=in.(gacha_pick,gacha_return)&order=created_at.desc&limit=80`);
+    if(!Array.isArray(rows)||!rows.length){
+      list.innerHTML='<div class="booth-empty">まだガチャ履歴はありません。</div>';
+      return;
+    }
+    const typeLabel=row=>String(row.movement_type)==="gacha_return"?"戻り":"ピック";
+    list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table">
+      <thead><tr><th>日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>区分</th><th>担当者</th><th>メモ</th></tr></thead>
+      <tbody>${rows.map(row=>`<tr>
+        <td>${esc(formatBoothDateTime(row.created_at))}</td>
+        <td>${esc(row.product_name||"-")}</td>
+        <td>${esc(row.barcode||"-")}</td>
+        <td>${esc(row.quantity??"-")}</td>
+        <td>${esc(typeLabel(row))}</td>
+        <td>${esc(row.staff||"-")}</td>
+        <td>${esc(row.memo||"")}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <div class="booth-history-cards">
+      ${rows.map(row=>`<article class="booth-history-card">
+        <div class="booth-history-card-top">
+          <strong>${esc(row.product_name||"-")}</strong>
+          <span>${esc(formatBoothDateTimeShort(row.created_at))}</span>
+        </div>
+        <div class="booth-history-card-meta">
+          <span>バーコード：${esc(row.barcode||"-")}</span>
+          <span>数量：${esc(row.quantity??"-")}</span>
+          <span>区分：${esc(typeLabel(row))}</span>
+          <span>担当者：${esc(row.staff||"-")}</span>
+          ${row.memo?`<span>メモ：${esc(row.memo)}</span>`:""}
+        </div>
+      </article>`).join("")}
+    </div>`;
+  }catch(e){
+    list.innerHTML='<div class="booth-empty">ガチャ履歴を読み込めませんでした。</div>';
+    boothShowError("ガチャ履歴エラー","ガチャ履歴の読み込みに失敗しました。\n"+e.message);
   }
 }
 
