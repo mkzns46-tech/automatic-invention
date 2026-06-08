@@ -38,9 +38,15 @@ function updateEquipmentMemoUi(){
   if(required)required.hidden=!isEquipment;
   if(memo)memo.required=isEquipment;
   const eventLabel=el("eventPickEventLabel");
-  if(eventLabel)eventLabel.hidden=!isEventPick;
+  if(eventLabel){
+    eventLabel.hidden=!isEventPick;
+    eventLabel.style.display=isEventPick?"":"none";
+  }
   const sourceLabel=el("eventPickSourceLabel");
-  if(sourceLabel)sourceLabel.hidden=!isEventPick;
+  if(sourceLabel){
+    sourceLabel.hidden=!isEventPick;
+    sourceLabel.style.display=isEventPick?"":"none";
+  }
   if(isEventPick&&typeof loadEventPickEvents==="function"&&!eventPickEvents.length){
     loadEventPickEvents().then(renderEventPickOptions).catch(()=>{});
   }
@@ -52,6 +58,7 @@ function ensureEventPickSourceControl(){
   const label=document.createElement("label");
   label.id="eventPickSourceLabel";
   label.hidden=true;
+  label.style.display="none";
   label.innerHTML='持ち出し元 <span class="required">必須</span><select id="eventPickSourceSelect"><option value="normal">通常棚</option><option value="storage">イベント保管在庫</option></select>';
   eventLabel.insertAdjacentElement("afterend",label);
 }
@@ -572,6 +579,7 @@ async function registerEventPickFromInventory({event,product,barcode,qty,staff,m
 
 async function registerBarcode(barcode){
   try{
+    updateEquipmentMemoUi();
     barcode=String(barcode||"").trim();
     const type=el("type").value;
     const staff=el("staff").value.trim();
