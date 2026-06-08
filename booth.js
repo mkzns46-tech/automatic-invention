@@ -426,15 +426,285 @@ async function confirmBoothSalesImportPreparing(event){
 }
 
 async function confirmBoothEventClosePreparing(event){
-  const period=[event?.event_start,event?.event_end].filter(Boolean).join(" ～ ")||"-";
-  const body=typeof getSmaregiOperationContextText==="function"
-    ? getSmaregiOperationContextText(`イベント名：${event?.name||"-"}\n対象期間：${period}\n\nイベントを締めます。`)
-    : `イベント名：${event?.name||"-"}\n対象期間：${period}\n\nイベントを締めます。`;
-  const ok=typeof confirmAppAction==="function"
-    ? await confirmAppAction("イベント締め確認",body,{okText:"締め"})
-    : true;
-  if(!ok)return;
-  if(typeof showPopup==="function")showPopup("準備中","イベント締めは次フェーズで実装します。");
+  const area=el("boothEventWorkArea");
+  if(!event||!event.id){
+    boothShowError("イベント締めエラー","イベントが見つかりません。");
+    return;
+  }
+  if(isBoothEventClosed(event)){
+    boothShowError("イベント締めエラー","このイベントはすでに締め済みです。");
+    return;
+  }
+  if(area)area.innerHTML='<section class="booth-work-card"><div class="booth-empty">締め前確認を読み込み中...</div></section>';
+  try{
+    const summary=await loadBoothCloseSummary(event);
+    renderBoothCloseConfirmPanel(event,summary);
+  }catch(e){
+    if(area)area.innerHTML='<section class="booth-work-card"><div class="booth-empty">締め前確認を読み込めませんでした。</div></section>';
+    boothShowError("イベント締めエラー","締め前確認の読み込みに失敗しました。\n"+e.message);
+  }
+}
+
+function getBoothCloseStoreContext(event){
+  const context=typeof getBoothSalesContext==="function"?getBoothSalesContext():{};
+  const fallbackStoreCode=typeof getBoothCurrentStoreCode==="function"?getBoothCurrentStoreCode():"tokyo";
+  const storeCode=String(event?.store_code||context.storeCode||fallbackStoreCode||"tokyo").toLowerCase();
+  const storeName=event?.store_name||context.storeName||(storeCode==="aichi"?"愛知":"東京");
+  return {
+    storeCode,
+    storeName,
+    accountName:context.accountName||"スマレジ本番接続"
+  };
+}
+
+function isBoothShelfReturnReflected(item){
+  return item?.shelf_return_reflected===true
+    || String(item?.shelf_return_reflected||"").toLowerCase()==="true"
+    || Boolean(item?.shelf_return_reflected_at);
+}
+
+function calculateBoothGachaConsumed(item){
+  return Math.max(0,Number(item?.taken_qty||0)-Number(item?.returned_qty||0));
+}
+
+function mergeBoothCloseRows(normalItems,gachaItems,products){
+  const productMap=new Map((products||[]).map(product=>[String(product.barcode||""),product]));
+  const rowsByBarcode=new Map();
+  (normalItems||[]).forEach(item=>{
+    const barcode=String(item.barcode||"");
+    const product=productMap.get(barcode)||{};
+    rowsByBarcode.set(barcode,{
+      id:item.id,
+      barcode,
+      product_name:item.product_name||product.name||"",
+      smaregi_product_id:product.smaregi_product_id||"",
+      normal_takeout_qty:Number(item.normal_takeout_qty||0),
+      storage_takeout_qty:Number(item.storage_takeout_qty||0),
+      taken_qty:Number(item.taken_qty||0),
+      sold_qty:Number(item.sold_qty||0),
+      returned_qty:Number(item.returned_qty||0),
+      shelf_return_qty:Number(item.shelf_return_qty||0),
+      event_storage_qty:Number(item.event_storage_qty||0),
+      consumed_qty:Number(item.consumed_qty||0),
+      difference_qty:calculateBoothItemDifference(item),
+      diff_memo:item.diff_memo||"",
+      updated_at:item.updated_at||"",
+      shelf_return_reflected:isBoothShelfReturnReflected(item),
+      gacha_pick_qty:0,
+      gacha_return_qty:0,
+      gacha_consumed_qty:0
+    });
+  });
+  (gachaItems||[]).forEach(item=>{
+    const barcode=String(item.barcode||"");
+    const product=productMap.get(barcode)||{};
+    const existing=rowsByBarcode.get(barcode)||{
+      id:"",
+      barcode,
+      product_name:item.product_name||product.name||"",
+      smaregi_product_id:product.smaregi_product_id||"",
+      normal_takeout_qty:0,
+      storage_takeout_qty:0,
+      taken_qty:0,
+      sold_qty:0,
+      returned_qty:0,
+      shelf_return_qty:0,
+      event_storage_qty:0,
+      consumed_qty:0,
+      difference_qty:0,
+      diff_memo:"",
+      updated_at:item.updated_at||"",
+      shelf_return_reflected:false
+    };
+    existing.gacha_pick_qty=Number(item.taken_qty||0);
+    existing.gacha_return_qty=Number(item.returned_qty||0);
+    existing.gacha_consumed_qty=calculateBoothGachaConsumed(item);
+    if(!existing.updated_at)existing.updated_at=item.updated_at||"";
+    rowsByBarcode.set(barcode,existing);
+  });
+  return [...rowsByBarcode.values()].sort((a,b)=>String(a.product_name||"").localeCompare(String(b.product_name||""),"ja"));
+}
+
+async function loadBoothCloseSummary(event){
+  const eventId=encodeURIComponent(event.id);
+  const normalItems=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_at,shelf_return_reflected_by,updated_at&event_id=eq.${eventId}&item_type=eq.normal&order=product_name.asc`);
+  const gachaItems=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,difference_qty,updated_at&event_id=eq.${eventId}&item_type=eq.gacha_prize&order=product_name.asc`);
+  const products=await fetchBoothProductsForItems([...(normalItems||[]),...(gachaItems||[])]);
+  const rows=mergeBoothCloseRows(normalItems||[],gachaItems||[],products||[]);
+  const diffRows=rows.filter(row=>Number(row.difference_qty||0)!==0);
+  const unconfirmedRows=diffRows.filter(row=>!String(row.diff_memo||"").trim());
+  const shelfReturnPendingRows=rows.filter(row=>Number(row.shelf_return_qty||0)>0&&!row.shelf_return_reflected);
+  return {
+    rows,
+    diffItemCount:diffRows.length,
+    diffTotal:diffRows.reduce((sum,row)=>sum+Math.abs(Number(row.difference_qty||0)),0),
+    unconfirmedCount:unconfirmedRows.length,
+    shelfReturnPendingQty:shelfReturnPendingRows.reduce((sum,row)=>sum+Number(row.shelf_return_qty||0),0),
+    shelfReturnPendingRows
+  };
+}
+
+function renderBoothCloseConfirmPanel(event,summary){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  const context=getBoothCloseStoreContext(event);
+  const period=[event.event_start,event.event_end].filter(Boolean).join(" ～ ")||"-";
+  const staffOptions='<option value="">締め担当者を選択</option>'+((staffMembers||[]).map(staff=>{
+    const name=staff.name||"";
+    return `<option value="${esc(name)}" ${name===event.created_by?"selected":""}>${esc(name)}</option>`;
+  }).join(""));
+  const warning=summary.unconfirmedCount>0
+    ? `<div class="message err booth-close-warning">差異メモ未入力の商品が ${esc(summary.unconfirmedCount)} 件あります。差異ありでも締めは可能ですが、内容を確認してください。</div>`
+    : "";
+  const rows=summary.rows.map(row=>`<tr class="${Number(row.difference_qty||0)===0?"":"booth-close-diff-row"}">
+      <td>${esc(row.product_name||"-")}</td>
+      <td>${esc(row.barcode||"-")}</td>
+      <td>${esc(row.smaregi_product_id||"-")}</td>
+      <td>${esc(row.normal_takeout_qty)}</td>
+      <td>${esc(row.storage_takeout_qty)}</td>
+      <td><strong>${esc(row.taken_qty)}</strong></td>
+      <td>${esc(row.sold_qty)}</td>
+      <td>${esc(row.returned_qty)}</td>
+      <td>${esc(row.shelf_return_qty)}</td>
+      <td>${esc(row.event_storage_qty)}</td>
+      <td>${esc(row.gacha_pick_qty||0)}</td>
+      <td>${esc(row.gacha_return_qty||0)}</td>
+      <td>${esc(row.gacha_consumed_qty||0)}</td>
+      <td><strong>${esc(row.difference_qty)}</strong></td>
+      <td>${esc(row.diff_memo||"-")}</td>
+      <td>${esc(formatBoothDateTimeShort(row.updated_at))}</td>
+    </tr>`).join("");
+  const cards=summary.rows.map(row=>`<article class="booth-history-card booth-close-item-card ${Number(row.difference_qty||0)===0?"":"booth-close-diff-row"}">
+      <div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong><span>差異：${esc(row.difference_qty)}</span></div>
+      <div class="booth-history-card-meta">
+        <span>バーコード：${esc(row.barcode||"-")}</span>
+        <span>持ち出し：${esc(row.taken_qty)}（通常 ${esc(row.normal_takeout_qty)} / 保管 ${esc(row.storage_takeout_qty)}）</span>
+        <span>販売：${esc(row.sold_qty)} / 棚戻し：${esc(row.returned_qty)} / イベント保管：${esc(row.event_storage_qty)}</span>
+        <span>ガチャ：ピック ${esc(row.gacha_pick_qty||0)} / 戻り ${esc(row.gacha_return_qty||0)} / 消費 ${esc(row.gacha_consumed_qty||0)}</span>
+        <span>メモ：${esc(row.diff_memo||"-")}</span>
+      </div>
+    </article>`).join("");
+  area.innerHTML=`
+    <section class="booth-work-card booth-close-card">
+      <h4>イベント締め前確認</h4>
+      <p class="section-note">販売・棚戻し・イベント保管・ガチャ・差異を確認してから締め確定します。締め時にスマレジ在庫更新APIは呼びません。</p>
+      <div class="booth-close-event-info">
+        <div><span>イベント名</span><strong>${esc(event.name||"-")}</strong></div>
+        <div><span>会場</span><strong>${esc(event.venue||"-")}</strong></div>
+        <div><span>日程</span><strong>${esc(period)}</strong></div>
+        <div><span>担当者</span><strong>${esc(event.created_by||"-")}</strong></div>
+        <div><span>店舗</span><strong>${esc(context.storeName)} / ${esc(String(context.storeCode).toUpperCase())}</strong></div>
+      </div>
+      <div class="booth-close-summary-grid">
+        <div><span>商品数</span><strong>${esc(summary.rows.length)}</strong></div>
+        <div><span>差異あり商品数</span><strong>${esc(summary.diffItemCount)}</strong></div>
+        <div><span>差異合計数</span><strong>${esc(summary.diffTotal)}</strong></div>
+        <div><span>未確認商品数</span><strong>${esc(summary.unconfirmedCount)}</strong></div>
+        <div><span>締め時に通常棚へ戻す数</span><strong>${esc(summary.shelfReturnPendingQty)}</strong></div>
+      </div>
+      ${warning}
+      <div class="booth-history-table-wrap"><table class="booth-history-table booth-close-table">
+        <thead><tr><th>商品名</th><th>バーコード</th><th>商品ID</th><th>通常ピック</th><th>保管持ち出し</th><th>持ち出し合計</th><th>販売</th><th>棚戻し</th><th>通常棚戻し</th><th>イベント保管</th><th>ガチャピック</th><th>ガチャ戻り</th><th>ガチャ消費</th><th>差異</th><th>メモ</th><th>最終更新</th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="16">商品がありません。</td></tr>'}</tbody>
+      </table></div>
+      <div class="booth-history-cards">${cards}</div>
+      <div class="booth-close-actions">
+        <label>締め担当者<span class="required">必須</span>
+          <select id="boothCloseStaff">${staffOptions}</select>
+        </label>
+        <button type="button" id="boothCloseReloadBtn" class="secondary">再読み込み</button>
+        <button type="button" id="boothCloseConfirmBtn">締め確定</button>
+      </div>
+    </section>`;
+  el("boothCloseReloadBtn")?.addEventListener("click",()=>confirmBoothEventClosePreparing(event));
+  el("boothCloseConfirmBtn")?.addEventListener("click",()=>confirmBoothEventClose(event));
+}
+
+async function confirmBoothEventClose(event){
+  const staff=String(el("boothCloseStaff")?.value||"").trim();
+  if(!staff){
+    boothShowError("イベント締めエラー","締め担当者を選択してください。","boothCloseStaff");
+    return;
+  }
+  try{
+    const latestRows=await sb(`booth_events?select=*&id=eq.${encodeURIComponent(event.id)}&limit=1`);
+    const latestEvent=Array.isArray(latestRows)&&latestRows[0]?latestRows[0]:null;
+    if(!latestEvent){
+      boothShowError("イベント締めエラー","イベントが見つかりません。");
+      return;
+    }
+    if(isBoothEventClosed(latestEvent)){
+      boothShowError("イベント締めエラー","このイベントはすでに締め済みです。");
+      return;
+    }
+    const summary=await loadBoothCloseSummary(latestEvent);
+    const body=[
+      "このイベントを締めます。",
+      "締め後は編集・削除できません。",
+      "在庫反映内容を確認してください。",
+      "",
+      `イベント名：${latestEvent.name||"-"}`,
+      `締め担当者：${staff}`,
+      `差異あり商品数：${summary.diffItemCount}`,
+      `差異合計数：${summary.diffTotal}`,
+      `未確認商品数：${summary.unconfirmedCount}`,
+      `通常棚へ戻す数：${summary.shelfReturnPendingQty}`,
+      "",
+      "スマレジ在庫更新APIは呼びません。",
+      "イベントピック・ガチャ・イベント保管は二重反映しません。",
+      "",
+      "実行しますか？"
+    ].join("\n");
+    const ok=typeof confirmAppAction==="function"
+      ? await confirmAppAction("イベント締め最終確認",body,{okText:"締め確定"})
+      : true;
+    if(!ok)return;
+    await finalizeBoothEventClose(latestEvent,summary,staff);
+  }catch(e){
+    boothShowError("イベント締めエラー","イベント締めに失敗しました。\n"+e.message);
+  }
+}
+
+async function reflectBoothShelfReturnsOnClose(summary,staff){
+  const now=new Date().toISOString();
+  for(const item of summary.shelfReturnPendingRows){
+    const qty=Number(item.shelf_return_qty||0);
+    if(qty<=0||!item.id||!item.barcode)continue;
+    const product=await findBoothProductByBarcode(item.barcode);
+    if(!product)throw new Error(`通常棚へ戻す商品が見つかりません：${item.barcode}`);
+    const nextStock=Number(product.base_stock||0)+qty;
+    await updateBoothProductBaseStock(item.barcode,nextStock);
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        shelf_return_reflected:true,
+        shelf_return_reflected_at:now,
+        shelf_return_reflected_by:staff,
+        updated_at:now
+      })
+    });
+  }
+}
+
+async function finalizeBoothEventClose(event,summary,staff){
+  const now=new Date().toISOString();
+  await reflectBoothShelfReturnsOnClose(summary,staff);
+  const updated=await sb(`booth_events?id=eq.${encodeURIComponent(event.id)}`,{
+    method:"PATCH",
+    headers:{Prefer:"return=representation"},
+    body:JSON.stringify({
+      status:"closed",
+      closed_at:now,
+      closed_by:staff
+    })
+  });
+  const closedEvent=Array.isArray(updated)&&updated[0]?updated[0]:{...event,status:"closed",closed_at:now,closed_by:staff};
+  boothEvents=boothEvents.map(row=>String(row.id)===String(event.id)?closedEvent:row);
+  boothCurrentEventId=String(event.id);
+  renderBoothEvents(boothEvents);
+  renderBoothEventDetail(closedEvent);
+  boothShowSuccess("イベント締め完了","イベントを締めました。締め後は編集・削除できません。");
 }
 
 function registerBoothCarryOutDraft(){
