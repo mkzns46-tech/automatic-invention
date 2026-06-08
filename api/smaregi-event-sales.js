@@ -1,4 +1,4 @@
-const DEFAULT_LIMIT = 1000;
+const DEFAULT_LIMIT = 100;
 
 function env(...names) {
   for (const name of names) {
@@ -167,7 +167,7 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
   return sales;
 }
 
-async function fetchTransactions(apiBase, token, context, fromDate, toDate, productIds) {
+async function fetchTransactions(apiBase, token, context, fromDate, toDate) {
   const rows = [];
   for (let page = 1; page <= 100; page += 1) {
     const url = new URL(apiBase + "/transactions");
@@ -177,9 +177,8 @@ async function fetchTransactions(apiBase, token, context, fromDate, toDate, prod
     url.searchParams.set("store_id", context.storeId);
     url.searchParams.set("terminal_tran_date_time-from", `${fromDate}T00:00:00+09:00`);
     url.searchParams.set("terminal_tran_date_time-to", `${toDate}T23:59:59+09:00`);
-    if (Array.isArray(productIds) && productIds.length === 1) {
-      url.searchParams.set("product_id", productIds[0]);
-    }
+    // /transactions does not support product_id as a query parameter.
+    // Product matching is done after transaction details are fetched.
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }
     });
@@ -216,7 +215,7 @@ module.exports = async function handler(req, res) {
     if (!context.targetTerminalId) throw new Error("イベント販売用レジIDが未設定です");
     const token = await getAccessToken(context);
     const apiBase = context.apiBase || `https://api.smaregi.jp/${context.contractId}/pos`;
-    const transactions = await fetchTransactions(apiBase, token, context, fromDate, toDate, productIds);
+    const transactions = await fetchTransactions(apiBase, token, context, fromDate, toDate);
     const productIdSet = new Set(productIds);
     const sales = normalizeSales(transactions, productIdSet, context.targetTerminalId);
 
