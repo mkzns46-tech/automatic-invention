@@ -697,6 +697,39 @@ async function reflectBoothShelfReturnsOnClose(summary,staff){
   }
 }
 
+async function loadBoothReflectedShelfReturnRows(eventId){
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,returned_qty,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_at&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&shelf_return_reflected=eq.true&order=product_name.asc`);
+  return (Array.isArray(rows)?rows:[]).map(row=>({
+    ...row,
+    shelf_return_effective_qty:getBoothCloseShelfReturnQty(row)
+  }));
+}
+
+async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
+  const now=new Date().toISOString();
+  const reflectedRows=await loadBoothReflectedShelfReturnRows(eventId);
+  for(const item of reflectedRows){
+    const qty=Number(item.shelf_return_effective_qty||0);
+    if(qty>0&&item.barcode){
+      const product=await findBoothProductByBarcode(item.barcode);
+      if(!product)throw new Error(`締め解除で戻す商品が見つかりません：${item.barcode}`);
+      const nextStock=Number(product.base_stock||0)-qty;
+      await updateBoothProductBaseStock(item.barcode,nextStock);
+    }
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        shelf_return_reflected:false,
+        shelf_return_reflected_at:null,
+        shelf_return_reflected_by:null,
+        updated_at:now
+      })
+    });
+  }
+  return reflectedRows.reduce((sum,row)=>sum+Number(row.shelf_return_effective_qty||0),0);
+}
+
 async function finalizeBoothEventClose(event,summary,staff){
   const now=new Date().toISOString();
   await reflectBoothShelfReturnsOnClose(summary,staff);
@@ -733,7 +766,7 @@ function renderBoothReopenPanel(event){
   area.innerHTML=`
     <section class="booth-work-card booth-reopen-card">
       <h4>締め解除</h4>
-      <p class="section-note">締め解除はイベントを再編集可能に戻すだけです。スマレジ在庫、products.base_stock、履歴は変更しません。</p>
+      <p class="section-note">締め解除はイベントを再編集可能に戻します。締め時に加算した通常棚戻し分だけ products.base_stock から減算し、スマレジ在庫APIは呼びません。</p>
       <div class="booth-close-event-info">
         <div><span>イベント名</span><strong>${esc(event.name||"-")}</strong></div>
         <div><span>締め日時</span><strong>${esc(formatBoothDateTime(event.closed_at))}</strong></div>
@@ -799,7 +832,8 @@ async function confirmBoothEventReopen(event){
       `解除担当者：${staff}`,
       `解除理由：${reasonText}`,
       "",
-      "スマレジ在庫・products.base_stock は変更しません。",
+      "締め時に加算した通常棚戻し分だけ products.base_stock から減算します。",
+      "スマレジ在庫APIは呼びません。",
       "",
       "実行しますか？"
     ].join("\n");
@@ -815,6 +849,7 @@ async function confirmBoothEventReopen(event){
 
 async function finalizeBoothEventReopen(event,staff,reason){
   const now=new Date().toISOString();
+  const revertedQty=await unreflectBoothShelfReturnsOnReopen(event.id,staff);
   const updated=await sb(`booth_events?id=eq.${encodeURIComponent(event.id)}`,{
     method:"PATCH",
     headers:{Prefer:"return=representation"},
@@ -840,7 +875,7 @@ async function finalizeBoothEventReopen(event,staff,reason){
   boothCurrentEventId=String(event.id);
   renderBoothEvents(boothEvents);
   renderBoothEventDetail(reopenedEvent);
-  boothShowSuccess("締め解除完了","イベントの締めを解除しました。再編集できます。");
+  boothShowSuccess("締め解除完了",`イベントの締めを解除しました。再編集できます。\n通常棚戻し反映を ${revertedQty} 点戻しました。`);
 }
 
 function registerBoothCarryOutDraft(){
