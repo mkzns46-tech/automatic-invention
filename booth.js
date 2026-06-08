@@ -717,6 +717,132 @@ async function finalizeBoothEventClose(event,summary,staff){
   boothShowSuccess("イベント締め完了","イベントを締めました。締め後は編集・削除できません。");
 }
 
+function renderBoothReopenPanel(event){
+  if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
+  if(!event||!event.id){
+    boothShowError("締め解除エラー","イベントが見つかりません。");
+    return;
+  }
+  if(!isBoothEventClosed(event)){
+    boothShowError("締め解除エラー","このイベントは締め済みではありません。");
+    return;
+  }
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  const staffOptions='<option value="">解除担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+  area.innerHTML=`
+    <section class="booth-work-card booth-reopen-card">
+      <h4>締め解除</h4>
+      <p class="section-note">締め解除はイベントを再編集可能に戻すだけです。スマレジ在庫、products.base_stock、履歴は変更しません。</p>
+      <div class="booth-close-event-info">
+        <div><span>イベント名</span><strong>${esc(event.name||"-")}</strong></div>
+        <div><span>締め日時</span><strong>${esc(formatBoothDateTime(event.closed_at))}</strong></div>
+        <div><span>締め担当者</span><strong>${esc(event.closed_by||"-")}</strong></div>
+        <div><span>状態</span><strong>${esc(getBoothStatusLabel(event.status))}</strong></div>
+      </div>
+      <div class="booth-reopen-form">
+        <label>解除担当者<span class="required">必須</span>
+          <select id="boothReopenStaff">${staffOptions}</select>
+        </label>
+        <label>解除理由<span class="required">必須</span>
+          <select id="boothReopenReason">
+            <option value="">解除理由を選択</option>
+            <option value="数量入力ミス">数量入力ミス</option>
+            <option value="戻り登録漏れ">戻り登録漏れ</option>
+            <option value="販売取り込み漏れ">販売取り込み漏れ</option>
+            <option value="ガチャ戻り漏れ">ガチャ戻り漏れ</option>
+            <option value="その他">その他</option>
+          </select>
+        </label>
+        <label>補足メモ
+          <input id="boothReopenMemo" autocomplete="off" placeholder="任意メモ">
+        </label>
+        <button type="button" id="boothReopenConfirmBtn">締め解除を実行</button>
+      </div>
+    </section>`;
+  el("boothReopenConfirmBtn")?.addEventListener("click",()=>confirmBoothEventReopen(event));
+}
+
+async function confirmBoothEventReopen(event){
+  if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
+  const staff=String(el("boothReopenStaff")?.value||"").trim();
+  const reason=String(el("boothReopenReason")?.value||"").trim();
+  const memo=String(el("boothReopenMemo")?.value||"").trim();
+  if(!staff){
+    boothShowError("締め解除エラー","解除担当者を選択してください。","boothReopenStaff");
+    return;
+  }
+  if(!reason){
+    boothShowError("締め解除エラー","解除理由を選択してください。","boothReopenReason");
+    return;
+  }
+  try{
+    const rows=await sb(`booth_events?select=*&id=eq.${encodeURIComponent(event.id)}&limit=1`);
+    const latestEvent=Array.isArray(rows)&&rows[0]?rows[0]:null;
+    if(!latestEvent){
+      boothShowError("締め解除エラー","イベントが見つかりません。");
+      return;
+    }
+    if(!isBoothEventClosed(latestEvent)){
+      boothShowError("締め解除エラー","このイベントは締め済みではありません。");
+      return;
+    }
+    const reasonText=memo?`${reason} / ${memo}`:reason;
+    const body=[
+      "このイベントの締めを解除します。",
+      "解除後は再編集できるようになります。",
+      "在庫や履歴を修正する場合は、再度締め処理を行ってください。",
+      "",
+      `イベント名：${latestEvent.name||"-"}`,
+      `締め日時：${formatBoothDateTime(latestEvent.closed_at)}`,
+      `締め担当者：${latestEvent.closed_by||"-"}`,
+      `解除担当者：${staff}`,
+      `解除理由：${reasonText}`,
+      "",
+      "スマレジ在庫・products.base_stock は変更しません。",
+      "",
+      "実行しますか？"
+    ].join("\n");
+    const ok=typeof confirmAppAction==="function"
+      ? await confirmAppAction("締め解除確認",body,{okText:"締め解除"})
+      : true;
+    if(!ok)return;
+    await finalizeBoothEventReopen(latestEvent,staff,reasonText);
+  }catch(e){
+    boothShowError("締め解除エラー","締め解除に失敗しました。\n"+e.message);
+  }
+}
+
+async function finalizeBoothEventReopen(event,staff,reason){
+  const now=new Date().toISOString();
+  const updated=await sb(`booth_events?id=eq.${encodeURIComponent(event.id)}`,{
+    method:"PATCH",
+    headers:{Prefer:"return=representation"},
+    body:JSON.stringify({
+      status:"active",
+      closed_at:null,
+      closed_by:null,
+      reopened_at:now,
+      reopened_by:staff,
+      reopen_reason:reason
+    })
+  });
+  const reopenedEvent=Array.isArray(updated)&&updated[0]?updated[0]:{
+    ...event,
+    status:"active",
+    closed_at:null,
+    closed_by:null,
+    reopened_at:now,
+    reopened_by:staff,
+    reopen_reason:reason
+  };
+  boothEvents=boothEvents.map(row=>String(row.id)===String(event.id)?reopenedEvent:row);
+  boothCurrentEventId=String(event.id);
+  renderBoothEvents(boothEvents);
+  renderBoothEventDetail(reopenedEvent);
+  boothShowSuccess("締め解除完了","イベントの締めを解除しました。再編集できます。");
+}
+
 function registerBoothCarryOutDraft(){
   const event=getBoothCurrentEvent();
   if(!event){
@@ -1345,6 +1471,7 @@ function renderBoothEventDetail(event){
   }
   detail.hidden=false;
   const closed=isBoothEventClosed(event);
+  const adminAuthed=typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
   const dateText=[event.event_start,event.event_end].filter(Boolean).join(" - ")||"-";
   const staffOptions='<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
   const detailOpen=window.innerWidth>800?" open":"";
@@ -1370,7 +1497,11 @@ function renderBoothEventDetail(event){
       <div class="booth-report-actions">
         <button type="button" id="boothCsvDownloadBtn" class="secondary">CSVダウンロード</button>
         <button type="button" id="boothPdfDownloadBtn" class="secondary">PDFダウンロード</button>
-      </div>`:""}
+        ${adminAuthed
+          ? `<button type="button" id="boothReopenEventBtn" class="secondary booth-reopen-btn">締め解除</button>`
+          : `<button type="button" class="secondary booth-reopen-btn" disabled>締め解除（管理者認証が必要）</button>`}
+      </div>
+      ${adminAuthed?"":`<div class="message booth-admin-required-note">締め解除には管理者認証が必要です。</div>`}`:""}
     <div class="booth-work-menu-title">作業内容を選んでください</div>
     <div class="booth-event-menu" aria-label="イベント内メニュー">
       <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">保管在庫持ち出し</button>
@@ -1452,6 +1583,7 @@ function renderBoothEventDetail(event){
   el("boothCarryOutSource")?.addEventListener("change",()=>previewBoothCarryOutProduct({popupOnError:false}));
   el("boothCsvDownloadBtn")?.addEventListener("click",showBoothReportPreparing);
   el("boothPdfDownloadBtn")?.addEventListener("click",showBoothReportPreparing);
+  el("boothReopenEventBtn")?.addEventListener("click",()=>renderBoothReopenPanel(event));
   updateBoothCameraZoomLabel();
   loadBoothCarryOutHistory(event.id);
 }
