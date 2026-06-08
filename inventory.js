@@ -699,6 +699,10 @@ async function registerBarcode(barcode){
       memo
     });
 
+    const visibleEventPickSourceLine=(!el("eventPickSourceLabel")?.hidden&&el("eventPickSourceSelect"))
+      ? `\n持ち出し元：${getEventPickSourceLabel(getEventPickSource())}`
+      : "";
+
     showMessage(type==="在庫修正"
       ?`在庫修正：${p.name} / 現在庫を ${qty} に上書き / 担当者：${staff}`
       :`${type}登録：${p.name} / 担当者：${staff} / 数量 ${qty} / 現在庫 ${newStock}`
@@ -707,7 +711,7 @@ async function registerBarcode(barcode){
     showPopup("登録完了",
       type==="在庫修正"
         ? `在庫修正\n商品名：${p.name}\n現在庫：${newStock}\n担当者：${staff}`
-        : `${type}登録\n商品名：${p.name}\n数量：${qty}\n現在庫：${newStock}\n担当者：${staff}`
+        : `${type}登録\n商品名：${p.name}${visibleEventPickSourceLine}\n数量：${qty}\n現在庫：${newStock}\n担当者：${staff}`
     );
 
     el("barcodeInput").value="";
