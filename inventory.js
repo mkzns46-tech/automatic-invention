@@ -240,7 +240,6 @@ async function renderScanPreview(){
     if(!p){
       info.textContent=`未登録バーコード：${barcode}`;
       info.className="message err";
-      showMessage(`未登録バーコード：${barcode}`,"err");
       return;
     }
 
@@ -249,7 +248,6 @@ async function renderScanPreview(){
   }catch(e){
     info.textContent="商品確認エラー。\n"+e.message;
     info.className="message err";
-    showMessage("商品確認エラー。\n"+e.message,"err");
   }
 }
 
