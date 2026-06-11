@@ -4306,6 +4306,21 @@ async function rollbackBoothEventStocksBeforeDelete(eventId){
     const eventStorageQty=Number(item.event_storage_qty||0);
     if(normalQty>0&&item.barcode){
       await adjustBoothProductBaseStock(item.barcode,normalQty);
+      await sb("inventory_logs",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({
+          type:"event_delete_return",
+          event_id:eventId,
+          staff:"イベント削除",
+          barcode:item.barcode,
+          product_name:item.product_name||"",
+          quantity:normalQty,
+          memo:"イベント削除ピック戻し",
+          affects_smaregi:false,
+          smaregi_delta:0
+        })
+      });
     }
     const storageDelta=storageTakeoutQty-eventStorageQty;
     if(storageDelta!==0&&item.barcode){

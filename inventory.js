@@ -21,6 +21,7 @@ function render(){
   renderStaffOptions();
   ensureEventPickSourceControl();
   renderEventPickOptions();
+  renderScrollableEventPickPicker();
   renderStaffList();
   renderProductCount();
   renderRecentRegistrationHistory();
@@ -50,7 +51,10 @@ function updateEquipmentMemoUi(){
     sourceLabel.style.display=canChooseSource?"":"none";
   }
   if(isEventPick&&typeof loadEventPickEvents==="function"&&!eventPickEvents.length){
-    loadEventPickEvents().then(renderEventPickOptions).catch(()=>{});
+    loadEventPickEvents().then(()=>{
+      renderEventPickOptions();
+      renderScrollableEventPickPicker();
+    }).catch(()=>{});
   }
 }
 
@@ -100,6 +104,75 @@ function renderEventPickOptions(){
 
 function findEventPickEvent(eventId){
   return (eventPickEvents||[]).find(event=>String(event.id)===String(eventId))||null;
+}
+
+function renderScrollableEventPickPicker(){
+  const select=el("eventPickEventSelect");
+  if(!select)return;
+  select.classList.add("event-pick-native-select");
+  let picker=el("eventPickEventPicker");
+  if(!picker){
+    picker=document.createElement("div");
+    picker.id="eventPickEventPicker";
+    picker.className="event-pick-picker";
+    select.insertAdjacentElement("afterend",picker);
+  }
+
+  const selectedEvent=findEventPickEvent(select.value);
+  const selectedLabel=selectedEvent?formatEventPickEventLabel(selectedEvent):"イベントを選択";
+  picker.innerHTML=`
+    <button type="button" class="event-pick-toggle" aria-expanded="false">${esc(selectedLabel)}</button>
+    <div class="event-pick-list" hidden>
+      <input type="search" class="event-pick-search" placeholder="イベント名・会場で検索">
+      <div class="event-pick-options"></div>
+    </div>`;
+
+  const toggle=picker.querySelector(".event-pick-toggle");
+  const list=picker.querySelector(".event-pick-list");
+  const search=picker.querySelector(".event-pick-search");
+  const options=picker.querySelector(".event-pick-options");
+
+  const renderOptions=()=>{
+    const keyword=String(search.value||"").trim().toLowerCase();
+    const filtered=(eventPickEvents||[]).filter(event=>{
+      const label=formatEventPickEventLabel(event).toLowerCase();
+      return !keyword||label.includes(keyword);
+    });
+    options.innerHTML=`
+      <button type="button" class="event-pick-option${!select.value?" is-selected":""}" data-event-id="">イベントを選択</button>
+      ${filtered.map(event=>{
+        const id=String(event.id);
+        return `<button type="button" class="event-pick-option${id===String(select.value)?" is-selected":""}" data-event-id="${esc(id)}">${esc(formatEventPickEventLabel(event))}</button>`;
+      }).join("")}
+      ${filtered.length?"":'<div class="event-pick-empty">該当イベントがありません</div>'}`;
+    options.querySelectorAll(".event-pick-option").forEach(option=>{
+      option.onclick=e=>{
+        e.stopPropagation();
+        select.value=option.dataset.eventId||"";
+        const event=findEventPickEvent(select.value);
+        toggle.textContent=event?formatEventPickEventLabel(event):"イベントを選択";
+        list.hidden=true;
+        toggle.setAttribute("aria-expanded","false");
+        select.dispatchEvent(new Event("change",{bubbles:true}));
+      };
+    });
+  };
+
+  toggle.onclick=e=>{
+    e.stopPropagation();
+    const willOpen=list.hidden;
+    document.querySelectorAll(".event-pick-list,.staff-picker-list").forEach(other=>{other.hidden=true;});
+    document.querySelectorAll(".event-pick-toggle,.staff-picker-toggle").forEach(other=>other.setAttribute("aria-expanded","false"));
+    list.hidden=!willOpen;
+    toggle.setAttribute("aria-expanded",String(willOpen));
+    if(willOpen){
+      renderOptions();
+      setTimeout(()=>search.focus(),0);
+    }
+  };
+  search.oninput=renderOptions;
+  list.onclick=e=>e.stopPropagation();
+  renderOptions();
 }
 
 function renderProductCount(){
@@ -169,6 +242,8 @@ function renderScrollableStaffPicker(selectId,pickerId){
 document.addEventListener("click",()=>{
   document.querySelectorAll(".staff-picker-list").forEach(list=>{list.hidden=true;});
   document.querySelectorAll(".staff-picker-toggle").forEach(toggle=>toggle.setAttribute("aria-expanded","false"));
+  document.querySelectorAll(".event-pick-list").forEach(list=>{list.hidden=true;});
+  document.querySelectorAll(".event-pick-toggle").forEach(toggle=>toggle.setAttribute("aria-expanded","false"));
 });
 
 function renderStaffList(){

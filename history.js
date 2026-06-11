@@ -2,6 +2,7 @@
 
 function inventoryTypeLabel(type){
   const labels={
+    event_delete_return:"イベント削除戻し",
     event_pick:"イベントピック",
     event_close_return:"イベント締め棚戻し",
     equipment_transfer:"備品転用",
@@ -16,6 +17,7 @@ function isInventoryOutType(type){
 }
 
 function isInventoryInType(type){
+  if(type==="event_delete_return")return true;
   return type==="入荷"||type==="gacha_return"||type==="event_close_return";
 }
 
@@ -390,7 +392,18 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
 }
 
 
+function ensureEventDeleteReturnHistoryFilterOption(){
+  const select=el("historyTypeFilter");
+  if(!select||select.querySelector('option[value="event_delete_return"]'))return;
+  const option=document.createElement("option");
+  option.value="event_delete_return";
+  option.textContent="イベント削除戻し";
+  const before=select.querySelector('option[value="gacha_pick"]');
+  select.insertBefore(option,before||null);
+}
+
 function getFilteredGlobalLogs(){
+  ensureEventDeleteReturnHistoryFilterOption();
   const type=String(el("historyTypeFilter")?.value||"");
   const product=String(el("historyProductFilter")?.value||"").trim().toLowerCase();
   const staff=String(el("historyStaffFilter")?.value||"").trim().toLowerCase();
