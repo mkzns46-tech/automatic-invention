@@ -554,6 +554,7 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
     const product=productMap.get(barcode)||{};
     rowsByBarcode.set(barcode,{
       id:item.id,
+      event_id:item.event_id,
       barcode,
       product_name:item.product_name||product.name||"",
       smaregi_product_id:product.smaregi_product_id||"",
@@ -586,6 +587,7 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
     const product=productMap.get(barcode)||{};
     const existing=rowsByBarcode.get(barcode)||{
       id:"",
+      event_id:item.event_id,
       barcode,
       product_name:item.product_name||product.name||"",
       smaregi_product_id:product.smaregi_product_id||"",
@@ -792,6 +794,37 @@ async function reflectBoothShelfReturnsOnClose(summary,staff){
       });
     }else{
       await adjustBoothProductBaseStock(item.barcode,delta);
+      await sb("inventory_logs",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({
+          type:"event_close_return",
+          event_id:item.event_id||boothCurrentEventId||null,
+          staff,
+          barcode:item.barcode,
+          product_name:item.product_name||"",
+          quantity:Math.abs(delta),
+          memo:delta>=0?"イベント締め棚戻し":"イベント締め棚戻し反映修正",
+          affects_smaregi:false,
+          smaregi_delta:0
+        })
+      });
+      await sb("booth_stock_movements",{
+        method:"POST",
+        headers:{Prefer:"return:minimal"},
+        body:JSON.stringify([{
+          event_id:item.event_id||boothCurrentEventId||null,
+          barcode:item.barcode,
+          product_name:item.product_name||"",
+          item_type:"normal",
+          movement_type:"event_close_return",
+          quantity:Math.abs(delta),
+          staff,
+          memo:delta>=0?"イベント締め棚戻し":"イベント締め棚戻し反映修正",
+          affects_smaregi:false,
+          smaregi_delta:0
+        }])
+      });
     }
     await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
       method:"PATCH",

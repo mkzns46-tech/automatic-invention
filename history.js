@@ -3,6 +3,7 @@
 function inventoryTypeLabel(type){
   const labels={
     event_pick:"イベントピック",
+    event_close_return:"イベント締め棚戻し",
     equipment_transfer:"備品転用",
     gacha_pick:"ガチャピック",
     gacha_return:"ガチャ戻り"
@@ -15,7 +16,7 @@ function isInventoryOutType(type){
 }
 
 function isInventoryInType(type){
-  return type==="入荷"||type==="gacha_return";
+  return type==="入荷"||type==="gacha_return"||type==="event_close_return";
 }
 
 function inventoryTypeMatchesFilter(logType,filterType){
