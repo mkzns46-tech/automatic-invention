@@ -497,6 +497,14 @@ function getBoothReturnProcessType(item){
   return "";
 }
 
+function getBoothCloseReturnProcessType(item){
+  return getBoothReturnProcessType(item)||(
+    Number(item?.returned_qty||0)>0&&Number(item?.event_storage_qty||0)<=0
+      ? "shelf"
+      : ""
+  );
+}
+
 function getBoothReturnProcessLabel(type){
   return String(type||"")==="storage"?"イベント保管":"通常棚へ戻す";
 }
@@ -566,8 +574,8 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
       shelf_return_qty:Number(item.shelf_return_qty||0),
       event_storage_qty:Number(item.event_storage_qty||0),
       shelf_return_effective_qty:getBoothCloseShelfReturnQty(item),
-      return_process_type:getBoothReturnProcessType(item),
-      return_process_label:getBoothReturnProcessLabel(getBoothReturnProcessType(item)),
+      return_process_type:getBoothCloseReturnProcessType(item),
+      return_process_label:getBoothReturnProcessLabel(getBoothCloseReturnProcessType(item)),
       return_reflected:isBoothReturnReflected(item),
       return_reflected_qty:getBoothReturnReflectedQty(item),
       return_reflect_qty:getBoothReturnReflectQty(item),
@@ -770,7 +778,7 @@ async function confirmBoothEventClose(event){
 async function reflectBoothShelfReturnsOnClose(summary,staff){
   const now=new Date().toISOString();
   for(const item of summary.returnPendingRows||summary.shelfReturnPendingRows||[]){
-    const processType=getBoothReturnProcessType(item);
+    const processType=getBoothCloseReturnProcessType(item);
     const effectiveQty=getBoothReturnReflectQty(item);
     const delta=getBoothReturnReflectDelta(item);
     if(delta===0||!item.id||!item.barcode)continue;
@@ -848,8 +856,19 @@ async function reflectBoothShelfReturnsOnClose(summary,staff){
 }
 
 async function ensureBoothCloseReturnHistory(summary,staff){
-  for(const item of summary.rows||[]){
-    const processType=getBoothReturnProcessType(item);
+  const summaryRows=summary.rows||[];
+  const eventId=(summaryRows.find(row=>row.event_id)?.event_id)||boothCurrentEventId||null;
+  let rows=summaryRows;
+  if(eventId){
+    const dbRows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,shelf_return_qty,event_storage_qty,return_process_type,return_reflected,return_reflected_qty,shelf_return_reflected,shelf_return_reflected_qty&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&order=product_name.asc`);
+    if(Array.isArray(dbRows)&&dbRows.length)rows=dbRows.map(row=>({
+      ...row,
+      shelf_return_effective_qty:getBoothCloseShelfReturnQty(row),
+      return_reflected_qty:getBoothReturnReflectedQty(row)
+    }));
+  }
+  for(const item of rows){
+    const processType=getBoothCloseReturnProcessType(item);
     if(processType!=="shelf")continue;
     const qty=getBoothReturnReflectedQty(item)||getBoothReturnReflectQty(item)||getBoothCloseShelfReturnQty(item);
     const eventId=item.event_id||boothCurrentEventId||null;
