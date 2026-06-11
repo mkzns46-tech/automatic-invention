@@ -41,17 +41,96 @@ const INVENTORY_ADMIN_PASSWORD="S3edc##530.";
 const INVENTORY_ADMIN_AUTHENTICATED_AT_KEY="arico_inventory_admin_authenticated_at";
 const INVENTORY_ADMIN_AUTH_DURATION_MS=12*60*60*1000;
 const SMAREGI_CONTEXT_STORAGE_KEY="arico_current_smaregi_context";
+const ARICO_CURRENT_STAFF_STORAGE_KEY="arico_current_staff_name";
 const SMAREGI_CONTEXT_OPTIONS={
   stores:[
-    {key:"tokyo",label:"東京"},
-    {key:"aichi",label:"愛知"}
+    {key:"tokyo",label:"東京",badge:"TOKYO",className:"is-tokyo"},
+    {key:"aichi",label:"愛知",badge:"AICHI",className:"is-aichi"},
+    {key:"nagano",label:"長野",badge:"NAGANO",className:"is-nagano"}
   ]
 };
 window.currentSmaregiAccount="production";
 window.currentStore="tokyo";
+window.currentStaffName=localStorage.getItem(ARICO_CURRENT_STAFF_STORAGE_KEY)||"";
 
 function getSmaregiContextOption(list,key,fallbackKey){
   return list.find(item=>item.key===key)||list.find(item=>item.key===fallbackKey)||list[0];
+}
+
+function getStoreInfoByCode(storeCode){
+  return getSmaregiContextOption(SMAREGI_CONTEXT_OPTIONS.stores,String(storeCode||"").toLowerCase(),"tokyo");
+}
+
+function getStoreCodeFromName(storeName){
+  const name=String(storeName||"").trim();
+  const found=SMAREGI_CONTEXT_OPTIONS.stores.find(item=>item.label===name||item.badge===name||item.key===name.toLowerCase());
+  return found ? found.key : "";
+}
+
+function normalizeStaffStoreCode(staff){
+  const code=String(staff?.store_code||staff?.storeCode||"").toLowerCase().trim();
+  if(code)return getStoreInfoByCode(code).key;
+  const fromName=getStoreCodeFromName(staff?.store_name||staff?.storeName||"");
+  return fromName||"";
+}
+
+function getStaffStoreName(staff){
+  const code=normalizeStaffStoreCode(staff);
+  return code ? getStoreInfoByCode(code).label : String(staff?.store_name||staff?.storeName||"未設定");
+}
+
+function getStaffDisplayName(staff){
+  const name=String(staff?.name||"").trim();
+  if(!name)return "";
+  return `${name}（${getStaffStoreName(staff)}）`;
+}
+
+function findStaffMemberByValue(value){
+  const raw=String(value||"").trim();
+  if(!raw||typeof staffMembers==="undefined")return null;
+  return (staffMembers||[]).find(staff=>{
+    const name=String(staff?.name||"").trim();
+    return raw===getStaffDisplayName(staff)||raw===name||raw===String(staff?.id||"");
+  })||null;
+}
+
+function setCurrentStaffName(staffValue){
+  const staff=findStaffMemberByValue(staffValue);
+  const display=staff ? getStaffDisplayName(staff) : String(staffValue||"").trim();
+  window.currentStaffName=display;
+  if(display)localStorage.setItem(ARICO_CURRENT_STAFF_STORAGE_KEY,display);
+  else localStorage.removeItem(ARICO_CURRENT_STAFF_STORAGE_KEY);
+  return staff;
+}
+
+function applyStoreFromStaffValue(staffValue){
+  const staff=setCurrentStaffName(staffValue);
+  const storeCode=normalizeStaffStoreCode(staff);
+  if(storeCode)setCurrentSmaregiContext(storeCode);
+  updateSmaregiContextSelector();
+  return staff;
+}
+
+function enforceStaffStoreMatch(staffValue,title="店舗確認エラー",focusId=""){
+  const staff=findStaffMemberByValue(staffValue);
+  if(!staff){
+    if(typeof showMessage==="function")showMessage("担当者を選択してください。","err");
+    if(focusId&&el(focusId))el(focusId).focus();
+    return false;
+  }
+  const staffStoreCode=normalizeStaffStoreCode(staff);
+  if(!staffStoreCode){
+    if(typeof showMessage==="function")showMessage("担当者の所属店舗が未設定です。","err");
+    if(focusId&&el(focusId))el(focusId).focus();
+    return false;
+  }
+  const context=getCurrentSmaregiContext();
+  if(staffStoreCode!==context.storeCode){
+    if(typeof showMessage==="function")showMessage("担当者の所属店舗と処理店舗が一致しません","err");
+    if(focusId&&el(focusId))el(focusId).focus();
+    return false;
+  }
+  return true;
 }
 
 function getCurrentSmaregiContext(){
@@ -120,11 +199,11 @@ function updateSmaregiContextSelector(){
   const badge=el("smaregiContextBadge");
   if(store)store.value=context.storeCode;
   if(badge){
-    const storeBadge=context.storeCode==="aichi" ? "AICHI" : "TOKYO";
+    const storeInfo=getStoreInfoByCode(context.storeCode);
+    const staffText=window.currentStaffName||localStorage.getItem(ARICO_CURRENT_STAFF_STORAGE_KEY)||"未選択";
     badge.classList.toggle("is-production",true);
-    badge.classList.toggle("is-tokyo",context.storeCode==="tokyo");
-    badge.classList.toggle("is-aichi",context.storeCode==="aichi");
-    badge.innerHTML=`<span>接続先：${esc(context.accountName)}</span><strong>${esc(storeBadge)}</strong><span>店舗：${esc(context.storeName)}</span>`;
+    SMAREGI_CONTEXT_OPTIONS.stores.forEach(item=>badge.classList.toggle(item.className,context.storeCode===item.key));
+    badge.innerHTML=`<span>接続先：${esc(context.accountName)}</span><strong>${esc(storeInfo.badge)}</strong><span>店舗：${esc(context.storeName)}</span><span>担当者：${esc(staffText)}</span>`;
   }
 }
 
@@ -132,8 +211,9 @@ function renderSmaregiConnectionSelector(){
   const root=el("smaregiContextBar");
   if(!root)return;
   const context=getCurrentSmaregiContext();
-  const storeClass=context.storeCode==="aichi" ? "is-aichi" : "is-tokyo";
-  const storeBadge=context.storeCode==="aichi" ? "AICHI" : "TOKYO";
+  const storeInfo=getStoreInfoByCode(context.storeCode);
+  const storeClass=storeInfo.className;
+  const storeBadge=storeInfo.badge;
   root.innerHTML=`
     <div id="smaregiContextBadge" class="smaregi-context-badge is-production ${storeClass}">
       <span>接続先：${esc(context.accountName)}</span>
@@ -154,6 +234,14 @@ function renderSmaregiConnectionSelector(){
     });
   }
 }
+
+document.addEventListener("change",event=>{
+  const target=event.target;
+  if(!(target instanceof HTMLSelectElement))return;
+  const staff=findStaffMemberByValue(target.value);
+  if(!staff)return;
+  applyStoreFromStaffValue(target.value);
+});
 
 function getInventoryAppMenuItemHtml(item){
   const attrs=`class="inventory-app-menu-item" data-menu-key="${esc(item.key)}" ${item.disabled?"disabled":""} ${item.title?`title="${esc(item.title)}"`:""}`;

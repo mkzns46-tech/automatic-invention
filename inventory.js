@@ -108,7 +108,8 @@ function renderProductCount(){
 }
 
 function renderStaffOptions(){
-  const options='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
+  const staffLabel=s=>typeof getStaffDisplayName==="function" ? getStaffDisplayName(s) : (s.name||"");
+  const options='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(staffLabel(s))}">${esc(staffLabel(s))}</option>`).join("");
 
   const staff=el("staff");
   if(staff){
@@ -121,7 +122,7 @@ function renderStaffOptions(){
   const smaregiChecker=el("smaregiCheckerName");
   if(smaregiChecker){
     const cur=smaregiChecker.value||localStorage.getItem("arico_smaregi_checker")||"";
-    smaregiChecker.innerHTML='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
+    smaregiChecker.innerHTML='<option value="">担当者を選択</option>'+staffMembers.map(s=>`<option value="${esc(staffLabel(s))}">${esc(staffLabel(s))}</option>`).join("");
     if(cur)smaregiChecker.value=cur;
   }
   renderScrollableStaffPicker("staff","staffPicker");
@@ -135,10 +136,11 @@ function renderScrollableStaffPicker(selectId,pickerId){
 
   select.classList.add("staff-native-select");
   const selected=String(select.value||"");
+  const staffLabel=member=>typeof getStaffDisplayName==="function" ? getStaffDisplayName(member) : (member.name||"");
   picker.innerHTML=`
     <button type="button" class="staff-picker-toggle" aria-expanded="false">${esc(selected||"担当者を選択")}</button>
     <div class="staff-picker-list" hidden>
-      ${staffMembers.map(member=>`<button type="button" class="staff-picker-option${member.name===selected?" is-selected":""}" data-staff-name="${esc(member.name)}">${esc(member.name)}</button>`).join("")}
+      ${staffMembers.map(member=>`<button type="button" class="staff-picker-option${staffLabel(member)===selected?" is-selected":""}" data-staff-name="${esc(staffLabel(member))}">${esc(staffLabel(member))}</button>`).join("")}
     </div>`;
 
   const toggle=picker.querySelector(".staff-picker-toggle");
@@ -155,6 +157,7 @@ function renderScrollableStaffPicker(selectId,pickerId){
     option.onclick=e=>{
       e.stopPropagation();
       select.value=option.dataset.staffName||"";
+      if(typeof applyStoreFromStaffValue==="function")applyStoreFromStaffValue(select.value);
       list.hidden=true;
       toggle.textContent=select.value||"担当者を選択";
       toggle.setAttribute("aria-expanded","false");
@@ -178,9 +181,10 @@ function renderStaffList(){
   body.innerHTML=staffMembers.map(s=>`
     <tr>
       <td>${esc(s.name)}</td>
+      <td>${esc(typeof getStaffStoreName==="function" ? getStaffStoreName(s) : (s.store_name||s.store_code||"未設定"))}</td>
       <td>
         <div class="staff-action-group">
-          <button type="button" class="staff-edit-btn secondary" data-staff-id="${s.id}" data-staff-name="${esc(s.name)}">編集</button>
+          <button type="button" class="staff-edit-btn secondary" data-staff-id="${s.id}" data-staff-name="${esc(s.name)}" data-staff-store="${esc(s.store_code||"")}">編集</button>
           <button type="button" class="staff-delete-btn" data-staff-id="${s.id}">削除</button>
         </div>
       </td>
@@ -188,7 +192,7 @@ function renderStaffList(){
   `).join("");
 
   document.querySelectorAll(".staff-edit-btn").forEach(btn=>{
-    btn.onclick=()=>editStaff(btn.dataset.staffId,btn.dataset.staffName);
+    btn.onclick=()=>editStaff(btn.dataset.staffId,btn.dataset.staffName,btn.dataset.staffStore);
   });
   document.querySelectorAll(".staff-delete-btn").forEach(btn=>{
     btn.onclick=()=>deleteStaff(btn.dataset.staffId);
@@ -200,18 +204,25 @@ async function saveStaff(e){
   if(!requireInventoryPrivilegedAccess())return;
   try{
     const name=el("staffNameInput").value.trim();
+    const storeCode=String(el("staffStoreInput")?.value||"").trim();
     if(!name){
       showMessage("担当者名を入力してください。","err");
       return;
     }
+    if(!storeCode){
+      showMessage("所属店舗を選択してください。","err");
+      return;
+    }
+    const storeInfo=typeof getStoreInfoByCode==="function" ? getStoreInfoByCode(storeCode) : {key:storeCode,label:storeCode};
 
-    await sb("staff_members?on_conflict=name",{
+    await sb("staff_members?on_conflict=name,store_code",{
       method:"POST",
       headers:{Prefer:"resolution=merge-duplicates,return=minimal"},
-      body:JSON.stringify([{name}])
+      body:JSON.stringify([{name,store_code:storeInfo.key,store_name:storeInfo.label}])
     });
 
     el("staffNameInput").value="";
+    if(el("staffStoreInput"))el("staffStoreInput").value="";
     showMessage(`担当者を追加しました：${name}`,"ok");
     await reloadAll();
   }catch(e){
@@ -234,15 +245,17 @@ async function deleteStaff(id){
   }
 }
 
-async function editStaff(id,currentName){
+async function editStaff(id,currentName,currentStoreCode=""){
   if(!requireInventoryPrivilegedAccess())return;
   try{
     const name=String(prompt("変更後の担当者名を入力してください。",currentName||"")||"").trim();
-    if(!name||name===currentName)return;
+    if(!name)return;
+    const storeCode=String(prompt("所属店舗コードを入力してください。tokyo / aichi / nagano",currentStoreCode||"tokyo")||"").trim().toLowerCase();
+    const storeInfo=typeof getStoreInfoByCode==="function" ? getStoreInfoByCode(storeCode) : {key:storeCode,label:storeCode};
     await sb(`staff_members?id=eq.${encodeURIComponent(id)}`,{
       method:"PATCH",
       headers:{Prefer:"return=minimal"},
-      body:JSON.stringify({name})
+      body:JSON.stringify({name,store_code:storeInfo.key,store_name:storeInfo.label})
     });
     showMessage(`担当者名を変更しました：${name}`,"ok");
     await reloadAll();
@@ -647,6 +660,11 @@ async function registerBarcode(barcode){
       return;
     }
 
+    const requiresStaffStoreMatch=type==="備品転用"||type==="在庫修正"||isEventPick||(type==="出荷"&&eventPickSource==="storage");
+    if(requiresStaffStoreMatch&&typeof enforceStaffStoreMatch==="function"&&!enforceStaffStoreMatch(staff,"店舗確認エラー","staff")){
+      return;
+    }
+
     if(isEventPick&&!eventPickEvent){
       showMessage("イベントピックするイベントを選択してください。","err");
       el("eventPickEventSelect")?.focus();
@@ -1021,6 +1039,9 @@ async function confirmEquipmentTransfer(logId,button=null){
   if(!checkedBy){
     showMessage("確認する担当者を選択してください。","err");
     el("staffPicker")?.querySelector(".staff-picker-toggle")?.focus();
+    return;
+  }
+  if(typeof enforceStaffStoreMatch==="function"&&!enforceStaffStoreMatch(checkedBy,"店舗確認エラー","staff")){
     return;
   }
   if(!logId){

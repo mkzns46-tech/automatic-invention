@@ -37,6 +37,14 @@
     <label>担当者名
       <input id="staffNameInput" placeholder="例：田中" />
     </label>
+    <label>所属店舗 <span class="required">必須</span>
+      <select id="staffStoreInput">
+        <option value="">店舗を選択</option>
+        <option value="tokyo">東京</option>
+        <option value="aichi">愛知</option>
+        <option value="nagano">長野</option>
+      </select>
+    </label>
     <button type="submit">担当者を追加</button>
   </form>
 
@@ -45,6 +53,7 @@
       <thead>
         <tr>
           <th>担当者名</th>
+          <th>所属店舗</th>
           <th>操作</th>
         </tr>
       </thead>

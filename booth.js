@@ -31,6 +31,22 @@ function showBoothLocalMessage(text,type=""){
   }
 }
 
+function getBoothStaffDisplayName(staff){
+  return typeof getStaffDisplayName==="function" ? getStaffDisplayName(staff) : (staff?.name||"");
+}
+
+function getBoothStaffOptions(placeholder="担当者を選択"){
+  return `<option value="">${esc(placeholder)}</option>`+((staffMembers||[]).map(staff=>{
+    const label=getBoothStaffDisplayName(staff);
+    return `<option value="${esc(label)}">${esc(label)}</option>`;
+  }).join(""));
+}
+
+function validateBoothStaffStore(staffValue,title="店舗確認エラー",focusId=""){
+  if(typeof enforceStaffStoreMatch==="function")return enforceStaffStoreMatch(staffValue,title,focusId);
+  return true;
+}
+
 async function loadBoothEvents(){
   try{
     showBoothLocalMessage("イベントを読み込み中...");
@@ -61,8 +77,7 @@ function renderBoothShell(){
             </label>
             <label>作成者<span class="required">必須</span>
               <select id="boothEventCreatedBy">
-                <option value="">担当者を選択</option>
-                ${(staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join("")}
+                ${getBoothStaffOptions()}
               </select>
             </label>
           </div>
@@ -238,6 +253,10 @@ async function createBoothEvent(){
     el("boothEventEnd")?.focus();
     return;
   }
+  if(!validateBoothStaffStore(created_by,"店舗確認エラー","boothEventCreatedBy"))return;
+  const createContext=typeof getCurrentSmaregiContext==="function"
+    ? getCurrentSmaregiContext()
+    : {storeCode:"tokyo",storeName:"東京"};
 
   if(typeof confirmAppAction==="function"){
     const ok=await confirmAppAction(
@@ -257,6 +276,8 @@ async function createBoothEvent(){
       event_start,
       event_end,
       created_by,
+      store_code:createContext.storeCode,
+      store_name:createContext.storeName,
       memo,
       status:"draft"
     };
@@ -626,7 +647,7 @@ function renderBoothCloseConfirmPanel(event,summary){
   const context=getBoothCloseStoreContext(event);
   const period=[event.event_start,event.event_end].filter(Boolean).join(" ～ ")||"-";
   const staffOptions='<option value="">締め担当者を選択</option>'+((staffMembers||[]).map(staff=>{
-    const name=staff.name||"";
+    const name=getBoothStaffDisplayName(staff);
     return `<option value="${esc(name)}" ${name===event.created_by?"selected":""}>${esc(name)}</option>`;
   }).join(""));
   const warning=summary.unconfirmedCount>0
@@ -880,7 +901,7 @@ function renderBoothReopenPanel(event){
   }
   const area=el("boothEventWorkArea");
   if(!area)return;
-  const staffOptions='<option value="">解除担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+  const staffOptions=getBoothStaffOptions("解除担当者を選択");
   area.innerHTML=`
     <section class="booth-work-card booth-reopen-card">
       <h4>締め解除</h4>
@@ -1106,7 +1127,7 @@ function renderBoothEventDetail(event){
   }
   detail.hidden=false;
   const dateText=[event.event_start,event.event_end].filter(Boolean).join(" - ")||"-";
-  const staffOptions='<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+  const staffOptions=getBoothStaffOptions();
   detail.innerHTML=`
     <div class="booth-detail-header">
       <div>
@@ -1560,6 +1581,7 @@ async function registerBoothCarryOut(){
     boothShowError("持ち出し登録エラー","担当者を選択してください。","boothCarryOutStaff");
     return;
   }
+  if(!validateBoothStaffStore(staff,"店舗確認エラー","boothCarryOutStaff"))return;
 
   try{
     const product=await findBoothProductByBarcode(barcode);
@@ -1626,7 +1648,7 @@ function renderBoothEventDetail(event){
   const closed=isBoothEventClosed(event);
   const adminAuthed=typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
   const dateText=[event.event_start,event.event_end].filter(Boolean).join(" - ")||"-";
-  const staffOptions='<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+  const staffOptions=getBoothStaffOptions();
   const detailOpen=window.innerWidth>800?" open":"";
   detail.innerHTML=`
     <div class="booth-detail-header booth-detail-title-only">
@@ -1952,7 +1974,7 @@ function renderBoothReturnPanel(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   const closed=isBoothEventClosed(event);
-  const staffOptions='<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+  const staffOptions=getBoothStaffOptions();
   area.innerHTML=`
     <section class="booth-work-card booth-return-card">
       <h4>棚戻し棚卸し</h4>
@@ -2190,6 +2212,7 @@ async function registerBoothCarryOut(){
     boothShowError("持ち出し登録エラー","担当者を選択してください。","boothCarryOutStaff");
     return;
   }
+  if(!validateBoothStaffStore(staff,"店舗確認エラー","boothCarryOutStaff"))return;
 
   try{
     const product=await findBoothProductByBarcode(barcode);
@@ -2622,7 +2645,7 @@ async function upsertBoothGachaEventItem(event,product,quantity,action){
 }
 
 function getBoothGachaStaffOptions(){
-  return '<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+  return getBoothStaffOptions();
 }
 
 function renderBoothGachaPanel(event){
@@ -2723,6 +2746,7 @@ async function validateBoothGachaForm(action){
     boothShowError("ガチャ登録エラー","担当者を選択してください。","boothGachaStaff");
     return null;
   }
+  if(!validateBoothStaffStore(staff,"店舗確認エラー","boothGachaStaff"))return null;
   const product=await findBoothProductByBarcode(barcode);
   if(!product){
     boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothGachaBarcode");
@@ -2877,7 +2901,7 @@ async function loadBoothGachaHistory(eventId){
 }
 
 function getBoothSalesStaffOptions(){
-  return '<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+  return getBoothStaffOptions();
 }
 
 function getBoothSalesContext(){
@@ -3421,7 +3445,7 @@ async function loadBoothStorageList(eventId){
 }
 
 function getBoothStorageStaffOptions(){
-  return '<option value="">担当者を選択</option>'+((staffMembers||[]).map(staff=>`<option value="${esc(staff.name||"")}">${esc(staff.name||"")}</option>`).join(""));
+  return getBoothStaffOptions();
 }
 
 function renderBoothStorageList(rows){

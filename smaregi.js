@@ -644,6 +644,9 @@ async function completeSmaregiStockCheck(){
   }else if(!confirm(message))return;
   try{
     const completedBy=getSmaregiCheckerName();
+    if(typeof enforceStaffStoreMatch==="function"&&!enforceStaffStoreMatch(completedBy,"店舗確認エラー","smaregiCheckerName")){
+      return;
+    }
     const appliedCount=await applySmaregiActualStocksToSheet(completedBy);
     const completed_at=new Date().toISOString();
     await sb(`smaregi_stock_snapshots?id=eq.${encodeURIComponent(smaregiSnapshot.id)}`,{
@@ -748,6 +751,9 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
     if(!checked_by){
       showMessage("担当者を選択してください","err");
       el("smaregiCheckerName")?.focus();
+      return false;
+    }
+    if(typeof enforceStaffStoreMatch==="function"&&!enforceStaffStoreMatch(checked_by,"店舗確認エラー","smaregiCheckerName")){
       return false;
     }
     if(typeof confirmAppAction==="function"){

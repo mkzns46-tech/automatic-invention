@@ -4233,6 +4233,10 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   border:1px solid #dcebe1;
   border-radius:14px;
   background:#f8fcf9;
+  position:sticky;
+  top:0;
+  z-index:1200;
+  box-shadow:0 8px 18px rgba(27,67,50,.08);
 }
 .smaregi-context-bar label{
   margin:0;
@@ -4259,12 +4263,28 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   color:#1b4332;
   font-size:13px;
   font-weight:900;
-  white-space:nowrap;
+  white-space:normal;
+  overflow-wrap:anywhere;
 }
 .smaregi-context-badge.is-production{
   background:#d8f3dc;
   color:#1b4332;
   border:1px solid #95d5b2;
+}
+.smaregi-context-badge.is-tokyo{
+  background:#d8f3dc;
+  color:#0f5132;
+  border-color:#95d5b2;
+}
+.smaregi-context-badge.is-aichi{
+  background:#dbeafe;
+  color:#1e3a8a;
+  border-color:#93c5fd;
+}
+.smaregi-context-badge.is-nagano{
+  background:#ffedd5;
+  color:#7c2d12;
+  border-color:#fdba74;
 }
 .smaregi-context-badge strong{
   display:inline-flex;
@@ -4275,8 +4295,9 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   font-size:12px;
   letter-spacing:.04em;
 }
-.smaregi-context-badge.is-tokyo strong{background:#2563eb}
-.smaregi-context-badge.is-aichi strong{background:#7c3aed}
+.smaregi-context-badge.is-tokyo strong{background:#2d6a4f}
+.smaregi-context-badge.is-aichi strong{background:#2563eb}
+.smaregi-context-badge.is-nagano strong{background:#f97316}
 .app-confirm-actions{
   display:grid;
   grid-template-columns:1fr 1fr;
