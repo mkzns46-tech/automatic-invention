@@ -811,7 +811,7 @@ async function reflectBoothShelfReturnsOnClose(summary,staff){
       });
       await sb("booth_stock_movements",{
         method:"POST",
-        headers:{Prefer:"return:minimal"},
+        headers:{Prefer:"return=minimal"},
         body:JSON.stringify([{
           event_id:item.event_id||boothCurrentEventId||null,
           barcode:item.barcode,
@@ -844,6 +844,57 @@ async function reflectBoothShelfReturnsOnClose(summary,staff){
         updated_at:now
       })
     });
+  }
+}
+
+async function ensureBoothCloseReturnHistory(summary,staff){
+  for(const item of summary.rows||[]){
+    const processType=getBoothReturnProcessType(item);
+    if(processType!=="shelf")continue;
+    const qty=getBoothReturnReflectedQty(item)||getBoothReturnReflectQty(item)||getBoothCloseShelfReturnQty(item);
+    const eventId=item.event_id||boothCurrentEventId||null;
+    if(!eventId||!item.barcode||qty<=0)continue;
+
+    const eventFilter=encodeURIComponent(eventId);
+    const barcodeFilter=encodeURIComponent(item.barcode);
+    const existingLogs=await sb(`inventory_logs?select=id&type=eq.event_close_return&event_id=eq.${eventFilter}&barcode=eq.${barcodeFilter}&limit=1`);
+    if(!Array.isArray(existingLogs)||existingLogs.length===0){
+      await sb("inventory_logs",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({
+          type:"event_close_return",
+          event_id:eventId,
+          staff,
+          barcode:item.barcode,
+          product_name:item.product_name||"",
+          quantity:qty,
+          memo:"イベント締め棚戻し",
+          affects_smaregi:false,
+          smaregi_delta:0
+        })
+      });
+    }
+
+    const existingMovements=await sb(`booth_stock_movements?select=id&movement_type=eq.event_close_return&event_id=eq.${eventFilter}&barcode=eq.${barcodeFilter}&limit=1`);
+    if(!Array.isArray(existingMovements)||existingMovements.length===0){
+      await sb("booth_stock_movements",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify([{
+          event_id:eventId,
+          barcode:item.barcode,
+          product_name:item.product_name||"",
+          item_type:"normal",
+          movement_type:"event_close_return",
+          quantity:qty,
+          staff,
+          memo:"イベント締め棚戻し",
+          affects_smaregi:false,
+          smaregi_delta:0
+        }])
+      });
+    }
   }
 }
 
@@ -905,6 +956,7 @@ async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
 async function finalizeBoothEventClose(event,summary,staff){
   const now=new Date().toISOString();
   await reflectBoothShelfReturnsOnClose(summary,staff);
+  await ensureBoothCloseReturnHistory(summary,staff);
   const updated=await sb(`booth_events?id=eq.${encodeURIComponent(event.id)}`,{
     method:"PATCH",
     headers:{Prefer:"return=representation"},
