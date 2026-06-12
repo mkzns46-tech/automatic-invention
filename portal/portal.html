@@ -7,8 +7,8 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=1">
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png?v=1">
 <meta name="theme-color" content="#2d6a4f">
-<link rel="stylesheet" href="style.css">
-<script src="auth.js"></script>
+<link rel="stylesheet" href="../style.css">
+<script src="../auth.js"></script>
 <script>
 const ARICO_PORTAL_LOGIN_KEY = "arico_portal_login";
 const ARICO_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
@@ -16,13 +16,13 @@ const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 const ARICO_INVENTORY_URL = "https://automatic-invention-eight.vercel.app/";
 
 (function(){
-  if(!checkAuthOrRedirect("index.html"))return;
+  if(!checkAuthOrRedirect("../index.html"))return;
 })();
 
 function aricoLogout(){
   clearAuthSession();
   sessionStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
-  location.href = "index.html";
+  location.href = "../index.html";
 }
 
 function createPortalToken(){
