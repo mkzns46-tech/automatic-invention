@@ -22,7 +22,7 @@ const ARICO_INVENTORY_URL = "https://automatic-invention-eight.vercel.app/";
 function aricoLogout(){
   clearAuthSession();
   sessionStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
-  location.href = "../index.html";
+  location.href = "https://arico-portal.vercel.app/index.html";
 }
 
 function createPortalToken(){
@@ -51,7 +51,7 @@ function openSales(){
 <div class="top-actions">
 <a class="pill active" href="portal.html">日本語</a>
 <a class="pill" href="portal_ko.html">한국어</a>
-<a class="pill" href="#" onclick="aricoLogout(); return false;">システムログイン画面に戻る</a>
+<a class="pill" href="#" onclick="aricoLogout(); return false;">ログアウト</a>
 </div>
 </div>
 
@@ -62,7 +62,7 @@ function openSales(){
     <p>在庫管理・棚卸・スマレジ連携</p>
   </a>
 
-  <a class="box" href="#" onclick="openSales(); return false;">
+  <a class="box" href="https://automatic-invention-eight.vercel.app/sales/sales-login.html" onclick="openSales(); return false;">
     <h3>販売管理</h3>
     <p>見積書・請求書・入金確認などの販売業務</p>
   </a>
