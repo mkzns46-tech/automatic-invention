@@ -430,6 +430,7 @@ function renderBoothEventDetail(event){
     </div>
     <div class="booth-work-menu-title">作業内容を選んでください</div>
     <div class="booth-event-menu" aria-label="イベント内メニュー">
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="copy">前回イベントコピー</button>
       <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">保管在庫持ち出し</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="return">戻り棚卸</button>
@@ -507,6 +508,14 @@ function switchBoothEventMenu(menu){
   const event=getBoothCurrentEvent();
   if(!event){
     if(typeof showMessage==="function")showMessage("イベントを開いてから操作してください。","err");
+    return;
+  }
+  if(menu==="copy"){
+    renderBoothCopyPanel(event);
+    return;
+  }
+  if(menu==="copy"){
+    renderBoothCopyPanel(event);
     return;
   }
   if(menu==="carry-out"){
@@ -1373,6 +1382,33 @@ function renderBoothCopyCard(event,closed=false){
   workArea.parentNode.insertBefore(section,workArea);
 }
 
+function renderBoothCopyPanel(event){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  const closed=isBoothEventClosed(event);
+  area.innerHTML=`
+    <section id="boothCopyCard" class="booth-copy-card">
+      <div>
+        <h4>前回イベントコピー</h4>
+        <p class="section-note">前回イベントの実績を、今回イベントのピッキング予定リストとしてコピーします。コピー時点では在庫・履歴・スマレジ在庫は変更しません。</p>
+      </div>
+      <div class="booth-copy-row">
+        <label>コピー元イベント
+          <select id="boothCopySourceEvent">
+            <option value="">コピー元イベントを選択</option>
+            ${getBoothCopySourceEventOptions(event)}
+          </select>
+        </label>
+        <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${closed?"disabled":""}>予定リストへコピー</button>
+      </div>
+      <div id="boothPlannedList" class="booth-planned-list">
+        <div class="booth-empty">予定リストを読み込み中...</div>
+      </div>
+    </section>`;
+  el("boothCopyPreviousEventBtn")?.addEventListener("click",()=>copyPreviousBoothEventPlan(event.id));
+  loadBoothPlannedItems(event.id);
+}
+
 async function fetchBoothPlanSourceItems(eventId){
   const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
   return Array.isArray(rows)?rows:[];
@@ -2082,6 +2118,7 @@ function renderBoothEventDetail(event){
       ${adminAuthed?"":`<div class="message booth-admin-required-note">締め解除には管理者認証が必要です。</div>`}`:""}
     <div class="booth-work-menu-title">作業内容を選んでください</div>
     <div class="booth-event-menu" aria-label="イベント内メニュー">
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="copy">前回イベントコピー</button>
       <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">保管在庫持ち出し</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="gacha">ガチャ管理</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
@@ -2176,6 +2213,10 @@ function switchBoothEventMenu(menu){
   const lockedMenus=["gacha","sales","return","storage","close"];
   if(isBoothEventClosed(event)&&lockedMenus.includes(menu)){
     showBoothClosedError();
+    return;
+  }
+  if(menu==="copy"){
+    renderBoothCopyPanel(event);
     return;
   }
   if(menu==="carry-out"){
