@@ -250,7 +250,11 @@ function updateSmaregiContextSelector(){
     warning.hidden=true;
     bar.insertBefore(warning,bar.children[1]||null);
   }
-  if(store)store.value=context.storeCode;
+  if(store){
+    const wrapper=store.closest("label");
+    if(wrapper)wrapper.remove();
+    else store.remove();
+  }
   if(badge){
     const storeInfo=getStoreInfoByCode(context.storeCode);
     const staffText=window.currentStaffName||localStorage.getItem(ARICO_CURRENT_STAFF_STORAGE_KEY)||"未選択";
@@ -273,12 +277,7 @@ function renderSmaregiConnectionSelector(){
       <span>接続先：${esc(context.accountName)}</span>
       <strong>${esc(storeBadge)}</strong>
       <span>店舗：${esc(context.storeName)}</span>
-    </div>
-    <label>店舗
-      <select id="smaregiStoreSelect" aria-label="店舗">
-        ${SMAREGI_CONTEXT_OPTIONS.stores.map(item=>`<option value="${esc(item.key)}">${esc(item.label)}</option>`).join("")}
-      </select>
-    </label>`;
+    </div>`;
   updateSmaregiContextSelector();
   const input=el("smaregiStoreSelect");
   if(input){
