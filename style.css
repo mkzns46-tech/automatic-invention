@@ -4872,3 +4872,41 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     width:100% !important;
   }
 }
+
+.booth-copy-card{
+  display:grid;
+  gap:12px;
+  margin:14px 0;
+  padding:14px;
+  border:1px solid #dcebe1;
+  border-radius:14px;
+  background:#f8fcf9;
+}
+.booth-copy-card h4{
+  margin:0 0 4px;
+  color:#1b4332;
+}
+.booth-copy-row{
+  display:grid;
+  grid-template-columns:minmax(220px,1fr) auto;
+  gap:10px;
+  align-items:end;
+}
+.booth-copy-row label{
+  margin:0;
+}
+.booth-copy-row button{
+  margin:0;
+  min-height:44px;
+}
+.booth-planned-list{
+  display:block;
+}
+@media(max-width:800px){
+  .booth-copy-row{
+    grid-template-columns:1fr;
+  }
+  .booth-copy-row button{
+    width:100%;
+  }
+}

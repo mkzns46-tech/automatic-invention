@@ -439,6 +439,42 @@ function renderBoothEventDetail(event){
       <button type="button" class="booth-event-menu-btn" data-booth-menu="diff">差異確認</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="close">イベント締め</button>
     </div>
+    <section class="booth-copy-card">
+      <div>
+        <h4>前回イベントコピー</h4>
+        <p class="section-note">コピー時はピッキング予定数量だけ保存します。在庫・履歴・スマレジ在庫は変更しません。</p>
+      </div>
+      <div class="booth-copy-row">
+        <label>コピー元イベント
+          <select id="boothCopySourceEvent">
+            <option value="">コピー元イベントを選択</option>
+            ${getBoothCopySourceEventOptions(event)}
+          </select>
+        </label>
+        <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${isBoothEventClosed(event)?"disabled":""}>予定リストへコピー</button>
+      </div>
+      <div id="boothPlannedList" class="booth-planned-list">
+        <div class="booth-empty">予定リストを読み込み中...</div>
+      </div>
+    </section>
+    <section class="booth-copy-card">
+      <div>
+        <h4>前回イベントコピー</h4>
+        <p class="section-note">コピー時はピッキング予定数量だけ保存します。在庫・履歴・スマレジ在庫は変更しません。</p>
+      </div>
+      <div class="booth-copy-row">
+        <label>コピー元イベント
+          <select id="boothCopySourceEvent">
+            <option value="">コピー元イベントを選択</option>
+            ${getBoothCopySourceEventOptions(event)}
+          </select>
+        </label>
+        <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${closed?"disabled":""}>予定リストへコピー</button>
+      </div>
+      <div id="boothPlannedList" class="booth-planned-list">
+        <div class="booth-empty">予定リストを読み込み中...</div>
+      </div>
+    </section>
     <div id="boothEventWorkArea" class="booth-work-area">
       <section class="booth-work-card booth-carry-out-card">
         <h4>持ち出しスキャン</h4>
@@ -458,6 +494,8 @@ function renderBoothEventDetail(event){
         <div class="booth-empty">まだ持ち出し履歴はありません。</div>
       </section>
     </div>`;
+
+  renderBoothCopyCard(event,closed);
 
   detail.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
     button.addEventListener("click",()=>switchBoothEventMenu(button.dataset.boothMenu));
@@ -1296,6 +1334,189 @@ function boothShowSuccess(title,text){
   if(typeof showPopup==="function")showPopup(title,text);
 }
 
+function getBoothEventCopyLabel(event){
+  const dateText=[event?.event_start,event?.event_end].filter(Boolean).join(" - ")||"日程未設定";
+  return `${event?.name||"無題イベント"}（${dateText}） / ${event?.venue||"-"}`;
+}
+
+function getBoothCopySourceEventOptions(targetEvent){
+  return (boothEvents||[])
+    .filter(event=>String(event.id)!==String(targetEvent?.id||""))
+    .map(event=>`<option value="${esc(event.id)}">${esc(getBoothEventCopyLabel(event))}</option>`)
+    .join("");
+}
+
+function renderBoothCopyCard(event,closed=false){
+  const workArea=el("boothEventWorkArea");
+  if(!workArea)return;
+  el("boothCopyCard")?.remove();
+  const section=document.createElement("section");
+  section.id="boothCopyCard";
+  section.className="booth-copy-card";
+  section.innerHTML=`
+    <div>
+      <h4>前回イベントコピー</h4>
+      <p class="section-note">コピー時はピッキング予定数量だけ保存します。在庫・履歴・スマレジ在庫は変更しません。</p>
+    </div>
+    <div class="booth-copy-row">
+      <label>コピー元イベント
+        <select id="boothCopySourceEvent">
+          <option value="">コピー元イベントを選択</option>
+          ${getBoothCopySourceEventOptions(event)}
+        </select>
+      </label>
+      <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${closed?"disabled":""}>予定リストへコピー</button>
+    </div>
+    <div id="boothPlannedList" class="booth-planned-list">
+      <div class="booth-empty">予定リストを読み込み中...</div>
+    </div>`;
+  workArea.parentNode.insertBefore(section,workArea);
+}
+
+async function fetchBoothPlanSourceItems(eventId){
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
+  return Array.isArray(rows)?rows:[];
+}
+
+async function findBoothPlanTargetItem(eventId,barcode,itemType){
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,item_type&event_id=eq.${encodeURIComponent(eventId)}&barcode=eq.${encodeURIComponent(barcode)}&item_type=eq.${encodeURIComponent(itemType)}&limit=1`);
+  return Array.isArray(rows)&&rows[0]?rows[0]:null;
+}
+
+async function saveBoothPlannedItem(eventId,item){
+  const itemType=String(item.item_type||"normal");
+  const barcode=String(item.barcode||"").trim();
+  if(!barcode)return false;
+  const now=new Date().toISOString();
+  const productName=item.product_name||"";
+  const target=await findBoothPlanTargetItem(eventId,barcode,itemType);
+  const normalActual=Number(item.normal_takeout_qty||0);
+  const storageActual=Number(item.storage_takeout_qty||0);
+  const takenActual=Number(item.taken_qty||0);
+  const plannedNormal=itemType==="normal" ? (normalActual||(!storageActual?takenActual:0)) : 0;
+  const plannedStorage=itemType==="normal" ? storageActual : 0;
+  const plannedGacha=itemType==="gacha_prize" ? takenActual : 0;
+  const payload={
+    product_name:productName,
+    planned_normal_takeout_qty:plannedNormal,
+    planned_storage_takeout_qty:plannedStorage,
+    planned_gacha_qty:plannedGacha,
+    updated_at:now
+  };
+  if(target){
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(target.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify(payload)
+    });
+    return true;
+  }
+  await sb("booth_event_items",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      event_id:eventId,
+      barcode,
+      product_name:productName,
+      item_type:itemType,
+      taken_qty:0,
+      normal_takeout_qty:0,
+      storage_takeout_qty:0,
+      sold_qty:0,
+      returned_qty:0,
+      consumed_qty:0,
+      difference_qty:0,
+      planned_normal_takeout_qty:plannedNormal,
+      planned_storage_takeout_qty:plannedStorage,
+      planned_gacha_qty:plannedGacha,
+      updated_at:now
+    }])
+  });
+  return true;
+}
+
+async function loadBoothPlannedItems(eventId){
+  const list=el("boothPlannedList");
+  if(!list)return;
+  try{
+    list.innerHTML='<div class="booth-empty">予定リストを読み込み中...</div>';
+    const rows=await sb(`booth_event_items?select=barcode,product_name,item_type,planned_normal_takeout_qty,planned_storage_takeout_qty,planned_gacha_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
+    const planned=(Array.isArray(rows)?rows:[]).filter(row=>
+      Number(row.planned_normal_takeout_qty||0)>0||
+      Number(row.planned_storage_takeout_qty||0)>0||
+      Number(row.planned_gacha_qty||0)>0
+    );
+    if(!planned.length){
+      list.innerHTML='<div class="booth-empty">ピッキング予定リストはまだありません。</div>';
+      return;
+    }
+    list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table">
+      <thead><tr><th>商品名</th><th>バーコード</th><th>通常棚予定</th><th>保管在庫予定</th><th>ガチャ予定</th></tr></thead>
+      <tbody>${planned.map(row=>`<tr>
+        <td>${esc(row.product_name||"-")}</td>
+        <td>${esc(row.barcode||"-")}</td>
+        <td>${esc(Number(row.planned_normal_takeout_qty||0))}</td>
+        <td>${esc(Number(row.planned_storage_takeout_qty||0))}</td>
+        <td>${esc(Number(row.planned_gacha_qty||0))}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`;
+  }catch(e){
+    list.innerHTML='<div class="booth-empty">予定リストを読み込めませんでした。</div>';
+  }
+}
+
+async function copyPreviousBoothEventPlan(targetEventId){
+  if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
+  const targetEvent=boothEvents.find(event=>String(event.id)===String(targetEventId));
+  if(!targetEvent){
+    boothShowError("前回イベントコピーエラー","コピー先イベントが見つかりません。");
+    return;
+  }
+  if(isBoothEventClosed(targetEvent)){
+    boothShowError("前回イベントコピーエラー","締め済みイベントにはコピーできません。");
+    return;
+  }
+  const sourceEventId=String(el("boothCopySourceEvent")?.value||"").trim();
+  if(!sourceEventId){
+    boothShowError("前回イベントコピーエラー","コピー元イベントを選択してください。","boothCopySourceEvent");
+    return;
+  }
+  const sourceEvent=boothEvents.find(event=>String(event.id)===sourceEventId);
+  const execute=async()=>{
+    try{
+      const sourceItems=await fetchBoothPlanSourceItems(sourceEventId);
+      const copyItems=sourceItems.filter(item=>{
+        const itemType=String(item.item_type||"normal");
+        if(itemType==="gacha_prize")return Number(item.taken_qty||0)>0;
+        return Number(item.normal_takeout_qty||0)>0||Number(item.storage_takeout_qty||0)>0||Number(item.taken_qty||0)>0;
+      });
+      if(!copyItems.length){
+        boothShowError("前回イベントコピーエラー","コピーできるピッキング実績がありません。");
+        return;
+      }
+      let count=0;
+      for(const item of copyItems){
+        if(await saveBoothPlannedItem(targetEventId,item))count++;
+      }
+      await loadBoothPlannedItems(targetEventId);
+      boothShowSuccess("前回イベントコピー完了",`予定リストへ ${count} 件コピーしました。\n在庫・履歴・スマレジ在庫は変更していません。`);
+    }catch(e){
+      boothShowError("前回イベントコピーエラー","前回イベントコピーに失敗しました。\n"+e.message);
+    }
+  };
+  const body=[
+    `コピー元：${sourceEvent?getBoothEventCopyLabel(sourceEvent):sourceEventId}`,
+    `コピー先：${getBoothEventCopyLabel(targetEvent)}`,
+    "",
+    "コピー時は予定数量だけ保存します。",
+    "products.base_stock、event_storage_stocks、スマレジ在庫、inventory_logs、booth_stock_movements は変更しません。",
+    "",
+    "実行しますか？"
+  ].join("\n");
+  if(typeof showBoothConfirmPopup==="function")showBoothConfirmPopup("前回イベントコピー確認",body,execute);
+  else await execute();
+}
+
 function renderBoothEventDetail(event){
   const detail=el("boothEventDetailRoot");
   if(!detail)return;
@@ -1386,6 +1607,8 @@ function renderBoothEventDetail(event){
   detail.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
     button.addEventListener("click",()=>switchBoothEventMenu(button.dataset.boothMenu));
   });
+  renderBoothCopyCard(event,isBoothEventClosed(event));
+  el("boothCopyPreviousEventBtn")?.addEventListener("click",()=>copyPreviousBoothEventPlan(event.id));
   el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOut);
   el("reloadBoothCarryOutHistoryBtn")?.addEventListener("click",()=>loadBoothCarryOutHistory(event.id));
   el("boothStartCameraBtn")?.addEventListener("click",()=>{
@@ -1396,6 +1619,7 @@ function renderBoothEventDetail(event){
   el("boothCameraZoomRange")?.addEventListener("input",applyBoothCameraZoom);
   updateBoothCameraZoomLabel();
   loadBoothCarryOutHistory(event.id);
+  loadBoothPlannedItems(event.id);
 }
 
 async function findBoothProductByBarcode(barcode){
@@ -1924,6 +2148,7 @@ function renderBoothEventDetail(event){
   detail.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
     button.addEventListener("click",()=>switchBoothEventMenu(button.dataset.boothMenu));
   });
+  el("boothCopyPreviousEventBtn")?.addEventListener("click",()=>copyPreviousBoothEventPlan(event.id));
   el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOut);
   el("reloadBoothCarryOutHistoryBtn")?.addEventListener("click",()=>loadBoothCarryOutHistory(event.id));
   el("boothStartCameraBtn")?.addEventListener("click",()=>{
@@ -1939,6 +2164,7 @@ function renderBoothEventDetail(event){
   el("boothReopenEventBtn")?.addEventListener("click",()=>renderBoothReopenPanel(event));
   updateBoothCameraZoomLabel();
   loadBoothCarryOutHistory(event.id);
+  loadBoothPlannedItems(event.id);
 }
 
 function switchBoothEventMenu(menu){
