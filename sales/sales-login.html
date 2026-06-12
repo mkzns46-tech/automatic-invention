@@ -3,51 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARICO ARCHERY 販売管理ログイン</title>
-<link rel="stylesheet" href="sales-style.css">
-<script src="sales-auth.js"></script>
+<meta http-equiv="refresh" content="0; url=https://automatic-invention-eight.vercel.app/sales/sales-login.html">
+<title>販売管理ログインへ移動中</title>
+<script>
+location.replace("https://automatic-invention-eight.vercel.app/sales/sales-login.html");
+</script>
 </head>
 <body>
-<main class="sales-wrap">
-  <section class="card login-card">
-    <div class="login-topbar">
-      <div>
-        <div class="brand">ARICO ARCHERY</div>
-        <h1>販売管理ログイン</h1>
-        <p class="lead">販売管理を利用するには認証が必要です。</p>
-      </div>
-      <div class="sales-actions login-actions">
-        <a class="pill" href="https://automatic-invention-eight.vercel.app/portal/portal.html">システム入口に戻る</a>
-        <a class="pill" href="https://arico-portal.vercel.app/index.html" onclick="clearSalesAuth();">ログアウト</a>
-      </div>
-    </div>
-
-    <label>販売管理パスワード
-      <input id="salesPassword" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitSalesLogin();">
-    </label>
-    <button type="button" class="primary" onclick="submitSalesLogin();">ログイン</button>
-    <div id="salesMessage" class="message hidden"></div>
-  </section>
-</main>
-<script>
-async function submitSalesLogin() {
-  const message = document.getElementById("salesMessage");
-  message.classList.remove("hidden");
-  message.className = "message";
-  message.textContent = "認証中...";
-  try {
-    await loginSalesAdmin(document.getElementById("salesPassword").value);
-    const params = new URLSearchParams(location.search);
-    location.href = params.get("next") || "index.html";
-  } catch (e) {
-    message.className = "message err";
-    message.textContent = e.message || "認証に失敗しました。";
-  }
-}
-if (hasSalesAuth()) {
-  const params = new URLSearchParams(location.search);
-  location.href = params.get("next") || "index.html";
-}
-</script>
+<p><a href="https://automatic-invention-eight.vercel.app/sales/sales-login.html">販売管理ログインへ移動</a></p>
 </body>
 </html>
