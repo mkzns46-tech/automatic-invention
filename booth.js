@@ -402,6 +402,59 @@ function getBoothCurrentEvent(){
   return boothEvents.find(row=>String(row.id)===String(boothCurrentEventId||""))||null;
 }
 
+async function exportPreviousBoothEventPlanCsv(targetEventId){
+  const sourceEventId=String(el("boothCopySourceEvent")?.value||"").trim();
+  if(!sourceEventId){
+    boothShowError("前回イベントCSV出力エラー","コピー元イベントを選択してください。","boothCopySourceEvent");
+    return;
+  }
+  try{
+    const sourceEvent=boothEvents.find(event=>String(event.id)===sourceEventId);
+    const rows=await fetchBoothPlanSourceItems(sourceEventId);
+    const exportRows=(Array.isArray(rows)?rows:[]).filter(item=>{
+      const planned=getBoothPlannedCopyNumbers(item);
+      return planned.plannedNormal>0||planned.plannedStorage>0||planned.plannedGacha>0;
+    });
+    if(!exportRows.length){
+      boothShowError("前回イベントCSV出力エラー","CSV出力できる前回イベント実績がありません。");
+      return;
+    }
+    const csvRows=[
+      ["商品名","バーコード","通常棚予定数","保管在庫予定数","ガチャ予定数","前回販売数","前回戻り数","前回差異"],
+      ...exportRows.map(item=>{
+        const planned=getBoothPlannedCopyNumbers(item);
+        return [
+          item.product_name||"",
+          item.barcode||"",
+          planned.plannedNormal,
+          planned.plannedStorage,
+          planned.plannedGacha,
+          Number(item.sold_qty||0),
+          Number(item.returned_qty||0),
+          Number(item.difference_qty||0)
+        ];
+      })
+    ];
+    const safeName=String(sourceEvent?.name||"previous_event").replace(/[\\/:*?"<>|]/g,"_");
+    const filename=`previous_event_copy_${safeName}_${new Date().toISOString().slice(0,10)}.csv`;
+    if(typeof downloadCsvFile==="function")downloadCsvFile(filename,csvRows);
+    else{
+      const csv=csvRows.map(row=>row.map(value=>`"${String(value??"").replaceAll('"','""')}"`).join(",")).join("\r\n");
+      const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url;
+      a.download=filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{try{document.body.removeChild(a);}catch(_){} URL.revokeObjectURL(url);},1000);
+    }
+    boothShowSuccess("前回イベントCSV出力完了",`CSVを出力しました：${exportRows.length}件\n在庫・履歴・スマレジ在庫は変更していません。`);
+  }catch(e){
+    boothShowError("前回イベントCSV出力エラー","CSV出力に失敗しました。\n"+e.message);
+  }
+}
+
 function renderBoothEventDetail(event){
   const detail=el("boothEventDetailRoot");
   if(!detail)return;
@@ -453,6 +506,7 @@ function renderBoothEventDetail(event){
           </select>
         </label>
         <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${isBoothEventClosed(event)?"disabled":""}>予定リストへコピー</button>
+        <button type="button" id="boothCopyCsvBtn" class="secondary">CSV出力</button>
       </div>
       <div id="boothPlannedList" class="booth-planned-list">
         <div class="booth-empty">予定リストを読み込み中...</div>
@@ -471,6 +525,7 @@ function renderBoothEventDetail(event){
           </select>
         </label>
         <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${closed?"disabled":""}>予定リストへコピー</button>
+        <button type="button" id="boothCopyCsvBtn" class="secondary">CSV出力</button>
       </div>
       <div id="boothPlannedList" class="booth-planned-list">
         <div class="booth-empty">予定リストを読み込み中...</div>
@@ -514,6 +569,9 @@ function switchBoothEventMenu(menu){
     renderBoothCopyPanel(event);
     return;
   }
+  document.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
+    button.classList.toggle("is-active",button.dataset.boothMenu===menu);
+  });
   if(menu==="copy"){
     renderBoothCopyPanel(event);
     return;
@@ -522,9 +580,6 @@ function switchBoothEventMenu(menu){
     renderBoothEventDetail(event);
     return;
   }
-  document.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
-    button.classList.toggle("is-active",button.dataset.boothMenu===menu);
-  });
   if(menu==="return"){
     renderBoothReturnPanel(event);
     return;
@@ -1375,6 +1430,7 @@ function renderBoothCopyCard(event,closed=false){
         </select>
       </label>
       <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${closed?"disabled":""}>予定リストへコピー</button>
+        <button type="button" id="boothCopyCsvBtn" class="secondary">CSV出力</button>
     </div>
     <div id="boothPlannedList" class="booth-planned-list">
       <div class="booth-empty">予定リストを読み込み中...</div>
@@ -1400,18 +1456,32 @@ function renderBoothCopyPanel(event){
           </select>
         </label>
         <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${closed?"disabled":""}>予定リストへコピー</button>
+        <button type="button" id="boothCopyCsvBtn" class="secondary">CSV出力</button>
       </div>
       <div id="boothPlannedList" class="booth-planned-list">
         <div class="booth-empty">予定リストを読み込み中...</div>
       </div>
     </section>`;
   el("boothCopyPreviousEventBtn")?.addEventListener("click",()=>copyPreviousBoothEventPlan(event.id));
+  el("boothCopyCsvBtn")?.addEventListener("click",()=>exportPreviousBoothEventPlanCsv(event.id));
   loadBoothPlannedItems(event.id);
 }
 
 async function fetchBoothPlanSourceItems(eventId){
-  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,difference_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
   return Array.isArray(rows)?rows:[];
+}
+
+function getBoothPlannedCopyNumbers(item){
+  const itemType=String(item?.item_type||"normal");
+  const normalActual=Number(item?.normal_takeout_qty||0);
+  const storageActual=Number(item?.storage_takeout_qty||0);
+  const takenActual=Number(item?.taken_qty||0);
+  return {
+    plannedNormal:itemType==="normal" ? (normalActual||(!storageActual?takenActual:0)) : 0,
+    plannedStorage:itemType==="normal" ? storageActual : 0,
+    plannedGacha:itemType==="gacha_prize" ? takenActual : 0
+  };
 }
 
 async function findBoothPlanTargetItem(eventId,barcode,itemType){
@@ -1426,12 +1496,7 @@ async function saveBoothPlannedItem(eventId,item){
   const now=new Date().toISOString();
   const productName=item.product_name||"";
   const target=await findBoothPlanTargetItem(eventId,barcode,itemType);
-  const normalActual=Number(item.normal_takeout_qty||0);
-  const storageActual=Number(item.storage_takeout_qty||0);
-  const takenActual=Number(item.taken_qty||0);
-  const plannedNormal=itemType==="normal" ? (normalActual||(!storageActual?takenActual:0)) : 0;
-  const plannedStorage=itemType==="normal" ? storageActual : 0;
-  const plannedGacha=itemType==="gacha_prize" ? takenActual : 0;
+  const {plannedNormal,plannedStorage,plannedGacha}=getBoothPlannedCopyNumbers(item);
   const payload={
     product_name:productName,
     planned_normal_takeout_qty:plannedNormal,
@@ -1645,6 +1710,7 @@ function renderBoothEventDetail(event){
   });
   renderBoothCopyCard(event,isBoothEventClosed(event));
   el("boothCopyPreviousEventBtn")?.addEventListener("click",()=>copyPreviousBoothEventPlan(event.id));
+  el("boothCopyCsvBtn")?.addEventListener("click",()=>exportPreviousBoothEventPlanCsv(event.id));
   el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOut);
   el("reloadBoothCarryOutHistoryBtn")?.addEventListener("click",()=>loadBoothCarryOutHistory(event.id));
   el("boothStartCameraBtn")?.addEventListener("click",()=>{
@@ -2186,6 +2252,7 @@ function renderBoothEventDetail(event){
     button.addEventListener("click",()=>switchBoothEventMenu(button.dataset.boothMenu));
   });
   el("boothCopyPreviousEventBtn")?.addEventListener("click",()=>copyPreviousBoothEventPlan(event.id));
+  el("boothCopyCsvBtn")?.addEventListener("click",()=>exportPreviousBoothEventPlanCsv(event.id));
   el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOut);
   el("reloadBoothCarryOutHistoryBtn")?.addEventListener("click",()=>loadBoothCarryOutHistory(event.id));
   el("boothStartCameraBtn")?.addEventListener("click",()=>{
@@ -2215,6 +2282,9 @@ function switchBoothEventMenu(menu){
     showBoothClosedError();
     return;
   }
+  document.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
+    button.classList.toggle("is-active",button.dataset.boothMenu===menu);
+  });
   if(menu==="copy"){
     renderBoothCopyPanel(event);
     return;
@@ -2223,9 +2293,6 @@ function switchBoothEventMenu(menu){
     renderBoothEventDetail(event);
     return;
   }
-  document.querySelectorAll(".booth-event-menu-btn").forEach(button=>{
-    button.classList.toggle("is-active",button.dataset.boothMenu===menu);
-  });
   if(menu==="return"){
     renderBoothReturnPanel(event);
     return;
