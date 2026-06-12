@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARICO PORTAL</title>
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=1">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png?v=1">
+<meta name="theme-color" content="#2d6a4f">
+<link rel="stylesheet" href="style.css">
+<script src="auth.js"></script>
+<script>
+const ARICO_PORTAL_LOGIN_KEY = "arico_portal_login";
+const ARICO_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
+const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
+const ARICO_INVENTORY_URL = "https://automatic-invention-eight.vercel.app/";
+
+(function(){
+  localStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
+  if(!checkAuthOrRedirect("index.html"))return;
+})();
+
+function aricoLogout(){
+  clearAuthSession();
+  localStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
+  sessionStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
+  location.href = "index.html";
+}
+
+function createPortalToken(){
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+function openInventory(){
+  location.href = buildInventoryAuthUrl(ARICO_INVENTORY_URL);
+}
+
+function openSales(){
+  location.href = "../sales/sales-login.html";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const grid = document.querySelector(".grid");
+  if (!grid || document.getElementById("salesPortalCard")) return;
+  const salesCard = document.createElement("a");
+  salesCard.className = "box";
+  salesCard.id = "salesPortalCard";
+  salesCard.href = "#";
+  salesCard.onclick = () => {
+    openSales();
+    return false;
+  };
+  salesCard.innerHTML = "<h3>販売管理</h3><p>見積書・請求書・入金確認などの販売業務</p>";
+  const firstCard = grid.querySelector(".box");
+  if (firstCard && firstCard.nextSibling) {
+    grid.insertBefore(salesCard, firstCard.nextSibling);
+  } else {
+    grid.appendChild(salesCard);
+  }
+});
+</script>
+</head>
+<body>
+<main class="wrap">
+<section class="card">
+<div class="topbar">
+<div>
+<div class="brand">ARICO TOKYO</div>
+<h1>システム入口</h1>
+</div>
+<div class="top-actions">
+<a class="pill active" href="portal.html">日本語</a>
+<a class="pill" href="portal_ko.html">한국어</a>
+<a class="pill" href="#" onclick="aricoLogout(); return false;">ログアウト</a>
+</div>
+</div>
+
+<div class="grid">
+<a class="box" href="#" onclick="openInventory(); return false;">
+<h3>在庫確認アプリ</h3>
+<p>在庫管理・棚卸・スマレジ連携</p>
+</a>
+
+<a class="box disabled" href="#" onclick="alert('レンタルリム管理 は現在作成中です。'); return false;">
+<h3>レンタルリム管理</h3>
+<p>作成中</p>
+</a>
+
+<a class="box disabled" href="#" onclick="alert('出荷前検品 は現在作成中です。'); return false;">
+<h3>出荷前検品</h3>
+<p>作成中</p>
+</a>
+</div>
+</section>
+</main>
+</body>
+</html>
