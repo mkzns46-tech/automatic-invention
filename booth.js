@@ -507,6 +507,7 @@ function renderBoothEventDetail(event){
         </label>
         <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${isBoothEventClosed(event)?"disabled":""}>予定リストへコピー</button>
         <button type="button" id="boothCopyCsvBtn" class="secondary">CSV出力</button>
+        <button type="button" id="boothCopyPdfBtn" class="secondary">PDF出力</button>
       </div>
       <div id="boothPlannedList" class="booth-planned-list">
         <div class="booth-empty">予定リストを読み込み中...</div>
@@ -526,6 +527,7 @@ function renderBoothEventDetail(event){
         </label>
         <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${closed?"disabled":""}>予定リストへコピー</button>
         <button type="button" id="boothCopyCsvBtn" class="secondary">CSV出力</button>
+        <button type="button" id="boothCopyPdfBtn" class="secondary">PDF出力</button>
       </div>
       <div id="boothPlannedList" class="booth-planned-list">
         <div class="booth-empty">予定リストを読み込み中...</div>
@@ -1431,6 +1433,7 @@ function renderBoothCopyCard(event,closed=false){
       </label>
       <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${closed?"disabled":""}>予定リストへコピー</button>
         <button type="button" id="boothCopyCsvBtn" class="secondary">CSV出力</button>
+        <button type="button" id="boothCopyPdfBtn" class="secondary">PDF出力</button>
     </div>
     <div id="boothPlannedList" class="booth-planned-list">
       <div class="booth-empty">予定リストを読み込み中...</div>
@@ -1457,6 +1460,7 @@ function renderBoothCopyPanel(event){
         </label>
         <button type="button" id="boothCopyPreviousEventBtn" class="secondary" ${closed?"disabled":""}>予定リストへコピー</button>
         <button type="button" id="boothCopyCsvBtn" class="secondary">CSV出力</button>
+        <button type="button" id="boothCopyPdfBtn" class="secondary">PDF出力</button>
       </div>
       <div id="boothPlannedList" class="booth-planned-list">
         <div class="booth-empty">予定リストを読み込み中...</div>
@@ -1464,11 +1468,12 @@ function renderBoothCopyPanel(event){
     </section>`;
   el("boothCopyPreviousEventBtn")?.addEventListener("click",()=>copyPreviousBoothEventPlan(event.id));
   el("boothCopyCsvBtn")?.addEventListener("click",()=>exportPreviousBoothEventPlanCsv(event.id));
+  el("boothCopyPdfBtn")?.addEventListener("click",()=>exportPreviousBoothEventPlanPdf(event.id));
   loadBoothPlannedItems(event.id);
 }
 
 async function fetchBoothPlanSourceItems(eventId){
-  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,difference_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
   return Array.isArray(rows)?rows:[];
 }
 
@@ -1482,6 +1487,211 @@ function getBoothPlannedCopyNumbers(item){
     plannedStorage:itemType==="normal" ? storageActual : 0,
     plannedGacha:itemType==="gacha_prize" ? takenActual : 0
   };
+}
+
+function getBoothCopyExportRows(items){
+  const sourceItems=Array.isArray(items)?items:[];
+  const mapped=sourceItems.map(item=>{
+    const planned=getBoothPlannedCopyNumbers(item);
+    const taken=Number(item?.taken_qty||0);
+    const sold=Number(item?.sold_qty||0);
+    const returned=Number(item?.returned_qty||0);
+    const consumed=Number(item?.consumed_qty||0);
+    const used=consumed||Math.max(0,taken-returned);
+    const isGacha=String(item?.item_type||"normal")==="gacha_prize";
+    const denominator=taken;
+    const numerator=isGacha?used:sold;
+    const rate=denominator>0?`${Math.round((numerator/denominator)*100)}%`:"-";
+    return {
+      productName:item?.product_name||"",
+      barcode:item?.barcode||"",
+      isGacha,
+      plannedNormal:planned.plannedNormal,
+      plannedStorage:planned.plannedStorage,
+      plannedGacha:planned.plannedGacha,
+      taken,
+      sold,
+      returned,
+      used,
+      difference:Number(item?.difference_qty||0),
+      consumptionRate:rate
+    };
+  }).filter(row=>row.plannedNormal>0||row.plannedStorage>0||row.plannedGacha>0);
+  return {
+    sales:mapped.filter(row=>!row.isGacha),
+    gacha:mapped.filter(row=>row.isGacha)
+  };
+}
+
+function getBoothCopySummary(rows,type){
+  const list=Array.isArray(rows)?rows:[];
+  const planned=list.reduce((sum,row)=>sum+(type==="gacha"?Number(row.plannedGacha||0):Number(row.plannedNormal||0)+Number(row.plannedStorage||0)),0);
+  const actual=list.reduce((sum,row)=>sum+(type==="gacha"?Number(row.used||0):Number(row.sold||0)),0);
+  const rates=list.map(row=>{
+    const base=Number(row.taken||0);
+    const value=type==="gacha"?Number(row.used||0):Number(row.sold||0);
+    return base>0?(value/base)*100:null;
+  }).filter(value=>value!==null);
+  const average=rates.length?`${Math.round(rates.reduce((sum,value)=>sum+value,0)/rates.length)}%`:"-";
+  return {count:list.length,planned,actual,average};
+}
+
+async function getBoothCopyExportContext(){
+  const sourceEventId=String(el("boothCopySourceEvent")?.value||"").trim();
+  if(!sourceEventId){
+    boothShowError("前回イベント出力エラー","コピー元イベントを選択してください。","boothCopySourceEvent");
+    return null;
+  }
+  const sourceEvent=boothEvents.find(event=>String(event.id)===sourceEventId);
+  const items=await fetchBoothPlanSourceItems(sourceEventId);
+  const rows=getBoothCopyExportRows(items);
+  if(!rows.sales.length&&!rows.gacha.length){
+    boothShowError("前回イベント出力エラー","出力できる前回イベント実績がありません。");
+    return null;
+  }
+  return {sourceEvent,rows};
+}
+
+async function exportPreviousBoothEventPlanCsv(targetEventId){
+  try{
+    const context=await getBoothCopyExportContext(targetEventId);
+    if(!context)return;
+    const {sourceEvent,rows}=context;
+    const csvRows=[
+      ["販売商品"],
+      ["商品名","バーコード","planned_normal_takeout_qty","planned_storage_takeout_qty","taken_qty","sold_qty","returned_qty","difference_qty","consumption_rate"],
+      ...rows.sales.map(row=>[
+        row.productName,
+        row.barcode,
+        row.plannedNormal,
+        row.plannedStorage,
+        row.taken,
+        row.sold,
+        row.returned,
+        row.difference,
+        row.consumptionRate
+      ]),
+      [],
+      ["ガチャ商品"],
+      ["商品名","バーコード","planned_gacha_qty","taken_qty","used_qty","returned_qty","difference_qty","consumption_rate"],
+      ...rows.gacha.map(row=>[
+        row.productName,
+        row.barcode,
+        row.plannedGacha,
+        row.taken,
+        row.used,
+        row.returned,
+        row.difference,
+        row.consumptionRate
+      ])
+    ];
+    const safeName=String(sourceEvent?.name||"previous_event").replace(/[\\/:*?"<>|]/g,"_");
+    const filename=`previous_event_copy_${safeName}_${new Date().toISOString().slice(0,10)}.csv`;
+    if(typeof downloadCsvFile==="function")downloadCsvFile(filename,csvRows);
+    else{
+      const csv=csvRows.map(row=>row.map(value=>`"${String(value??"").replaceAll('"','""')}"`).join(",")).join("\r\n");
+      const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url;
+      a.download=filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{try{document.body.removeChild(a);}catch(_){} URL.revokeObjectURL(url);},1000);
+    }
+    boothShowSuccess("前回イベントCSV出力完了","CSVを出力しました。在庫・履歴・スマレジ在庫は変更していません。");
+  }catch(e){
+    boothShowError("前回イベントCSV出力エラー","CSV出力に失敗しました。\n"+e.message);
+  }
+}
+
+function boothCopyPdfTable(title,headers,rows){
+  const headerHtml=headers.map(header=>`<th>${esc(header)}</th>`).join("");
+  const bodyHtml=rows.length
+    ? rows.map(row=>`<tr>${row.map(value=>`<td>${esc(value)}</td>`).join("")}</tr>`).join("")
+    : `<tr><td colspan="${headers.length}">対象商品はありません。</td></tr>`;
+  return `<h2>${esc(title)}</h2><table><thead><tr>${headerHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`;
+}
+
+async function exportPreviousBoothEventPlanPdf(targetEventId){
+  try{
+    const context=await getBoothCopyExportContext(targetEventId);
+    if(!context)return;
+    const {sourceEvent,rows}=context;
+    const salesSummary=getBoothCopySummary(rows.sales,"sales");
+    const gachaSummary=getBoothCopySummary(rows.gacha,"gacha");
+    const eventDate=[sourceEvent?.event_start,sourceEvent?.event_end].filter(Boolean).join(" ～ ")||"-";
+    const outputAt=new Date().toLocaleString("ja-JP");
+    const html=`<!doctype html><html lang="ja"><head><meta charset="utf-8">
+      <title>ARICO ARCHERY イベント予定リスト</title>
+      <style>
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#12372a;margin:24px;}
+        h1{font-size:22px;margin:0 0 12px;}
+        h2{font-size:16px;margin:22px 0 8px;border-bottom:2px solid #2d6a4f;padding-bottom:4px;}
+        .meta{display:grid;grid-template-columns:120px 1fr;gap:6px 12px;margin-bottom:16px;font-size:13px;}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;}
+        th,td{border:1px solid #cfe3d6;padding:6px 8px;text-align:left;}
+        th{background:#e5f4ea;}
+        .summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px;}
+        .summary div{border:1px solid #cfe3d6;border-radius:10px;padding:10px;background:#f7fcf8;}
+        @media print{button{display:none}body{margin:12mm}}
+      </style></head><body>
+      <h1>ARICO ARCHERY<br>イベント予定リスト</h1>
+      <div class="meta">
+        <strong>イベント名</strong><span>${esc(sourceEvent?.name||"-")}</span>
+        <strong>会場</strong><span>${esc(sourceEvent?.venue||"-")}</span>
+        <strong>開催日</strong><span>${esc(eventDate)}</span>
+        <strong>出力日時</strong><span>${esc(outputAt)}</span>
+      </div>
+      ${boothCopyPdfTable("販売商品",["商品名","予定数","持出数","販売数","戻り数","差異","消化率"],rows.sales.map(row=>[
+        row.productName,
+        Number(row.plannedNormal||0)+Number(row.plannedStorage||0),
+        row.taken,
+        row.sold,
+        row.returned,
+        row.difference,
+        row.consumptionRate
+      ]))}
+      ${boothCopyPdfTable("ガチャ商品",["商品名","予定数","持出数","使用数","戻り数","差異","消化率"],rows.gacha.map(row=>[
+        row.productName,
+        row.plannedGacha,
+        row.taken,
+        row.used,
+        row.returned,
+        row.difference,
+        row.consumptionRate
+      ]))}
+      <h2>集計</h2>
+      <div class="summary">
+        <div>
+          <strong>販売商品</strong><br>
+          商品数：${salesSummary.count}<br>
+          販売予定数：${salesSummary.planned}<br>
+          販売実績数：${salesSummary.actual}<br>
+          平均消化率：${salesSummary.average}
+        </div>
+        <div>
+          <strong>ガチャ商品</strong><br>
+          商品数：${gachaSummary.count}<br>
+          ガチャ予定数：${gachaSummary.planned}<br>
+          ガチャ使用数：${gachaSummary.actual}<br>
+          平均消化率：${gachaSummary.average}
+        </div>
+      </div>
+      <script>window.addEventListener("load",()=>setTimeout(()=>window.print(),300));</script>
+      </body></html>`;
+    const win=window.open("","_blank");
+    if(!win){
+      boothShowError("前回イベントPDF出力エラー","PDF出力画面を開けませんでした。ポップアップブロックを確認してください。");
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    boothShowSuccess("前回イベントPDF出力","PDF出力用の印刷画面を開きました。在庫・履歴・スマレジ在庫は変更していません。");
+  }catch(e){
+    boothShowError("前回イベントPDF出力エラー","PDF出力に失敗しました。\n"+e.message);
+  }
 }
 
 async function findBoothPlanTargetItem(eventId,barcode,itemType){
@@ -1561,6 +1771,51 @@ async function loadBoothPlannedItems(eventId){
         <td>${esc(Number(row.planned_gacha_qty||0))}</td>
       </tr>`).join("")}</tbody>
     </table></div>`;
+  }catch(e){
+    list.innerHTML='<div class="booth-empty">予定リストを読み込めませんでした。</div>';
+  }
+}
+
+async function loadBoothPlannedItems(eventId){
+  const list=el("boothPlannedList");
+  if(!list)return;
+  list.innerHTML='<div class="booth-empty">予定リストを読み込み中...</div>';
+  try{
+    const rows=await sb(`booth_event_items?select=barcode,product_name,item_type,planned_normal_takeout_qty,planned_storage_takeout_qty,planned_gacha_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
+    const planned=(Array.isArray(rows)?rows:[]).filter(row=>
+      Number(row.planned_normal_takeout_qty||0)>0||
+      Number(row.planned_storage_takeout_qty||0)>0||
+      Number(row.planned_gacha_qty||0)>0
+    );
+    if(!planned.length){
+      list.innerHTML='<div class="booth-empty">ピッキング予定リストはまだありません。</div>';
+      return;
+    }
+    const salesRows=planned.filter(row=>Number(row.planned_gacha_qty||0)<=0);
+    const gachaRows=planned.filter(row=>Number(row.planned_gacha_qty||0)>0);
+    const salesTable=salesRows.length?`<div class="booth-history-table-wrap"><table class="booth-history-table">
+      <thead><tr><th>商品名</th><th>バーコード</th><th>通常棚予定</th><th>保管在庫予定</th></tr></thead>
+      <tbody>${salesRows.map(row=>`<tr>
+        <td>${esc(row.product_name||"-")}</td>
+        <td>${esc(row.barcode||"-")}</td>
+        <td>${esc(Number(row.planned_normal_takeout_qty||0))}</td>
+        <td>${esc(Number(row.planned_storage_takeout_qty||0))}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`:'<div class="booth-empty">販売商品の予定はありません。</div>';
+    const gachaTable=gachaRows.length?`<div class="booth-history-table-wrap"><table class="booth-history-table">
+      <thead><tr><th>商品名</th><th>バーコード</th><th>ガチャ予定</th></tr></thead>
+      <tbody>${gachaRows.map(row=>`<tr>
+        <td>${esc(row.product_name||"-")}</td>
+        <td>${esc(row.barcode||"-")}</td>
+        <td>${esc(Number(row.planned_gacha_qty||0))}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>`:'<div class="booth-empty">ガチャ商品の予定はありません。</div>';
+    list.innerHTML=`
+      <div class="booth-copy-section-title">販売商品</div>
+      ${salesTable}
+      <div class="booth-copy-section-title">ガチャ商品</div>
+      ${gachaTable}
+    `;
   }catch(e){
     list.innerHTML='<div class="booth-empty">予定リストを読み込めませんでした。</div>';
   }
@@ -1711,6 +1966,7 @@ function renderBoothEventDetail(event){
   renderBoothCopyCard(event,isBoothEventClosed(event));
   el("boothCopyPreviousEventBtn")?.addEventListener("click",()=>copyPreviousBoothEventPlan(event.id));
   el("boothCopyCsvBtn")?.addEventListener("click",()=>exportPreviousBoothEventPlanCsv(event.id));
+  el("boothCopyPdfBtn")?.addEventListener("click",()=>exportPreviousBoothEventPlanPdf(event.id));
   el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOut);
   el("reloadBoothCarryOutHistoryBtn")?.addEventListener("click",()=>loadBoothCarryOutHistory(event.id));
   el("boothStartCameraBtn")?.addEventListener("click",()=>{
@@ -2253,6 +2509,7 @@ function renderBoothEventDetail(event){
   });
   el("boothCopyPreviousEventBtn")?.addEventListener("click",()=>copyPreviousBoothEventPlan(event.id));
   el("boothCopyCsvBtn")?.addEventListener("click",()=>exportPreviousBoothEventPlanCsv(event.id));
+  el("boothCopyPdfBtn")?.addEventListener("click",()=>exportPreviousBoothEventPlanPdf(event.id));
   el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOut);
   el("reloadBoothCarryOutHistoryBtn")?.addEventListener("click",()=>loadBoothCarryOutHistory(event.id));
   el("boothStartCameraBtn")?.addEventListener("click",()=>{
