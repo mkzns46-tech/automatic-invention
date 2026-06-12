@@ -133,6 +133,51 @@ function enforceStaffStoreMatch(staffValue,title="店舗確認エラー",focusId
   return true;
 }
 
+function getInventoryStaffStoreMismatchState(){
+  const staffValue=window.currentStaffName||localStorage.getItem(ARICO_CURRENT_STAFF_STORAGE_KEY)||"";
+  const staff=findStaffMemberByValue(staffValue);
+  const context=getCurrentSmaregiContext();
+  const staffStoreCode=normalizeStaffStoreCode(staff);
+  const locked=Boolean(staff&&staffStoreCode&&staffStoreCode!==context.storeCode);
+  return {locked,staff,staffValue,staffStoreCode,context};
+}
+
+function isInventoryStoreMismatchLocked(){
+  return getInventoryStaffStoreMismatchState().locked;
+}
+
+function isInventoryStoreMismatchAllowedAction(action){
+  return ["settings","admin-auth","logout"].includes(String(action||""));
+}
+
+function isInventoryStoreMismatchAllowedScreen(screen){
+  return String(screen||"")==="settings";
+}
+
+function updateInventoryStoreMismatchLockUi(){
+  const state=getInventoryStaffStoreMismatchState();
+  const warning=el("inventoryStoreMismatchWarning");
+  if(warning){
+    warning.hidden=!state.locked;
+    if(state.locked)warning.textContent="担当者の所属店舗と現在の店舗が一致しません";
+  }
+  document.body.classList.toggle("inventory-store-mismatch-locked",state.locked);
+  const menu=el("inventoryAppMenu");
+  if(menu){
+    menu.querySelectorAll(".inventory-app-menu-item").forEach(item=>{
+      const action=item.dataset.menuAction||"";
+      const locked=state.locked&&!isInventoryStoreMismatchAllowedAction(action);
+      item.classList.toggle("is-store-locked",locked);
+      if(item.tagName==="BUTTON")item.disabled=locked;
+      if(locked)item.setAttribute("aria-disabled","true");
+      else item.removeAttribute("aria-disabled");
+    });
+  }
+  if(state.locked&&!isInventoryStoreMismatchAllowedScreen(document.body.dataset.inventoryScreen)){
+    showInventoryScreen("settings","settings");
+  }
+}
+
 function getCurrentSmaregiContext(){
   let saved={};
   try{
@@ -197,6 +242,14 @@ function updateSmaregiContextSelector(){
   const context=getCurrentSmaregiContext();
   const store=el("smaregiStoreSelect");
   const badge=el("smaregiContextBadge");
+  const bar=el("smaregiContextBar");
+  if(bar&&!el("inventoryStoreMismatchWarning")){
+    const warning=document.createElement("div");
+    warning.id="inventoryStoreMismatchWarning";
+    warning.className="inventory-store-mismatch-warning";
+    warning.hidden=true;
+    bar.insertBefore(warning,bar.children[1]||null);
+  }
   if(store)store.value=context.storeCode;
   if(badge){
     const storeInfo=getStoreInfoByCode(context.storeCode);
@@ -205,6 +258,7 @@ function updateSmaregiContextSelector(){
     SMAREGI_CONTEXT_OPTIONS.stores.forEach(item=>badge.classList.toggle(item.className,context.storeCode===item.key));
     badge.innerHTML=`<span>接続先：${esc(context.accountName)}</span><strong>${esc(storeInfo.badge)}</strong><span>店舗：${esc(context.storeName)}</span><span>担当者：${esc(staffText)}</span>`;
   }
+  updateInventoryStoreMismatchLockUi();
 }
 
 function renderSmaregiConnectionSelector(){
@@ -298,6 +352,7 @@ function renderInventoryAppMenu(){
   bindInventoryMenuDrawer();
   updateInventoryAdminAuthControl();
   setInventoryAppMenuActive("inventory");
+  updateInventoryStoreMismatchLockUi();
 }
 
 function setInventoryAppMenuActive(key){
@@ -414,6 +469,11 @@ function scrollInventoryPanelIntoView(targetId){
 }
 
 function showInventoryScreen(screen,menuKey=screen){
+  if(isInventoryStoreMismatchLocked()&&!isInventoryStoreMismatchAllowedScreen(screen)){
+    updateInventoryStoreMismatchLockUi();
+    screen="settings";
+    menuKey="settings";
+  }
   document.body.dataset.inventoryScreen=screen;
   document.querySelector("main.grid")?.classList.remove("smaregi-mode");
   document.querySelectorAll("[data-inventory-screen]").forEach(panel=>{
