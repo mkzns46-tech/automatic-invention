@@ -16,13 +16,11 @@ const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 const ARICO_INVENTORY_URL = "https://automatic-invention-eight.vercel.app/";
 
 (function(){
-  localStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
   if(!checkAuthOrRedirect("index.html"))return;
 })();
 
 function aricoLogout(){
   clearAuthSession();
-  localStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
   sessionStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
   location.href = "index.html";
 }
@@ -40,26 +38,6 @@ function openInventory(){
 function openSales(){
   location.href = "../sales/sales-login.html";
 }
-
-document.addEventListener("DOMContentLoaded", () => {
-  const grid = document.querySelector(".grid");
-  if (!grid || document.getElementById("salesPortalCard")) return;
-  const salesCard = document.createElement("a");
-  salesCard.className = "box";
-  salesCard.id = "salesPortalCard";
-  salesCard.href = "#";
-  salesCard.onclick = () => {
-    openSales();
-    return false;
-  };
-  salesCard.innerHTML = "<h3>販売管理</h3><p>見積書・請求書・入金確認などの販売業務</p>";
-  const firstCard = grid.querySelector(".box");
-  if (firstCard && firstCard.nextSibling) {
-    grid.insertBefore(salesCard, firstCard.nextSibling);
-  } else {
-    grid.appendChild(salesCard);
-  }
-});
 </script>
 </head>
 <body>
@@ -78,20 +56,27 @@ document.addEventListener("DOMContentLoaded", () => {
 </div>
 
 <div class="grid">
-<a class="box" href="#" onclick="openInventory(); return false;">
-<h3>在庫確認アプリ</h3>
-<p>在庫管理・棚卸・スマレジ連携</p>
-</a>
 
-<a class="box disabled" href="#" onclick="alert('レンタルリム管理 は現在作成中です。'); return false;">
-<h3>レンタルリム管理</h3>
-<p>作成中</p>
-</a>
+  <a class="box" href="#" onclick="openInventory(); return false;">
+    <h3>在庫確認アプリ</h3>
+    <p>在庫管理・棚卸・スマレジ連携</p>
+  </a>
 
-<a class="box disabled" href="#" onclick="alert('出荷前検品 は現在作成中です。'); return false;">
-<h3>出荷前検品</h3>
-<p>作成中</p>
-</a>
+  <a class="box" href="#" onclick="openSales(); return false;">
+    <h3>販売管理</h3>
+    <p>見積書・請求書・入金確認などの販売業務</p>
+  </a>
+
+  <a class="box disabled" href="#" onclick="alert('レンタルリム管理 は現在作成中です。'); return false;">
+    <h3>レンタルリム管理</h3>
+    <p>作成中</p>
+  </a>
+
+  <a class="box disabled" href="#" onclick="alert('出荷前検品 は現在作成中です。'); return false;">
+    <h3>出荷前検品</h3>
+    <p>作成中</p>
+  </a>
+
 </div>
 </section>
 </main>
