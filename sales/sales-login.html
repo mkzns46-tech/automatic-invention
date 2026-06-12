@@ -10,9 +10,18 @@
 <body>
 <main class="sales-wrap">
   <section class="card login-card">
-    <div class="brand">ARICO ARCHERY</div>
-    <h1>販売管理ログイン</h1>
-    <p class="lead">販売管理を利用するには認証が必要です。</p>
+    <div class="login-topbar">
+      <div>
+        <div class="brand">ARICO ARCHERY</div>
+        <h1>販売管理ログイン</h1>
+        <p class="lead">販売管理を利用するには認証が必要です。</p>
+      </div>
+      <div class="sales-actions login-actions">
+        <a class="pill" href="../portal/portal.html">システム入口に戻る</a>
+        <a class="pill" href="../index.html" onclick="clearSalesAuth();">システムログイン画面に戻る</a>
+      </div>
+    </div>
+
     <label>販売管理パスワード
       <input id="salesPassword" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') submitSalesLogin();">
     </label>
