@@ -154,6 +154,33 @@ function getFilteredBoothEvents(events){
   });
 }
 
+function isBoothEventClosedStatus(event){
+  return String(event?.status||"").toLowerCase()==="closed";
+}
+
+function getBoothTodayKey(){
+  const now=new Date();
+  const y=now.getFullYear();
+  const m=String(now.getMonth()+1).padStart(2,"0");
+  const d=String(now.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
+}
+
+function getBoothDateKey(value){
+  return String(value||"").slice(0,10);
+}
+
+function getBoothListStatusInfo(event){
+  if(isBoothEventClosedStatus(event))return {label:"締め済み",className:"booth-status-closed"};
+  const today=getBoothTodayKey();
+  const start=getBoothDateKey(event?.event_start);
+  const end=getBoothDateKey(event?.event_end);
+  if(start&&today<start)return {label:"開催予定",className:"booth-status-upcoming"};
+  if(end&&today>end)return {label:"締め前",className:"booth-status-draft"};
+  if((!start||today>=start)&&(!end||today<=end))return {label:"開催中",className:"booth-status-active"};
+  return {label:"締め前",className:"booth-status-draft"};
+}
+
 function applyBoothEventFilter(){
   const from=String(el("boothFilterFromDate")?.value||"").trim();
   const to=String(el("boothFilterToDate")?.value||"").trim();
@@ -185,6 +212,54 @@ function renderBoothEvents(events){
   const list=el("boothEventList");
   if(!list)return;
   const rows=getFilteredBoothEvents(events);
+  const hasActiveFilter=Boolean(boothFilterFrom||boothFilterTo);
+  const openRows=rows.filter(event=>!isBoothEventClosedStatus(event));
+  const closedRows=rows.filter(event=>isBoothEventClosedStatus(event));
+  const visibleRows=hasActiveFilter?rows:openRows;
+  const eventCardHtml=event=>{
+    const dateText=[event.event_start,event.event_end].filter(Boolean).join(" - ")||"日程未設定";
+    const statusInfo=getBoothListStatusInfo(event);
+    return `<article class="booth-event-item ${String(boothCurrentEventId)===String(event.id)?"is-open":""} ${isBoothEventClosedStatus(event)?"is-closed":""}">
+      <div class="booth-event-main">
+        <div class="booth-event-title-row">
+          <strong>${esc(event.name||"無題イベント")}</strong>
+          <span class="booth-status ${esc(statusInfo.className)}">${esc(statusInfo.label)}</span>
+        </div>
+        <div class="booth-event-meta">
+          <span>会場：${esc(event.venue||"-")}</span>
+          <span>日程：${esc(dateText)}</span>
+          <span>作成者：${esc(event.created_by||"-")}</span>
+        </div>
+        ${event.memo?`<p class="booth-event-memo">${esc(event.memo)}</p>`:""}
+      </div>
+      <div class="booth-event-actions">
+        <button type="button" class="secondary booth-open-event-btn" data-event-id="${esc(event.id)}">開く</button>
+        <button type="button" class="booth-delete-event-btn" data-event-id="${esc(event.id)}">削除</button>
+      </div>
+    </article>`;
+  };
+  if(!rows.length){
+    list.innerHTML='<div class="booth-empty">条件に一致するイベントはありません。</div>';
+    return;
+  }
+  const openHtml=visibleRows.length
+    ? visibleRows.map(eventCardHtml).join("")
+    : '<div class="booth-empty">締め前のイベントはありません。</div>';
+  const closedHtml=(!hasActiveFilter&&closedRows.length)
+    ? `<details class="booth-closed-events-collapse">
+        <summary>締め済みイベント ${closedRows.length}件</summary>
+        <div class="booth-event-list booth-closed-event-list">${closedRows.map(eventCardHtml).join("")}</div>
+      </details>`
+    : "";
+  list.innerHTML=[openHtml,closedHtml].filter(Boolean).join("");
+
+  list.querySelectorAll(".booth-open-event-btn").forEach(button=>{
+    button.addEventListener("click",()=>openBoothEvent(button.dataset.eventId));
+  });
+  list.querySelectorAll(".booth-delete-event-btn").forEach(button=>{
+    button.addEventListener("click",()=>deleteBoothEvent(button.dataset.eventId));
+  });
+  return;
   if(!rows.length){
     list.innerHTML='<div class="booth-empty">イベントはまだありません。</div>';
     return;

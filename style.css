@@ -3769,16 +3769,52 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   color:#166534;
 }
 .booth-status-draft{
-  background:#fef9c3;
-  color:#854d0e;
+  background:#ffedd5;
+  color:#9a3412;
 }
 .booth-status-closed{
-  background:#e0f2fe;
-  color:#075985;
+  background:#e5e7eb;
+  color:#4b5563;
+}
+.booth-status-upcoming{
+  background:#dbeafe;
+  color:#1d4ed8;
 }
 .booth-status-cancelled{
   background:#fee2e2;
   color:#991b1b;
+}
+.booth-event-item.is-closed{
+  background:#f8faf9;
+  opacity:.72;
+}
+.booth-closed-events-collapse{
+  border:1px solid #dcebe1;
+  border-radius:14px;
+  background:#f8faf9;
+  padding:10px 12px;
+}
+.booth-closed-events-collapse summary{
+  cursor:pointer;
+  color:#527161;
+  font-weight:900;
+  list-style:none;
+}
+.booth-closed-events-collapse summary::-webkit-details-marker{
+  display:none;
+}
+.booth-closed-events-collapse summary::before{
+  content:"▶";
+  display:inline-block;
+  margin-right:8px;
+  font-size:11px;
+  transition:transform .15s ease;
+}
+.booth-closed-events-collapse[open] summary::before{
+  transform:rotate(90deg);
+}
+.booth-closed-event-list{
+  margin-top:10px;
 }
 .booth-event-meta{
   display:flex;
