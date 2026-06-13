@@ -70,7 +70,51 @@ function showSalesMessage(text, type) {
   const box = document.getElementById("salesMessage");
   if (!box) return;
   box.textContent = text || "";
-  box.className = "message" + (type === "err" ? " err" : type === "warn" ? " warn" : "");
+  box.className = "message" + (type === "err" ? " err" : type === "warn" ? " warn" : type === "ok" ? " ok" : "");
+}
+
+function getProductUnitPrice(product) {
+  const value = Number(product?.price ?? 0);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function playSalesNotifySound(type = "ok") {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = type === "err" ? 220 : 660;
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.2);
+  } catch (_) {}
+}
+
+function showSalesToast(text, type = "ok") {
+  const toast = document.getElementById("salesToast");
+  if (!toast) {
+    alert(text);
+    return;
+  }
+  toast.textContent = text;
+  toast.className = `sales-toast ${type}`;
+  toast.hidden = false;
+  clearTimeout(showSalesToast.timer);
+  showSalesToast.timer = setTimeout(() => {
+    toast.hidden = true;
+  }, 1800);
+}
+
+function notifySalesProductAdded(text, type = "ok") {
+  showSalesToast(text, type);
+  playSalesNotifySound(type);
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -141,13 +185,15 @@ async function searchProducts() {
   results.innerHTML = '<div class="message">検索中...</div>';
   try {
     const filter = encodeURIComponent(`*${query}*`);
-    const rows = await salesFetch(`products?select=barcode,name,base_stock,category,genre&or=(name.ilike.${filter},barcode.ilike.${filter})&limit=20`);
-    results.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>商品名</th><th>バーコード</th><th>現在庫</th><th>操作</th></tr></thead><tbody>${rows.map(row => {
+    const rows = await salesFetch(`products?select=barcode,name,base_stock,category,genre,price&or=(name.ilike.${filter},barcode.ilike.${filter})&limit=20`);
+    results.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>商品名</th><th>バーコード</th><th>税込単価</th><th>現在在庫</th><th>操作</th></tr></thead><tbody>${rows.map(row => {
       const stock = Number(row.base_stock || 0);
+      const price = getProductUnitPrice(row);
       return `<tr>
         <td>${escapeHtml(row.name || "")}</td>
         <td>${escapeHtml(row.barcode || "")}</td>
-        <td>${stock > 0 ? `現在庫 ${stock}` : `<span class="line-stock warn">現在庫 0 / 取寄せ</span>`}</td>
+        <td>${price ? money(price) : '<span class="line-stock warn">未登録</span>'}</td>
+        <td>${stock > 0 ? `現在在庫 ${stock}` : `<span class="line-stock warn">現在在庫 0 / 取寄せ</span>`}</td>
         <td><button type="button" class="secondary" onclick='addProductLine(${JSON.stringify(row).replaceAll("'", "&#39;")})'>追加</button></td>
       </tr>`;
     }).join("")}</tbody></table></div>` : '<div class="message warn">該当商品がありません。</div>';
@@ -157,22 +203,28 @@ async function searchProducts() {
 }
 
 function addProductLine(product) {
-  const units = readUnits();
-  const unit = units[product.barcode] || "個";
-  currentLines.push({
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
-    barcode: product.barcode || "",
-    name: product.name || "",
-    stock: Number(product.base_stock || 0),
-    qty: 1,
-    unit,
-    unitPrice: 0,
-    discountValue: 0,
-    discountAmount: 0,
-    amount: 0,
-    memo: ""
-  });
-  renderLines();
+  try {
+    const units = readUnits();
+    const unit = units[product.barcode] || "個";
+    const unitPrice = getProductUnitPrice(product);
+    currentLines.push({
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+      barcode: product.barcode || "",
+      name: product.name || "",
+      stock: Number(product.base_stock || 0),
+      qty: 1,
+      unit,
+      unitPrice,
+      discountValue: 0,
+      discountAmount: 0,
+      amount: 0,
+      memo: ""
+    });
+    renderLines();
+    notifySalesProductAdded("商品を見積に追加しました", "ok");
+  } catch (e) {
+    notifySalesProductAdded("商品の追加に失敗しました", "err");
+  }
 }
 
 function renderLines() {
@@ -180,14 +232,14 @@ function renderLines() {
   area.innerHTML = currentLines.length ? currentLines.map((line, index) => `
     <div class="quote-line">
       <label>商品名<input value="${escapeHtml(line.name)}" onchange="updateLine(${index}, 'name', this.value)"></label>
-      <label>現在庫<div class="${Number(line.stock) > 0 ? "" : "line-stock warn"}">${Number(line.stock) > 0 ? `現在庫 ${line.stock}` : "現在庫 0 / 取寄せ"}</div></label>
+      <label>現在在庫<div class="${Number(line.stock) > 0 ? "" : "line-stock warn"}">${Number(line.stock) > 0 ? `現在在庫 ${line.stock}` : "現在在庫 0 / 取寄せ"}</div></label>
       <label>数量<input type="number" min="0" step="1" value="${line.qty}" onchange="updateLine(${index}, 'qty', this.value)"></label>
       <label>単位<select onchange="updateLine(${index}, 'unit', this.value)">${UNIT_OPTIONS.map(unit => `<option value="${unit}" ${unit === line.unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label>
       <label>税込単価<input type="number" min="0" step="1" value="${line.unitPrice}" onchange="updateLine(${index}, 'unitPrice', this.value)"></label>
       <label>値引率%<input type="number" min="0" step="1" value="${line.discountValue}" onchange="updateLine(${index}, 'discountValue', this.value)"></label>
       <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateLine(${index}, 'memo', this.value)"></label>
       <button type="button" class="danger" onclick="removeLine(${index})">削除</button>
-    </div>`).join("") : '<div class="message">商品明細を追加してください。</div>';
+    </div>`).join("") : '<div class="message">見積商品を追加してください。</div>';
   recalcTotals();
 }
 
@@ -204,7 +256,7 @@ function updateLine(index, key, value) {
   if (document.getElementById("discountTemplate").value !== "custom" && key !== "unit") {
     applyDiscountTemplate(false);
   }
-  recalcLine(line);
+  recalcSalesLine(line);
   renderLines();
 }
 
@@ -224,19 +276,13 @@ function applyDiscountTemplate(render = true) {
     if (template === "all10") line.discountValue = 10;
     if (template === "dealer10") line.discountValue = isDealerBrand(line.name) ? 10 : 0;
     if (template === "none") line.discountValue = 0;
-    recalcLine(line);
+    recalcSalesLine(line);
   });
   if (render) renderLines();
 }
 
-function recalcLine(line) {
-  const gross = Number(line.qty || 0) * Number(line.unitPrice || 0);
-  line.amount = gross;
-  line.discountAmount = Math.floor(gross * Number(line.discountValue || 0) / 100);
-}
-
 function recalcTotals() {
-  currentLines.forEach(recalcLine);
+  currentLines.forEach(recalcSalesLine);
   const totals = calcQuoteTotals({ lines: currentLines });
   document.getElementById("subtotalText").textContent = money(totals.subtotal);
   document.getElementById("discountText").textContent = money(totals.discount);
@@ -274,7 +320,7 @@ function saveQuote() {
     return;
   }
   if (!currentLines.length) {
-    showSalesMessage("商品明細を追加してください。", "err");
+    showSalesMessage("見積商品を追加してください。", "err");
     return;
   }
   const quote = collectQuote();
@@ -288,10 +334,8 @@ function saveQuote() {
   showSalesMessage("見積書を保存しました。", "ok");
 }
 
-function editQuote(id) {
-  const quote = readQuotes().find(q => q.id === id);
-  if (!quote) return;
-  currentQuoteId = id;
+function fillQuoteForm(quote) {
+  currentQuoteId = quote.id || null;
   currentLines = JSON.parse(JSON.stringify(quote.lines || []));
   document.getElementById("customerName").value = quote.customerName || "";
   document.getElementById("customerType").value = quote.customerType || "個人";
@@ -307,23 +351,23 @@ function editQuote(id) {
   renderLines();
 }
 
+function editQuote(id) {
+  const quote = readQuotes().find(q => q.id === id);
+  if (quote) fillQuoteForm(quote);
+}
+
 function duplicateQuote(id) {
   const quote = readQuotes().find(q => q.id === id);
   if (!quote) return;
-  currentQuoteId = null;
-  currentLines = JSON.parse(JSON.stringify(quote.lines || []));
-  document.getElementById("customerName").value = quote.customerName || "";
-  document.getElementById("customerType").value = quote.customerType || "個人";
-  document.getElementById("customerAddress").value = quote.address || "";
-  document.getElementById("customerPhone").value = quote.phone || "";
-  document.getElementById("customerEmail").value = quote.email || "";
-  document.getElementById("quoteSubject").value = quote.subject || "";
-  document.getElementById("quoteDate").value = today();
-  document.getElementById("validUntil").value = quote.validUntil || today();
-  document.getElementById("quoteStaff").value = quote.staff || "";
-  document.getElementById("quoteMemo").value = quote.memo || "";
-  document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
-  renderLines();
+  fillQuoteForm({
+    ...JSON.parse(JSON.stringify(quote)),
+    id: null,
+    quoteNo: "",
+    createdAt: "",
+    updatedAt: "",
+    status: "下書き",
+    quoteDate: today()
+  });
   showSalesMessage("見積書を複製しました。保存すると新しい見積番号になります。", "ok");
 }
 

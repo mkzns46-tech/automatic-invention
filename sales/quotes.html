@@ -4,10 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 見積書</title>
-<link rel="stylesheet" href="sales-style.css">
+<link rel="stylesheet" href="sales-style.css?v=20260613-4">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
+<script src="sales-nav.js" defer></script>
 <script src="customers.js"></script>
+<script src="sales-calculator.js"></script>
 <script src="quote-pdf.js"></script>
 <script src="quotes.js" defer></script>
 </head>
@@ -17,18 +19,18 @@
     <div>
       <div class="brand">ARICO ARCHERY</div>
       <h1>見積書</h1>
-      <p class="lead">v1は見積作成・一覧・PDF出力のみ。在庫とスマレジ在庫は変更しません。</p>
+      <p class="lead">見積作成・一覧・PDF出力を行います。在庫とスマレジ在庫は変更しません。</p>
     </div>
     <div class="sales-actions">
       <a class="pill" href="index.html">販売管理トップ</a>
-      <button type="button" class="secondary" onclick="logoutSales();">システムログイン画面に戻る</button>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
     </div>
   </header>
 
   <div id="salesMessage" class="message">見積書を作成できます。</div>
 
   <section class="card">
-    <div class="sales-actions" style="justify-content:space-between">
+    <div class="sales-actions section-heading-row">
       <h2>見積書一覧</h2>
       <button type="button" class="primary" onclick="newQuote();">新規見積</button>
     </div>
@@ -41,7 +43,7 @@
   </section>
 
   <section class="card" id="quoteEditorCard">
-    <h2>見積書作成</h2>
+    <h2>顧客情報</h2>
     <div class="row three">
       <label>顧客名<input id="customerName"></label>
       <label>顧客区分<select id="customerType"></select></label>
@@ -71,10 +73,10 @@
   </section>
 
   <section class="card">
-    <h2>商品明細</h2>
-    <div class="row two">
+    <h2>見積商品</h2>
+    <div class="product-search-row">
       <label>商品検索<input id="productSearchInput" placeholder="商品名・バーコード・商品コード"></label>
-      <div><button type="button" class="secondary" onclick="searchProducts();">検索</button></div>
+      <button type="button" class="secondary" onclick="searchProducts();">検索</button>
     </div>
     <div id="productSearchResults"></div>
     <div id="quoteLines" class="quote-lines"></div>
@@ -90,5 +92,6 @@
     </div>
   </section>
 </main>
+<div id="salesToast" class="sales-toast" hidden></div>
 </body>
 </html>
