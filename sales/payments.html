@@ -4,18 +4,93 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 入金確認</title>
-<link rel="stylesheet" href="sales-style.css">
+<link rel="stylesheet" href="sales-style.css?v=20260614-payments">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-placeholder.js" defer></script>
+<script src="sales-nav.js?v=20260614-payments" defer></script>
+<script src="payments.js?v=20260614-payments" defer></script>
 </head>
-<body data-sales-title="入金確認">
+<body>
 <main class="sales-wrap">
   <header class="sales-header">
-    <div><div class="brand">ARICO ARCHERY</div><h1 id="salesPlaceholderTitle">入金確認</h1></div>
-    <div class="sales-actions"><a class="pill" href="index.html">販売管理トップ</a><button type="button" class="secondary" onclick="logoutSales();">システムログイン画面に戻る</button></div>
+    <div>
+      <div class="brand">ARICO ARCHERY</div>
+      <h1>入金確認</h1>
+      <p class="lead">発行済み請求書の入金状態を手動で確認・記録します。銀行API連携はまだ行いません。</p>
+    </div>
+    <div class="sales-actions">
+      <a class="pill" href="invoices.html">請求書</a>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+    </div>
   </header>
-  <section class="card"><p id="salesPlaceholderMessage">準備中です。</p></section>
+
+  <div id="salesMessage" class="message">請求書を選択して入金確認できます。</div>
+
+  <section class="card collapsible-list-card" id="paymentInvoiceListCard">
+    <div class="sales-actions section-heading-row">
+      <h2 class="list-heading" onclick="togglePaymentInvoiceList();">入金対象請求書一覧 <span class="status-badge muted" id="paymentInvoiceListCount">0件</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="paymentInvoiceListToggle" onclick="togglePaymentInvoiceList();">一覧を開く</button>
+    </div>
+    <div class="list-panel" id="paymentInvoiceListPanel" hidden>
+      <div class="list-filter-row">
+        <label>一覧検索<input id="paymentInvoiceSearch" placeholder="顧客名・担当者・件名・請求書番号・ステータス"></label>
+        <label>ステータス
+          <select id="paymentInvoiceStatusFilter">
+            <option value="">全て</option>
+            <option value="発行済み">発行済み</option>
+            <option value="入金待ち">入金待ち</option>
+            <option value="入金済み">入金済み</option>
+          </select>
+        </label>
+        <label>開始日<input id="paymentInvoiceDateFromFilter" type="date"></label>
+        <label>終了日<input id="paymentInvoiceDateToFilter" type="date"></label>
+      </div>
+      <div class="table-wrap list-scroll">
+        <table>
+          <thead><tr><th>請求書番号</th><th>請求日</th><th>発行日</th><th>支払期限</th><th>顧客名</th><th>件名</th><th>合計金額</th><th>入金済額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <tbody id="paymentInvoiceListBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="paymentEditorCard">
+    <h2>入金情報</h2>
+    <div class="row three">
+      <label>請求書番号<input id="paymentInvoiceNo" readonly></label>
+      <label>顧客名<input id="paymentCustomerName" readonly></label>
+      <label>請求額<input id="paymentInvoiceTotal" readonly></label>
+    </div>
+    <div class="row three">
+      <label>入金日<input id="paymentDate" type="date"></label>
+      <label>入金額<input id="paymentAmount" type="number" min="0" step="1"></label>
+      <label>入金方法<input id="paymentMethod" value="振込" readonly></label>
+    </div>
+    <div class="row three">
+      <label>振込名義<input id="paymentPayerName"></label>
+      <label>担当者<input id="paymentStaff"></label>
+      <label>現在ステータス<input id="paymentCurrentStatus" readonly></label>
+    </div>
+    <label>メモ<textarea id="paymentMemo"></textarea></label>
+    <div class="sales-actions" style="margin-top:14px">
+      <button type="button" class="primary" onclick="savePayment();">入金確認を保存</button>
+      <a class="secondary" id="paymentInvoiceLink" href="invoices.html">請求書を開く</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>入金履歴</h2>
+    <div id="paymentHistory" class="payment-history">
+      <div class="message">請求書を選択すると入金履歴を表示します。</div>
+    </div>
+  </section>
 </main>
+<div id="salesPopup" class="app-popup" style="display:none;">
+  <div class="app-popup-card">
+    <div id="salesPopupTitle" class="app-popup-title">完了</div>
+    <div id="salesPopupBody" class="app-popup-body"></div>
+    <button type="button" id="salesPopupClose">OK</button>
+  </div>
+</div>
 </body>
 </html>

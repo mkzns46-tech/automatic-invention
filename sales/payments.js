@@ -1,0 +1,355 @@
+const PAYMENTS_INVOICES_KEY = "arico_sales_invoices_v1";
+const PAYMENT_STATUS_ISSUED = "発行済み";
+const PAYMENT_STATUS_WAITING = "入金待ち";
+const PAYMENT_STATUS_PAID = "入金済み";
+const PAYMENT_TARGET_STATUSES = [PAYMENT_STATUS_ISSUED, PAYMENT_STATUS_WAITING, PAYMENT_STATUS_PAID];
+
+let selectedPaymentInvoiceId = null;
+let paymentSearchText = "";
+let paymentStatusFilter = "";
+let paymentDateFrom = "";
+let paymentDateTo = "";
+let paymentListCollapsed = true;
+
+function readPaymentInvoices() {
+  return JSON.parse(localStorage.getItem(PAYMENTS_INVOICES_KEY) || "[]");
+}
+
+function writePaymentInvoices(invoices) {
+  localStorage.setItem(PAYMENTS_INVOICES_KEY, JSON.stringify(invoices));
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[ch]));
+}
+
+function money(value) {
+  return Number(value || 0).toLocaleString("ja-JP") + "円";
+}
+
+function normalizePaymentStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === "issued" || value === "発行済み") return PAYMENT_STATUS_ISSUED;
+  if (value === "waiting_payment" || value === "payment_waiting" || value === "入金待ち") return PAYMENT_STATUS_WAITING;
+  if (value === "paid" || value === "入金済み") return PAYMENT_STATUS_PAID;
+  return status || "";
+}
+
+function statusBadge(status) {
+  const value = normalizePaymentStatus(status);
+  const type = value === PAYMENT_STATUS_PAID ? "ok" : value === PAYMENT_STATUS_WAITING ? "warn" : "info";
+  return `<span class="status-badge ${type}">${escapeHtml(value || "未設定")}</span>`;
+}
+
+function recalcPaymentLine(line) {
+  const qty = Number(line.qty || 0);
+  const unitPrice = Number(line.unitPrice || 0);
+  const discountValue = Number(line.discountValue || 0);
+  const gross = Math.round(qty * unitPrice);
+  line.discountAmount = Math.round(gross * discountValue / 100);
+  line.amount = Math.max(0, gross - line.discountAmount);
+  return line;
+}
+
+function calcInvoiceTotal(invoice) {
+  return (invoice?.lines || []).reduce((total, line) => total + Number(recalcPaymentLine(line).amount || 0), 0);
+}
+
+function getInvoicePayments(invoice) {
+  return Array.isArray(invoice?.payments) ? invoice.payments : [];
+}
+
+function getPaidTotal(invoice) {
+  return getInvoicePayments(invoice).reduce((total, payment) => total + Number(payment.amount || 0), 0);
+}
+
+function normalizeDateOnly(value) {
+  if (!value) return "";
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("ja-JP");
+}
+
+function matchesDateRange(values, from, to) {
+  if (!from && !to) return true;
+  return values.some(value => {
+    const date = normalizeDateOnly(value);
+    if (!date) return false;
+    if (from && date < from) return false;
+    if (to && date > to) return false;
+    return true;
+  });
+}
+
+function showSalesMessage(text, type) {
+  const box = document.getElementById("salesMessage");
+  if (!box) return;
+  box.textContent = text || "";
+  box.className = "message" + (type === "err" ? " err" : type === "warn" ? " warn" : type === "ok" ? " ok" : "");
+}
+
+function playSalesNoticeSound(type = "ok") {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = type === "err" ? 220 : type === "warn" ? 440 : 660;
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.22);
+  } catch (_) {}
+}
+
+function showSalesPopup(title, body, type = "ok") {
+  const popup = document.getElementById("salesPopup");
+  const titleEl = document.getElementById("salesPopupTitle");
+  const bodyEl = document.getElementById("salesPopupBody");
+  const close = document.getElementById("salesPopupClose");
+  if (!popup || !titleEl || !bodyEl || !close) {
+    alert(`${title}\n${body || ""}`);
+    return;
+  }
+  titleEl.textContent = title || "完了";
+  bodyEl.textContent = body || "";
+  popup.dataset.type = type;
+  popup.style.display = "flex";
+  close.onclick = () => {
+    popup.style.display = "none";
+  };
+  playSalesNoticeSound(type);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (!requireSalesAuth()) return;
+  bindPaymentListControls();
+  clearPaymentForm();
+  renderPaymentInvoiceList();
+});
+
+function bindPaymentListControls() {
+  const search = document.getElementById("paymentInvoiceSearch");
+  const status = document.getElementById("paymentInvoiceStatusFilter");
+  const dateFrom = document.getElementById("paymentInvoiceDateFromFilter");
+  const dateTo = document.getElementById("paymentInvoiceDateToFilter");
+  if (search) {
+    search.addEventListener("input", () => {
+      paymentSearchText = search.value.trim().toLowerCase();
+      renderPaymentInvoiceList();
+    });
+  }
+  if (status) {
+    status.addEventListener("change", () => {
+      paymentStatusFilter = status.value;
+      renderPaymentInvoiceList();
+    });
+  }
+  if (dateFrom) {
+    dateFrom.addEventListener("input", () => {
+      paymentDateFrom = dateFrom.value;
+      renderPaymentInvoiceList();
+    });
+  }
+  if (dateTo) {
+    dateTo.addEventListener("input", () => {
+      paymentDateTo = dateTo.value;
+      renderPaymentInvoiceList();
+    });
+  }
+  setPaymentInvoiceListCollapsed(true);
+}
+
+function togglePaymentInvoiceList() {
+  setPaymentInvoiceListCollapsed(!paymentListCollapsed);
+}
+
+function setPaymentInvoiceListCollapsed(collapsed) {
+  paymentListCollapsed = collapsed;
+  const panel = document.getElementById("paymentInvoiceListPanel");
+  const button = document.getElementById("paymentInvoiceListToggle");
+  if (panel) panel.hidden = paymentListCollapsed;
+  if (button) button.textContent = paymentListCollapsed ? "一覧を開く" : "一覧を閉じる";
+}
+
+function getPaymentTargetInvoices() {
+  return readPaymentInvoices()
+    .filter(invoice => PAYMENT_TARGET_STATUSES.includes(normalizePaymentStatus(invoice.status)))
+    .sort((a, b) => String(b.issuedAt || b.invoiceDate || b.createdAt).localeCompare(String(a.issuedAt || a.invoiceDate || a.createdAt)));
+}
+
+function renderPaymentInvoiceList() {
+  const body = document.getElementById("paymentInvoiceListBody");
+  const allInvoices = getPaymentTargetInvoices();
+  const invoices = allInvoices.filter(matchesPaymentInvoiceFilters);
+  const count = document.getElementById("paymentInvoiceListCount");
+  if (count) count.textContent = paymentSearchText || paymentStatusFilter || paymentDateFrom || paymentDateTo
+    ? `${invoices.length}/${allInvoices.length}件`
+    : `${allInvoices.length}件`;
+  if (!body) return;
+  body.innerHTML = invoices.length ? invoices.map(invoice => {
+    const total = calcInvoiceTotal(invoice);
+    const paid = getPaidTotal(invoice);
+    const status = normalizePaymentStatus(invoice.status);
+    return `<tr>
+      <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo || "")} ${statusBadge(status)}</span></td>
+      <td>${escapeHtml(invoice.invoiceDate || "")}</td>
+      <td>${escapeHtml(normalizeDateOnly(invoice.issuedAt))}</td>
+      <td>${escapeHtml(invoice.dueDate || "")}</td>
+      <td>${escapeHtml(invoice.customerName || "")}</td>
+      <td>${escapeHtml(invoice.subject || "")}</td>
+      <td>${money(total)}</td>
+      <td>${money(paid)}</td>
+      <td>${statusBadge(status)}</td>
+      <td>${escapeHtml(invoice.staff || "")}</td>
+      <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">選択</button></td>
+    </tr>`;
+  }).join("") : '<tr><td colspan="11">入金確認対象の請求書はありません。</td></tr>';
+}
+
+function matchesPaymentInvoiceFilters(invoice) {
+  const status = normalizePaymentStatus(invoice.status);
+  if (paymentStatusFilter && status !== paymentStatusFilter) return false;
+  if (!matchesDateRange([invoice.invoiceDate, invoice.issuedAt, invoice.dueDate], paymentDateFrom, paymentDateTo)) return false;
+  if (!paymentSearchText) return true;
+  const text = [
+    invoice.invoiceNo,
+    invoice.customerName,
+    invoice.staff,
+    invoice.subject,
+    status,
+    invoice.status,
+    invoice.invoiceDate,
+    invoice.issuedAt,
+    invoice.dueDate
+  ].map(value => String(value || "").toLowerCase()).join(" ");
+  return text.includes(paymentSearchText);
+}
+
+function clearPaymentForm() {
+  selectedPaymentInvoiceId = null;
+  document.getElementById("paymentInvoiceNo").value = "";
+  document.getElementById("paymentCustomerName").value = "";
+  document.getElementById("paymentInvoiceTotal").value = "";
+  document.getElementById("paymentDate").value = today();
+  document.getElementById("paymentAmount").value = "";
+  document.getElementById("paymentMethod").value = "振込";
+  document.getElementById("paymentPayerName").value = "";
+  document.getElementById("paymentStaff").value = "";
+  document.getElementById("paymentCurrentStatus").value = "";
+  document.getElementById("paymentMemo").value = "";
+  document.getElementById("paymentInvoiceLink").href = "invoices.html";
+  renderPaymentHistory(null);
+}
+
+function selectPaymentInvoice(id) {
+  const invoice = readPaymentInvoices().find(row => row.id === id);
+  if (!invoice) {
+    showSalesPopup("選択失敗", "請求書が見つかりません。", "err");
+    return;
+  }
+  selectedPaymentInvoiceId = invoice.id;
+  const total = calcInvoiceTotal(invoice);
+  const paid = getPaidTotal(invoice);
+  document.getElementById("paymentInvoiceNo").value = invoice.invoiceNo || "";
+  document.getElementById("paymentCustomerName").value = invoice.customerName || "";
+  document.getElementById("paymentInvoiceTotal").value = `${money(total)}（入金済 ${money(paid)}）`;
+  document.getElementById("paymentDate").value = today();
+  document.getElementById("paymentAmount").value = Math.max(0, total - paid);
+  document.getElementById("paymentMethod").value = "振込";
+  document.getElementById("paymentPayerName").value = invoice.customerName || "";
+  document.getElementById("paymentStaff").value = invoice.staff || "";
+  document.getElementById("paymentCurrentStatus").value = normalizePaymentStatus(invoice.status);
+  document.getElementById("paymentMemo").value = "";
+  document.getElementById("paymentInvoiceLink").href = `invoices.html?id=${encodeURIComponent(invoice.id)}`;
+  renderPaymentHistory(invoice);
+  showSalesMessage(`${invoice.invoiceNo || ""} の入金確認を入力できます。`, "ok");
+}
+
+function savePayment() {
+  if (!selectedPaymentInvoiceId) {
+    showSalesPopup("請求書未選択", "入金確認する請求書を選択してください。", "warn");
+    return;
+  }
+  const amount = Number(document.getElementById("paymentAmount").value || 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    showSalesPopup("入力確認", "入金額を1円以上で入力してください。", "warn");
+    return;
+  }
+  const invoices = readPaymentInvoices();
+  const index = invoices.findIndex(row => row.id === selectedPaymentInvoiceId);
+  if (index < 0) {
+    showSalesPopup("保存失敗", "請求書が見つかりません。", "err");
+    return;
+  }
+  const invoice = invoices[index];
+  const now = new Date().toISOString();
+  const payment = {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+    paymentDate: document.getElementById("paymentDate").value || today(),
+    amount,
+    method: "振込",
+    payerName: document.getElementById("paymentPayerName").value.trim(),
+    staff: document.getElementById("paymentStaff").value.trim(),
+    memo: document.getElementById("paymentMemo").value,
+    createdAt: now
+  };
+  invoice.payments = [...getInvoicePayments(invoice), payment];
+  invoice.paymentUpdatedAt = now;
+  invoice.updatedAt = now;
+  invoice.status = getPaidTotal(invoice) >= calcInvoiceTotal(invoice) ? PAYMENT_STATUS_PAID : PAYMENT_STATUS_WAITING;
+  invoices[index] = invoice;
+  writePaymentInvoices(invoices);
+  selectPaymentInvoice(invoice.id);
+  renderPaymentInvoiceList();
+  showSalesPopup("入金確認を保存しました", `${invoice.invoiceNo || ""}\nステータス: ${invoice.status}`, "ok");
+}
+
+function renderPaymentHistory(invoice) {
+  const area = document.getElementById("paymentHistory");
+  if (!area) return;
+  if (!invoice) {
+    area.innerHTML = '<div class="message">請求書を選択すると入金履歴を表示します。</div>';
+    return;
+  }
+  const payments = getInvoicePayments(invoice).slice().sort((a, b) => String(b.paymentDate || b.createdAt).localeCompare(String(a.paymentDate || a.createdAt)));
+  if (!payments.length) {
+    area.innerHTML = '<div class="message warn">入金履歴はまだありません。</div>';
+    return;
+  }
+  area.innerHTML = `<div class="table-wrap payment-history-table"><table>
+    <thead><tr><th>入金日</th><th>入金額</th><th>入金方法</th><th>振込名義</th><th>担当者</th><th>登録日時</th><th>メモ</th></tr></thead>
+    <tbody>${payments.map(payment => `<tr>
+      <td>${escapeHtml(payment.paymentDate || "")}</td>
+      <td>${money(payment.amount)}</td>
+      <td>${escapeHtml(payment.method || "振込")}</td>
+      <td>${escapeHtml(payment.payerName || "")}</td>
+      <td>${escapeHtml(payment.staff || "")}</td>
+      <td>${escapeHtml(formatDateTime(payment.createdAt))}</td>
+      <td>${escapeHtml(payment.memo || "")}</td>
+    </tr>`).join("")}</tbody>
+  </table></div>`;
+}
