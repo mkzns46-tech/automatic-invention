@@ -27,3 +27,17 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.summary div{padding:12px;border:1px solid var(--border);border-radius:12px;background:#f8fcf9;color:var(--muted);font-weight:800}.summary strong{display:block;font-size:20px;color:var(--main-dark);margin-top:4px}
 .login-card{max-width:680px;margin:54px auto;border-top:6px solid var(--main);padding:24px}.login-topbar{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px}.login-topbar h1{margin:3px 0 0;color:var(--main-dark);font-size:28px}.login-topbar .brand{color:var(--main)}.login-actions{min-width:220px}.login-actions .pill{width:100%;min-height:40px}.hidden{display:none!important}
 @media(max-width:900px){.sales-has-sidebar .sales-wrap,.sales-wrap{margin-left:0;padding:10px}.sales-sidebar{position:static;width:auto;margin:10px;border-radius:16px}.sales-sidebar nav{grid-template-columns:1fr 1fr}.sales-header{display:block;padding:18px 16px}.sales-header h1{font-size:24px}.sales-actions{justify-content:flex-start;margin-top:12px}.login-topbar{display:block}.login-actions{min-width:0}.grid,.row,.row.two,.row.three{grid-template-columns:1fr}.quote-line{grid-template-columns:1fr}.summary{grid-template-columns:1fr}table{min-width:760px}.pill,.secondary,button{width:100%}}
+
+/* v1.2 inventory-matched sidebar override */
+body.sales-has-sidebar .sales-sidebar{position:fixed!important;top:12px!important;left:12px!important;bottom:12px!important;width:256px!important;padding:14px 10px!important;border:1px solid #d9e5dd!important;border-radius:16px!important;background:#fff!important;color:#1b4332!important;box-shadow:0 4px 20px rgba(27,67,50,.06)!important}
+body.sales-has-sidebar .sales-sidebar-brand strong{color:#6b7280!important;font-size:12px!important;font-weight:900!important;letter-spacing:.08em!important}
+body.sales-has-sidebar .sales-sidebar-brand span{color:#1b4332!important}
+body.sales-has-sidebar .sales-menu-link{min-height:48px!important;border:1px solid transparent!important;border-radius:11px!important;background:#fff!important;color:#1b4332!important;box-shadow:none!important}
+body.sales-has-sidebar .sales-menu-link span{color:#527161!important}
+body.sales-has-sidebar .sales-menu-link:hover{background:#f0f7f2!important}
+body.sales-has-sidebar .sales-menu-link.active{border-color:#d8eee0!important;background:#eaf6ee!important;color:#0b5d40!important}
+body.sales-has-sidebar .sales-language{border-top:1px solid #e5e7eb!important}
+body.sales-has-sidebar .sales-language a{border:1px solid #d9e5dd!important;background:#fff!important;color:#1b4332!important}
+body.sales-has-sidebar .sales-language a.active{border-color:#d8eee0!important;background:#eaf6ee!important;color:#0b5d40!important}
+.section-note{margin:5px 0 0;color:#527161;font-size:13px;font-weight:700;line-height:1.5}
+.sales-smaregi-card .row{align-items:end}
