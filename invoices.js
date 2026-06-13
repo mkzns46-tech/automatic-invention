@@ -76,10 +76,10 @@
       <div>内消費税<strong id="taxText">0円</strong></div>
     </div>
     <div class="sales-actions" style="margin-top:14px">
-      <button type="button" class="primary" id="issueInvoiceBtn" onclick="issueInvoice();">発行確定</button>
-      <button type="button" class="primary" onclick="saveInvoice();">保存</button>
-      <button type="button" class="secondary" onclick="outputCurrentInvoicePdf();">PDF出力</button>
-      <button type="button" class="danger" onclick="cancelInvoice();">キャンセル</button>
+      <button type="button" class="primary invoice-issue-button" id="issueInvoiceBtn" onclick="issueInvoice();">発行確定</button>
+      <button type="button" class="primary" id="saveInvoiceBtn" onclick="saveInvoice();">保存</button>
+      <button type="button" class="secondary" id="invoicePdfBtn" onclick="outputCurrentInvoicePdf();">PDF出力</button>
+      <button type="button" class="danger" id="cancelInvoiceBtn" onclick="cancelInvoice();">キャンセル</button>
     </div>
   </section>
 </main>
