@@ -3,19 +3,39 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARICO ARCHERY 請求書</title>
-<link rel="stylesheet" href="sales-style.css">
+<title>ARICO ARCHERY 販売管理</title>
+<link rel="stylesheet" href="sales-style.css?v=20260613-vtest">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-placeholder.js" defer></script>
+<script src="sales-nav.js?v=20260613-vtest" defer></script>
+<script src="sales.js?v=20260613-vtest" defer></script>
 </head>
-<body data-sales-title="請求書">
+<body>
 <main class="sales-wrap">
   <header class="sales-header">
-    <div><div class="brand">ARICO ARCHERY</div><h1 id="salesPlaceholderTitle">請求書</h1></div>
-    <div class="sales-actions"><a class="pill" href="index.html">販売管理トップ</a><button type="button" class="secondary" onclick="logoutSales();">ログアウト</button></div>
+    <div>
+      <div class="brand">ARICO ARCHERY</div>
+      <h1>販売管理</h1>
+      <p class="lead">見積・請求・入金確認などの販売業務入口です。</p>
+    </div>
+    <div class="sales-actions">
+      <a class="pill" href="../portal/portal.html">システム入口に戻る</a>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+    </div>
   </header>
-  <section class="card"><p id="salesPlaceholderMessage">準備中です。</p></section>
+
+  <div id="salesMessage" class="message">販売管理トップです。左メニューから機能を選択できます。</div>
+
+  <section class="card sales-overview-card">
+    <div class="section-title">
+      <div>
+        <h2>販売管理メニュー</h2>
+        <p class="section-note">見積書を中心に、販売フローごとの画面へ移動します。</p>
+      </div>
+      <div class="badge muted">v1</div>
+    </div>
+    <section id="salesMenuGrid" class="grid"></section>
+  </section>
 </main>
 </body>
 </html>

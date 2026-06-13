@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="sales-style.css?v=20260613-vtest">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-nav.js" defer></script>
+<script src="sales-nav.js?v=20260613-vtest" defer></script>
 <script src="customers.js"></script>
 <script src="sales-calculator.js"></script>
 <script src="quote-pdf.js?v=20260613-vtest"></script>
