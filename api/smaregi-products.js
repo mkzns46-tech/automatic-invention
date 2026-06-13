@@ -238,16 +238,28 @@ async function getAccessToken(context) {
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return sendJson(res, 405, { ok: false, error: "POST only" });
+    return sendJson(res, 405, {
+      ok: false,
+      error: "POST only",
+      step: "method_check",
+      status: 405
+    });
   }
 
+  let step = "init";
   try {
+    step = "parse_body";
     parseBody(req);
+    step = "resolve_context";
     const context = resolveSmaregiContext();
+    step = "oauth_token";
     const token = await getAccessToken(context);
     const apiBase = context.apiBase || `https://api.smaregi.jp/${context.contractId}/pos`;
+    step = "products_fetch";
     const products = await fetchAll(apiBase, "/products", token);
+    step = "price_fetch";
     const { rows: storePriceRows, result: priceApi } = await fetchStoreProductPrices(apiBase, context.storeId, token);
+    step = "price_merge";
     const storePriceIndex = buildStorePriceIndex(storePriceRows);
 
     let inlinePriceCount = 0;
@@ -273,6 +285,7 @@ module.exports = async function handler(req, res) {
       return row;
     }).filter(Boolean);
 
+    step = "response";
     return sendJson(res, 200, {
       ok: true,
       products: normalized,
@@ -297,12 +310,15 @@ module.exports = async function handler(req, res) {
     console.error("[smaregi-products] failed", {
       message,
       stack: error?.stack || "",
-      method: req.method
+      method: req.method,
+      step
     });
     return sendJson(res, 500, {
       ok: false,
       error: message,
-      errorType: message.includes("OAuth") ? "smaregi_auth_failed" : "smaregi_products_failed"
+      errorType: message.includes("OAuth") ? "smaregi_auth_failed" : "smaregi_products_failed",
+      step,
+      status: 500
     });
   }
 };
