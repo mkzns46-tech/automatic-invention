@@ -7,14 +7,12 @@
 <link rel="stylesheet" href="sales-style.css">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
+<script src="sales-nav.js" defer></script>
 <script src="sales-placeholder.js" defer></script>
 </head>
 <body data-sales-title="顧客管理">
 <main class="sales-wrap">
-  <header class="sales-header">
-    <div><div class="brand">ARICO ARCHERY</div><h1 id="salesPlaceholderTitle">顧客管理</h1></div>
-    <div class="sales-actions"><a class="pill" href="index.html">販売管理トップ</a><button type="button" class="secondary" onclick="logoutSales();">システムログイン画面に戻る</button></div>
-  </header>
+  <header class="sales-header"><div><div class="brand">ARICO ARCHERY</div><h1 id="salesPlaceholderTitle">顧客管理</h1></div><div class="sales-actions"><a class="pill" href="index.html">販売管理トップ</a><button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button></div></header>
   <section class="card"><p id="salesPlaceholderMessage">準備中です。</p></section>
 </main>
 </body>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARICO ARCHERY 판매 관리</title>
+<link rel="stylesheet" href="sales-style.css">
+<script src="sales-auth.js"></script>
+<script>requireSalesAuth();</script>
+<script src="sales-nav.js" defer></script>
+</head>
+<body>
+<main class="sales-wrap">
+  <header class="sales-header">
+    <div>
+      <div class="brand">ARICO ARCHERY</div>
+      <h1>판매 관리</h1>
+      <p class="lead">견적, 청구, 입금 확인 등 판매 업무의 입구입니다.</p>
+    </div>
+    <div class="sales-actions">
+      <a class="pill" href="../portal/portal_ko.html">시스템 입구로 돌아가기</a>
+      <button type="button" class="secondary" onclick="logoutSales();">로그인 화면으로 돌아가기</button>
+    </div>
+  </header>
+  <div class="message">왼쪽 메뉴에서 기능을 선택할 수 있습니다. 현재 v1에서는 견적서 기능을 사용할 수 있습니다.</div>
+  <section class="grid">
+    <a class="card menu-card" href="quotes.html"><h3>견적서</h3><p>견적 작성・목록・PDF 출력</p></a>
+    <a class="card menu-card disabled" href="invoices.html"><h3>청구서</h3><p>준비 중</p></a>
+    <a class="card menu-card disabled" href="payments.html"><h3>입금 확인</h3><p>준비 중</p></a>
+    <a class="card menu-card disabled" href="picking.html"><h3>검품</h3><p>준비 중</p></a>
+    <a class="card menu-card disabled" href="delivery.html"><h3>납품서</h3><p>준비 중</p></a>
+    <a class="card menu-card disabled" href="receipts.html"><h3>영수증</h3><p>준비 중</p></a>
+    <a class="card menu-card disabled" href="backorders.html"><h3>도매 발주 잔량</h3><p>준비 중</p></a>
+    <a class="card menu-card disabled" href="customers.html"><h3>고객 관리</h3><p>준비 중</p></a>
+  </section>
+</main>
+</body>
+</html>

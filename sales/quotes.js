@@ -120,13 +120,15 @@ async function searchProducts() {
   results.innerHTML = '<div class="message">検索中...</div>';
   try {
     const filter = encodeURIComponent(`*${query}*`);
-    const rows = await salesFetch(`products?select=barcode,name,base_stock,category,genre,smaregi_product_id&or=(name.ilike.${filter},barcode.ilike.${filter},smaregi_product_id.ilike.${filter})&limit=20`);
-    results.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>商品名</th><th>バーコード</th><th>スマレジ商品ID</th><th>現在庫</th><th>操作</th></tr></thead><tbody>${rows.map(row => {
+    const rows = await salesFetch(`products?select=*&or=(name.ilike.${filter},barcode.ilike.${filter},smaregi_product_id.ilike.${filter})&limit=20`);
+    results.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>商品名</th><th>バーコード</th><th>スマレジ商品ID</th><th>税込単価</th><th>現在庫</th><th>操作</th></tr></thead><tbody>${rows.map(row => {
       const stock = Number(row.base_stock || 0);
+      const price = getProductUnitPrice(row);
       return `<tr>
         <td>${escapeHtml(row.name || "")}</td>
         <td>${escapeHtml(row.barcode || "")}</td>
         <td>${escapeHtml(row.smaregi_product_id || "")}</td>
+        <td>${price ? salesYen(price) : '<span class="line-stock warn">未登録</span>'}</td>
         <td>${stock > 0 ? `現在庫 ${stock}` : `<span class="line-stock warn">現在庫 0 / 取寄せ</span>`}</td>
         <td><button type="button" class="secondary" onclick='addProductLine(${JSON.stringify(row).replaceAll("'", "&#39;")})'>追加</button></td>
       </tr>`;
@@ -136,10 +138,28 @@ async function searchProducts() {
   }
 }
 
+function getProductUnitPrice(product) {
+  const keys = [
+    "price",
+    "sales_price",
+    "selling_price",
+    "unit_price",
+    "tax_included_price",
+    "tax_included_unit_price",
+    "default_price"
+  ];
+  for (const key of keys) {
+    const value = Number(product?.[key] || 0);
+    if (value > 0) return value;
+  }
+  return 0;
+}
+
 function addProductLine(product) {
   const units = readUnits();
   const unitKey = product.barcode || product.smaregi_product_id || product.name;
   const unit = units[unitKey] || "個";
+  const unitPrice = getProductUnitPrice(product);
   currentLines.push({
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     barcode: product.barcode || "",
@@ -148,7 +168,7 @@ function addProductLine(product) {
     stock: Number(product.base_stock || 0),
     qty: 1,
     unit,
-    unitPrice: 0,
+    unitPrice,
     discountValue: 0,
     discountAmount: 0,
     amount: 0,
@@ -156,6 +176,9 @@ function addProductLine(product) {
   });
   markQuoteDirty();
   renderLines();
+  if (!unitPrice) {
+    showSalesMessage("この商品には価格列が登録されていないため、税込単価を手入力してください。", "warn");
+  }
 }
 
 function renderLines() {
