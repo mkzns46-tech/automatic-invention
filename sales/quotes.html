@@ -8,6 +8,8 @@
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="customers.js"></script>
+<script src="sales-calculator.js"></script>
+<script src="sales-storage.js"></script>
 <script src="quote-pdf.js"></script>
 <script src="quotes.js" defer></script>
 </head>
@@ -86,7 +88,7 @@
     </div>
     <div class="sales-actions" style="margin-top:14px">
       <button type="button" class="primary" onclick="saveQuote();">保存</button>
-      <button type="button" class="secondary" onclick="outputCurrentQuotePdf();">PDF出力</button>
+      <button type="button" class="secondary" onclick="outputCurrentQuotePdf();">保存済みPDF出力</button>
     </div>
   </section>
 </main>
