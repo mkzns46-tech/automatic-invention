@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 販売管理</title>
-<link rel="stylesheet" href="sales-style.css">
+<link rel="stylesheet" href="sales-style.css?v=20260613-3">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
+<script src="sales-nav.js" defer></script>
 <script src="sales.js" defer></script>
 </head>
 <body>
@@ -19,11 +20,22 @@
     </div>
     <div class="sales-actions">
       <a class="pill" href="../portal/portal.html">システム入口に戻る</a>
-      <button type="button" class="secondary" onclick="logoutSales();">システムログイン画面に戻る</button>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
     </div>
   </header>
-  <div id="salesMessage" class="message">販売管理トップです。v1では見積書のみ利用できます。</div>
-  <section id="salesMenuGrid" class="grid"></section>
+
+  <div id="salesMessage" class="message">販売管理トップです。左メニューから機能を選択できます。</div>
+
+  <section class="card sales-overview-card">
+    <div class="section-title">
+      <div>
+        <h2>販売管理メニュー</h2>
+        <p class="section-note">見積書を中心に、販売フローごとの画面へ移動します。</p>
+      </div>
+      <div class="badge muted">v1</div>
+    </div>
+    <section id="salesMenuGrid" class="grid"></section>
+  </section>
 </main>
 </body>
 </html>

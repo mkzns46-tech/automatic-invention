@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARICO ARCHERY 販売管理 設定</title>
+<link rel="stylesheet" href="sales-style.css?v=20260613-3">
+<script src="sales-auth.js"></script>
+<script>requireSalesAuth();</script>
+<script src="sales-storage.js"></script>
+<script src="sales-nav.js" defer></script>
+<script src="sales-smaregi.js" defer></script>
+<script src="settings.js" defer></script>
+</head>
+<body>
+<main class="sales-wrap">
+  <header class="sales-header">
+    <div>
+      <div class="brand">ARICO ARCHERY</div>
+      <h1>設定</h1>
+      <p class="lead">販売管理で使用する商品データを管理します。</p>
+    </div>
+    <div class="sales-actions">
+      <a class="pill" href="index.html">販売管理トップ</a>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+    </div>
+  </header>
+
+  <div id="salesMessage" class="message">設定画面です。スマレジ商品マスターを販売管理の商品検索へ反映できます。</div>
+
+  <section class="card sales-smaregi-card">
+    <div class="section-title">
+      <div>
+        <h2>スマレジ商品データ取得</h2>
+        <p class="section-note">商品名・バーコード・スマレジ商品ID・取得できる場合は価格を販売管理の商品検索に反映します。</p>
+      </div>
+      <div class="badge muted">商品マスター</div>
+    </div>
+    <div class="row three">
+      <label>スマレジ環境
+        <select id="salesSmaregiAccount">
+          <option value="old">旧スマレジ</option>
+          <option value="new">新スマレジ</option>
+        </select>
+      </label>
+      <label>店舗
+        <select id="salesSmaregiStore">
+          <option value="tokyo">東京</option>
+          <option value="aichi">愛知</option>
+        </select>
+      </label>
+      <div class="settings-action-cell">
+        <button type="button" id="salesSmaregiImportBtn" class="secondary" onclick="importSalesSmaregiProducts();">スマレジ商品マスター取込</button>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

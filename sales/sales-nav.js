@@ -6,7 +6,8 @@ const SALES_MENU_ITEMS = [
   ["納品書", "delivery.html", "準備中"],
   ["領収書", "receipts.html", "準備中"],
   ["卸発注残", "backorders.html", "準備中"],
-  ["顧客管理", "customers.html", "準備中"]
+  ["顧客管理", "customers.html", "準備中"],
+  ["設定", "settings.html", "スマレジ商品取込"]
 ];
 
 const SALES_MENU_ITEMS_KO = [
@@ -17,7 +18,8 @@ const SALES_MENU_ITEMS_KO = [
   ["납품서", "delivery.html", "준비 중"],
   ["영수증", "receipts.html", "준비 중"],
   ["도매 발주 잔량", "backorders.html", "준비 중"],
-  ["고객 관리", "customers.html", "준비 중"]
+  ["고객 관리", "customers.html", "준비 중"],
+  ["설정", "settings.html", "스마레지 상품 가져오기"]
 ];
 
 function renderSalesSidebar() {
