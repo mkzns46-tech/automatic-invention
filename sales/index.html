@@ -4,10 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 販売管理</title>
-<link rel="stylesheet" href="sales-style.css">
+<link rel="stylesheet" href="sales-style.css?v=20260613-2">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
+<script src="sales-storage.js"></script>
 <script src="sales-nav.js" defer></script>
+<script src="sales-smaregi.js" defer></script>
 <script src="sales.js" defer></script>
 </head>
 <body>
@@ -24,6 +26,25 @@
     </div>
   </header>
   <div id="salesMessage" class="message">販売管理トップです。左メニューから機能を選択できます。</div>
+  <section class="card sales-smaregi-card">
+    <h2>スマレジ商品データ取得</h2>
+    <div class="row three">
+      <label>スマレジ環境
+        <select id="salesSmaregiAccount">
+          <option value="old">旧スマレジ</option>
+          <option value="new">新スマレジ</option>
+        </select>
+      </label>
+      <label>店舗
+        <select id="salesSmaregiStore">
+          <option value="tokyo">東京</option>
+          <option value="aichi">愛知</option>
+        </select>
+      </label>
+      <div><button type="button" id="salesSmaregiImportBtn" class="secondary" onclick="importSalesSmaregiProducts();">スマレジ商品マスター取込</button></div>
+    </div>
+    <p class="section-note">商品名・バーコード・スマレジ商品ID・取得できる場合は価格を販売管理の商品検索に反映します。</p>
+  </section>
   <section id="salesMenuGrid" class="grid"></section>
 </main>
 </body>

@@ -7,6 +7,14 @@ function env(...names) {
   return "";
 }
 
+function firstNumber(...values) {
+  for (const value of values) {
+    const number = Number(String(value ?? "").replace(/,/g, ""));
+    if (Number.isFinite(number) && number > 0) return number;
+  }
+  return 0;
+}
+
 async function fetchAll(baseUrl, path, token) {
   const rows = [];
   for (let page = 1; page <= 100; page += 1) {
@@ -76,9 +84,21 @@ module.exports = async function handler(req, res) {
       const category = String(product.categoryName ?? product.category_name ?? "").trim();
       const genre = String(product.genreName ?? product.genre_name ?? "").trim();
       const department = String(product.departmentName ?? product.department_name ?? "").trim();
+      const price = firstNumber(
+        product.price,
+        product.productPrice,
+        product.product_price,
+        product.sellingPrice,
+        product.selling_price,
+        product.salesPrice,
+        product.sales_price,
+        product.unitPrice,
+        product.unit_price
+      );
       if (category) row.category = category;
       if (genre) row.genre = genre;
       if (department) row.department = department;
+      if (price) row.price = price;
       return row;
     }).filter(Boolean);
 
