@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 請求書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260613-6">
+<link rel="stylesheet" href="sales-style.css?v=20260613-vtest">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js" defer></script>
-<script src="invoice-pdf.js"></script>
-<script src="invoices.js" defer></script>
+<script src="invoice-pdf.js?v=20260613-vtest"></script>
+<script src="invoices.js?v=20260613-vtest" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
