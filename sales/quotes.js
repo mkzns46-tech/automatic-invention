@@ -5,6 +5,9 @@ const INVOICES_KEY = "arico_sales_invoices_v1";
 const PRODUCT_UNITS_KEY = "arico_sales_product_units_v1";
 const UNIT_OPTIONS = ["個", "本", "袋", "箱", "セット", "台", "式", "ダース", "枚", "組"];
 const DEALER_BRANDS = ["FIVICS", "MK", "JET6", "WJ"];
+const QUOTE_STATUS_DRAFT = "下書き";
+const QUOTE_STATUS_INVOICED = "請求書変換済み";
+const QUOTE_STATUS_CANCELLED = "キャンセル";
 
 let currentQuoteId = null;
 let currentLines = [];
@@ -86,6 +89,20 @@ function today() {
 
 function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
+}
+
+function normalizeQuoteStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (!value || value === "draft" || value === "下書き") return QUOTE_STATUS_DRAFT;
+  if (value === "invoiced" || value === "invoice_created" || value === "請求書変換済み") return QUOTE_STATUS_INVOICED;
+  if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return QUOTE_STATUS_CANCELLED;
+  return status || QUOTE_STATUS_DRAFT;
+}
+
+function quoteStatusBadge(status) {
+  const value = normalizeQuoteStatus(status);
+  const type = value === QUOTE_STATUS_CANCELLED ? "danger" : value === QUOTE_STATUS_INVOICED ? "info" : "muted";
+  return `<span class="status-badge ${type}">${escapeHtml(value)}</span>`;
 }
 
 function showSalesMessage(text, type) {
@@ -224,12 +241,12 @@ function renderQuoteList() {
   const body = document.getElementById("quoteListBody");
   const quotes = readQuotes().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   body.innerHTML = quotes.length ? quotes.map(q => `<tr>
-    <td>${escapeHtml(q.quoteNo)}</td>
+    <td><span class="number-with-status">${escapeHtml(q.quoteNo)} ${quoteStatusBadge(q.status)}</span></td>
     <td>${escapeHtml(q.quoteDate || "")}</td>
     <td>${escapeHtml(q.customerName || "")}</td>
     <td>${escapeHtml(q.subject || "")}</td>
     <td>${money(calcQuoteTotals(q).total)}</td>
-    <td>${escapeHtml(q.status || "下書き")}</td>
+    <td>${quoteStatusBadge(q.status)}</td>
     <td>${escapeHtml(q.staff || "")}</td>
     <td>
       <button type="button" class="secondary" onclick="editQuote('${q.id}')">編集</button>
@@ -266,7 +283,8 @@ function buildInvoiceFromQuote(quote, invoices) {
 }
 
 function convertQuoteToInvoice(id) {
-  const quote = readQuotes().find(q => q.id === id);
+  const quotes = readQuotes();
+  const quote = quotes.find(q => q.id === id);
   if (!quote) {
     showSalesMessage("見積書が見つかりません。", "err");
     return;
@@ -274,6 +292,9 @@ function convertQuoteToInvoice(id) {
   const invoices = readInvoices();
   const existing = invoices.find(invoice => invoice.sourceQuoteId === quote.id);
   if (existing) {
+    quote.status = QUOTE_STATUS_INVOICED;
+    writeQuotes(quotes);
+    renderQuoteList();
     showSalesMessage(`作成済みの請求書を開きます: ${existing.invoiceNo}`, "warn");
     location.href = `invoices.html?id=${encodeURIComponent(existing.id)}`;
     return;
@@ -281,6 +302,9 @@ function convertQuoteToInvoice(id) {
   const invoice = buildInvoiceFromQuote(quote, invoices);
   invoices.push(invoice);
   writeInvoices(invoices);
+  quote.status = QUOTE_STATUS_INVOICED;
+  writeQuotes(quotes);
+  renderQuoteList();
   showSalesMessage(`請求書を作成しました: ${invoice.invoiceNo}`, "ok");
   location.href = `invoices.html?id=${encodeURIComponent(invoice.id)}`;
 }

@@ -9,18 +9,6 @@ const INVOICE_STATUS_CANCELLED = "キャンセル";
 let currentInvoiceId = null;
 let currentInvoiceLines = [];
 
-console.log("invoices.js loaded v20260613");
-alert("invoices.js loaded v20260613");
-
-function showInvoiceLoadedTestBanner() {
-  if (document.getElementById("invoiceLoadedTestBanner")) return;
-  const banner = document.createElement("div");
-  banner.id = "invoiceLoadedTestBanner";
-  banner.className = "message ok invoice-loaded-test";
-  banner.textContent = "invoices.js loaded v20260613";
-  document.body.prepend(banner);
-}
-
 function readInvoices() {
   return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
 }
@@ -197,7 +185,6 @@ function confirmSalesPopup(title, body, type = "warn") {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  showInvoiceLoadedTestBanner();
   if (!requireSalesAuth()) return;
   document.getElementById("invoiceStatus").innerHTML = INVOICE_STATUS_OPTIONS
     .map(status => `<option value="${status}">${status}</option>`)
