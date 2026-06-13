@@ -13,11 +13,10 @@ function renderSalesHome() {
   const menus = [
     ["見積書", "quotes.html", "見積書作成・一覧・PDF出力", false],
     ["請求書", "invoices.html", "見積から変換・編集・PDF出力", false],
-    ["入金確認", "payments.html", "準備中", true],
-    ["検品", "picking.html", "準備中", true],
+    ["入金確認", "payments.html", "請求書発行後の入金状態を確認", true],
+    ["検品確認", "shipping.html", "発送前確認の状況を確認", true],
     ["納品書", "delivery.html", "準備中", true],
     ["領収書", "receipts.html", "準備中", true],
-    ["卸発注残", "backorders.html", "準備中", true],
     ["顧客管理", "customers.html", "準備中", true],
     ["設定", "settings.html", "スマレジ商品データ取込", false]
   ];

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARICO ARCHERY 検品確認</title>
+<link rel="stylesheet" href="sales-style.css?v=20260614-list-ui">
+<script src="sales-auth.js"></script>
+<script>requireSalesAuth();</script>
+<script src="sales-nav.js?v=20260614-list-ui" defer></script>
+<script src="shipping.js?v=20260614-list-ui" defer></script>
+</head>
+<body>
+<main class="sales-wrap">
+  <header class="sales-header">
+    <div>
+      <div class="brand">ARICO ARCHERY</div>
+      <h1>検品確認</h1>
+      <p class="lead">販売管理側で、請求書に対する検品状況・発送状況を確認するための準備画面です。</p>
+    </div>
+    <div class="sales-actions">
+      <a class="pill" href="index.html">販売管理トップ</a>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+    </div>
+  </header>
+
+  <div id="salesMessage" class="message">検品確認は準備中です。</div>
+
+  <section class="card">
+    <div class="section-title">
+      <div>
+        <h2>検品確認</h2>
+        <p class="section-note">今後、別入口の発送確認で行ったスキャン検品・発送準備の結果を販売管理側に反映します。</p>
+      </div>
+      <div class="badge muted">準備中</div>
+    </div>
+    <div class="shipping-placeholder-grid">
+      <div class="summary"><div>必要数<strong>0</strong></div><div>検品済数<strong>0</strong></div><div>不足数<strong>0</strong></div><div>発送待ち<strong>0</strong></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>将来対応予定</h2>
+    <div class="shipping-roadmap">
+      <span class="status-badge info">請求書別状況確認</span>
+      <span class="status-badge info">請求書との連携</span>
+      <span class="status-badge ok">検品状況確認</span>
+      <span class="status-badge warn">発送状況確認</span>
+      <span class="status-badge muted">発送確認から結果反映</span>
+    </div>
+  </section>
+</main>
+</body>
+</html>

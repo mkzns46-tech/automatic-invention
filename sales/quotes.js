@@ -12,6 +12,9 @@ const QUOTE_STATUS_CANCELLED = "キャンセル";
 let currentQuoteId = null;
 let currentLines = [];
 let productSearchTimer = null;
+let quoteListSearchText = "";
+let quoteListStatusFilter = "";
+let quoteListCollapsed = false;
 
 function salesFetch(path) {
   return fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
@@ -204,10 +207,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("quoteDate").value = today();
   document.getElementById("validUntil").value = today();
   bindProductAutoSearch();
+  bindQuoteListControls();
   await loadStaffOptions();
   renderQuoteList();
   newQuote();
 });
+
+function bindQuoteListControls() {
+  const search = document.getElementById("quoteListSearch");
+  const status = document.getElementById("quoteStatusFilter");
+  if (search) {
+    search.addEventListener("input", () => {
+      quoteListSearchText = search.value.trim().toLowerCase();
+      renderQuoteList();
+    });
+  }
+  if (status) {
+    status.addEventListener("change", () => {
+      quoteListStatusFilter = status.value;
+      renderQuoteList();
+    });
+  }
+}
+
+function toggleQuoteList() {
+  quoteListCollapsed = !quoteListCollapsed;
+  const panel = document.getElementById("quoteListPanel");
+  const button = document.getElementById("quoteListToggle");
+  if (panel) panel.hidden = quoteListCollapsed;
+  if (button) button.textContent = quoteListCollapsed ? "一覧を開く" : "一覧を閉じる";
+}
 
 function bindProductAutoSearch() {
   const input = document.getElementById("productSearchInput");
@@ -239,7 +268,9 @@ async function loadStaffOptions() {
 
 function renderQuoteList() {
   const body = document.getElementById("quoteListBody");
-  const quotes = readQuotes().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const quotes = readQuotes()
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .filter(matchesQuoteListFilters);
   body.innerHTML = quotes.length ? quotes.map(q => `<tr>
     <td><span class="number-with-status">${escapeHtml(q.quoteNo)} ${quoteStatusBadge(q.status)}</span></td>
     <td>${escapeHtml(q.quoteDate || "")}</td>
@@ -255,6 +286,21 @@ function renderQuoteList() {
       <button type="button" class="secondary" onclick="convertQuoteToInvoice('${q.id}')">請求書へ変換</button>
     </td>
   </tr>`).join("") : '<tr><td colspan="8">見積書はまだありません。</td></tr>';
+}
+
+function matchesQuoteListFilters(quote) {
+  const status = normalizeQuoteStatus(quote.status);
+  if (quoteListStatusFilter && status !== quoteListStatusFilter) return false;
+  if (!quoteListSearchText) return true;
+  const text = [
+    quote.quoteNo,
+    quote.customerName,
+    quote.staff,
+    quote.subject,
+    status,
+    quote.status
+  ].map(value => String(value || "").toLowerCase()).join(" ");
+  return text.includes(quoteListSearchText);
 }
 
 function buildInvoiceFromQuote(quote, invoices) {

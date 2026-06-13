@@ -8,6 +8,9 @@ const INVOICE_STATUS_CANCELLED = "キャンセル";
 
 let currentInvoiceId = null;
 let currentInvoiceLines = [];
+let invoiceListSearchText = "";
+let invoiceListStatusFilter = "";
+let invoiceListCollapsed = false;
 
 function readInvoices() {
   return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
@@ -190,15 +193,43 @@ document.addEventListener("DOMContentLoaded", () => {
     .map(status => `<option value="${status}">${status}</option>`)
     .join("");
   document.getElementById("invoiceStatus").disabled = true;
+  bindInvoiceListControls();
   renderInvoiceList();
   const id = new URLSearchParams(location.search).get("id");
   if (id) editInvoice(id);
   else clearInvoiceEditor();
 });
 
+function bindInvoiceListControls() {
+  const search = document.getElementById("invoiceListSearch");
+  const status = document.getElementById("invoiceStatusFilter");
+  if (search) {
+    search.addEventListener("input", () => {
+      invoiceListSearchText = search.value.trim().toLowerCase();
+      renderInvoiceList();
+    });
+  }
+  if (status) {
+    status.addEventListener("change", () => {
+      invoiceListStatusFilter = status.value;
+      renderInvoiceList();
+    });
+  }
+}
+
+function toggleInvoiceList() {
+  invoiceListCollapsed = !invoiceListCollapsed;
+  const panel = document.getElementById("invoiceListPanel");
+  const button = document.getElementById("invoiceListToggle");
+  if (panel) panel.hidden = invoiceListCollapsed;
+  if (button) button.textContent = invoiceListCollapsed ? "一覧を開く" : "一覧を閉じる";
+}
+
 function renderInvoiceList() {
   const body = document.getElementById("invoiceListBody");
-  const invoices = readInvoices().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const invoices = readInvoices()
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .filter(matchesInvoiceListFilters);
   body.innerHTML = invoices.length ? invoices.map(invoice => {
     const totals = calcInvoiceTotals(invoice);
     const status = normalizeInvoiceStatus(invoice.status);
@@ -216,6 +247,22 @@ function renderInvoiceList() {
       </td>
     </tr>`;
   }).join("") : '<tr><td colspan="8">請求書はまだありません。見積書一覧から「請求書へ変換」を実行してください。</td></tr>';
+}
+
+function matchesInvoiceListFilters(invoice) {
+  const status = normalizeInvoiceStatus(invoice.status);
+  if (invoiceListStatusFilter && status !== invoiceListStatusFilter) return false;
+  if (!invoiceListSearchText) return true;
+  const text = [
+    invoice.invoiceNo,
+    invoice.sourceQuoteNo,
+    invoice.customerName,
+    invoice.staff,
+    invoice.subject,
+    status,
+    invoice.status
+  ].map(value => String(value || "").toLowerCase()).join(" ");
+  return text.includes(invoiceListSearchText);
 }
 
 function clearInvoiceEditor() {
