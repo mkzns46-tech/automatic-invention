@@ -53,6 +53,60 @@ function buildSalesSmaregiPriceNote(data, priceCount) {
   return "価格取得結果: 0件";
 }
 
+async function readSalesApiJson(response) {
+  const responseText = await response.text().catch(() => "");
+  const statusInfo = {
+    ok: response.ok,
+    status: response.status,
+    statusText: response.statusText,
+    body: responseText
+  };
+  console.log("[Sales Smaregi API response]", statusInfo);
+  if (!responseText) {
+    const error = new Error(`API応答なし（HTTP ${response.status}）`);
+    error.apiStatus = response.status;
+    error.apiBody = "";
+    throw error;
+  }
+  try {
+    const data = JSON.parse(responseText);
+    if (!response.ok || data.ok === false) {
+      const error = new Error(data.error || `API error ${response.status}`);
+      error.apiStatus = response.status;
+      error.apiBody = responseText;
+      error.apiData = data;
+      throw error;
+    }
+    return data;
+  } catch (e) {
+    if (e.apiStatus) throw e;
+    const error = new Error(`JSON解析失敗（HTTP ${response.status}）`);
+    error.apiStatus = response.status;
+    error.apiBody = responseText;
+    error.parseError = e.message || String(e);
+    throw error;
+  }
+}
+
+function getSalesImportErrorTitle(error) {
+  const message = String(error?.message || "");
+  const body = String(error?.apiBody || "");
+  if (message.includes("API応答なし")) return "API応答なし";
+  if (message.includes("JSON解析失敗")) return "JSON解析失敗";
+  if (message.includes("OAuth") || message.includes("auth") || body.includes("OAuth")) return "スマレジ認証失敗";
+  return "取込失敗";
+}
+
+function formatSalesImportError(error) {
+  const lines = [
+    error?.message || "スマレジ商品マスター取込に失敗しました。"
+  ];
+  if (error?.apiStatus) lines.push(`HTTP status: ${error.apiStatus}`);
+  if (error?.parseError) lines.push(`parse error: ${error.parseError}`);
+  if (error?.apiBody) lines.push(`response: ${String(error.apiBody).slice(0, 500)}`);
+  return lines.join("\n");
+}
+
 async function importSalesSmaregiProducts() {
   const button = document.getElementById("salesSmaregiImportBtn");
   const oldText = button?.textContent;
@@ -67,8 +121,7 @@ async function importSalesSmaregiProducts() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({})
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `API error ${res.status}`);
+    const data = await readSalesApiJson(res);
     const rows = (Array.isArray(data.products) ? data.products : [])
       .map(salesNormalizeSmaregiProduct)
       .filter(row => row.barcode && row.name);
@@ -84,10 +137,11 @@ async function importSalesSmaregiProducts() {
       showSalesPopup(type === "ok" ? "取込完了" : "取込完了（価格警告）", message, type);
     }
   } catch (e) {
-    const message = e.message || "スマレジ商品マスター取込に失敗しました。";
+    console.error("[Sales Smaregi Import Error]", e);
+    const message = formatSalesImportError(e);
     showSalesMessage(message, "err");
     if (typeof showSalesPopup === "function") {
-      showSalesPopup("取込失敗", message, "err");
+      showSalesPopup(getSalesImportErrorTitle(e), message, "err");
     }
   } finally {
     if (button) {

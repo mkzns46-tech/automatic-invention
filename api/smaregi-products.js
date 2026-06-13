@@ -1,5 +1,13 @@
 const DEFAULT_LIMIT = 1000;
 
+function sendJson(res, status, payload) {
+  try {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+  } catch (_) {}
+  return res.status(status).json(payload);
+}
+
 function env(...names) {
   for (const name of names) {
     if (name && process.env[name]) return process.env[name];
@@ -152,7 +160,13 @@ async function fetchAll(baseUrl, path, token) {
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }
     });
-    const body = await response.json().catch(() => null);
+    const responseText = await response.text().catch(() => "");
+    let body = null;
+    try {
+      body = responseText ? JSON.parse(responseText) : null;
+    } catch (_) {
+      throw new Error(`${path} API ${response.status}: JSON parse failed: ${responseText.slice(0, 500)}`);
+    }
     if (!response.ok) {
       throw new Error(`${path} API ${response.status}: ${JSON.stringify(body)}`);
     }
@@ -208,7 +222,13 @@ async function getAccessToken(context) {
       scope: "pos.products:read"
     }).toString()
   });
-  const body = await response.json().catch(() => null);
+  const responseText = await response.text().catch(() => "");
+  let body = null;
+  try {
+    body = responseText ? JSON.parse(responseText) : null;
+  } catch (_) {
+    throw new Error(`Smaregi OAuth JSON parse failed ${response.status}: ${responseText.slice(0, 500)}`);
+  }
   if (!response.ok || !body?.access_token) {
     throw new Error(`Smaregi OAuth error ${response.status}: ${JSON.stringify(body)}`);
   }
@@ -218,7 +238,7 @@ async function getAccessToken(context) {
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return res.status(405).json({ error: "POST only" });
+    return sendJson(res, 405, { ok: false, error: "POST only" });
   }
 
   try {
@@ -253,7 +273,8 @@ module.exports = async function handler(req, res) {
       return row;
     }).filter(Boolean);
 
-    return res.status(200).json({
+    return sendJson(res, 200, {
+      ok: true,
       products: normalized,
       count: normalized.length,
       priceCount: normalized.filter(row => Object.prototype.hasOwnProperty.call(row, "price")).length,
@@ -272,6 +293,16 @@ module.exports = async function handler(req, res) {
       }
     });
   } catch (error) {
-    return res.status(500).json({ error: error.message || String(error) });
+    const message = error?.message || String(error);
+    console.error("[smaregi-products] failed", {
+      message,
+      stack: error?.stack || "",
+      method: req.method
+    });
+    return sendJson(res, 500, {
+      ok: false,
+      error: message,
+      errorType: message.includes("OAuth") ? "smaregi_auth_failed" : "smaregi_products_failed"
+    });
   }
 };
