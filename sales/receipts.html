@@ -4,18 +4,99 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 領収書</title>
-<link rel="stylesheet" href="sales-style.css">
+<link rel="stylesheet" href="sales-style.css?v=20260614-receipts">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-placeholder.js" defer></script>
+<script src="sales-nav.js?v=20260614-receipts" defer></script>
+<script src="receipt-pdf.js?v=20260614-receipts"></script>
+<script src="receipts.js?v=20260614-receipts" defer></script>
 </head>
-<body data-sales-title="領収書">
+<body>
 <main class="sales-wrap">
   <header class="sales-header">
-    <div><div class="brand">ARICO ARCHERY</div><h1 id="salesPlaceholderTitle">領収書</h1></div>
-    <div class="sales-actions"><a class="pill" href="index.html">販売管理トップ</a><button type="button" class="secondary" onclick="logoutSales();">システムログイン画面に戻る</button></div>
+    <div>
+      <div class="brand">ARICO ARCHERY</div>
+      <h1>領収書</h1>
+      <p class="lead">入金済み請求書から領収書を作成し、PDF出力します。在庫とスマレジ売上は変更しません。</p>
+    </div>
+    <div class="sales-actions">
+      <a class="pill" href="payments.html">入金確認</a>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+    </div>
   </header>
-  <section class="card"><p id="salesPlaceholderMessage">準備中です。</p></section>
+
+  <div id="salesMessage" class="message">入金済み請求書から領収書を作成できます。</div>
+
+  <section class="card collapsible-list-card">
+    <div class="sales-actions section-heading-row">
+      <h2 class="list-heading">領収書発行対象 <span class="status-badge muted" id="receiptTargetCount">0件</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="receiptIssuedToggle" onclick="toggleIssuedReceiptList();">発行済みを開く</button>
+    </div>
+    <div class="list-panel">
+      <div class="list-filter-row">
+        <label>一覧検索<input id="receiptSearch" placeholder="顧客名・件名・請求書番号・領収書番号・ステータス"></label>
+        <label>ステータス
+          <select id="receiptStatusFilter">
+            <option value="">全て</option>
+            <option value="未発行">未発行</option>
+            <option value="発行済み">発行済み</option>
+            <option value="キャンセル">キャンセル</option>
+          </select>
+        </label>
+        <label>開始日<input id="receiptDateFromFilter" type="date"></label>
+        <label>終了日<input id="receiptDateToFilter" type="date"></label>
+      </div>
+      <div class="list-subheading">未発行の領収書 / 入金済み請求書</div>
+      <div class="table-wrap list-scroll">
+        <table>
+          <thead><tr><th>番号</th><th>請求書番号</th><th>入金日</th><th>顧客名</th><th>件名</th><th>入金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <tbody id="receiptTargetListBody"></tbody>
+        </table>
+      </div>
+      <div class="list-panel completed-list-panel" id="issuedReceiptListPanel" hidden>
+        <div class="list-subheading">発行済み・キャンセル済み</div>
+        <div class="table-wrap list-scroll">
+          <table>
+            <thead><tr><th>領収書番号</th><th>請求書番号</th><th>入金日</th><th>顧客名</th><th>件名</th><th>入金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+            <tbody id="issuedReceiptListBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="receiptDetailCard">
+    <h2>領収書詳細</h2>
+    <div class="row three">
+      <label>領収書番号<input id="receiptNo" readonly></label>
+      <label>請求書番号<input id="sourceInvoiceNo" readonly></label>
+      <label>ステータス<input id="receiptStatus" readonly></label>
+    </div>
+    <div class="row three">
+      <label>顧客名<input id="receiptCustomerName" readonly></label>
+      <label>件名<input id="receiptSubject" readonly></label>
+      <label>担当者<input id="receiptStaff" readonly></label>
+    </div>
+    <div class="row three">
+      <label>入金日<input id="receiptPaymentDate" readonly></label>
+      <label>入金額<input id="receiptAmount" readonly></label>
+      <label>入金方法<input id="receiptMethod" readonly></label>
+    </div>
+    <div class="row two">
+      <label>振込名義<input id="receiptPayerName" readonly></label>
+      <label>備考<textarea id="receiptMemo" readonly></textarea></label>
+    </div>
+    <div class="sales-actions" style="margin-top:14px">
+      <button type="button" class="secondary" onclick="outputCurrentReceiptPdf();">PDF出力</button>
+    </div>
+  </section>
 </main>
+<div id="salesPopup" class="app-popup" style="display:none;">
+  <div class="app-popup-card">
+    <div id="salesPopupTitle" class="app-popup-title">完了</div>
+    <div id="salesPopupBody" class="app-popup-body"></div>
+    <button type="button" id="salesPopupClose">OK</button>
+  </div>
+</div>
 </body>
 </html>

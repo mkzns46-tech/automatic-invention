@@ -6,7 +6,7 @@ function showSalesMessage(text, type) {
 }
 
 function comingSoonSales(name) {
-  showSalesMessage(`${name} は準備中です。現在は見積書・請求書・入金確認・納品書・設定を利用できます。`, "warn");
+  showSalesMessage(`${name} は準備中です。現在は見積書・請求書・入金確認・納品書・領収書・設定を利用できます。`, "warn");
 }
 
 function renderSalesHome() {
@@ -16,7 +16,7 @@ function renderSalesHome() {
     ["入金確認", "payments.html", "請求書発行後の入金状態を確認", false],
     ["検品確認", "shipping.html", "発送前確認の状況を確認", true],
     ["納品書", "delivery.html", "請求書から作成された納品書を確認", false],
-    ["領収書", "receipts.html", "準備中", true],
+    ["領収書", "receipts.html", "入金済み請求書から領収書を作成", false],
     ["顧客管理", "customers.html", "準備中", true],
     ["設定", "settings.html", "スマレジ商品データ取込", false]
   ];
