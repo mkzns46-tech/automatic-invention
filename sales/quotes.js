@@ -14,7 +14,9 @@ let currentLines = [];
 let productSearchTimer = null;
 let quoteListSearchText = "";
 let quoteListStatusFilter = "";
-let quoteListCollapsed = false;
+let quoteListDateFrom = "";
+let quoteListDateTo = "";
+let quoteListCollapsed = true;
 
 function salesFetch(path) {
   return fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
@@ -216,6 +218,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 function bindQuoteListControls() {
   const search = document.getElementById("quoteListSearch");
   const status = document.getElementById("quoteStatusFilter");
+  const dateFrom = document.getElementById("quoteDateFromFilter");
+  const dateTo = document.getElementById("quoteDateToFilter");
   if (search) {
     search.addEventListener("input", () => {
       quoteListSearchText = search.value.trim().toLowerCase();
@@ -228,10 +232,27 @@ function bindQuoteListControls() {
       renderQuoteList();
     });
   }
+  if (dateFrom) {
+    dateFrom.addEventListener("input", () => {
+      quoteListDateFrom = dateFrom.value;
+      renderQuoteList();
+    });
+  }
+  if (dateTo) {
+    dateTo.addEventListener("input", () => {
+      quoteListDateTo = dateTo.value;
+      renderQuoteList();
+    });
+  }
+  setQuoteListCollapsed(true);
 }
 
 function toggleQuoteList() {
-  quoteListCollapsed = !quoteListCollapsed;
+  setQuoteListCollapsed(!quoteListCollapsed);
+}
+
+function setQuoteListCollapsed(collapsed) {
+  quoteListCollapsed = collapsed;
   const panel = document.getElementById("quoteListPanel");
   const button = document.getElementById("quoteListToggle");
   if (panel) panel.hidden = quoteListCollapsed;
@@ -268,9 +289,12 @@ async function loadStaffOptions() {
 
 function renderQuoteList() {
   const body = document.getElementById("quoteListBody");
-  const quotes = readQuotes()
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-    .filter(matchesQuoteListFilters);
+  const allQuotes = readQuotes().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const quotes = allQuotes.filter(matchesQuoteListFilters);
+  const count = document.getElementById("quoteListCount");
+  if (count) count.textContent = quoteListSearchText || quoteListStatusFilter || quoteListDateFrom || quoteListDateTo
+    ? `${quotes.length}/${allQuotes.length}件`
+    : `${allQuotes.length}件`;
   body.innerHTML = quotes.length ? quotes.map(q => `<tr>
     <td><span class="number-with-status">${escapeHtml(q.quoteNo)} ${quoteStatusBadge(q.status)}</span></td>
     <td>${escapeHtml(q.quoteDate || "")}</td>
@@ -291,6 +315,7 @@ function renderQuoteList() {
 function matchesQuoteListFilters(quote) {
   const status = normalizeQuoteStatus(quote.status);
   if (quoteListStatusFilter && status !== quoteListStatusFilter) return false;
+  if (!matchesDateRange([quote.createdAt, quote.quoteDate, quote.validUntil], quoteListDateFrom, quoteListDateTo)) return false;
   if (!quoteListSearchText) return true;
   const text = [
     quote.quoteNo,
@@ -301,6 +326,25 @@ function matchesQuoteListFilters(quote) {
     quote.status
   ].map(value => String(value || "").toLowerCase()).join(" ");
   return text.includes(quoteListSearchText);
+}
+
+function normalizeDateOnly(value) {
+  if (!value) return "";
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+function matchesDateRange(values, from, to) {
+  if (!from && !to) return true;
+  return values.some(value => {
+    const date = normalizeDateOnly(value);
+    if (!date) return false;
+    if (from && date < from) return false;
+    if (to && date > to) return false;
+    return true;
+  });
 }
 
 function buildInvoiceFromQuote(quote, invoices) {

@@ -10,7 +10,9 @@ let currentInvoiceId = null;
 let currentInvoiceLines = [];
 let invoiceListSearchText = "";
 let invoiceListStatusFilter = "";
-let invoiceListCollapsed = false;
+let invoiceListDateFrom = "";
+let invoiceListDateTo = "";
+let invoiceListCollapsed = true;
 
 function readInvoices() {
   return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
@@ -203,6 +205,8 @@ document.addEventListener("DOMContentLoaded", () => {
 function bindInvoiceListControls() {
   const search = document.getElementById("invoiceListSearch");
   const status = document.getElementById("invoiceStatusFilter");
+  const dateFrom = document.getElementById("invoiceDateFromFilter");
+  const dateTo = document.getElementById("invoiceDateToFilter");
   if (search) {
     search.addEventListener("input", () => {
       invoiceListSearchText = search.value.trim().toLowerCase();
@@ -215,10 +219,27 @@ function bindInvoiceListControls() {
       renderInvoiceList();
     });
   }
+  if (dateFrom) {
+    dateFrom.addEventListener("input", () => {
+      invoiceListDateFrom = dateFrom.value;
+      renderInvoiceList();
+    });
+  }
+  if (dateTo) {
+    dateTo.addEventListener("input", () => {
+      invoiceListDateTo = dateTo.value;
+      renderInvoiceList();
+    });
+  }
+  setInvoiceListCollapsed(true);
 }
 
 function toggleInvoiceList() {
-  invoiceListCollapsed = !invoiceListCollapsed;
+  setInvoiceListCollapsed(!invoiceListCollapsed);
+}
+
+function setInvoiceListCollapsed(collapsed) {
+  invoiceListCollapsed = collapsed;
   const panel = document.getElementById("invoiceListPanel");
   const button = document.getElementById("invoiceListToggle");
   if (panel) panel.hidden = invoiceListCollapsed;
@@ -227,9 +248,12 @@ function toggleInvoiceList() {
 
 function renderInvoiceList() {
   const body = document.getElementById("invoiceListBody");
-  const invoices = readInvoices()
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-    .filter(matchesInvoiceListFilters);
+  const allInvoices = readInvoices().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const invoices = allInvoices.filter(matchesInvoiceListFilters);
+  const count = document.getElementById("invoiceListCount");
+  if (count) count.textContent = invoiceListSearchText || invoiceListStatusFilter || invoiceListDateFrom || invoiceListDateTo
+    ? `${invoices.length}/${allInvoices.length}件`
+    : `${allInvoices.length}件`;
   body.innerHTML = invoices.length ? invoices.map(invoice => {
     const totals = calcInvoiceTotals(invoice);
     const status = normalizeInvoiceStatus(invoice.status);
@@ -252,6 +276,7 @@ function renderInvoiceList() {
 function matchesInvoiceListFilters(invoice) {
   const status = normalizeInvoiceStatus(invoice.status);
   if (invoiceListStatusFilter && status !== invoiceListStatusFilter) return false;
+  if (!matchesDateRange([invoice.invoiceDate, invoice.issuedAt, invoice.dueDate], invoiceListDateFrom, invoiceListDateTo)) return false;
   if (!invoiceListSearchText) return true;
   const text = [
     invoice.invoiceNo,
@@ -263,6 +288,25 @@ function matchesInvoiceListFilters(invoice) {
     invoice.status
   ].map(value => String(value || "").toLowerCase()).join(" ");
   return text.includes(invoiceListSearchText);
+}
+
+function normalizeDateOnly(value) {
+  if (!value) return "";
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+function matchesDateRange(values, from, to) {
+  if (!from && !to) return true;
+  return values.some(value => {
+    const date = normalizeDateOnly(value);
+    if (!date) return false;
+    if (from && date < from) return false;
+    if (to && date > to) return false;
+    return true;
+  });
 }
 
 function clearInvoiceEditor() {
