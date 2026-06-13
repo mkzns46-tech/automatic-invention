@@ -1,6 +1,6 @@
 const SALES_MENU_ITEMS = [
   ["見積書", "quotes.html", "見積作成・一覧・PDF"],
-  ["請求書", "invoices.html", "準備中"],
+  ["請求書", "invoices.html", "変換・編集・PDF"],
   ["入金確認", "payments.html", "準備中"],
   ["検品", "picking.html", "準備中"],
   ["納品書", "delivery.html", "準備中"],
@@ -12,7 +12,7 @@ const SALES_MENU_ITEMS = [
 
 const SALES_MENU_ITEMS_KO = [
   ["견적서", "quotes.html", "견적 작성・목록・PDF"],
-  ["청구서", "invoices.html", "준비 중"],
+  ["청구서", "invoices.html", "변환・편집・PDF"],
   ["입금 확인", "payments.html", "준비 중"],
   ["검품", "picking.html", "준비 중"],
   ["납품서", "delivery.html", "준비 중"],

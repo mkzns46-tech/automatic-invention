@@ -6,13 +6,13 @@ function showSalesMessage(text, type) {
 }
 
 function comingSoonSales(name) {
-  showSalesMessage(`${name} は準備中です。v1では見積書と設定を利用できます。`, "warn");
+  showSalesMessage(`${name} は準備中です。現在は見積書・請求書・設定を利用できます。`, "warn");
 }
 
 function renderSalesHome() {
   const menus = [
     ["見積書", "quotes.html", "見積書作成・一覧・PDF出力", false],
-    ["請求書", "invoices.html", "準備中", true],
+    ["請求書", "invoices.html", "見積から変換・編集・PDF出力", false],
     ["入金確認", "payments.html", "準備中", true],
     ["検品", "picking.html", "準備中", true],
     ["納品書", "delivery.html", "準備中", true],

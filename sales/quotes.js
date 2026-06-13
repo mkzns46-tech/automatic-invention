@@ -1,6 +1,7 @@
 const ARICO_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
 const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 const QUOTES_KEY = "arico_sales_quotes_v1";
+const INVOICES_KEY = "arico_sales_invoices_v1";
 const PRODUCT_UNITS_KEY = "arico_sales_product_units_v1";
 const UNIT_OPTIONS = ["個", "本", "袋", "箱", "セット", "台", "式", "ダース", "枚", "組"];
 const DEALER_BRANDS = ["FIVICS", "MK", "JET6", "WJ"];
@@ -57,6 +58,26 @@ function nextQuoteNo(quotes) {
     return Math.max(num, match ? Number(match[1]) : 0);
   }, 0);
   return quoteNo(max + 1);
+}
+
+function readInvoices() {
+  return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
+}
+
+function writeInvoices(invoices) {
+  localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
+}
+
+function invoiceNo(n) {
+  return "INV-" + String(n).padStart(6, "0");
+}
+
+function nextInvoiceNo(invoices) {
+  const max = invoices.reduce((num, invoice) => {
+    const match = String(invoice.invoiceNo || "").match(/^INV-(\d+)$/);
+    return Math.max(num, match ? Number(match[1]) : 0);
+  }, 0);
+  return invoiceNo(max + 1);
 }
 
 function today() {
@@ -214,9 +235,54 @@ function renderQuoteList() {
       <button type="button" class="secondary" onclick="editQuote('${q.id}')">編集</button>
       <button type="button" class="secondary" onclick="printQuoteById('${q.id}')">PDF出力</button>
       <button type="button" class="secondary" onclick="duplicateQuote('${q.id}')">複製</button>
-      <button type="button" class="secondary" onclick="showSalesMessage('請求書へ変換はv1では準備中です。','warn')">請求書へ変換</button>
+      <button type="button" class="secondary" onclick="convertQuoteToInvoice('${q.id}')">請求書へ変換</button>
     </td>
   </tr>`).join("") : '<tr><td colspan="8">見積書はまだありません。</td></tr>';
+}
+
+function buildInvoiceFromQuote(quote, invoices) {
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+    invoiceNo: nextInvoiceNo(invoices),
+    sourceQuoteId: quote.id,
+    sourceQuoteNo: quote.quoteNo || "",
+    createdAt: now,
+    updatedAt: now,
+    status: "下書き",
+    customerName: quote.customerName || "",
+    customerType: quote.customerType || "",
+    address: quote.address || "",
+    phone: quote.phone || "",
+    email: quote.email || "",
+    subject: quote.subject || "",
+    invoiceDate: today(),
+    dueDate: today(),
+    staff: quote.staff || "",
+    memo: quote.memo || "",
+    discountTemplate: quote.discountTemplate || "none",
+    lines: JSON.parse(JSON.stringify(quote.lines || []))
+  };
+}
+
+function convertQuoteToInvoice(id) {
+  const quote = readQuotes().find(q => q.id === id);
+  if (!quote) {
+    showSalesMessage("見積書が見つかりません。", "err");
+    return;
+  }
+  const invoices = readInvoices();
+  const existing = invoices.find(invoice => invoice.sourceQuoteId === quote.id);
+  if (existing) {
+    showSalesMessage(`作成済みの請求書を開きます: ${existing.invoiceNo}`, "warn");
+    location.href = `invoices.html?id=${encodeURIComponent(existing.id)}`;
+    return;
+  }
+  const invoice = buildInvoiceFromQuote(quote, invoices);
+  invoices.push(invoice);
+  writeInvoices(invoices);
+  showSalesMessage(`請求書を作成しました: ${invoice.invoiceNo}`, "ok");
+  location.href = `invoices.html?id=${encodeURIComponent(invoice.id)}`;
 }
 
 function newQuote() {
