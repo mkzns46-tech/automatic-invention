@@ -4,18 +4,59 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 顧客管理</title>
-<link rel="stylesheet" href="sales-style.css">
+<link rel="stylesheet" href="sales-style.css?v=20260614-lists-hidden">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-placeholder.js" defer></script>
+<script src="sales-nav.js?v=20260614-lists-hidden" defer></script>
+<script src="customers.js?v=20260614-lists-hidden" defer></script>
 </head>
-<body data-sales-title="顧客管理">
+<body>
 <main class="sales-wrap">
   <header class="sales-header">
-    <div><div class="brand">ARICO ARCHERY</div><h1 id="salesPlaceholderTitle">顧客管理</h1></div>
-    <div class="sales-actions"><a class="pill" href="index.html">販売管理トップ</a><button type="button" class="secondary" onclick="logoutSales();">システムログイン画面に戻る</button></div>
+    <div>
+      <div class="brand">ARICO ARCHERY</div>
+      <h1>顧客管理</h1>
+      <p class="lead">見積書・請求書に登録された顧客を一覧で確認します。</p>
+    </div>
+    <div class="sales-actions">
+      <a class="pill" href="index.html">販売管理トップ</a>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+    </div>
   </header>
-  <section class="card"><p id="salesPlaceholderMessage">準備中です。</p></section>
+
+  <div id="salesMessage" class="message">顧客一覧を確認できます。</div>
+
+  <section class="card collapsible-list-card">
+    <div class="sales-actions section-heading-row">
+      <h2 class="list-heading" onclick="toggleCustomerList();">▶ 顧客一覧 <span class="status-badge muted" id="customerListCount">0件</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="customerListToggle" onclick="toggleCustomerList();">一覧を開く</button>
+    </div>
+    <div class="list-panel" id="customerListPanel" hidden>
+      <div class="list-filter-row">
+        <label>一覧検索<input id="customerSearch" placeholder="顧客名・顧客区分・電話番号・メールアドレス・担当者"></label>
+        <label>顧客区分
+          <select id="customerTypeFilter">
+            <option value="">全て</option>
+            <option value="個人">個人</option>
+            <option value="学校">学校</option>
+            <option value="協会">協会</option>
+            <option value="企業">企業</option>
+            <option value="ショップ">ショップ</option>
+            <option value="卸">卸</option>
+            <option value="その他">その他</option>
+          </select>
+        </label>
+        <label>開始日<input id="customerDateFromFilter" type="date"></label>
+        <label>終了日<input id="customerDateToFilter" type="date"></label>
+      </div>
+      <div class="table-wrap list-scroll">
+        <table>
+          <thead><tr><th>顧客名</th><th>顧客区分</th><th>電話番号</th><th>メールアドレス</th><th>担当者</th><th>最終取引日</th><th>見積数</th><th>請求数</th></tr></thead>
+          <tbody id="customerListBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 </main>
 </body>
 </html>

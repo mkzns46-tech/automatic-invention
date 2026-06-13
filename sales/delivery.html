@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 納品書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-delivery">
+<link rel="stylesheet" href="sales-style.css?v=20260614-lists-hidden">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-nav.js?v=20260614-receipts" defer></script>
-<script src="delivery-pdf.js?v=20260614-delivery"></script>
-<script src="delivery.js?v=20260614-delivery" defer></script>
+<script src="sales-nav.js?v=20260614-lists-hidden" defer></script>
+<script src="delivery-pdf.js?v=20260614-lists-hidden"></script>
+<script src="delivery.js?v=20260614-lists-hidden" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -29,10 +29,10 @@
 
   <section class="card collapsible-list-card">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading">納品書一覧 <span class="status-badge muted" id="deliveryListCount">0件</span></h2>
-      <button type="button" class="secondary list-toggle-button" id="deliveryCompletedToggle" onclick="toggleDeliveryCompletedList();">完了済みを開く</button>
+      <h2 class="list-heading" onclick="toggleDeliveryCompletedList();">▶ 納品書一覧 <span class="status-badge muted" id="deliveryListCount">0件</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="deliveryCompletedToggle" onclick="toggleDeliveryCompletedList();">一覧を開く</button>
     </div>
-    <div class="list-panel">
+    <div class="list-panel" id="deliveryListPanel" hidden>
       <div class="list-filter-row">
         <label>一覧検索<input id="deliverySearch" placeholder="顧客名・件名・請求書番号・納品書番号・ステータス"></label>
         <label>ステータス

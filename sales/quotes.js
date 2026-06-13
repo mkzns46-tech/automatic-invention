@@ -16,7 +16,7 @@ let quoteListSearchText = "";
 let quoteListStatusFilter = "";
 let quoteListDateFrom = "";
 let quoteListDateTo = "";
-let quoteCompletedListCollapsed = true;
+let quoteListCollapsed = true;
 
 function salesFetch(path) {
   return fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
@@ -287,19 +287,21 @@ function bindQuoteListControls() {
       renderQuoteList();
     });
   }
-  setQuoteCompletedListCollapsed(true);
+  setQuoteListCollapsed(true);
 }
 
 function toggleQuoteList() {
-  setQuoteCompletedListCollapsed(!quoteCompletedListCollapsed);
+  setQuoteListCollapsed(!quoteListCollapsed);
 }
 
-function setQuoteCompletedListCollapsed(collapsed) {
-  quoteCompletedListCollapsed = collapsed;
+function setQuoteListCollapsed(collapsed) {
+  quoteListCollapsed = collapsed;
+  const listPanel = document.getElementById("quoteListPanel");
   const panel = document.getElementById("quoteCompletedListPanel");
   const button = document.getElementById("quoteListToggle");
-  if (panel) panel.hidden = quoteCompletedListCollapsed;
-  if (button) button.textContent = quoteCompletedListCollapsed ? "完了済みを開く" : "完了済みを閉じる";
+  if (listPanel) listPanel.hidden = quoteListCollapsed;
+  if (panel) panel.hidden = quoteListCollapsed;
+  if (button) button.textContent = quoteListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
 function bindProductAutoSearch() {
@@ -339,8 +341,8 @@ function renderQuoteList() {
   const completedQuotes = quotes.filter(quote => normalizeQuoteStatus(quote.status) !== QUOTE_STATUS_DRAFT);
   const count = document.getElementById("quoteListCount");
   if (count) count.textContent = quoteListSearchText || quoteListStatusFilter || quoteListDateFrom || quoteListDateTo
-    ? `対応中 ${activeQuotes.length}件 / 完了 ${completedQuotes.length}件`
-    : `対応中 ${activeQuotes.length}件`;
+    ? `下書き ${activeQuotes.length}件 / 全${quotes.length}件`
+    : `下書き ${activeQuotes.length}件`;
   body.innerHTML = activeQuotes.length ? activeQuotes.map(renderQuoteListRow).join("") : '<tr><td colspan="8">対応が必要な見積書はありません。</td></tr>';
   if (completedBody) {
     completedBody.innerHTML = completedQuotes.length ? completedQuotes.map(renderQuoteListRow).join("") : '<tr><td colspan="8">完了済み・キャンセル済みの見積書はありません。</td></tr>';

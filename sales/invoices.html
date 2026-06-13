@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 請求書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-delivery">
+<link rel="stylesheet" href="sales-style.css?v=20260614-lists-hidden">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-nav.js?v=20260614-receipts" defer></script>
-<script src="invoice-pdf.js?v=20260614-delivery"></script>
-<script src="invoices.js?v=20260614-delivery" defer></script>
+<script src="sales-nav.js?v=20260614-lists-hidden" defer></script>
+<script src="invoice-pdf.js?v=20260614-lists-hidden"></script>
+<script src="invoices.js?v=20260614-lists-hidden" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -29,11 +29,11 @@
 
   <section class="card collapsible-list-card" id="invoiceListCard">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading">請求書一覧 <span class="status-badge muted" id="invoiceListCount">0件</span></h2>
-      <button type="button" class="secondary list-toggle-button" id="invoiceListToggle" onclick="toggleInvoiceList();">完了済みを開く</button>
+      <h2 class="list-heading" onclick="toggleInvoiceList();">▶ 請求書一覧 <span class="status-badge muted" id="invoiceListCount">0件</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="invoiceListToggle" onclick="toggleInvoiceList();">一覧を開く</button>
       <button type="button" class="secondary" onclick="clearInvoiceEditor();">新規入力をクリア</button>
     </div>
-    <div class="list-panel" id="invoiceListPanel">
+    <div class="list-panel" id="invoiceListPanel" hidden>
       <div class="list-filter-row">
         <label>一覧検索<input id="invoiceListSearch" placeholder="顧客名・担当者・件名・請求書番号・ステータス"></label>
         <label>ステータス

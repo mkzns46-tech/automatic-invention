@@ -8,7 +8,7 @@ let deliverySearchText = "";
 let deliveryStatusFilter = "";
 let deliveryDateFrom = "";
 let deliveryDateTo = "";
-let deliveryCompletedCollapsed = true;
+let deliveryListCollapsed = true;
 
 function readDeliveries() {
   return JSON.parse(localStorage.getItem(DELIVERIES_KEY) || "[]");
@@ -111,19 +111,21 @@ function bindDeliveryListControls() {
     deliveryDateTo = event.target.value;
     renderDeliveryList();
   });
-  setDeliveryCompletedCollapsed(true);
+  setDeliveryListCollapsed(true);
 }
 
 function toggleDeliveryCompletedList() {
-  setDeliveryCompletedCollapsed(!deliveryCompletedCollapsed);
+  setDeliveryListCollapsed(!deliveryListCollapsed);
 }
 
-function setDeliveryCompletedCollapsed(collapsed) {
-  deliveryCompletedCollapsed = collapsed;
+function setDeliveryListCollapsed(collapsed) {
+  deliveryListCollapsed = collapsed;
+  const listPanel = document.getElementById("deliveryListPanel");
   const panel = document.getElementById("deliveryCompletedListPanel");
   const button = document.getElementById("deliveryCompletedToggle");
-  if (panel) panel.hidden = deliveryCompletedCollapsed;
-  if (button) button.textContent = deliveryCompletedCollapsed ? "完了済みを開く" : "完了済みを閉じる";
+  if (listPanel) listPanel.hidden = deliveryListCollapsed;
+  if (panel) panel.hidden = deliveryListCollapsed;
+  if (button) button.textContent = deliveryListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
 function renderDeliveryList() {
@@ -133,8 +135,8 @@ function renderDeliveryList() {
   const completedDeliveries = deliveries.filter(delivery => normalizeDeliveryStatus(delivery.status) !== DELIVERY_STATUS_DRAFT);
   const count = document.getElementById("deliveryListCount");
   if (count) count.textContent = deliverySearchText || deliveryStatusFilter || deliveryDateFrom || deliveryDateTo
-    ? `対応中 ${activeDeliveries.length}件 / 完了 ${completedDeliveries.length}件`
-    : `対応中 ${activeDeliveries.length}件`;
+    ? `未発行 ${activeDeliveries.length}件 / 全${deliveries.length}件`
+    : `未発行 ${activeDeliveries.length}件`;
   document.getElementById("deliveryListBody").innerHTML = activeDeliveries.length
     ? activeDeliveries.map(renderDeliveryRow).join("")
     : '<tr><td colspan="10">対応が必要な納品書はありません。</td></tr>';

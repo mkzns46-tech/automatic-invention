@@ -10,7 +10,7 @@ let paymentSearchText = "";
 let paymentStatusFilter = "";
 let paymentDateFrom = "";
 let paymentDateTo = "";
-let paymentCompletedListCollapsed = true;
+let paymentListCollapsed = true;
 
 function readPaymentInvoices() {
   return JSON.parse(localStorage.getItem(PAYMENTS_INVOICES_KEY) || "[]");
@@ -233,19 +233,21 @@ function bindPaymentListControls() {
       renderPaymentInvoiceList();
     });
   }
-  setPaymentCompletedListCollapsed(true);
+  setPaymentListCollapsed(true);
 }
 
 function togglePaymentInvoiceList() {
-  setPaymentCompletedListCollapsed(!paymentCompletedListCollapsed);
+  setPaymentListCollapsed(!paymentListCollapsed);
 }
 
-function setPaymentCompletedListCollapsed(collapsed) {
-  paymentCompletedListCollapsed = collapsed;
+function setPaymentListCollapsed(collapsed) {
+  paymentListCollapsed = collapsed;
+  const listPanel = document.getElementById("paymentInvoiceListPanel");
   const panel = document.getElementById("paymentCompletedListPanel");
   const button = document.getElementById("paymentInvoiceListToggle");
-  if (panel) panel.hidden = paymentCompletedListCollapsed;
-  if (button) button.textContent = paymentCompletedListCollapsed ? "完了済みを開く" : "完了済みを閉じる";
+  if (listPanel) listPanel.hidden = paymentListCollapsed;
+  if (panel) panel.hidden = paymentListCollapsed;
+  if (button) button.textContent = paymentListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
 function getPaymentTargetInvoices() {
@@ -269,8 +271,8 @@ function renderPaymentInvoiceList() {
   });
   const count = document.getElementById("paymentInvoiceListCount");
   if (count) count.textContent = paymentSearchText || paymentStatusFilter || paymentDateFrom || paymentDateTo
-    ? `対応中 ${activeInvoices.length}件 / 完了 ${completedInvoices.length}件`
-    : `対応中 ${activeInvoices.length}件`;
+    ? `入金待ち ${activeInvoices.length}件 / 全${invoices.length}件`
+    : `入金待ち ${activeInvoices.length}件`;
   if (!body) return;
   body.innerHTML = activeInvoices.length ? activeInvoices.map(renderPaymentInvoiceRow).join("") : '<tr><td colspan="11">対応が必要な入金確認はありません。</td></tr>';
   if (completedBody) {

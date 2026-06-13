@@ -13,7 +13,7 @@ let invoiceListSearchText = "";
 let invoiceListStatusFilter = "";
 let invoiceListDateFrom = "";
 let invoiceListDateTo = "";
-let invoiceCompletedListCollapsed = true;
+let invoiceListCollapsed = true;
 
 function readInvoices() {
   return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
@@ -291,19 +291,21 @@ function bindInvoiceListControls() {
       renderInvoiceList();
     });
   }
-  setInvoiceCompletedListCollapsed(true);
+  setInvoiceListCollapsed(true);
 }
 
 function toggleInvoiceList() {
-  setInvoiceCompletedListCollapsed(!invoiceCompletedListCollapsed);
+  setInvoiceListCollapsed(!invoiceListCollapsed);
 }
 
-function setInvoiceCompletedListCollapsed(collapsed) {
-  invoiceCompletedListCollapsed = collapsed;
+function setInvoiceListCollapsed(collapsed) {
+  invoiceListCollapsed = collapsed;
+  const listPanel = document.getElementById("invoiceListPanel");
   const panel = document.getElementById("invoiceCompletedListPanel");
   const button = document.getElementById("invoiceListToggle");
-  if (panel) panel.hidden = invoiceCompletedListCollapsed;
-  if (button) button.textContent = invoiceCompletedListCollapsed ? "完了済みを開く" : "完了済みを閉じる";
+  if (listPanel) listPanel.hidden = invoiceListCollapsed;
+  if (panel) panel.hidden = invoiceListCollapsed;
+  if (button) button.textContent = invoiceListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
 function renderInvoiceList() {
@@ -321,8 +323,8 @@ function renderInvoiceList() {
   });
   const count = document.getElementById("invoiceListCount");
   if (count) count.textContent = invoiceListSearchText || invoiceListStatusFilter || invoiceListDateFrom || invoiceListDateTo
-    ? `対応中 ${activeInvoices.length}件 / 完了 ${completedInvoices.length}件`
-    : `対応中 ${activeInvoices.length}件`;
+    ? `入金待ち ${activeInvoices.length}件 / 全${invoices.length}件`
+    : `入金待ち ${activeInvoices.length}件`;
   body.innerHTML = activeInvoices.length ? activeInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="8">対応が必要な請求書はありません。</td></tr>';
   if (completedBody) {
     completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="8">完了済み・キャンセル済みの請求書はありません。</td></tr>';

@@ -9,7 +9,7 @@ let receiptSearchText = "";
 let receiptStatusFilter = "";
 let receiptDateFrom = "";
 let receiptDateTo = "";
-let issuedReceiptCollapsed = true;
+let receiptListCollapsed = true;
 
 function readInvoices() {
   return JSON.parse(localStorage.getItem(RECEIPTS_INVOICES_KEY) || "[]");
@@ -175,19 +175,21 @@ function bindReceiptControls() {
     receiptDateTo = event.target.value;
     renderReceiptLists();
   });
-  setIssuedReceiptCollapsed(true);
+  setReceiptListCollapsed(true);
 }
 
 function toggleIssuedReceiptList() {
-  setIssuedReceiptCollapsed(!issuedReceiptCollapsed);
+  setReceiptListCollapsed(!receiptListCollapsed);
 }
 
-function setIssuedReceiptCollapsed(collapsed) {
-  issuedReceiptCollapsed = collapsed;
+function setReceiptListCollapsed(collapsed) {
+  receiptListCollapsed = collapsed;
+  const listPanel = document.getElementById("receiptListPanel");
   const panel = document.getElementById("issuedReceiptListPanel");
   const button = document.getElementById("receiptIssuedToggle");
-  if (panel) panel.hidden = issuedReceiptCollapsed;
-  if (button) button.textContent = issuedReceiptCollapsed ? "発行済みを開く" : "発行済みを閉じる";
+  if (listPanel) listPanel.hidden = receiptListCollapsed;
+  if (panel) panel.hidden = receiptListCollapsed;
+  if (button) button.textContent = receiptListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
 function getPaidInvoiceTargets() {

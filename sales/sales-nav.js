@@ -5,7 +5,7 @@ const SALES_MENU_ITEMS = [
   ["検品確認", "shipping.html", "準備中"],
   ["納品書", "delivery.html", "一覧・詳細・PDF"],
   ["領収書", "receipts.html", "作成・一覧・PDF"],
-  ["顧客管理", "customers.html", "準備中"],
+  ["顧客管理", "customers.html", "一覧"],
   ["設定", "settings.html", "スマレジ商品取込"]
 ];
 
@@ -16,7 +16,7 @@ const SALES_MENU_ITEMS_KO = [
   ["검품 확인", "shipping.html", "준비 중"],
   ["납품서", "delivery.html", "목록・상세・PDF"],
   ["영수증", "receipts.html", "작성・목록・PDF"],
-  ["고객 관리", "customers.html", "준비 중"],
+  ["고객 관리", "customers.html", "목록"],
   ["설정", "settings.html", "스마레지 상품 가져오기"]
 ];
 
