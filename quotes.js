@@ -1,39 +1,24 @@
-const ARICO_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
-const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
-const QUOTES_KEY = "arico_sales_quotes_v1";
-const PRODUCT_UNITS_KEY = "arico_sales_product_units_v1";
-const UNIT_OPTIONS = ["個", "本", "袋", "箱", "セット", "台", "式", "ダース", "枚", "組"];
-const DEALER_BRANDS = ["FIVICS", "MK", "JET6", "WJ"];
+const INVOICES_KEY = "arico_sales_invoices_v1";
+const INVOICE_STATUS_OPTIONS = ["下書き", "発行済み", "入金待ち", "入金済み", "キャンセル"];
+const INVOICE_STATUS_DRAFT = "下書き";
+const INVOICE_STATUS_ISSUED = "発行済み";
+const INVOICE_STATUS_WAITING_PAYMENT = "入金待ち";
+const INVOICE_STATUS_PAID = "入金済み";
+const INVOICE_STATUS_CANCELLED = "キャンセル";
 
-let currentQuoteId = null;
-let currentLines = [];
+let currentInvoiceId = null;
+let currentInvoiceLines = [];
 
-function salesFetch(path) {
-  return fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
-    headers: {
-      apikey: ARICO_SUPABASE_API_KEY,
-      Authorization: `Bearer ${ARICO_SUPABASE_API_KEY}`
-    }
-  }).then(async res => {
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
-  });
+function readInvoices() {
+  return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
 }
 
-function readQuotes() {
-  return JSON.parse(localStorage.getItem(QUOTES_KEY) || "[]");
+function writeInvoices(invoices) {
+  localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
 }
 
-function writeQuotes(quotes) {
-  localStorage.setItem(QUOTES_KEY, JSON.stringify(quotes));
-}
-
-function readUnits() {
-  return JSON.parse(localStorage.getItem(PRODUCT_UNITS_KEY) || "{}");
-}
-
-function writeUnits(units) {
-  localStorage.setItem(PRODUCT_UNITS_KEY, JSON.stringify(units));
+function today() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function escapeHtml(value) {
@@ -46,292 +31,440 @@ function escapeHtml(value) {
   }[ch]));
 }
 
-function quoteNo(n) {
-  return "Q-" + String(n).padStart(6, "0");
-}
-
-function nextQuoteNo(quotes) {
-  const max = quotes.reduce((num, quote) => {
-    const match = String(quote.quoteNo || "").match(/^Q-(\d+)$/);
-    return Math.max(num, match ? Number(match[1]) : 0);
-  }, 0);
-  return quoteNo(max + 1);
-}
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
+}
+
+function normalizeInvoiceStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (!value || value === "draft" || value === "下書き") return INVOICE_STATUS_DRAFT;
+  if (value === "issued" || value === "発行済み") return INVOICE_STATUS_ISSUED;
+  if (value === "waiting_payment" || value === "payment_waiting" || value === "入金待ち") return INVOICE_STATUS_WAITING_PAYMENT;
+  if (value === "paid" || value === "入金済み") return INVOICE_STATUS_PAID;
+  if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return INVOICE_STATUS_CANCELLED;
+  return status || INVOICE_STATUS_DRAFT;
+}
+
+function isInvoiceEditable(invoiceOrStatus) {
+  const status = normalizeInvoiceStatus(typeof invoiceOrStatus === "string" ? invoiceOrStatus : invoiceOrStatus?.status);
+  return status === INVOICE_STATUS_DRAFT;
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("ja-JP");
+}
+
+function statusBadge(status) {
+  const value = normalizeInvoiceStatus(status);
+  const type = value === INVOICE_STATUS_CANCELLED
+    ? "danger"
+    : value === INVOICE_STATUS_DRAFT
+      ? "muted"
+      : value === INVOICE_STATUS_WAITING_PAYMENT
+        ? "warn"
+        : value === INVOICE_STATUS_ISSUED
+          ? "info"
+          : "ok";
+  return `<span class="status-badge ${type}">${escapeHtml(value)}</span>`;
+}
+
+function recalcInvoiceLine(line) {
+  const qty = Number(line.qty || 0);
+  const unitPrice = Number(line.unitPrice || 0);
+  const discountValue = Number(line.discountValue || 0);
+  const gross = Math.round(qty * unitPrice);
+  line.discountAmount = Math.round(gross * discountValue / 100);
+  line.amount = Math.max(0, gross - line.discountAmount);
+  return line;
+}
+
+function calcInvoiceTotals(invoice) {
+  const lines = invoice?.lines || [];
+  let subtotal = 0;
+  let discount = 0;
+  let total = 0;
+  lines.forEach(line => {
+    recalcInvoiceLine(line);
+    const gross = Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0));
+    subtotal += gross;
+    discount += Number(line.discountAmount || 0);
+    total += Number(line.amount || 0);
+  });
+  return {
+    subtotal,
+    discount,
+    total,
+    tax: Math.floor(total * 10 / 110)
+  };
 }
 
 function showSalesMessage(text, type) {
   const box = document.getElementById("salesMessage");
   if (!box) return;
   box.textContent = text || "";
-  box.className = "message" + (type === "err" ? " err" : type === "warn" ? " warn" : "");
+  box.className = "message" + (type === "err" ? " err" : type === "warn" ? " warn" : type === "ok" ? " ok" : "");
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
+function playSalesNoticeSound(type = "ok") {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = type === "err" ? 220 : type === "warn" ? 440 : 660;
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.22);
+  } catch (_) {}
+}
+
+function showSalesPopup(title, body, type = "ok") {
+  const popup = document.getElementById("salesPopup");
+  const titleEl = document.getElementById("salesPopupTitle");
+  const bodyEl = document.getElementById("salesPopupBody");
+  const close = document.getElementById("salesPopupClose");
+  if (!popup || !titleEl || !bodyEl || !close) {
+    alert(`${title}\n${body || ""}`);
+    return;
+  }
+  titleEl.textContent = title || "完了";
+  bodyEl.textContent = body || "";
+  popup.dataset.type = type;
+  popup.style.display = "flex";
+  close.onclick = () => {
+    popup.style.display = "none";
+  };
+  playSalesNoticeSound(type);
+}
+
+function confirmSalesPopup(title, body, type = "warn") {
+  const popup = document.getElementById("salesPopup");
+  const titleEl = document.getElementById("salesPopupTitle");
+  const bodyEl = document.getElementById("salesPopupBody");
+  const okButton = document.getElementById("salesPopupClose");
+  if (!popup || !titleEl || !bodyEl || !okButton) {
+    return Promise.resolve(confirm(body || title || ""));
+  }
+  let cancelButton = document.getElementById("salesPopupCancel");
+  if (!cancelButton) {
+    cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.id = "salesPopupCancel";
+    cancelButton.className = "secondary";
+    okButton.insertAdjacentElement("afterend", cancelButton);
+  }
+  return new Promise(resolve => {
+    titleEl.textContent = title || "確認";
+    bodyEl.textContent = body || "";
+    popup.dataset.type = type;
+    popup.style.display = "flex";
+    okButton.textContent = "OK";
+    cancelButton.textContent = "キャンセル";
+    cancelButton.style.display = "";
+    const close = result => {
+      popup.style.display = "none";
+      cancelButton.style.display = "none";
+      okButton.textContent = "OK";
+      okButton.onclick = null;
+      cancelButton.onclick = null;
+      resolve(result);
+    };
+    okButton.onclick = () => close(true);
+    cancelButton.onclick = () => close(false);
+    playSalesNoticeSound(type);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
-  document.getElementById("customerType").innerHTML = ARICO_CUSTOMER_TYPES.map(type => `<option value="${type}">${type}</option>`).join("");
-  document.getElementById("quoteDate").value = today();
-  document.getElementById("validUntil").value = today();
-  await loadStaffOptions();
-  renderQuoteList();
-  newQuote();
+  document.getElementById("invoiceStatus").innerHTML = INVOICE_STATUS_OPTIONS
+    .map(status => `<option value="${status}">${status}</option>`)
+    .join("");
+  document.getElementById("invoiceStatus").disabled = true;
+  renderInvoiceList();
+  const id = new URLSearchParams(location.search).get("id");
+  if (id) editInvoice(id);
+  else clearInvoiceEditor();
 });
 
-async function loadStaffOptions() {
-  const select = document.getElementById("quoteStaff");
-  try {
-    const staff = await salesFetch("staff_members?select=name,store_name&order=name.asc");
-    select.innerHTML = '<option value="">担当者を選択</option>' + staff.map(row => {
-      const label = row.store_name ? `${row.name}（${row.store_name}）` : row.name;
-      return `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`;
-    }).join("");
-  } catch (_) {
-    select.innerHTML = '<option value="">担当者を選択</option>';
-  }
+function renderInvoiceList() {
+  const body = document.getElementById("invoiceListBody");
+  const invoices = readInvoices().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  body.innerHTML = invoices.length ? invoices.map(invoice => {
+    const totals = calcInvoiceTotals(invoice);
+    const status = normalizeInvoiceStatus(invoice.status);
+    return `<tr>
+      <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo)} ${statusBadge(status)}</span></td>
+      <td>${escapeHtml(invoice.invoiceDate || "")}</td>
+      <td>${escapeHtml(invoice.customerName || "")}</td>
+      <td>${escapeHtml(invoice.subject || "")}</td>
+      <td>${money(totals.total)}</td>
+      <td>${statusBadge(status)}</td>
+      <td>${escapeHtml(invoice.sourceQuoteNo || "")}</td>
+      <td>
+        <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">編集</button>
+        <button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF出力</button>
+      </td>
+    </tr>`;
+  }).join("") : '<tr><td colspan="8">請求書はまだありません。見積書一覧から「請求書へ変換」を実行してください。</td></tr>';
 }
 
-function renderQuoteList() {
-  const body = document.getElementById("quoteListBody");
-  const quotes = readQuotes().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  body.innerHTML = quotes.length ? quotes.map(q => `<tr>
-    <td>${escapeHtml(q.quoteNo)}</td>
-    <td>${escapeHtml(q.quoteDate || "")}</td>
-    <td>${escapeHtml(q.customerName || "")}</td>
-    <td>${escapeHtml(q.subject || "")}</td>
-    <td>${money(calcQuoteTotals(q).total)}</td>
-    <td>${escapeHtml(q.status || "下書き")}</td>
-    <td>${escapeHtml(q.staff || "")}</td>
-    <td>
-      <button type="button" class="secondary" onclick="editQuote('${q.id}')">編集</button>
-      <button type="button" class="secondary" onclick="printQuoteById('${q.id}')">PDF出力</button>
-      <button type="button" class="secondary" onclick="duplicateQuote('${q.id}')">複製</button>
-      <button type="button" class="secondary" onclick="showSalesMessage('請求書へ変換はv1では準備中です。','warn')">請求書へ変換</button>
-    </td>
-  </tr>`).join("") : '<tr><td colspan="8">見積書はまだありません。</td></tr>';
-}
-
-function newQuote() {
-  currentQuoteId = null;
-  currentLines = [];
-  ["customerName", "customerAddress", "customerPhone", "customerEmail", "quoteSubject", "quoteMemo", "productSearchInput"].forEach(id => {
+function clearInvoiceEditor() {
+  currentInvoiceId = null;
+  currentInvoiceLines = [];
+  ["invoiceNo", "sourceQuoteNo", "customerName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
-  document.getElementById("customerType").value = "個人";
-  document.getElementById("discountTemplate").value = "none";
-  document.getElementById("quoteDate").value = today();
-  document.getElementById("validUntil").value = today();
-  document.getElementById("productSearchResults").innerHTML = "";
-  renderLines();
+  document.getElementById("invoiceStatus").value = INVOICE_STATUS_DRAFT;
+  document.getElementById("issuedAt").value = "";
+  document.getElementById("invoiceDate").value = today();
+  document.getElementById("dueDate").value = today();
+  renderInvoiceLines();
+  updateInvoiceLockState({ status: INVOICE_STATUS_DRAFT });
 }
 
-async function searchProducts() {
-  const query = document.getElementById("productSearchInput").value.trim();
-  const results = document.getElementById("productSearchResults");
-  if (!query) {
-    showSalesMessage("商品名・バーコード・商品コードを入力してください。", "err");
+function fillInvoiceForm(invoice) {
+  currentInvoiceId = invoice.id || null;
+  currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || []));
+  document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
+  document.getElementById("invoiceStatus").value = normalizeInvoiceStatus(invoice.status);
+  document.getElementById("sourceQuoteNo").value = invoice.sourceQuoteNo || "";
+  document.getElementById("issuedAt").value = formatDateTime(invoice.issuedAt);
+  document.getElementById("customerName").value = invoice.customerName || "";
+  document.getElementById("customerType").value = invoice.customerType || "";
+  document.getElementById("invoiceStaff").value = invoice.staff || "";
+  document.getElementById("customerAddress").value = invoice.address || "";
+  document.getElementById("customerPhone").value = invoice.phone || "";
+  document.getElementById("customerEmail").value = invoice.email || "";
+  document.getElementById("invoiceSubject").value = invoice.subject || "";
+  document.getElementById("invoiceDate").value = invoice.invoiceDate || today();
+  document.getElementById("dueDate").value = invoice.dueDate || today();
+  document.getElementById("invoiceMemo").value = invoice.memo || "";
+  renderInvoiceLines();
+  updateInvoiceLockState(invoice);
+}
+
+function editInvoice(id) {
+  const invoice = readInvoices().find(row => row.id === id);
+  if (!invoice) {
+    showSalesMessage("請求書が見つかりません。", "err");
     return;
   }
-  results.innerHTML = '<div class="message">検索中...</div>';
-  try {
-    const filter = encodeURIComponent(`*${query}*`);
-    const rows = await salesFetch(`products?select=barcode,name,base_stock,category,genre&or=(name.ilike.${filter},barcode.ilike.${filter})&limit=20`);
-    results.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>商品名</th><th>バーコード</th><th>現在庫</th><th>操作</th></tr></thead><tbody>${rows.map(row => {
-      const stock = Number(row.base_stock || 0);
-      return `<tr>
-        <td>${escapeHtml(row.name || "")}</td>
-        <td>${escapeHtml(row.barcode || "")}</td>
-        <td>${stock > 0 ? `現在庫 ${stock}` : `<span class="line-stock warn">現在庫 0 / 取寄せ</span>`}</td>
-        <td><button type="button" class="secondary" onclick='addProductLine(${JSON.stringify(row).replaceAll("'", "&#39;")})'>追加</button></td>
-      </tr>`;
-    }).join("")}</tbody></table></div>` : '<div class="message warn">該当商品がありません。</div>';
-  } catch (e) {
-    results.innerHTML = '<div class="message err">商品検索に失敗しました。</div>';
-  }
+  fillInvoiceForm(invoice);
+  history.replaceState(null, "", `invoices.html?id=${encodeURIComponent(id)}`);
 }
 
-function addProductLine(product) {
-  const units = readUnits();
-  const unit = units[product.barcode] || "個";
-  currentLines.push({
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
-    barcode: product.barcode || "",
-    name: product.name || "",
-    stock: Number(product.base_stock || 0),
-    qty: 1,
-    unit,
-    unitPrice: 0,
-    discountValue: 0,
-    discountAmount: 0,
-    amount: 0,
-    memo: ""
-  });
-  renderLines();
-}
-
-function renderLines() {
-  const area = document.getElementById("quoteLines");
-  area.innerHTML = currentLines.length ? currentLines.map((line, index) => `
-    <div class="quote-line">
-      <label>商品名<input value="${escapeHtml(line.name)}" onchange="updateLine(${index}, 'name', this.value)"></label>
-      <label>現在庫<div class="${Number(line.stock) > 0 ? "" : "line-stock warn"}">${Number(line.stock) > 0 ? `現在庫 ${line.stock}` : "現在庫 0 / 取寄せ"}</div></label>
-      <label>数量<input type="number" min="0" step="1" value="${line.qty}" onchange="updateLine(${index}, 'qty', this.value)"></label>
-      <label>単位<select onchange="updateLine(${index}, 'unit', this.value)">${UNIT_OPTIONS.map(unit => `<option value="${unit}" ${unit === line.unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label>
-      <label>税込単価<input type="number" min="0" step="1" value="${line.unitPrice}" onchange="updateLine(${index}, 'unitPrice', this.value)"></label>
-      <label>値引率%<input type="number" min="0" step="1" value="${line.discountValue}" onchange="updateLine(${index}, 'discountValue', this.value)"></label>
-      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateLine(${index}, 'memo', this.value)"></label>
-      <button type="button" class="danger" onclick="removeLine(${index})">削除</button>
-    </div>`).join("") : '<div class="message">商品明細を追加してください。</div>';
+function renderInvoiceLines() {
+  const area = document.getElementById("invoiceLines");
+  const locked = !isInvoiceEditable(document.getElementById("invoiceStatus")?.value);
+  const disabled = locked ? "disabled" : "";
+  area.innerHTML = currentInvoiceLines.length ? currentInvoiceLines.map((line, index) => {
+    recalcInvoiceLine(line);
+    return `<div class="invoice-line">
+      <label>商品名<input value="${escapeHtml(line.name || "")}" onchange="updateInvoiceLine(${index}, 'name', this.value)" ${disabled}></label>
+      <label>数量<input type="number" min="0" step="1" value="${Number(line.qty || 0)}" onchange="updateInvoiceLine(${index}, 'qty', this.value)" ${disabled}></label>
+      <label>単位<input value="${escapeHtml(line.unit || "")}" onchange="updateInvoiceLine(${index}, 'unit', this.value)" ${disabled}></label>
+      <label>税込単価<input type="number" min="0" step="1" value="${Number(line.unitPrice || 0)}" onchange="updateInvoiceLine(${index}, 'unitPrice', this.value)" ${disabled}></label>
+      <label>値引率%<input type="number" min="0" step="1" value="${Number(line.discountValue || 0)}" onchange="updateInvoiceLine(${index}, 'discountValue', this.value)" ${disabled}></label>
+      <label>金額<div class="line-amount">${money(line.amount)}</div></label>
+      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateInvoiceLine(${index}, 'memo', this.value)" ${disabled}></label>
+      <button type="button" class="danger" onclick="removeInvoiceLine(${index})" ${disabled}>削除</button>
+    </div>`;
+  }).join("") : '<div class="message">請求商品がありません。</div>';
   recalcTotals();
 }
 
-function updateLine(index, key, value) {
-  const line = currentLines[index];
+function updateInvoiceLine(index, key, value) {
+  if (!isInvoiceEditable(document.getElementById("invoiceStatus")?.value)) {
+    showSalesMessage("発行済みの請求書は商品明細を編集できません。", "warn");
+    renderInvoiceLines();
+    return;
+  }
+  const line = currentInvoiceLines[index];
   if (!line) return;
   if (["qty", "unitPrice", "discountValue"].includes(key)) line[key] = Number(value || 0);
   else line[key] = value;
-  if (key === "unit" && line.barcode) {
-    const units = readUnits();
-    units[line.barcode] = value;
-    writeUnits(units);
+  recalcInvoiceLine(line);
+  renderInvoiceLines();
+}
+
+function removeInvoiceLine(index) {
+  if (!isInvoiceEditable(document.getElementById("invoiceStatus")?.value)) {
+    showSalesMessage("発行済みの請求書は商品明細を編集できません。", "warn");
+    return;
   }
-  if (document.getElementById("discountTemplate").value !== "custom" && key !== "unit") {
-    applyDiscountTemplate(false);
+  currentInvoiceLines.splice(index, 1);
+  renderInvoiceLines();
+}
+
+function updateInvoiceLockState(invoice) {
+  const editable = isInvoiceEditable(invoice);
+  const issueButton = ensureIssueInvoiceButton();
+  const saveButton = document.getElementById("saveInvoiceBtn");
+  const lockTargets = [
+    "customerName",
+    "customerType",
+    "invoiceStaff",
+    "customerAddress",
+    "customerPhone",
+    "customerEmail",
+    "invoiceSubject",
+    "invoiceDate",
+    "dueDate",
+    "invoiceMemo"
+  ];
+  if (issueButton) {
+    const hasInvoice = Boolean(currentInvoiceId || document.getElementById("invoiceNo")?.value);
+    const shouldShow = Boolean(hasInvoice && editable);
+    issueButton.hidden = !shouldShow;
+    issueButton.style.display = shouldShow ? "" : "none";
+    issueButton.disabled = !shouldShow;
+    issueButton.textContent = "発行確定";
   }
-  recalcLine(line);
-  renderLines();
-}
-
-function removeLine(index) {
-  currentLines.splice(index, 1);
-  renderLines();
-}
-
-function isDealerBrand(name) {
-  const text = String(name || "").toUpperCase();
-  return DEALER_BRANDS.some(brand => text.includes(brand));
-}
-
-function applyDiscountTemplate(render = true) {
-  const template = document.getElementById("discountTemplate").value;
-  currentLines.forEach(line => {
-    if (template === "all10") line.discountValue = 10;
-    if (template === "dealer10") line.discountValue = isDealerBrand(line.name) ? 10 : 0;
-    if (template === "none") line.discountValue = 0;
-    recalcLine(line);
+  if (saveButton) {
+    saveButton.hidden = !editable;
+    saveButton.disabled = !editable;
+  }
+  lockTargets.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) element.disabled = !editable;
   });
-  if (render) renderLines();
+  document.getElementById("invoiceEditorCard")?.classList.toggle("locked", !editable);
+  showSalesMessage(
+    editable ? "請求書を編集できます。" : "発行済みのため請求情報・金額・商品明細は編集できません。PDF出力とキャンセル処理は可能です。",
+    editable ? "" : "warn"
+  );
+  renderInvoiceLines();
 }
 
-function recalcLine(line) {
-  const gross = Number(line.qty || 0) * Number(line.unitPrice || 0);
-  line.amount = gross;
-  line.discountAmount = Math.floor(gross * Number(line.discountValue || 0) / 100);
+function ensureIssueInvoiceButton() {
+  let button = document.getElementById("issueInvoiceBtn");
+  const saveButton = document.getElementById("saveInvoiceBtn");
+  const pdfButton = document.getElementById("invoicePdfBtn");
+  const actions = saveButton?.parentElement || pdfButton?.parentElement;
+  if (button) {
+    if (actions && pdfButton && button.nextElementSibling !== pdfButton) actions.insertBefore(button, pdfButton);
+    return button;
+  }
+  if (!actions) return null;
+  button = document.createElement("button");
+  button.type = "button";
+  button.id = "issueInvoiceBtn";
+  button.className = "primary invoice-issue-button";
+  button.textContent = "発行確定";
+  button.onclick = issueInvoice;
+  if (pdfButton) actions.insertBefore(button, pdfButton);
+  else if (saveButton) actions.insertBefore(button, saveButton.nextSibling);
+  else actions.prepend(button);
+  return button;
 }
 
 function recalcTotals() {
-  currentLines.forEach(recalcLine);
-  const totals = calcQuoteTotals({ lines: currentLines });
+  currentInvoiceLines.forEach(recalcInvoiceLine);
+  const totals = calcInvoiceTotals({ lines: currentInvoiceLines });
   document.getElementById("subtotalText").textContent = money(totals.subtotal);
   document.getElementById("discountText").textContent = money(totals.discount);
   document.getElementById("totalText").textContent = money(totals.total);
   document.getElementById("taxText").textContent = money(totals.tax);
 }
 
-function collectQuote() {
-  const quotes = readQuotes();
-  const existing = currentQuoteId ? quotes.find(q => q.id === currentQuoteId) : null;
+function collectInvoice() {
+  const invoices = readInvoices();
+  const existing = currentInvoiceId ? invoices.find(invoice => invoice.id === currentInvoiceId) : null;
   return {
-    id: currentQuoteId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
-    quoteNo: existing?.quoteNo || nextQuoteNo(quotes),
+    ...(existing || {}),
+    id: currentInvoiceId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+    invoiceNo: document.getElementById("invoiceNo").value || existing?.invoiceNo || "",
+    sourceQuoteId: existing?.sourceQuoteId || "",
+    sourceQuoteNo: document.getElementById("sourceQuoteNo").value || existing?.sourceQuoteNo || "",
+    issuedAt: existing?.issuedAt || "",
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    status: existing?.status || "下書き",
+    status: normalizeInvoiceStatus(document.getElementById("invoiceStatus").value),
     customerName: document.getElementById("customerName").value.trim(),
-    customerType: document.getElementById("customerType").value,
+    customerType: document.getElementById("customerType").value.trim(),
     address: document.getElementById("customerAddress").value.trim(),
     phone: document.getElementById("customerPhone").value.trim(),
     email: document.getElementById("customerEmail").value.trim(),
-    subject: document.getElementById("quoteSubject").value.trim(),
-    quoteDate: document.getElementById("quoteDate").value,
-    validUntil: document.getElementById("validUntil").value,
-    staff: document.getElementById("quoteStaff").value,
-    memo: document.getElementById("quoteMemo").value,
-    discountTemplate: document.getElementById("discountTemplate").value,
-    lines: currentLines
+    subject: document.getElementById("invoiceSubject").value.trim(),
+    invoiceDate: document.getElementById("invoiceDate").value,
+    dueDate: document.getElementById("dueDate").value,
+    staff: document.getElementById("invoiceStaff").value.trim(),
+    memo: document.getElementById("invoiceMemo").value,
+    lines: currentInvoiceLines.map(line => ({ ...line }))
   };
 }
 
-function saveQuote() {
+function saveInvoice() {
   if (!document.getElementById("customerName").value.trim()) {
     showSalesMessage("顧客名を入力してください。", "err");
     return;
   }
-  if (!currentLines.length) {
-    showSalesMessage("商品明細を追加してください。", "err");
+  if (!currentInvoiceLines.length) {
+    showSalesMessage("請求商品がありません。", "err");
     return;
   }
-  const quote = collectQuote();
-  const quotes = readQuotes();
-  const index = quotes.findIndex(q => q.id === quote.id);
-  if (index >= 0) quotes[index] = quote;
-  else quotes.push(quote);
-  writeQuotes(quotes);
-  currentQuoteId = quote.id;
-  renderQuoteList();
-  showSalesMessage("見積書を保存しました。", "ok");
+  const invoice = collectInvoice();
+  const invoices = readInvoices();
+  const index = invoices.findIndex(row => row.id === invoice.id);
+  if (index >= 0) invoices[index] = invoice;
+  else invoices.push(invoice);
+  writeInvoices(invoices);
+  currentInvoiceId = invoice.id;
+  renderInvoiceList();
+  updateInvoiceLockState(invoice);
+  showSalesPopup("保存完了", `請求書を保存しました\n${invoice.invoiceNo}`, "ok");
 }
 
-function editQuote(id) {
-  const quote = readQuotes().find(q => q.id === id);
-  if (!quote) return;
-  currentQuoteId = id;
-  currentLines = JSON.parse(JSON.stringify(quote.lines || []));
-  document.getElementById("customerName").value = quote.customerName || "";
-  document.getElementById("customerType").value = quote.customerType || "個人";
-  document.getElementById("customerAddress").value = quote.address || "";
-  document.getElementById("customerPhone").value = quote.phone || "";
-  document.getElementById("customerEmail").value = quote.email || "";
-  document.getElementById("quoteSubject").value = quote.subject || "";
-  document.getElementById("quoteDate").value = quote.quoteDate || today();
-  document.getElementById("validUntil").value = quote.validUntil || today();
-  document.getElementById("quoteStaff").value = quote.staff || "";
-  document.getElementById("quoteMemo").value = quote.memo || "";
-  document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
-  renderLines();
+async function issueInvoice() {
+  if (!currentInvoiceId) {
+    showSalesMessage("先に請求書を保存してください。", "err");
+    return;
+  }
+  const confirmed = await confirmSalesPopup("発行確定", "この請求書を発行確定しますか？", "warn");
+  if (!confirmed) return;
+  const invoices = readInvoices();
+  const index = invoices.findIndex(row => row.id === currentInvoiceId);
+  if (index < 0) {
+    showSalesMessage("請求書が見つかりません。", "err");
+    return;
+  }
+  const invoice = collectInvoice();
+  if (!isInvoiceEditable(invoice.status)) {
+    showSalesMessage("この請求書は発行確定済みです。", "warn");
+    return;
+  }
+  invoice.status = INVOICE_STATUS_ISSUED;
+  invoice.issuedAt = new Date().toISOString();
+  invoice.updatedAt = invoice.issuedAt;
+  invoices[index] = invoice;
+  writeInvoices(invoices);
+  fillInvoiceForm(invoice);
+  renderInvoiceList();
+  showSalesPopup("発行確定", "請求書を発行確定しました", "ok");
 }
 
-function duplicateQuote(id) {
-  const quote = readQuotes().find(q => q.id === id);
-  if (!quote) return;
-  currentQuoteId = null;
-  currentLines = JSON.parse(JSON.stringify(quote.lines || []));
-  document.getElementById("customerName").value = quote.customerName || "";
-  document.getElementById("customerType").value = quote.customerType || "個人";
-  document.getElementById("customerAddress").value = quote.address || "";
-  document.getElementById("customerPhone").value = quote.phone || "";
-  document.getElementById("customerEmail").value = quote.email || "";
-  document.getElementById("quoteSubject").value = quote.subject || "";
-  document.getElementById("quoteDate").value = today();
-  document.getElementById("validUntil").value = quote.validUntil || today();
-  document.getElementById("quoteStaff").value = quote.staff || "";
-  document.getElementById("quoteMemo").value = quote.memo || "";
-  document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
-  renderLines();
-  showSalesMessage("見積書を複製しました。保存すると新しい見積番号になります。", "ok");
+function cancelInvoice() {
+  if (!currentInvoiceId) return;
+  document.getElementById("invoiceStatus").value = INVOICE_STATUS_CANCELLED;
+  saveInvoice();
 }
 
-function outputCurrentQuotePdf() {
-  printQuotePdf(collectQuote());
+function outputCurrentInvoicePdf() {
+  printInvoicePdf(collectInvoice());
 }
 
-function printQuoteById(id) {
-  const quote = readQuotes().find(q => q.id === id);
-  if (quote) printQuotePdf(quote);
+function printInvoiceById(id) {
+  const invoice = readInvoices().find(row => row.id === id);
+  if (invoice) printInvoicePdf(invoice);
 }
