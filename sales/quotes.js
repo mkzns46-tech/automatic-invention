@@ -110,6 +110,11 @@ function quoteStatusBadge(status) {
   return `<span class="status-badge ${type}">${escapeHtml(value)}</span>`;
 }
 
+function canDeleteQuote(quoteOrStatus) {
+  const status = normalizeQuoteStatus(typeof quoteOrStatus === "string" ? quoteOrStatus : quoteOrStatus?.status);
+  return status === QUOTE_STATUS_DRAFT || status === QUOTE_STATUS_CANCELLED;
+}
+
 function showSalesMessage(text, type) {
   const box = document.getElementById("salesMessage");
   if (!box) return;
@@ -153,6 +158,44 @@ function showSalesPopup(title, body, type = "ok") {
     popup.style.display = "none";
   };
   playSalesNoticeSound(type);
+}
+
+function confirmSalesPopup(title, body, type = "warn") {
+  const popup = document.getElementById("salesPopup");
+  const titleEl = document.getElementById("salesPopupTitle");
+  const bodyEl = document.getElementById("salesPopupBody");
+  const okButton = document.getElementById("salesPopupClose");
+  if (!popup || !titleEl || !bodyEl || !okButton) {
+    return Promise.resolve(confirm(body || title || ""));
+  }
+  let cancelButton = document.getElementById("salesPopupCancel");
+  if (!cancelButton) {
+    cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.id = "salesPopupCancel";
+    cancelButton.className = "secondary";
+    okButton.insertAdjacentElement("afterend", cancelButton);
+  }
+  return new Promise(resolve => {
+    titleEl.textContent = title || "確認";
+    bodyEl.textContent = body || "";
+    popup.dataset.type = type;
+    popup.style.display = "flex";
+    okButton.textContent = "OK";
+    cancelButton.textContent = "キャンセル";
+    cancelButton.style.display = "";
+    const close = result => {
+      popup.style.display = "none";
+      cancelButton.style.display = "none";
+      okButton.textContent = "OK";
+      okButton.onclick = null;
+      cancelButton.onclick = null;
+      resolve(result);
+    };
+    okButton.onclick = () => close(true);
+    cancelButton.onclick = () => close(false);
+    playSalesNoticeSound(type);
+  });
 }
 
 function getProductPriceInfo(product) {
@@ -305,6 +348,9 @@ function renderQuoteList() {
 }
 
 function renderQuoteListRow(q) {
+  const deleteButton = canDeleteQuote(q)
+    ? `<button type="button" class="danger" onclick="deleteQuote('${q.id}')">見積削除</button>`
+    : "";
   return `<tr>
     <td><span class="number-with-status">${escapeHtml(q.quoteNo)} ${quoteStatusBadge(q.status)}</span></td>
     <td>${escapeHtml(q.quoteDate || "")}</td>
@@ -318,6 +364,7 @@ function renderQuoteListRow(q) {
       <button type="button" class="secondary" onclick="printQuoteById('${q.id}')">PDF出力</button>
       <button type="button" class="secondary" onclick="duplicateQuote('${q.id}')">複製</button>
       <button type="button" class="secondary" onclick="convertQuoteToInvoice('${q.id}')">請求書へ変換</button>
+      ${deleteButton}
     </td>
   </tr>`;
 }
@@ -422,6 +469,7 @@ function newQuote() {
   document.getElementById("validUntil").value = today();
   document.getElementById("productSearchResults").innerHTML = "";
   renderLines();
+  updateQuoteDeleteButton(null);
 }
 
 async function searchProducts() {
@@ -588,7 +636,16 @@ async function saveQuote() {
   writeQuotes(quotes);
   currentQuoteId = quote.id;
   renderQuoteList();
+  updateQuoteDeleteButton(quote);
   showSalesMessage("見積書を保存しました。", "ok");
+}
+
+function updateQuoteDeleteButton(quote) {
+  const button = document.getElementById("deleteQuoteBtn");
+  if (!button) return;
+  const shouldShow = Boolean(quote?.id && canDeleteQuote(quote));
+  button.hidden = !shouldShow;
+  button.disabled = !shouldShow;
 }
 
 async function fillQuoteForm(quote) {
@@ -606,6 +663,7 @@ async function fillQuoteForm(quote) {
   document.getElementById("quoteMemo").value = quote.memo || "";
   document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
   renderLines();
+  updateQuoteDeleteButton(quote);
   await refreshQuoteLineStocks().catch(() => {});
 }
 
@@ -627,6 +685,30 @@ async function duplicateQuote(id) {
     quoteDate: today()
   });
   showSalesMessage("見積書を複製しました。保存すると新しい見積番号になります。", "ok");
+}
+
+async function deleteCurrentQuote() {
+  if (!currentQuoteId) return;
+  await deleteQuote(currentQuoteId);
+}
+
+async function deleteQuote(id) {
+  const quotes = readQuotes();
+  const quote = quotes.find(q => q.id === id);
+  if (!quote) {
+    showSalesPopup("削除失敗", "見積書が見つかりません。", "err");
+    return;
+  }
+  if (!canDeleteQuote(quote)) {
+    showSalesPopup("削除できません", "請求書に変換済みの見積書は削除できません。", "warn");
+    return;
+  }
+  const confirmed = await confirmSalesPopup("見積書削除", "この見積書を削除しますか？", "warn");
+  if (!confirmed) return;
+  writeQuotes(quotes.filter(q => q.id !== id));
+  renderQuoteList();
+  if (currentQuoteId === id) newQuote();
+  showSalesPopup("削除完了", "見積書を削除しました", "ok");
 }
 
 function outputCurrentQuotePdf() {
