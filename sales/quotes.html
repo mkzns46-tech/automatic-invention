@@ -4,13 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 見積書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260613-2">
+<link rel="stylesheet" href="sales-style.css">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-nav.js" defer></script>
 <script src="customers.js"></script>
-<script src="sales-calculator.js"></script>
-<script src="sales-storage.js"></script>
 <script src="quote-pdf.js"></script>
 <script src="quotes.js" defer></script>
 </head>
@@ -89,7 +86,7 @@
     </div>
     <div class="sales-actions" style="margin-top:14px">
       <button type="button" class="primary" onclick="saveQuote();">保存</button>
-      <button type="button" class="secondary" onclick="outputCurrentQuotePdf();">保存済みPDF出力</button>
+      <button type="button" class="secondary" onclick="outputCurrentQuotePdf();">PDF出力</button>
     </div>
   </section>
 </main>

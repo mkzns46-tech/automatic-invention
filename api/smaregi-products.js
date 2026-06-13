@@ -29,6 +29,14 @@ function firstNumber(...values) {
   return 0;
 }
 
+function firstString(...values) {
+  for (const value of values) {
+    const text = String(value ?? "").trim();
+    if (text) return text;
+  }
+  return "";
+}
+
 function findProductPrice(product) {
   const direct = firstNumber(
     product.price,
@@ -42,8 +50,12 @@ function findProductPrice(product) {
     product.unit_price,
     product.taxIncludedPrice,
     product.tax_included_price,
+    product.taxIncludedUnitPrice,
+    product.tax_included_unit_price,
     product.displayPrice,
-    product.display_price
+    product.display_price,
+    product.storePrice,
+    product.store_price
   );
   if (direct) return direct;
 
@@ -66,6 +78,37 @@ function findProductPrice(product) {
     }
   }
   return 0;
+}
+
+function getProductIds(row) {
+  return {
+    productId: firstString(row.productId, row.product_id, row.id),
+    productCode: firstString(row.productCode, row.product_code, row.barcode, row.code)
+  };
+}
+
+function addPriceIndex(index, prefix, value, price) {
+  const key = String(value || "").trim();
+  if (!key || !price) return;
+  index.set(`${prefix}:${key}`, price);
+}
+
+function buildStorePriceIndex(priceRows) {
+  const index = new Map();
+  for (const row of priceRows) {
+    if (!row || typeof row !== "object") continue;
+    const price = findProductPrice(row);
+    if (!price) continue;
+    const { productId, productCode } = getProductIds(row);
+    addPriceIndex(index, "productId", productId, price);
+    addPriceIndex(index, "productCode", productCode, price);
+  }
+  return index;
+}
+
+function findStorePrice(index, product) {
+  const { productId, productCode } = getProductIds(product);
+  return index.get(`productId:${productId}`) || index.get(`productCode:${productCode}`) || 0;
 }
 
 function resolveSmaregiContext(body = {}) {
@@ -128,6 +171,32 @@ async function fetchAll(baseUrl, path, token) {
   return rows;
 }
 
+async function fetchStoreProductPrices(apiBase, storeId, token) {
+  const path = storeId ? `/stores/${encodeURIComponent(storeId)}/product_prices` : "";
+  const result = {
+    attempted: Boolean(path),
+    ok: false,
+    path: path || null,
+    count: 0,
+    priceCount: 0,
+    error: ""
+  };
+  if (!path) {
+    result.error = "storeId is not configured";
+    return { rows: [], result };
+  }
+  try {
+    const rows = await fetchAll(apiBase, path, token);
+    result.ok = true;
+    result.count = rows.length;
+    result.priceCount = rows.filter(row => findProductPrice(row) > 0).length;
+    return { rows, result };
+  } catch (error) {
+    result.error = error.message || String(error);
+    return { rows: [], result };
+  }
+}
+
 async function getAccessToken(context) {
   const { contractId, clientId, clientSecret } = context;
   if (!contractId || !clientId || !clientSecret) {
@@ -165,7 +234,11 @@ module.exports = async function handler(req, res) {
     const token = await getAccessToken(context);
     const apiBase = context.apiBase || `https://api.smaregi.jp/${context.contractId}/pos`;
     const products = await fetchAll(apiBase, "/products", token);
+    const { rows: storePriceRows, result: priceApi } = await fetchStoreProductPrices(apiBase, context.storeId, token);
+    const storePriceIndex = buildStorePriceIndex(storePriceRows);
 
+    let inlinePriceCount = 0;
+    let storePriceMatchCount = 0;
     const normalized = products.map(product => {
       const barcode = String(product.productCode ?? product.product_code ?? "").trim();
       const name = String(product.productName ?? product.product_name ?? "").trim();
@@ -175,7 +248,11 @@ module.exports = async function handler(req, res) {
       const category = String(product.categoryName ?? product.category_name ?? "").trim();
       const genre = String(product.genreName ?? product.genre_name ?? "").trim();
       const department = String(product.departmentName ?? product.department_name ?? "").trim();
-      const price = findProductPrice(product);
+      const inlinePrice = findProductPrice(product);
+      const storePrice = findStorePrice(storePriceIndex, product);
+      const price = storePrice || inlinePrice;
+      if (inlinePrice) inlinePriceCount += 1;
+      if (storePrice) storePriceMatchCount += 1;
       if (category) row.category = category;
       if (genre) row.genre = genre;
       if (department) row.department = department;
@@ -187,6 +264,11 @@ module.exports = async function handler(req, res) {
       products: normalized,
       count: normalized.length,
       priceCount: normalized.filter(row => Number(row.price || 0) > 0).length,
+      priceSource: {
+        inlineProductCount: inlinePriceCount,
+        storeProductPriceCount: storePriceMatchCount
+      },
+      priceApi,
       context: {
         accountKey: context.accountKey,
         accountName: context.accountName,

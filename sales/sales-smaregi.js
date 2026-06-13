@@ -30,6 +30,26 @@ function salesNormalizeSmaregiProduct(row) {
   };
 }
 
+function buildSalesSmaregiPriceNote(data, priceCount) {
+  const apiPriceCount = Number(data.priceCount || priceCount || 0);
+  const priceApi = data.priceApi || {};
+  const source = data.priceSource || {};
+  if (apiPriceCount) {
+    return [
+      `Prices: ${priceCount}`,
+      `store price matched: ${Number(source.storeProductPriceCount || 0)}`,
+      `product response price: ${Number(source.inlineProductCount || 0)}`
+    ].join(" / ");
+  }
+  if (priceApi.attempted && !priceApi.ok) {
+    return `Prices: 0. Store price API failed: ${priceApi.error || "unknown error"}`;
+  }
+  if (!priceApi.attempted) {
+    return `Prices: 0. Store price API was skipped: ${priceApi.error || "storeId is not configured"}`;
+  }
+  return "Prices: 0. Smaregi returned no product prices.";
+}
+
 async function importSalesSmaregiProducts() {
   const button = document.getElementById("salesSmaregiImportBtn");
   const accountKey = document.getElementById("salesSmaregiAccount")?.value || "old";
@@ -56,9 +76,7 @@ async function importSalesSmaregiProducts() {
     }
     const priceCount = rows.filter(row => Number(row.price || 0) > 0).length;
     const apiPriceCount = Number(data.priceCount || priceCount || 0);
-    const priceNote = apiPriceCount
-      ? `Prices: ${priceCount}`
-      : "Prices: 0. Smaregi did not return product prices in this API response.";
+    const priceNote = buildSalesSmaregiPriceNote(data, priceCount);
     showSalesMessage(`Smaregi import complete. Products: ${rows.length} / ${priceNote}`, apiPriceCount ? "ok" : "warn");
   } catch (e) {
     showSalesMessage(e.message || "Smaregi product master import failed.", "err");
