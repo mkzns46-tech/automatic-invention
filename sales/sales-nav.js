@@ -3,7 +3,7 @@ const SALES_MENU_ITEMS = [
   ["請求書", "invoices.html", "変換・編集・PDF"],
   ["入金確認", "payments.html", "手動確認"],
   ["検品確認", "shipping.html", "準備中"],
-  ["納品書", "delivery.html", "準備中"],
+  ["納品書", "delivery.html", "一覧・詳細・PDF"],
   ["領収書", "receipts.html", "準備中"],
   ["顧客管理", "customers.html", "準備中"],
   ["設定", "settings.html", "スマレジ商品取込"]
@@ -14,7 +14,7 @@ const SALES_MENU_ITEMS_KO = [
   ["청구서", "invoices.html", "변환・편집・PDF"],
   ["입금 확인", "payments.html", "수동 확인"],
   ["검품 확인", "shipping.html", "준비 중"],
-  ["납품서", "delivery.html", "준비 중"],
+  ["납품서", "delivery.html", "목록・상세・PDF"],
   ["영수증", "receipts.html", "준비 중"],
   ["고객 관리", "customers.html", "준비 중"],
   ["설정", "settings.html", "스마레지 상품 가져오기"]

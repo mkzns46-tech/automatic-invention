@@ -1,4 +1,5 @@
 const INVOICES_KEY = "arico_sales_invoices_v1";
+const DELIVERIES_KEY = "arico_sales_deliveries_v1";
 const INVOICE_STATUS_OPTIONS = ["下書き", "発行済み", "入金待ち", "入金済み", "キャンセル"];
 const INVOICE_STATUS_DRAFT = "下書き";
 const INVOICE_STATUS_ISSUED = "発行済み";
@@ -20,6 +21,14 @@ function readInvoices() {
 
 function writeInvoices(invoices) {
   localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
+}
+
+function readDeliveries() {
+  return JSON.parse(localStorage.getItem(DELIVERIES_KEY) || "[]");
+}
+
+function writeDeliveries(deliveries) {
+  localStorage.setItem(DELIVERIES_KEY, JSON.stringify(deliveries));
 }
 
 function today() {
@@ -104,6 +113,57 @@ function calcInvoiceTotals(invoice) {
     total,
     tax: Math.floor(total * 10 / 110)
   };
+}
+
+function deliveryNo(n) {
+  return "DEL-" + String(n).padStart(6, "0");
+}
+
+function nextDeliveryNo(deliveries) {
+  const max = deliveries.reduce((num, delivery) => {
+    const match = String(delivery.deliveryNo || "").match(/^DEL-(\d+)$/);
+    return Math.max(num, match ? Number(match[1]) : 0);
+  }, 0);
+  return deliveryNo(max + 1);
+}
+
+function buildDeliveryFromInvoice(invoice, deliveries) {
+  const totals = calcInvoiceTotals(invoice);
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+    deliveryNo: nextDeliveryNo(deliveries),
+    sourceInvoiceId: invoice.id || "",
+    sourceInvoiceNo: invoice.invoiceNo || "",
+    invoiceDate: invoice.invoiceDate || "",
+    issuedAt: invoice.issuedAt || "",
+    createdAt: now,
+    updatedAt: now,
+    status: "draft",
+    customerName: invoice.customerName || "",
+    customerType: invoice.customerType || "",
+    address: invoice.address || "",
+    phone: invoice.phone || "",
+    email: invoice.email || "",
+    subject: invoice.subject || "",
+    staff: invoice.staff || "",
+    memo: invoice.memo || "",
+    lines: JSON.parse(JSON.stringify(invoice.lines || [])),
+    subtotal: totals.subtotal,
+    discount: totals.discount,
+    total: totals.total,
+    tax: totals.tax
+  };
+}
+
+function ensureDeliveryForInvoice(invoice) {
+  const deliveries = readDeliveries();
+  const existing = deliveries.find(delivery => delivery.sourceInvoiceNo === invoice.invoiceNo);
+  if (existing) return existing;
+  const delivery = buildDeliveryFromInvoice(invoice, deliveries);
+  deliveries.push(delivery);
+  writeDeliveries(deliveries);
+  return delivery;
 }
 
 function showSalesMessage(text, type) {
@@ -549,9 +609,10 @@ async function issueInvoice() {
     showSalesMessage("この請求書は発行確定済みです。", "warn");
     return;
   }
-  invoice.status = INVOICE_STATUS_ISSUED;
+  invoice.status = "waiting_payment";
   invoice.issuedAt = new Date().toISOString();
   invoice.updatedAt = invoice.issuedAt;
+  ensureDeliveryForInvoice(invoice);
   invoices[index] = invoice;
   writeInvoices(invoices);
   fillInvoiceForm(invoice);
