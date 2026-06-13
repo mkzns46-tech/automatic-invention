@@ -13,7 +13,7 @@ async function salesUpsertProducts(rows) {
       headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify(withoutPrice)
     });
-    throw new Error("products.price列が未作成のため、価格以外の商品情報のみ取り込みました。supabase_products_price_update.sql を実行してください。");
+    throw new Error("products.price column is missing. Product data was imported without prices. Run supabase_products_price_update.sql first.");
   }
 }
 
@@ -38,16 +38,16 @@ async function importSalesSmaregiProducts() {
   try {
     if (button) {
       button.disabled = true;
-      button.textContent = "取得中...";
+      button.textContent = "Importing...";
     }
-    showSalesMessage("スマレジ商品マスターを取得しています。", "");
+    showSalesMessage("Smaregi product master import started.", "");
     const res = await fetch("/api/smaregi-products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ accountKey, storeCode })
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `APIエラー ${res.status}`);
+    if (!res.ok) throw new Error(data.error || `API error ${res.status}`);
     const rows = (Array.isArray(data.products) ? data.products : [])
       .map(salesNormalizeSmaregiProduct)
       .filter(row => row.barcode && row.name);
@@ -55,9 +55,13 @@ async function importSalesSmaregiProducts() {
       await salesUpsertProducts(rows.slice(i, i + 500));
     }
     const priceCount = rows.filter(row => Number(row.price || 0) > 0).length;
-    showSalesMessage(`スマレジ商品マスターを取り込みました。商品数: ${rows.length}件 / 価格あり: ${priceCount}件`, "ok");
+    const apiPriceCount = Number(data.priceCount || priceCount || 0);
+    const priceNote = apiPriceCount
+      ? `Prices: ${priceCount}`
+      : "Prices: 0. Smaregi did not return product prices in this API response.";
+    showSalesMessage(`Smaregi import complete. Products: ${rows.length} / ${priceNote}`, apiPriceCount ? "ok" : "warn");
   } catch (e) {
-    showSalesMessage(e.message || "スマレジ商品マスター取得に失敗しました。", "err");
+    showSalesMessage(e.message || "Smaregi product master import failed.", "err");
   } finally {
     if (button) {
       button.disabled = false;

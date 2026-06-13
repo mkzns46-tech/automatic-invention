@@ -29,6 +29,45 @@ function firstNumber(...values) {
   return 0;
 }
 
+function findProductPrice(product) {
+  const direct = firstNumber(
+    product.price,
+    product.productPrice,
+    product.product_price,
+    product.sellingPrice,
+    product.selling_price,
+    product.salesPrice,
+    product.sales_price,
+    product.unitPrice,
+    product.unit_price,
+    product.taxIncludedPrice,
+    product.tax_included_price,
+    product.displayPrice,
+    product.display_price
+  );
+  if (direct) return direct;
+
+  const seen = new Set();
+  const stack = [product];
+  while (stack.length) {
+    const value = stack.pop();
+    if (!value || typeof value !== "object" || seen.has(value)) continue;
+    seen.add(value);
+    for (const [key, child] of Object.entries(value)) {
+      const lowerKey = key.toLowerCase();
+      if (
+        /(price|amount|unitprice)/.test(lowerKey) &&
+        !/(cost|stock|taxamount|discount|point)/.test(lowerKey)
+      ) {
+        const number = firstNumber(child);
+        if (number) return number;
+      }
+      if (child && typeof child === "object") stack.push(child);
+    }
+  }
+  return 0;
+}
+
 function resolveSmaregiContext(body = {}) {
   const requestedAccountKey = normalizeKey(body.accountKey || body.currentSmaregiAccount, "old");
   const requestedStoreCode = normalizeKey(body.storeCode || body.currentStore, "tokyo");
@@ -136,17 +175,7 @@ module.exports = async function handler(req, res) {
       const category = String(product.categoryName ?? product.category_name ?? "").trim();
       const genre = String(product.genreName ?? product.genre_name ?? "").trim();
       const department = String(product.departmentName ?? product.department_name ?? "").trim();
-      const price = firstNumber(
-        product.price,
-        product.productPrice,
-        product.product_price,
-        product.sellingPrice,
-        product.selling_price,
-        product.salesPrice,
-        product.sales_price,
-        product.unitPrice,
-        product.unit_price
-      );
+      const price = findProductPrice(product);
       if (category) row.category = category;
       if (genre) row.genre = genre;
       if (department) row.department = department;
@@ -157,6 +186,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       products: normalized,
       count: normalized.length,
+      priceCount: normalized.filter(row => Number(row.price || 0) > 0).length,
       context: {
         accountKey: context.accountKey,
         accountName: context.accountName,
