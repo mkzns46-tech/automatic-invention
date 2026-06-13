@@ -73,12 +73,7 @@ function showSalesMessage(text, type) {
   box.className = "message" + (type === "err" ? " err" : type === "warn" ? " warn" : type === "ok" ? " ok" : "");
 }
 
-function getProductUnitPrice(product) {
-  const value = Number(product?.price ?? 0);
-  return Number.isFinite(value) && value > 0 ? value : 0;
-}
-
-function playSalesNotifySound(type = "ok") {
+function playSalesNoticeSound(type = "ok") {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
@@ -86,35 +81,82 @@ function playSalesNotifySound(type = "ok") {
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
     oscillator.type = "sine";
-    oscillator.frequency.value = type === "err" ? 220 : 660;
+    oscillator.frequency.value = type === "err" ? 220 : type === "warn" ? 440 : 660;
     gain.gain.setValueAtTime(0.001, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
     oscillator.connect(gain);
     gain.connect(ctx.destination);
     oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.2);
+    oscillator.stop(ctx.currentTime + 0.22);
   } catch (_) {}
 }
 
-function showSalesToast(text, type = "ok") {
-  const toast = document.getElementById("salesToast");
-  if (!toast) {
-    alert(text);
+function showSalesPopup(title, body, type = "ok") {
+  const popup = document.getElementById("salesPopup");
+  const titleEl = document.getElementById("salesPopupTitle");
+  const bodyEl = document.getElementById("salesPopupBody");
+  const close = document.getElementById("salesPopupClose");
+  if (!popup || !titleEl || !bodyEl || !close) {
+    alert(`${title}\n${body || ""}`);
     return;
   }
-  toast.textContent = text;
-  toast.className = `sales-toast ${type}`;
-  toast.hidden = false;
-  clearTimeout(showSalesToast.timer);
-  showSalesToast.timer = setTimeout(() => {
-    toast.hidden = true;
-  }, 1800);
+  titleEl.textContent = title || "完了";
+  bodyEl.textContent = body || "";
+  popup.dataset.type = type;
+  popup.style.display = "flex";
+  close.onclick = () => {
+    popup.style.display = "none";
+  };
+  playSalesNoticeSound(type);
 }
 
-function notifySalesProductAdded(text, type = "ok") {
-  showSalesToast(text, type);
-  playSalesNotifySound(type);
+function getProductPriceInfo(product) {
+  if (!product || product.price === null || product.price === undefined) {
+    return { hasPrice: false, value: 0 };
+  }
+  const value = Number(product.price);
+  return Number.isFinite(value) ? { hasPrice: true, value } : { hasPrice: false, value: 0 };
+}
+
+function formatStock(stock) {
+  const value = Number(stock || 0);
+  return value > 0 ? `現在庫 ${value}` : "現在庫 0 / 取寄せ";
+}
+
+function stockClass(stock) {
+  return Number(stock || 0) > 0 ? "" : "line-stock warn";
+}
+
+function sanitizeProductRow(row = {}) {
+  return {
+    barcode: String(row.barcode || ""),
+    name: String(row.name || ""),
+    base_stock: Number(row.base_stock || 0),
+    price: row.price === null || row.price === undefined ? null : Number(row.price),
+    smaregi_product_id: row.smaregi_product_id || null
+  };
+}
+
+async function fetchProductByBarcode(barcode) {
+  const value = String(barcode || "").trim();
+  if (!value) return null;
+  const rows = await salesFetch(`products?select=barcode,name,base_stock,price,smaregi_product_id&barcode=eq.${encodeURIComponent(value)}&limit=1`);
+  return rows[0] ? sanitizeProductRow(rows[0]) : null;
+}
+
+async function refreshQuoteLineStocks() {
+  const uniqueBarcodes = [...new Set(currentLines.map(line => String(line.barcode || "").trim()).filter(Boolean))];
+  for (const barcode of uniqueBarcodes) {
+    const latest = await fetchProductByBarcode(barcode).catch(() => null);
+    if (!latest) continue;
+    currentLines.forEach(line => {
+      if (String(line.barcode) !== barcode) return;
+      line.stock = latest.base_stock;
+      if (line.name === "" && latest.name) line.name = latest.name;
+    });
+  }
+  renderLines();
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -185,15 +227,15 @@ async function searchProducts() {
   results.innerHTML = '<div class="message">検索中...</div>';
   try {
     const filter = encodeURIComponent(`*${query}*`);
-    const rows = await salesFetch(`products?select=barcode,name,base_stock,category,genre,price&or=(name.ilike.${filter},barcode.ilike.${filter})&limit=20`);
-    results.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>商品名</th><th>バーコード</th><th>税込単価</th><th>現在在庫</th><th>操作</th></tr></thead><tbody>${rows.map(row => {
-      const stock = Number(row.base_stock || 0);
-      const price = getProductUnitPrice(row);
+    const rows = await salesFetch(`products?select=barcode,name,base_stock,price,smaregi_product_id&or=(name.ilike.${filter},barcode.ilike.${filter},smaregi_product_id.ilike.${filter})&limit=20`);
+    results.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>商品名</th><th>バーコード</th><th>現在庫</th><th>販売価格</th><th>操作</th></tr></thead><tbody>${rows.map(raw => {
+      const row = sanitizeProductRow(raw);
+      const price = getProductPriceInfo(row);
       return `<tr>
         <td>${escapeHtml(row.name || "")}</td>
         <td>${escapeHtml(row.barcode || "")}</td>
-        <td>${price ? money(price) : '<span class="line-stock warn">未登録</span>'}</td>
-        <td>${stock > 0 ? `現在在庫 ${stock}` : `<span class="line-stock warn">現在在庫 0 / 取寄せ</span>`}</td>
+        <td><span class="${stockClass(row.base_stock)}">${formatStock(row.base_stock)}</span></td>
+        <td>${price.hasPrice ? money(price.value) : '<span class="line-stock warn">価格未登録</span>'}</td>
         <td><button type="button" class="secondary" onclick='addProductLine(${JSON.stringify(row).replaceAll("'", "&#39;")})'>追加</button></td>
       </tr>`;
     }).join("")}</tbody></table></div>` : '<div class="message warn">該当商品がありません。</div>';
@@ -202,28 +244,31 @@ async function searchProducts() {
   }
 }
 
-function addProductLine(product) {
+async function addProductLine(product) {
   try {
+    const latest = await fetchProductByBarcode(product.barcode).catch(() => null);
+    const row = latest || sanitizeProductRow(product);
     const units = readUnits();
-    const unit = units[product.barcode] || "個";
-    const unitPrice = getProductUnitPrice(product);
+    const unit = units[row.barcode] || "個";
+    const price = getProductPriceInfo(row);
     currentLines.push({
       id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
-      barcode: product.barcode || "",
-      name: product.name || "",
-      stock: Number(product.base_stock || 0),
+      barcode: row.barcode || "",
+      smaregiProductId: row.smaregi_product_id || "",
+      name: row.name || "",
+      stock: Number(row.base_stock || 0),
       qty: 1,
       unit,
-      unitPrice,
+      unitPrice: price.hasPrice ? price.value : 0,
       discountValue: 0,
       discountAmount: 0,
       amount: 0,
       memo: ""
     });
     renderLines();
-    notifySalesProductAdded("商品を見積に追加しました", "ok");
+    showSalesPopup("追加完了", "商品を見積に追加しました", "ok");
   } catch (e) {
-    notifySalesProductAdded("商品の追加に失敗しました", "err");
+    showSalesPopup("追加失敗", "商品の追加に失敗しました", "err");
   }
 }
 
@@ -232,7 +277,7 @@ function renderLines() {
   area.innerHTML = currentLines.length ? currentLines.map((line, index) => `
     <div class="quote-line">
       <label>商品名<input value="${escapeHtml(line.name)}" onchange="updateLine(${index}, 'name', this.value)"></label>
-      <label>現在在庫<div class="${Number(line.stock) > 0 ? "" : "line-stock warn"}">${Number(line.stock) > 0 ? `現在在庫 ${line.stock}` : "現在在庫 0 / 取寄せ"}</div></label>
+      <label>現在庫<div class="${stockClass(line.stock)}">${formatStock(line.stock)}</div></label>
       <label>数量<input type="number" min="0" step="1" value="${line.qty}" onchange="updateLine(${index}, 'qty', this.value)"></label>
       <label>単位<select onchange="updateLine(${index}, 'unit', this.value)">${UNIT_OPTIONS.map(unit => `<option value="${unit}" ${unit === line.unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label>
       <label>税込単価<input type="number" min="0" step="1" value="${line.unitPrice}" onchange="updateLine(${index}, 'unitPrice', this.value)"></label>
@@ -310,11 +355,11 @@ function collectQuote() {
     staff: document.getElementById("quoteStaff").value,
     memo: document.getElementById("quoteMemo").value,
     discountTemplate: document.getElementById("discountTemplate").value,
-    lines: currentLines
+    lines: currentLines.map(({ stock, ...line }) => ({ ...line }))
   };
 }
 
-function saveQuote() {
+async function saveQuote() {
   if (!document.getElementById("customerName").value.trim()) {
     showSalesMessage("顧客名を入力してください。", "err");
     return;
@@ -322,6 +367,11 @@ function saveQuote() {
   if (!currentLines.length) {
     showSalesMessage("見積商品を追加してください。", "err");
     return;
+  }
+  try {
+    await refreshQuoteLineStocks();
+  } catch (_) {
+    showSalesMessage("最新在庫の再確認に失敗しました。見積は保存できますが、現在庫表示を確認してください。", "warn");
   }
   const quote = collectQuote();
   const quotes = readQuotes();
@@ -334,9 +384,9 @@ function saveQuote() {
   showSalesMessage("見積書を保存しました。", "ok");
 }
 
-function fillQuoteForm(quote) {
+async function fillQuoteForm(quote) {
   currentQuoteId = quote.id || null;
-  currentLines = JSON.parse(JSON.stringify(quote.lines || []));
+  currentLines = JSON.parse(JSON.stringify(quote.lines || [])).map(line => ({ ...line, stock: 0 }));
   document.getElementById("customerName").value = quote.customerName || "";
   document.getElementById("customerType").value = quote.customerType || "個人";
   document.getElementById("customerAddress").value = quote.address || "";
@@ -349,17 +399,18 @@ function fillQuoteForm(quote) {
   document.getElementById("quoteMemo").value = quote.memo || "";
   document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
   renderLines();
+  await refreshQuoteLineStocks().catch(() => {});
 }
 
-function editQuote(id) {
+async function editQuote(id) {
   const quote = readQuotes().find(q => q.id === id);
-  if (quote) fillQuoteForm(quote);
+  if (quote) await fillQuoteForm(quote);
 }
 
-function duplicateQuote(id) {
+async function duplicateQuote(id) {
   const quote = readQuotes().find(q => q.id === id);
   if (!quote) return;
-  fillQuoteForm({
+  await fillQuoteForm({
     ...JSON.parse(JSON.stringify(quote)),
     id: null,
     quoteNo: "",

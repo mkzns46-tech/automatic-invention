@@ -21,12 +21,10 @@ function parseBody(req) {
   }
 }
 
-function firstNumber(...values) {
-  for (const value of values) {
-    const number = Number(String(value ?? "").replace(/,/g, ""));
-    if (Number.isFinite(number) && number > 0) return number;
-  }
-  return 0;
+function parseNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(String(value).replace(/,/g, ""));
+  return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
 function firstString(...values) {
@@ -38,26 +36,31 @@ function firstString(...values) {
 }
 
 function findProductPrice(product) {
-  const direct = firstNumber(
-    product.price,
-    product.productPrice,
-    product.product_price,
-    product.sellingPrice,
-    product.selling_price,
-    product.salesPrice,
-    product.sales_price,
-    product.unitPrice,
-    product.unit_price,
-    product.taxIncludedPrice,
-    product.tax_included_price,
-    product.taxIncludedUnitPrice,
-    product.tax_included_unit_price,
-    product.displayPrice,
-    product.display_price,
-    product.storePrice,
-    product.store_price
-  );
-  if (direct) return direct;
+  const directKeys = [
+    "price",
+    "productPrice",
+    "product_price",
+    "sellingPrice",
+    "selling_price",
+    "salesPrice",
+    "sales_price",
+    "unitPrice",
+    "unit_price",
+    "taxIncludedPrice",
+    "tax_included_price",
+    "taxIncludedUnitPrice",
+    "tax_included_unit_price",
+    "displayPrice",
+    "display_price",
+    "storePrice",
+    "store_price"
+  ];
+  for (const key of directKeys) {
+    if (Object.prototype.hasOwnProperty.call(product, key)) {
+      const price = parseNumber(product[key]);
+      if (price !== null) return price;
+    }
+  }
 
   const seen = new Set();
   const stack = [product];
@@ -71,13 +74,13 @@ function findProductPrice(product) {
         /(price|amount|unitprice)/.test(lowerKey) &&
         !/(cost|stock|taxamount|discount|point)/.test(lowerKey)
       ) {
-        const number = firstNumber(child);
-        if (number) return number;
+        const price = parseNumber(child);
+        if (price !== null) return price;
       }
       if (child && typeof child === "object") stack.push(child);
     }
   }
-  return 0;
+  return null;
 }
 
 function getProductIds(row) {
@@ -89,7 +92,7 @@ function getProductIds(row) {
 
 function addPriceIndex(index, prefix, value, price) {
   const key = String(value || "").trim();
-  if (!key || !price) return;
+  if (!key || price === null || price === undefined) return;
   index.set(`${prefix}:${key}`, price);
 }
 
@@ -98,7 +101,7 @@ function buildStorePriceIndex(priceRows) {
   for (const row of priceRows) {
     if (!row || typeof row !== "object") continue;
     const price = findProductPrice(row);
-    if (!price) continue;
+    if (price === null) continue;
     const { productId, productCode } = getProductIds(row);
     addPriceIndex(index, "productId", productId, price);
     addPriceIndex(index, "productCode", productCode, price);
@@ -108,7 +111,9 @@ function buildStorePriceIndex(priceRows) {
 
 function findStorePrice(index, product) {
   const { productId, productCode } = getProductIds(product);
-  return index.get(`productId:${productId}`) || index.get(`productCode:${productCode}`) || 0;
+  if (index.has(`productId:${productId}`)) return index.get(`productId:${productId}`);
+  if (index.has(`productCode:${productCode}`)) return index.get(`productCode:${productCode}`);
+  return null;
 }
 
 function resolveSmaregiContext(body = {}) {
@@ -140,9 +145,9 @@ function resolveSmaregiContext(body = {}) {
 
   return {
     accountKey,
-    accountName: accountKey === "new" ? "新スマレジ" : "旧スマレジ",
+    accountName: accountKey === "new" ? "new Smaregi" : "old Smaregi",
     storeCode,
-    storeName: storeCode === "aichi" ? "愛知" : "東京",
+    storeName: storeCode === "aichi" ? "Aichi" : "Tokyo",
     storeId,
     clientId,
     clientSecret,
@@ -189,7 +194,7 @@ async function fetchStoreProductPrices(apiBase, storeId, token) {
     const rows = await fetchAll(apiBase, path, token);
     result.ok = true;
     result.count = rows.length;
-    result.priceCount = rows.filter(row => findProductPrice(row) > 0).length;
+    result.priceCount = rows.filter(row => findProductPrice(row) !== null).length;
     return { rows, result };
   } catch (error) {
     result.error = error.message || String(error);
@@ -200,7 +205,7 @@ async function fetchStoreProductPrices(apiBase, storeId, token) {
 async function getAccessToken(context) {
   const { contractId, clientId, clientSecret } = context;
   if (!contractId || !clientId || !clientSecret) {
-    throw new Error(`スマレジOAuth設定が不足しています: ${context.accountName} / ${context.storeName}`);
+    throw new Error(`Smaregi OAuth settings are missing: ${context.accountName} / ${context.storeName}`);
   }
 
   const tokenUrl = `https://id.smaregi.jp/app/${contractId}/token`;
@@ -218,7 +223,7 @@ async function getAccessToken(context) {
   });
   const body = await response.json().catch(() => null);
   if (!response.ok || !body?.access_token) {
-    throw new Error(`スマレジOAuth認証エラー ${response.status}: ${JSON.stringify(body)}`);
+    throw new Error(`Smaregi OAuth error ${response.status}: ${JSON.stringify(body)}`);
   }
   return body.access_token;
 }
@@ -250,20 +255,20 @@ module.exports = async function handler(req, res) {
       const department = String(product.departmentName ?? product.department_name ?? "").trim();
       const inlinePrice = findProductPrice(product);
       const storePrice = findStorePrice(storePriceIndex, product);
-      const price = storePrice || inlinePrice;
-      if (inlinePrice) inlinePriceCount += 1;
-      if (storePrice) storePriceMatchCount += 1;
+      const price = storePrice !== null ? storePrice : inlinePrice;
+      if (inlinePrice !== null) inlinePriceCount += 1;
+      if (storePrice !== null) storePriceMatchCount += 1;
       if (category) row.category = category;
       if (genre) row.genre = genre;
       if (department) row.department = department;
-      if (price) row.price = price;
+      if (price !== null) row.price = price;
       return row;
     }).filter(Boolean);
 
     return res.status(200).json({
       products: normalized,
       count: normalized.length,
-      priceCount: normalized.filter(row => Number(row.price || 0) > 0).length,
+      priceCount: normalized.filter(row => Object.prototype.hasOwnProperty.call(row, "price")).length,
       priceSource: {
         inlineProductCount: inlinePriceCount,
         storeProductPriceCount: storePriceMatchCount

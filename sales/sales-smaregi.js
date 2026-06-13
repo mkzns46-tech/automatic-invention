@@ -1,4 +1,5 @@
 async function salesUpsertProducts(rows) {
+  if (!rows.length) return;
   try {
     await salesFetch("products?on_conflict=barcode", {
       method: "POST",
@@ -18,53 +19,53 @@ async function salesUpsertProducts(rows) {
 }
 
 function salesNormalizeSmaregiProduct(row) {
-  return {
+  const product = {
     barcode: String(row.barcode || ""),
     name: String(row.name || ""),
     category: String(row.category || ""),
     genre: String(row.genre || ""),
     department: String(row.department || ""),
     location: String(row.location || ""),
-    smaregi_product_id: String(row.smaregi_product_id || "").trim() || null,
-    price: Number(row.price || 0)
+    smaregi_product_id: String(row.smaregi_product_id || "").trim() || null
   };
+  if (Object.prototype.hasOwnProperty.call(row, "price")) {
+    product.price = Number(row.price || 0);
+  }
+  return product;
 }
 
 function buildSalesSmaregiPriceNote(data, priceCount) {
-  const apiPriceCount = Number(data.priceCount || priceCount || 0);
   const priceApi = data.priceApi || {};
   const source = data.priceSource || {};
-  if (apiPriceCount) {
+  if (priceCount) {
     return [
-      `Prices: ${priceCount}`,
-      `store price matched: ${Number(source.storeProductPriceCount || 0)}`,
-      `product response price: ${Number(source.inlineProductCount || 0)}`
+      `価格反映: ${priceCount}件`,
+      `店舗別価格: ${Number(source.storeProductPriceCount || 0)}件`,
+      `商品一覧内価格: ${Number(source.inlineProductCount || 0)}件`
     ].join(" / ");
   }
   if (priceApi.attempted && !priceApi.ok) {
-    return `Prices: 0. Store price API failed: ${priceApi.error || "unknown error"}`;
+    return `価格取得失敗: ${priceApi.error || "unknown error"}`;
   }
   if (!priceApi.attempted) {
-    return `Prices: 0. Store price API was skipped: ${priceApi.error || "storeId is not configured"}`;
+    return `価格取得未実行: ${priceApi.error || "storeId is not configured"}`;
   }
-  return "Prices: 0. Smaregi returned no product prices.";
+  return "価格取得結果: 0件";
 }
 
 async function importSalesSmaregiProducts() {
   const button = document.getElementById("salesSmaregiImportBtn");
-  const accountKey = document.getElementById("salesSmaregiAccount")?.value || "old";
-  const storeCode = document.getElementById("salesSmaregiStore")?.value || "tokyo";
   const oldText = button?.textContent;
   try {
     if (button) {
       button.disabled = true;
-      button.textContent = "Importing...";
+      button.textContent = "取込中...";
     }
-    showSalesMessage("Smaregi product master import started.", "");
+    showSalesMessage("新スマレジ商品マスターを取り込み中...", "");
     const res = await fetch("/api/smaregi-products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accountKey, storeCode })
+      body: JSON.stringify({ accountKey: "new", storeCode: "tokyo" })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `API error ${res.status}`);
@@ -74,12 +75,20 @@ async function importSalesSmaregiProducts() {
     for (let i = 0; i < rows.length; i += 500) {
       await salesUpsertProducts(rows.slice(i, i + 500));
     }
-    const priceCount = rows.filter(row => Number(row.price || 0) > 0).length;
-    const apiPriceCount = Number(data.priceCount || priceCount || 0);
+    const priceCount = rows.filter(row => Object.prototype.hasOwnProperty.call(row, "price")).length;
     const priceNote = buildSalesSmaregiPriceNote(data, priceCount);
-    showSalesMessage(`Smaregi import complete. Products: ${rows.length} / ${priceNote}`, apiPriceCount ? "ok" : "warn");
+    const message = `商品マスター取込完了: ${rows.length}件\n${priceNote}`;
+    const type = priceCount ? "ok" : "warn";
+    showSalesMessage(message, type);
+    if (typeof showSalesPopup === "function") {
+      showSalesPopup(type === "ok" ? "取込完了" : "取込完了（価格警告）", message, type);
+    }
   } catch (e) {
-    showSalesMessage(e.message || "Smaregi product master import failed.", "err");
+    const message = e.message || "スマレジ商品マスター取込に失敗しました。";
+    showSalesMessage(message, "err");
+    if (typeof showSalesPopup === "function") {
+      showSalesPopup("取込失敗", message, "err");
+    }
   } finally {
     if (button) {
       button.disabled = false;
