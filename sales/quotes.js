@@ -7,6 +7,7 @@ const DEALER_BRANDS = ["FIVICS", "MK", "JET6", "WJ"];
 
 let currentQuoteId = null;
 let currentLines = [];
+let productSearchTimer = null;
 
 function salesFetch(path) {
   return fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
@@ -164,10 +165,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("customerType").innerHTML = ARICO_CUSTOMER_TYPES.map(type => `<option value="${type}">${type}</option>`).join("");
   document.getElementById("quoteDate").value = today();
   document.getElementById("validUntil").value = today();
+  bindProductAutoSearch();
   await loadStaffOptions();
   renderQuoteList();
   newQuote();
 });
+
+function bindProductAutoSearch() {
+  const input = document.getElementById("productSearchInput");
+  if (!input) return;
+  input.addEventListener("input", () => {
+    clearTimeout(productSearchTimer);
+    productSearchTimer = setTimeout(searchProducts, 250);
+  });
+  input.addEventListener("keydown", event => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    clearTimeout(productSearchTimer);
+    searchProducts();
+  });
+}
 
 async function loadStaffOptions() {
   const select = document.getElementById("quoteStaff");
@@ -221,7 +238,7 @@ async function searchProducts() {
   const query = document.getElementById("productSearchInput").value.trim();
   const results = document.getElementById("productSearchResults");
   if (!query) {
-    showSalesMessage("商品名・バーコード・商品コードを入力してください。", "err");
+    results.innerHTML = "";
     return;
   }
   results.innerHTML = '<div class="message">検索中...</div>';

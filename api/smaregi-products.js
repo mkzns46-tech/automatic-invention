@@ -116,38 +116,25 @@ function findStorePrice(index, product) {
   return null;
 }
 
-function resolveSmaregiContext(body = {}) {
-  const requestedAccountKey = normalizeKey(body.accountKey || body.currentSmaregiAccount, "old");
-  const requestedStoreCode = normalizeKey(body.storeCode || body.currentStore, "tokyo");
-  const accountKey = requestedAccountKey === "new" ? "new" : "old";
-  const storeCode = requestedStoreCode === "aichi" ? "aichi" : "tokyo";
-  const accountPrefix = accountKey === "new" ? "NEW" : "OLD";
-  const storePrefix = storeCode === "aichi" ? "AICHI" : "TOKYO";
-
-  const clientId = accountKey === "new"
-    ? env("SMAREGI_NEW_CLIENT_ID", "NEW_SMAREGI_CLIENT_ID")
-    : env("SMAREGI_OLD_CLIENT_ID", "OLD_SMAREGI_CLIENT_ID", "SMAREGI_CLIENT_ID");
-  const clientSecret = accountKey === "new"
-    ? env("SMAREGI_NEW_CLIENT_SECRET", "NEW_SMAREGI_CLIENT_SECRET")
-    : env("SMAREGI_OLD_CLIENT_SECRET", "OLD_SMAREGI_CLIENT_SECRET", "SMAREGI_CLIENT_SECRET");
-  const contractId = accountKey === "new"
-    ? env("SMAREGI_NEW_CONTRACT_ID", "SMAREGI_NEW_CONTRACTID", "NEW_SMAREGI_CONTRACT_ID", "NEW_SMAREGI_CONTRACTID")
-    : env("SMAREGI_OLD_CONTRACT_ID", "SMAREGI_OLD_CONTRACTID", "OLD_SMAREGI_CONTRACT_ID", "OLD_SMAREGI_CONTRACTID", "SMAREGI_CONTRACT_ID", "SMAREGI_CONTRACTID");
-  const apiBase = accountKey === "new"
-    ? env("SMAREGI_NEW_POS_API_BASE_URL", "NEW_SMAREGI_POS_API_BASE_URL")
-    : env("SMAREGI_OLD_POS_API_BASE_URL", "OLD_SMAREGI_POS_API_BASE_URL", "SMAREGI_POS_API_BASE_URL");
-  const storeId = env(
-    `SMAREGI_${accountPrefix}_${storePrefix}_STORE_ID`,
-    `${accountPrefix}_SMAREGI_${storePrefix}_STORE_ID`,
-    `SMAREGI_${storePrefix}_STORE_ID`,
-    storeCode === "tokyo" ? "SMAREGI_STORE_ID" : ""
+function resolveSmaregiContext() {
+  const clientId = env("SMAREGI_NEW_CLIENT_ID", "NEW_SMAREGI_CLIENT_ID", "SMAREGI_CLIENT_ID");
+  const clientSecret = env("SMAREGI_NEW_CLIENT_SECRET", "NEW_SMAREGI_CLIENT_SECRET", "SMAREGI_CLIENT_SECRET");
+  const contractId = env(
+    "SMAREGI_NEW_CONTRACT_ID",
+    "SMAREGI_NEW_CONTRACTID",
+    "NEW_SMAREGI_CONTRACT_ID",
+    "NEW_SMAREGI_CONTRACTID",
+    "SMAREGI_CONTRACT_ID",
+    "SMAREGI_CONTRACTID"
   );
+  const apiBase = env("SMAREGI_NEW_POS_API_BASE_URL", "NEW_SMAREGI_POS_API_BASE_URL", "SMAREGI_POS_API_BASE_URL");
+  const storeId = env("SMAREGI_NEW_STORE_ID", "NEW_SMAREGI_STORE_ID", "SMAREGI_STORE_ID");
 
   return {
-    accountKey,
-    accountName: accountKey === "new" ? "new Smaregi" : "old Smaregi",
-    storeCode,
-    storeName: storeCode === "aichi" ? "Aichi" : "Tokyo",
+    accountKey: "new",
+    accountName: "new Smaregi",
+    storeCode: "common",
+    storeName: "common",
     storeId,
     clientId,
     clientSecret,
@@ -235,7 +222,8 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const context = resolveSmaregiContext(parseBody(req));
+    parseBody(req);
+    const context = resolveSmaregiContext();
     const token = await getAccessToken(context);
     const apiBase = context.apiBase || `https://api.smaregi.jp/${context.contractId}/pos`;
     const products = await fetchAll(apiBase, "/products", token);

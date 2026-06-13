@@ -65,7 +65,7 @@ async function importSalesSmaregiProducts() {
     const res = await fetch("/api/smaregi-products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accountKey: "new", storeCode: "tokyo" })
+      body: JSON.stringify({})
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `API error ${res.status}`);
