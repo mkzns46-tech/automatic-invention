@@ -2,14 +2,15 @@ const PAYMENTS_INVOICES_KEY = "arico_sales_invoices_v1";
 const PAYMENT_STATUS_ISSUED = "発行済み";
 const PAYMENT_STATUS_WAITING = "入金待ち";
 const PAYMENT_STATUS_PAID = "入金済み";
-const PAYMENT_TARGET_STATUSES = [PAYMENT_STATUS_ISSUED, PAYMENT_STATUS_WAITING, PAYMENT_STATUS_PAID];
+const PAYMENT_STATUS_CANCELLED = "キャンセル";
+const PAYMENT_TARGET_STATUSES = [PAYMENT_STATUS_ISSUED, PAYMENT_STATUS_WAITING, PAYMENT_STATUS_PAID, PAYMENT_STATUS_CANCELLED];
 
 let selectedPaymentInvoiceId = null;
 let paymentSearchText = "";
 let paymentStatusFilter = "";
 let paymentDateFrom = "";
 let paymentDateTo = "";
-let paymentListCollapsed = true;
+let paymentCompletedListCollapsed = true;
 
 function readPaymentInvoices() {
   return JSON.parse(localStorage.getItem(PAYMENTS_INVOICES_KEY) || "[]");
@@ -42,12 +43,13 @@ function normalizePaymentStatus(status) {
   if (value === "issued" || value === "発行済み") return PAYMENT_STATUS_ISSUED;
   if (value === "waiting_payment" || value === "payment_waiting" || value === "入金待ち") return PAYMENT_STATUS_WAITING;
   if (value === "paid" || value === "入金済み") return PAYMENT_STATUS_PAID;
+  if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return PAYMENT_STATUS_CANCELLED;
   return status || "";
 }
 
 function statusBadge(status) {
   const value = normalizePaymentStatus(status);
-  const type = value === PAYMENT_STATUS_PAID ? "ok" : value === PAYMENT_STATUS_WAITING ? "warn" : "info";
+  const type = value === PAYMENT_STATUS_CANCELLED ? "danger" : value === PAYMENT_STATUS_PAID ? "ok" : value === PAYMENT_STATUS_WAITING ? "warn" : "info";
   return `<span class="status-badge ${type}">${escapeHtml(value || "未設定")}</span>`;
 }
 
@@ -69,8 +71,21 @@ function getInvoicePayments(invoice) {
   return Array.isArray(invoice?.payments) ? invoice.payments : [];
 }
 
+function getActivePayments(invoice) {
+  return getInvoicePayments(invoice).filter(payment => payment.status !== "canceled");
+}
+
 function getPaidTotal(invoice) {
-  return getInvoicePayments(invoice).reduce((total, payment) => total + Number(payment.amount || 0), 0);
+  return getActivePayments(invoice).reduce((total, payment) => total + Number(payment.amount || 0), 0);
+}
+
+function getLatestActivePayment(invoice) {
+  return getActivePayments(invoice).slice().sort((a, b) => String(b.paymentDate || b.createdAt).localeCompare(String(a.paymentDate || a.createdAt)))[0] || null;
+}
+
+function getLatestPaymentDate(invoice) {
+  const payment = getLatestActivePayment(invoice);
+  return payment ? payment.paymentDate || normalizeDateOnly(payment.createdAt) : "";
 }
 
 function normalizeDateOnly(value) {
@@ -144,6 +159,44 @@ function showSalesPopup(title, body, type = "ok") {
   playSalesNoticeSound(type);
 }
 
+function confirmSalesPopup(title, body, type = "warn") {
+  const popup = document.getElementById("salesPopup");
+  const titleEl = document.getElementById("salesPopupTitle");
+  const bodyEl = document.getElementById("salesPopupBody");
+  const okButton = document.getElementById("salesPopupClose");
+  if (!popup || !titleEl || !bodyEl || !okButton) {
+    return Promise.resolve(confirm(body || title || ""));
+  }
+  let cancelButton = document.getElementById("salesPopupCancel");
+  if (!cancelButton) {
+    cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.id = "salesPopupCancel";
+    cancelButton.className = "secondary";
+    okButton.insertAdjacentElement("afterend", cancelButton);
+  }
+  return new Promise(resolve => {
+    titleEl.textContent = title || "確認";
+    bodyEl.textContent = body || "";
+    popup.dataset.type = type;
+    popup.style.display = "flex";
+    okButton.textContent = "OK";
+    cancelButton.textContent = "キャンセル";
+    cancelButton.style.display = "";
+    const close = result => {
+      popup.style.display = "none";
+      cancelButton.style.display = "none";
+      okButton.textContent = "OK";
+      okButton.onclick = null;
+      cancelButton.onclick = null;
+      resolve(result);
+    };
+    okButton.onclick = () => close(true);
+    cancelButton.onclick = () => close(false);
+    playSalesNoticeSound(type);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   bindPaymentListControls();
@@ -180,19 +233,19 @@ function bindPaymentListControls() {
       renderPaymentInvoiceList();
     });
   }
-  setPaymentInvoiceListCollapsed(true);
+  setPaymentCompletedListCollapsed(true);
 }
 
 function togglePaymentInvoiceList() {
-  setPaymentInvoiceListCollapsed(!paymentListCollapsed);
+  setPaymentCompletedListCollapsed(!paymentCompletedListCollapsed);
 }
 
-function setPaymentInvoiceListCollapsed(collapsed) {
-  paymentListCollapsed = collapsed;
-  const panel = document.getElementById("paymentInvoiceListPanel");
+function setPaymentCompletedListCollapsed(collapsed) {
+  paymentCompletedListCollapsed = collapsed;
+  const panel = document.getElementById("paymentCompletedListPanel");
   const button = document.getElementById("paymentInvoiceListToggle");
-  if (panel) panel.hidden = paymentListCollapsed;
-  if (button) button.textContent = paymentListCollapsed ? "一覧を開く" : "一覧を閉じる";
+  if (panel) panel.hidden = paymentCompletedListCollapsed;
+  if (button) button.textContent = paymentCompletedListCollapsed ? "完了済みを開く" : "完了済みを閉じる";
 }
 
 function getPaymentTargetInvoices() {
@@ -203,17 +256,35 @@ function getPaymentTargetInvoices() {
 
 function renderPaymentInvoiceList() {
   const body = document.getElementById("paymentInvoiceListBody");
+  const completedBody = document.getElementById("paymentCompletedListBody");
   const allInvoices = getPaymentTargetInvoices();
   const invoices = allInvoices.filter(matchesPaymentInvoiceFilters);
+  const activeInvoices = invoices.filter(invoice => {
+    const status = normalizePaymentStatus(invoice.status);
+    return status === PAYMENT_STATUS_ISSUED || status === PAYMENT_STATUS_WAITING;
+  });
+  const completedInvoices = invoices.filter(invoice => {
+    const status = normalizePaymentStatus(invoice.status);
+    return status === PAYMENT_STATUS_PAID || status === PAYMENT_STATUS_CANCELLED;
+  });
   const count = document.getElementById("paymentInvoiceListCount");
   if (count) count.textContent = paymentSearchText || paymentStatusFilter || paymentDateFrom || paymentDateTo
-    ? `${invoices.length}/${allInvoices.length}件`
-    : `${allInvoices.length}件`;
+    ? `対応中 ${activeInvoices.length}件 / 完了 ${completedInvoices.length}件`
+    : `対応中 ${activeInvoices.length}件`;
   if (!body) return;
-  body.innerHTML = invoices.length ? invoices.map(invoice => {
+  body.innerHTML = activeInvoices.length ? activeInvoices.map(renderPaymentInvoiceRow).join("") : '<tr><td colspan="11">対応が必要な入金確認はありません。</td></tr>';
+  if (completedBody) {
+    completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderPaymentInvoiceRow).join("") : '<tr><td colspan="11">完了済み・キャンセル済みの入金確認はありません。</td></tr>';
+  }
+}
+
+function renderPaymentInvoiceRow(invoice) {
     const total = calcInvoiceTotal(invoice);
-    const paid = getPaidTotal(invoice);
     const status = normalizePaymentStatus(invoice.status);
+    const paymentDate = getLatestPaymentDate(invoice);
+    const cancelButton = status === PAYMENT_STATUS_PAID
+      ? `<button type="button" class="danger" onclick="cancelPayment('${invoice.id}')">入金取消</button>`
+      : "";
     return `<tr>
       <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo || "")} ${statusBadge(status)}</span></td>
       <td>${escapeHtml(invoice.invoiceDate || "")}</td>
@@ -222,12 +293,11 @@ function renderPaymentInvoiceList() {
       <td>${escapeHtml(invoice.customerName || "")}</td>
       <td>${escapeHtml(invoice.subject || "")}</td>
       <td>${money(total)}</td>
-      <td>${money(paid)}</td>
+      <td>${escapeHtml(paymentDate || (status === PAYMENT_STATUS_PAID ? "" : "未入金"))}</td>
       <td>${statusBadge(status)}</td>
       <td>${escapeHtml(invoice.staff || "")}</td>
-      <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">選択</button></td>
+      <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">選択</button>${cancelButton}</td>
     </tr>`;
-  }).join("") : '<tr><td colspan="11">入金確認対象の請求書はありません。</td></tr>';
 }
 
 function matchesPaymentInvoiceFilters(invoice) {
@@ -307,6 +377,7 @@ function savePayment() {
   }
   const invoice = invoices[index];
   const now = new Date().toISOString();
+  const previousStatus = normalizePaymentStatus(invoice.status);
   const payment = {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     paymentDate: document.getElementById("paymentDate").value || today(),
@@ -315,17 +386,69 @@ function savePayment() {
     payerName: document.getElementById("paymentPayerName").value.trim(),
     staff: document.getElementById("paymentStaff").value.trim(),
     memo: document.getElementById("paymentMemo").value,
+    status: "confirmed",
+    previousStatus,
     createdAt: now
   };
   invoice.payments = [...getInvoicePayments(invoice), payment];
   invoice.paymentUpdatedAt = now;
   invoice.updatedAt = now;
   invoice.status = getPaidTotal(invoice) >= calcInvoiceTotal(invoice) ? PAYMENT_STATUS_PAID : PAYMENT_STATUS_WAITING;
+  if (invoice.status === PAYMENT_STATUS_PAID) {
+    invoice.paidAt = now;
+    invoice.paymentDate = payment.paymentDate;
+    invoice.paidAmount = getPaidTotal(invoice);
+  }
   invoices[index] = invoice;
   writePaymentInvoices(invoices);
   selectPaymentInvoice(invoice.id);
   renderPaymentInvoiceList();
   showSalesPopup("入金確認を保存しました", `${invoice.invoiceNo || ""}\nステータス: ${invoice.status}`, "ok");
+}
+
+async function cancelPayment(id) {
+  const invoices = readPaymentInvoices();
+  const index = invoices.findIndex(row => row.id === id);
+  if (index < 0) {
+    showSalesPopup("取消失敗", "請求書が見つかりません。", "err");
+    return;
+  }
+  const confirmed = await confirmSalesPopup("入金確認取消", "この入金確認を取り消しますか？", "warn");
+  if (!confirmed) return;
+  const invoice = invoices[index];
+  const payment = getLatestActivePayment(invoice);
+  if (!payment) {
+    showSalesPopup("取消不可", "取り消せる入金履歴がありません。", "warn");
+    return;
+  }
+  const now = new Date().toISOString();
+  payment.status = "canceled";
+  payment.canceledAt = now;
+  payment.canceledBy = document.getElementById("paymentStaff")?.value.trim() || payment.staff || "";
+  payment.cancelReason = "";
+  const activePaidTotal = getPaidTotal(invoice);
+  const invoiceTotal = calcInvoiceTotal(invoice);
+  if (activePaidTotal >= invoiceTotal) {
+    invoice.status = PAYMENT_STATUS_PAID;
+    invoice.paidAmount = activePaidTotal;
+  } else if (activePaidTotal > 0) {
+    invoice.status = PAYMENT_STATUS_WAITING;
+    delete invoice.paidAt;
+    delete invoice.paymentDate;
+    invoice.paidAmount = activePaidTotal;
+  } else {
+    invoice.status = payment.previousStatus === PAYMENT_STATUS_ISSUED ? PAYMENT_STATUS_ISSUED : PAYMENT_STATUS_WAITING;
+    delete invoice.paidAt;
+    delete invoice.paymentDate;
+    delete invoice.paidAmount;
+  }
+  invoice.paymentUpdatedAt = now;
+  invoice.updatedAt = now;
+  invoices[index] = invoice;
+  writePaymentInvoices(invoices);
+  selectPaymentInvoice(invoice.id);
+  renderPaymentInvoiceList();
+  showSalesPopup("入金確認を取り消しました", `${invoice.invoiceNo || ""}\nステータス: ${invoice.status}`, "ok");
 }
 
 function renderPaymentHistory(invoice) {
@@ -341,15 +464,15 @@ function renderPaymentHistory(invoice) {
     return;
   }
   area.innerHTML = `<div class="table-wrap payment-history-table"><table>
-    <thead><tr><th>入金日</th><th>入金額</th><th>入金方法</th><th>振込名義</th><th>担当者</th><th>登録日時</th><th>メモ</th></tr></thead>
+    <thead><tr><th>入金日</th><th>入金額</th><th>振込名義</th><th>担当者</th><th>ステータス</th><th>メモ</th><th>取消日時</th></tr></thead>
     <tbody>${payments.map(payment => `<tr>
       <td>${escapeHtml(payment.paymentDate || "")}</td>
       <td>${money(payment.amount)}</td>
-      <td>${escapeHtml(payment.method || "振込")}</td>
       <td>${escapeHtml(payment.payerName || "")}</td>
       <td>${escapeHtml(payment.staff || "")}</td>
-      <td>${escapeHtml(formatDateTime(payment.createdAt))}</td>
+      <td>${payment.status === "canceled" ? '<span class="status-badge danger">取消済み</span>' : '<span class="status-badge ok">入金確認済み</span>'}</td>
       <td>${escapeHtml(payment.memo || "")}</td>
+      <td>${escapeHtml(formatDateTime(payment.canceledAt))}</td>
     </tr>`).join("")}</tbody>
   </table></div>`;
 }

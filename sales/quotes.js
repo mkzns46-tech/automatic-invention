@@ -16,7 +16,7 @@ let quoteListSearchText = "";
 let quoteListStatusFilter = "";
 let quoteListDateFrom = "";
 let quoteListDateTo = "";
-let quoteListCollapsed = true;
+let quoteCompletedListCollapsed = true;
 
 function salesFetch(path) {
   return fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
@@ -244,19 +244,19 @@ function bindQuoteListControls() {
       renderQuoteList();
     });
   }
-  setQuoteListCollapsed(true);
+  setQuoteCompletedListCollapsed(true);
 }
 
 function toggleQuoteList() {
-  setQuoteListCollapsed(!quoteListCollapsed);
+  setQuoteCompletedListCollapsed(!quoteCompletedListCollapsed);
 }
 
-function setQuoteListCollapsed(collapsed) {
-  quoteListCollapsed = collapsed;
-  const panel = document.getElementById("quoteListPanel");
+function setQuoteCompletedListCollapsed(collapsed) {
+  quoteCompletedListCollapsed = collapsed;
+  const panel = document.getElementById("quoteCompletedListPanel");
   const button = document.getElementById("quoteListToggle");
-  if (panel) panel.hidden = quoteListCollapsed;
-  if (button) button.textContent = quoteListCollapsed ? "一覧を開く" : "一覧を閉じる";
+  if (panel) panel.hidden = quoteCompletedListCollapsed;
+  if (button) button.textContent = quoteCompletedListCollapsed ? "完了済みを開く" : "完了済みを閉じる";
 }
 
 function bindProductAutoSearch() {
@@ -289,13 +289,23 @@ async function loadStaffOptions() {
 
 function renderQuoteList() {
   const body = document.getElementById("quoteListBody");
+  const completedBody = document.getElementById("quoteCompletedListBody");
   const allQuotes = readQuotes().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   const quotes = allQuotes.filter(matchesQuoteListFilters);
+  const activeQuotes = quotes.filter(quote => normalizeQuoteStatus(quote.status) === QUOTE_STATUS_DRAFT);
+  const completedQuotes = quotes.filter(quote => normalizeQuoteStatus(quote.status) !== QUOTE_STATUS_DRAFT);
   const count = document.getElementById("quoteListCount");
   if (count) count.textContent = quoteListSearchText || quoteListStatusFilter || quoteListDateFrom || quoteListDateTo
-    ? `${quotes.length}/${allQuotes.length}件`
-    : `${allQuotes.length}件`;
-  body.innerHTML = quotes.length ? quotes.map(q => `<tr>
+    ? `対応中 ${activeQuotes.length}件 / 完了 ${completedQuotes.length}件`
+    : `対応中 ${activeQuotes.length}件`;
+  body.innerHTML = activeQuotes.length ? activeQuotes.map(renderQuoteListRow).join("") : '<tr><td colspan="8">対応が必要な見積書はありません。</td></tr>';
+  if (completedBody) {
+    completedBody.innerHTML = completedQuotes.length ? completedQuotes.map(renderQuoteListRow).join("") : '<tr><td colspan="8">完了済み・キャンセル済みの見積書はありません。</td></tr>';
+  }
+}
+
+function renderQuoteListRow(q) {
+  return `<tr>
     <td><span class="number-with-status">${escapeHtml(q.quoteNo)} ${quoteStatusBadge(q.status)}</span></td>
     <td>${escapeHtml(q.quoteDate || "")}</td>
     <td>${escapeHtml(q.customerName || "")}</td>
@@ -309,7 +319,7 @@ function renderQuoteList() {
       <button type="button" class="secondary" onclick="duplicateQuote('${q.id}')">複製</button>
       <button type="button" class="secondary" onclick="convertQuoteToInvoice('${q.id}')">請求書へ変換</button>
     </td>
-  </tr>`).join("") : '<tr><td colspan="8">見積書はまだありません。</td></tr>';
+  </tr>`;
 }
 
 function matchesQuoteListFilters(quote) {

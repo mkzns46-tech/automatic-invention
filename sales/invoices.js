@@ -12,7 +12,7 @@ let invoiceListSearchText = "";
 let invoiceListStatusFilter = "";
 let invoiceListDateFrom = "";
 let invoiceListDateTo = "";
-let invoiceListCollapsed = true;
+let invoiceCompletedListCollapsed = true;
 
 function readInvoices() {
   return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
@@ -231,30 +231,45 @@ function bindInvoiceListControls() {
       renderInvoiceList();
     });
   }
-  setInvoiceListCollapsed(true);
+  setInvoiceCompletedListCollapsed(true);
 }
 
 function toggleInvoiceList() {
-  setInvoiceListCollapsed(!invoiceListCollapsed);
+  setInvoiceCompletedListCollapsed(!invoiceCompletedListCollapsed);
 }
 
-function setInvoiceListCollapsed(collapsed) {
-  invoiceListCollapsed = collapsed;
-  const panel = document.getElementById("invoiceListPanel");
+function setInvoiceCompletedListCollapsed(collapsed) {
+  invoiceCompletedListCollapsed = collapsed;
+  const panel = document.getElementById("invoiceCompletedListPanel");
   const button = document.getElementById("invoiceListToggle");
-  if (panel) panel.hidden = invoiceListCollapsed;
-  if (button) button.textContent = invoiceListCollapsed ? "一覧を開く" : "一覧を閉じる";
+  if (panel) panel.hidden = invoiceCompletedListCollapsed;
+  if (button) button.textContent = invoiceCompletedListCollapsed ? "完了済みを開く" : "完了済みを閉じる";
 }
 
 function renderInvoiceList() {
   const body = document.getElementById("invoiceListBody");
+  const completedBody = document.getElementById("invoiceCompletedListBody");
   const allInvoices = readInvoices().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   const invoices = allInvoices.filter(matchesInvoiceListFilters);
+  const activeInvoices = invoices.filter(invoice => {
+    const status = normalizeInvoiceStatus(invoice.status);
+    return status === INVOICE_STATUS_DRAFT || status === INVOICE_STATUS_ISSUED || status === INVOICE_STATUS_WAITING_PAYMENT;
+  });
+  const completedInvoices = invoices.filter(invoice => {
+    const status = normalizeInvoiceStatus(invoice.status);
+    return status === INVOICE_STATUS_PAID || status === INVOICE_STATUS_CANCELLED;
+  });
   const count = document.getElementById("invoiceListCount");
   if (count) count.textContent = invoiceListSearchText || invoiceListStatusFilter || invoiceListDateFrom || invoiceListDateTo
-    ? `${invoices.length}/${allInvoices.length}件`
-    : `${allInvoices.length}件`;
-  body.innerHTML = invoices.length ? invoices.map(invoice => {
+    ? `対応中 ${activeInvoices.length}件 / 完了 ${completedInvoices.length}件`
+    : `対応中 ${activeInvoices.length}件`;
+  body.innerHTML = activeInvoices.length ? activeInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="8">対応が必要な請求書はありません。</td></tr>';
+  if (completedBody) {
+    completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="8">完了済み・キャンセル済みの請求書はありません。</td></tr>';
+  }
+}
+
+function renderInvoiceListRow(invoice) {
     const totals = calcInvoiceTotals(invoice);
     const status = normalizeInvoiceStatus(invoice.status);
     return `<tr>
@@ -270,7 +285,6 @@ function renderInvoiceList() {
         <button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF出力</button>
       </td>
     </tr>`;
-  }).join("") : '<tr><td colspan="8">請求書はまだありません。見積書一覧から「請求書へ変換」を実行してください。</td></tr>';
 }
 
 function matchesInvoiceListFilters(invoice) {

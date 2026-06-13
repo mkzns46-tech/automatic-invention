@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 入金確認</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-payments">
+<link rel="stylesheet" href="sales-style.css?v=20260614-payment-cancel">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-nav.js?v=20260614-payments" defer></script>
-<script src="payments.js?v=20260614-payments" defer></script>
+<script src="sales-nav.js?v=20260614-payment-cancel" defer></script>
+<script src="payments.js?v=20260614-payment-cancel" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -28,10 +28,10 @@
 
   <section class="card collapsible-list-card" id="paymentInvoiceListCard">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="togglePaymentInvoiceList();">入金対象請求書一覧 <span class="status-badge muted" id="paymentInvoiceListCount">0件</span></h2>
-      <button type="button" class="secondary list-toggle-button" id="paymentInvoiceListToggle" onclick="togglePaymentInvoiceList();">一覧を開く</button>
+      <h2 class="list-heading">入金対象請求書一覧 <span class="status-badge muted" id="paymentInvoiceListCount">0件</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="paymentInvoiceListToggle" onclick="togglePaymentInvoiceList();">完了済みを開く</button>
     </div>
-    <div class="list-panel" id="paymentInvoiceListPanel" hidden>
+    <div class="list-panel" id="paymentInvoiceListPanel">
       <div class="list-filter-row">
         <label>一覧検索<input id="paymentInvoiceSearch" placeholder="顧客名・担当者・件名・請求書番号・ステータス"></label>
         <label>ステータス
@@ -40,16 +40,27 @@
             <option value="発行済み">発行済み</option>
             <option value="入金待ち">入金待ち</option>
             <option value="入金済み">入金済み</option>
+            <option value="キャンセル">キャンセル</option>
           </select>
         </label>
         <label>開始日<input id="paymentInvoiceDateFromFilter" type="date"></label>
         <label>終了日<input id="paymentInvoiceDateToFilter" type="date"></label>
       </div>
+      <div class="list-subheading">対応が必要な請求書</div>
       <div class="table-wrap list-scroll">
         <table>
-          <thead><tr><th>請求書番号</th><th>請求日</th><th>発行日</th><th>支払期限</th><th>顧客名</th><th>件名</th><th>合計金額</th><th>入金済額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <thead><tr><th>請求書番号</th><th>請求日</th><th>発行日</th><th>支払期限</th><th>顧客名</th><th>件名</th><th>合計金額</th><th>入金日</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
           <tbody id="paymentInvoiceListBody"></tbody>
         </table>
+      </div>
+      <div class="list-panel completed-list-panel" id="paymentCompletedListPanel" hidden>
+        <div class="list-subheading">完了済み・キャンセル済み</div>
+        <div class="table-wrap list-scroll">
+          <table>
+            <thead><tr><th>請求書番号</th><th>請求日</th><th>発行日</th><th>支払期限</th><th>顧客名</th><th>件名</th><th>合計金額</th><th>入金日</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+            <tbody id="paymentCompletedListBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </section>
