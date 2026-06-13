@@ -1,8 +1,25 @@
 const INVOICES_KEY = "arico_sales_invoices_v1";
 const INVOICE_STATUS_OPTIONS = ["下書き", "発行済み", "入金待ち", "入金済み", "キャンセル"];
+const INVOICE_STATUS_DRAFT = "下書き";
+const INVOICE_STATUS_ISSUED = "発行済み";
+const INVOICE_STATUS_WAITING_PAYMENT = "入金待ち";
+const INVOICE_STATUS_PAID = "入金済み";
+const INVOICE_STATUS_CANCELLED = "キャンセル";
 
 let currentInvoiceId = null;
 let currentInvoiceLines = [];
+
+console.log("invoices.js loaded v20260613");
+alert("invoices.js loaded v20260613");
+
+function showInvoiceLoadedTestBanner() {
+  if (document.getElementById("invoiceLoadedTestBanner")) return;
+  const banner = document.createElement("div");
+  banner.id = "invoiceLoadedTestBanner";
+  banner.className = "message ok invoice-loaded-test";
+  banner.textContent = "invoices.js loaded v20260613";
+  document.body.prepend(banner);
+}
 
 function readInvoices() {
   return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
@@ -28,6 +45,42 @@ function escapeHtml(value) {
 
 function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
+}
+
+function normalizeInvoiceStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (!value || value === "draft" || value === "下書き") return INVOICE_STATUS_DRAFT;
+  if (value === "issued" || value === "発行済み") return INVOICE_STATUS_ISSUED;
+  if (value === "waiting_payment" || value === "payment_waiting" || value === "入金待ち") return INVOICE_STATUS_WAITING_PAYMENT;
+  if (value === "paid" || value === "入金済み") return INVOICE_STATUS_PAID;
+  if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return INVOICE_STATUS_CANCELLED;
+  return status || INVOICE_STATUS_DRAFT;
+}
+
+function isInvoiceEditable(invoiceOrStatus) {
+  const status = normalizeInvoiceStatus(typeof invoiceOrStatus === "string" ? invoiceOrStatus : invoiceOrStatus?.status);
+  return status === INVOICE_STATUS_DRAFT;
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("ja-JP");
+}
+
+function statusBadge(status) {
+  const value = normalizeInvoiceStatus(status);
+  const type = value === INVOICE_STATUS_CANCELLED
+    ? "danger"
+    : value === INVOICE_STATUS_DRAFT
+      ? "muted"
+      : value === INVOICE_STATUS_WAITING_PAYMENT
+        ? "warn"
+        : value === INVOICE_STATUS_ISSUED
+          ? "info"
+          : "ok";
+  return `<span class="status-badge ${type}">${escapeHtml(value)}</span>`;
 }
 
 function recalcInvoiceLine(line) {
@@ -105,11 +158,51 @@ function showSalesPopup(title, body, type = "ok") {
   playSalesNoticeSound(type);
 }
 
+function confirmSalesPopup(title, body, type = "warn") {
+  const popup = document.getElementById("salesPopup");
+  const titleEl = document.getElementById("salesPopupTitle");
+  const bodyEl = document.getElementById("salesPopupBody");
+  const okButton = document.getElementById("salesPopupClose");
+  if (!popup || !titleEl || !bodyEl || !okButton) {
+    return Promise.resolve(confirm(body || title || ""));
+  }
+  let cancelButton = document.getElementById("salesPopupCancel");
+  if (!cancelButton) {
+    cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.id = "salesPopupCancel";
+    cancelButton.className = "secondary";
+    okButton.insertAdjacentElement("afterend", cancelButton);
+  }
+  return new Promise(resolve => {
+    titleEl.textContent = title || "確認";
+    bodyEl.textContent = body || "";
+    popup.dataset.type = type;
+    popup.style.display = "flex";
+    okButton.textContent = "OK";
+    cancelButton.textContent = "キャンセル";
+    cancelButton.style.display = "";
+    const close = result => {
+      popup.style.display = "none";
+      cancelButton.style.display = "none";
+      okButton.textContent = "OK";
+      okButton.onclick = null;
+      cancelButton.onclick = null;
+      resolve(result);
+    };
+    okButton.onclick = () => close(true);
+    cancelButton.onclick = () => close(false);
+    playSalesNoticeSound(type);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  showInvoiceLoadedTestBanner();
   if (!requireSalesAuth()) return;
   document.getElementById("invoiceStatus").innerHTML = INVOICE_STATUS_OPTIONS
     .map(status => `<option value="${status}">${status}</option>`)
     .join("");
+  document.getElementById("invoiceStatus").disabled = true;
   renderInvoiceList();
   const id = new URLSearchParams(location.search).get("id");
   if (id) editInvoice(id);
@@ -121,13 +214,14 @@ function renderInvoiceList() {
   const invoices = readInvoices().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   body.innerHTML = invoices.length ? invoices.map(invoice => {
     const totals = calcInvoiceTotals(invoice);
+    const status = normalizeInvoiceStatus(invoice.status);
     return `<tr>
-      <td>${escapeHtml(invoice.invoiceNo)}</td>
+      <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo)} ${statusBadge(status)}</span></td>
       <td>${escapeHtml(invoice.invoiceDate || "")}</td>
       <td>${escapeHtml(invoice.customerName || "")}</td>
       <td>${escapeHtml(invoice.subject || "")}</td>
       <td>${money(totals.total)}</td>
-      <td>${escapeHtml(invoice.status || "下書き")}</td>
+      <td>${statusBadge(status)}</td>
       <td>${escapeHtml(invoice.sourceQuoteNo || "")}</td>
       <td>
         <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">編集</button>
@@ -144,18 +238,21 @@ function clearInvoiceEditor() {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
-  document.getElementById("invoiceStatus").value = "下書き";
+  document.getElementById("invoiceStatus").value = INVOICE_STATUS_DRAFT;
+  document.getElementById("issuedAt").value = "";
   document.getElementById("invoiceDate").value = today();
   document.getElementById("dueDate").value = today();
   renderInvoiceLines();
+  updateInvoiceLockState({ status: INVOICE_STATUS_DRAFT });
 }
 
 function fillInvoiceForm(invoice) {
   currentInvoiceId = invoice.id || null;
   currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || []));
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
-  document.getElementById("invoiceStatus").value = invoice.status || "下書き";
+  document.getElementById("invoiceStatus").value = normalizeInvoiceStatus(invoice.status);
   document.getElementById("sourceQuoteNo").value = invoice.sourceQuoteNo || "";
+  document.getElementById("issuedAt").value = formatDateTime(invoice.issuedAt);
   document.getElementById("customerName").value = invoice.customerName || "";
   document.getElementById("customerType").value = invoice.customerType || "";
   document.getElementById("invoiceStaff").value = invoice.staff || "";
@@ -167,6 +264,7 @@ function fillInvoiceForm(invoice) {
   document.getElementById("dueDate").value = invoice.dueDate || today();
   document.getElementById("invoiceMemo").value = invoice.memo || "";
   renderInvoiceLines();
+  updateInvoiceLockState(invoice);
 }
 
 function editInvoice(id) {
@@ -181,23 +279,30 @@ function editInvoice(id) {
 
 function renderInvoiceLines() {
   const area = document.getElementById("invoiceLines");
+  const locked = !isInvoiceEditable(document.getElementById("invoiceStatus")?.value);
+  const disabled = locked ? "disabled" : "";
   area.innerHTML = currentInvoiceLines.length ? currentInvoiceLines.map((line, index) => {
     recalcInvoiceLine(line);
     return `<div class="invoice-line">
-      <label>商品名<input value="${escapeHtml(line.name || "")}" onchange="updateInvoiceLine(${index}, 'name', this.value)"></label>
-      <label>数量<input type="number" min="0" step="1" value="${Number(line.qty || 0)}" onchange="updateInvoiceLine(${index}, 'qty', this.value)"></label>
-      <label>単位<input value="${escapeHtml(line.unit || "")}" onchange="updateInvoiceLine(${index}, 'unit', this.value)"></label>
-      <label>税込単価<input type="number" min="0" step="1" value="${Number(line.unitPrice || 0)}" onchange="updateInvoiceLine(${index}, 'unitPrice', this.value)"></label>
-      <label>値引率%<input type="number" min="0" step="1" value="${Number(line.discountValue || 0)}" onchange="updateInvoiceLine(${index}, 'discountValue', this.value)"></label>
+      <label>商品名<input value="${escapeHtml(line.name || "")}" onchange="updateInvoiceLine(${index}, 'name', this.value)" ${disabled}></label>
+      <label>数量<input type="number" min="0" step="1" value="${Number(line.qty || 0)}" onchange="updateInvoiceLine(${index}, 'qty', this.value)" ${disabled}></label>
+      <label>単位<input value="${escapeHtml(line.unit || "")}" onchange="updateInvoiceLine(${index}, 'unit', this.value)" ${disabled}></label>
+      <label>税込単価<input type="number" min="0" step="1" value="${Number(line.unitPrice || 0)}" onchange="updateInvoiceLine(${index}, 'unitPrice', this.value)" ${disabled}></label>
+      <label>値引率%<input type="number" min="0" step="1" value="${Number(line.discountValue || 0)}" onchange="updateInvoiceLine(${index}, 'discountValue', this.value)" ${disabled}></label>
       <label>金額<div class="line-amount">${money(line.amount)}</div></label>
-      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateInvoiceLine(${index}, 'memo', this.value)"></label>
-      <button type="button" class="danger" onclick="removeInvoiceLine(${index})">削除</button>
+      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateInvoiceLine(${index}, 'memo', this.value)" ${disabled}></label>
+      <button type="button" class="danger" onclick="removeInvoiceLine(${index})" ${disabled}>削除</button>
     </div>`;
   }).join("") : '<div class="message">請求商品がありません。</div>';
   recalcTotals();
 }
 
 function updateInvoiceLine(index, key, value) {
+  if (!isInvoiceEditable(document.getElementById("invoiceStatus")?.value)) {
+    showSalesMessage("発行済みの請求書は商品明細を編集できません。", "warn");
+    renderInvoiceLines();
+    return;
+  }
   const line = currentInvoiceLines[index];
   if (!line) return;
   if (["qty", "unitPrice", "discountValue"].includes(key)) line[key] = Number(value || 0);
@@ -207,8 +312,74 @@ function updateInvoiceLine(index, key, value) {
 }
 
 function removeInvoiceLine(index) {
+  if (!isInvoiceEditable(document.getElementById("invoiceStatus")?.value)) {
+    showSalesMessage("発行済みの請求書は商品明細を編集できません。", "warn");
+    return;
+  }
   currentInvoiceLines.splice(index, 1);
   renderInvoiceLines();
+}
+
+function updateInvoiceLockState(invoice) {
+  const editable = isInvoiceEditable(invoice);
+  const issueButton = ensureIssueInvoiceButton();
+  const saveButton = document.getElementById("saveInvoiceBtn");
+  const lockTargets = [
+    "customerName",
+    "customerType",
+    "invoiceStaff",
+    "customerAddress",
+    "customerPhone",
+    "customerEmail",
+    "invoiceSubject",
+    "invoiceDate",
+    "dueDate",
+    "invoiceMemo"
+  ];
+  if (issueButton) {
+    const hasInvoice = Boolean(currentInvoiceId || document.getElementById("invoiceNo")?.value);
+    const shouldShow = Boolean(hasInvoice && editable);
+    issueButton.hidden = !shouldShow;
+    issueButton.style.display = shouldShow ? "" : "none";
+    issueButton.disabled = !shouldShow;
+    issueButton.textContent = "発行確定";
+  }
+  if (saveButton) {
+    saveButton.hidden = !editable;
+    saveButton.disabled = !editable;
+  }
+  lockTargets.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) element.disabled = !editable;
+  });
+  document.getElementById("invoiceEditorCard")?.classList.toggle("locked", !editable);
+  showSalesMessage(
+    editable ? "請求書を編集できます。" : "発行済みのため請求情報・金額・商品明細は編集できません。PDF出力とキャンセル処理は可能です。",
+    editable ? "" : "warn"
+  );
+  renderInvoiceLines();
+}
+
+function ensureIssueInvoiceButton() {
+  let button = document.getElementById("issueInvoiceBtn");
+  const saveButton = document.getElementById("saveInvoiceBtn");
+  const pdfButton = document.getElementById("invoicePdfBtn");
+  const actions = saveButton?.parentElement || pdfButton?.parentElement;
+  if (button) {
+    if (actions && pdfButton && button.nextElementSibling !== pdfButton) actions.insertBefore(button, pdfButton);
+    return button;
+  }
+  if (!actions) return null;
+  button = document.createElement("button");
+  button.type = "button";
+  button.id = "issueInvoiceBtn";
+  button.className = "primary invoice-issue-button";
+  button.textContent = "発行確定";
+  button.onclick = issueInvoice;
+  if (pdfButton) actions.insertBefore(button, pdfButton);
+  else if (saveButton) actions.insertBefore(button, saveButton.nextSibling);
+  else actions.prepend(button);
+  return button;
 }
 
 function recalcTotals() {
@@ -229,9 +400,10 @@ function collectInvoice() {
     invoiceNo: document.getElementById("invoiceNo").value || existing?.invoiceNo || "",
     sourceQuoteId: existing?.sourceQuoteId || "",
     sourceQuoteNo: document.getElementById("sourceQuoteNo").value || existing?.sourceQuoteNo || "",
+    issuedAt: existing?.issuedAt || "",
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    status: document.getElementById("invoiceStatus").value,
+    status: normalizeInvoiceStatus(document.getElementById("invoiceStatus").value),
     customerName: document.getElementById("customerName").value.trim(),
     customerType: document.getElementById("customerType").value.trim(),
     address: document.getElementById("customerAddress").value.trim(),
@@ -263,12 +435,41 @@ function saveInvoice() {
   writeInvoices(invoices);
   currentInvoiceId = invoice.id;
   renderInvoiceList();
+  updateInvoiceLockState(invoice);
   showSalesPopup("保存完了", `請求書を保存しました\n${invoice.invoiceNo}`, "ok");
+}
+
+async function issueInvoice() {
+  if (!currentInvoiceId) {
+    showSalesMessage("先に請求書を保存してください。", "err");
+    return;
+  }
+  const confirmed = await confirmSalesPopup("発行確定", "この請求書を発行確定しますか？", "warn");
+  if (!confirmed) return;
+  const invoices = readInvoices();
+  const index = invoices.findIndex(row => row.id === currentInvoiceId);
+  if (index < 0) {
+    showSalesMessage("請求書が見つかりません。", "err");
+    return;
+  }
+  const invoice = collectInvoice();
+  if (!isInvoiceEditable(invoice.status)) {
+    showSalesMessage("この請求書は発行確定済みです。", "warn");
+    return;
+  }
+  invoice.status = INVOICE_STATUS_ISSUED;
+  invoice.issuedAt = new Date().toISOString();
+  invoice.updatedAt = invoice.issuedAt;
+  invoices[index] = invoice;
+  writeInvoices(invoices);
+  fillInvoiceForm(invoice);
+  renderInvoiceList();
+  showSalesPopup("発行確定", "請求書を発行確定しました", "ok");
 }
 
 function cancelInvoice() {
   if (!currentInvoiceId) return;
-  document.getElementById("invoiceStatus").value = "キャンセル";
+  document.getElementById("invoiceStatus").value = INVOICE_STATUS_CANCELLED;
   saveInvoice();
 }
 

@@ -4,14 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 請求書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260613-6">
+<link rel="stylesheet" href="sales-style.css?v=20260613-vtest">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-nav.js" defer></script>
-<script src="invoice-pdf.js"></script>
-<script src="invoices.js" defer></script>
+<script src="sales-nav.js?v=20260613-vtest" defer></script>
+<script src="invoice-pdf.js?v=20260613-vtest"></script>
+<script src="invoices.js?v=20260613-vtest" defer></script>
 </head>
 <body>
+<div class="message ok invoice-html-reflection-test">HTML反映確認 v20260613</div>
 <main class="sales-wrap">
   <header class="sales-header">
     <div>
@@ -42,10 +43,11 @@
 
   <section class="card" id="invoiceEditorCard">
     <h2>請求情報</h2>
-    <div class="row three">
+    <div class="row">
       <label>請求書番号<input id="invoiceNo" readonly></label>
       <label>ステータス<select id="invoiceStatus"></select></label>
       <label>元見積番号<input id="sourceQuoteNo" readonly></label>
+      <label>発行日時<input id="issuedAt" readonly></label>
     </div>
     <div class="row three">
       <label>顧客名<input id="customerName"></label>
@@ -75,9 +77,10 @@
       <div>内消費税<strong id="taxText">0円</strong></div>
     </div>
     <div class="sales-actions" style="margin-top:14px">
-      <button type="button" class="primary" onclick="saveInvoice();">保存</button>
-      <button type="button" class="secondary" onclick="outputCurrentInvoicePdf();">PDF出力</button>
-      <button type="button" class="danger" onclick="cancelInvoice();">キャンセル</button>
+      <button type="button" class="primary" id="saveInvoiceBtn" onclick="saveInvoice();">保存</button>
+      <button type="button" class="primary invoice-issue-button" id="issueInvoiceBtn" onclick="issueInvoice();">発行確定</button>
+      <button type="button" class="secondary" id="invoicePdfBtn" onclick="outputCurrentInvoicePdf();">PDF出力</button>
+      <button type="button" class="danger" id="cancelInvoiceBtn" onclick="cancelInvoice();">キャンセル</button>
     </div>
   </section>
 </main>
