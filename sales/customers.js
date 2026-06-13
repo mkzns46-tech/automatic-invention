@@ -2,7 +2,7 @@ const ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ
 const CUSTOMER_QUOTES_KEY = "arico_sales_quotes_v1";
 const CUSTOMER_INVOICES_KEY = "arico_sales_invoices_v1";
 
-let customerListCollapsed = true;
+let customerListCollapsed = false;
 let customerSearchText = "";
 let customerTypeFilter = "";
 let customerDateFrom = "";
@@ -66,7 +66,7 @@ function bindCustomerListControls() {
     customerDateTo = event.target.value;
     renderCustomerList();
   });
-  setCustomerListCollapsed(true);
+  setCustomerListCollapsed(false);
 }
 
 function toggleCustomerList() {

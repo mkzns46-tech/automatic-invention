@@ -16,7 +16,7 @@ let quoteListSearchText = "";
 let quoteListStatusFilter = "";
 let quoteListDateFrom = "";
 let quoteListDateTo = "";
-let quoteListCollapsed = true;
+let quoteListCollapsed = false;
 
 function salesFetch(path) {
   return fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
@@ -287,7 +287,7 @@ function bindQuoteListControls() {
       renderQuoteList();
     });
   }
-  setQuoteListCollapsed(true);
+  setQuoteListCollapsed(false);
 }
 
 function toggleQuoteList() {

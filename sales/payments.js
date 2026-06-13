@@ -10,7 +10,7 @@ let paymentSearchText = "";
 let paymentStatusFilter = "";
 let paymentDateFrom = "";
 let paymentDateTo = "";
-let paymentListCollapsed = true;
+let paymentListCollapsed = false;
 
 function readPaymentInvoices() {
   return JSON.parse(localStorage.getItem(PAYMENTS_INVOICES_KEY) || "[]");
@@ -233,7 +233,7 @@ function bindPaymentListControls() {
       renderPaymentInvoiceList();
     });
   }
-  setPaymentListCollapsed(true);
+  setPaymentListCollapsed(false);
 }
 
 function togglePaymentInvoiceList() {

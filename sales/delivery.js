@@ -8,7 +8,7 @@ let deliverySearchText = "";
 let deliveryStatusFilter = "";
 let deliveryDateFrom = "";
 let deliveryDateTo = "";
-let deliveryListCollapsed = true;
+let deliveryListCollapsed = false;
 
 function readDeliveries() {
   return JSON.parse(localStorage.getItem(DELIVERIES_KEY) || "[]");
@@ -111,7 +111,7 @@ function bindDeliveryListControls() {
     deliveryDateTo = event.target.value;
     renderDeliveryList();
   });
-  setDeliveryListCollapsed(true);
+  setDeliveryListCollapsed(false);
 }
 
 function toggleDeliveryCompletedList() {

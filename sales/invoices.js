@@ -13,7 +13,7 @@ let invoiceListSearchText = "";
 let invoiceListStatusFilter = "";
 let invoiceListDateFrom = "";
 let invoiceListDateTo = "";
-let invoiceListCollapsed = true;
+let invoiceListCollapsed = false;
 
 function readInvoices() {
   return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
@@ -291,7 +291,7 @@ function bindInvoiceListControls() {
       renderInvoiceList();
     });
   }
-  setInvoiceListCollapsed(true);
+  setInvoiceListCollapsed(false);
 }
 
 function toggleInvoiceList() {
