@@ -94,7 +94,7 @@ function money(value) {
 function normalizeQuoteStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (!value || value === "draft" || value === "下書き") return QUOTE_STATUS_DRAFT;
-  if (value === "invoiced" || value === "invoice_created" || value === "請求書変換済み") return QUOTE_STATUS_INVOICED;
+  if (value === "converted" || value === "invoiced" || value === "invoice_created" || value === "請求書変換済み") return QUOTE_STATUS_INVOICED;
   if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return QUOTE_STATUS_CANCELLED;
   return status || QUOTE_STATUS_DRAFT;
 }
