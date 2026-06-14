@@ -410,44 +410,8 @@ function bindTransactionTypeControls() {
   if (!transactionType) return;
   transactionType.addEventListener("change", () => {
     applyTransactionTypeToLines();
-    syncRefundMemoWithTransactionType();
     renderLines();
   });
-}
-
-const AUTO_REFUND_MEMO_TEXT = "\u8fd4\u91d1\u5bfe\u8c61";
-
-function hasExactMemoLine(value, text) {
-  return String(value || "").split(/\r?\n/).some(line => line.trim() === text);
-}
-
-function appendMemoLine(value, text) {
-  const current = String(value || "").trimEnd();
-  return current ? `${current}\n${text}` : text;
-}
-
-function removeExactMemoLine(value, text) {
-  return String(value || "")
-    .split(/\r?\n/)
-    .filter(line => line.trim() !== text)
-    .join("\n")
-    .trim();
-}
-
-function syncRefundMemoWithTransactionType() {
-  const memo = document.getElementById("quoteMemo");
-  if (!memo) return;
-  if (isRefundTransaction(getCurrentTransactionType())) {
-    if (!hasExactMemoLine(memo.value, AUTO_REFUND_MEMO_TEXT)) {
-      memo.value = appendMemoLine(memo.value, AUTO_REFUND_MEMO_TEXT);
-      memo.dataset.autoRefundMemo = "true";
-    }
-    return;
-  }
-  if (memo.dataset.autoRefundMemo === "true") {
-    memo.value = removeExactMemoLine(memo.value, AUTO_REFUND_MEMO_TEXT);
-    delete memo.dataset.autoRefundMemo;
-  }
 }
 
 function applyTransactionTypeToLines() {
@@ -470,7 +434,6 @@ function applyTransactionTypeToLines() {
       line.discountAmountInput = Number(line.manualDiscountAmountBeforeTransaction || 0);
       line.autoTransactionDiscount = false;
     }
-    if (isRefundTransaction(transactionType) && !line.memo) line.memo = "返金対象";
     recalcSalesLine(line);
   });
 }
@@ -847,8 +810,6 @@ function newQuote(shouldScroll = false) {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
-  const quoteMemo = document.getElementById("quoteMemo");
-  if (quoteMemo) delete quoteMemo.dataset.autoRefundMemo;
   document.getElementById("customerType").value = "個人";
   setFieldValue("transactionType", "通常販売");
   document.getElementById("discountTemplate").value = "none";
@@ -919,7 +880,7 @@ async function addProductLine(product) {
       autoTransactionDiscount: isFreeTransaction(getCurrentTransactionType()),
       discountAmount: 0,
       amount: 0,
-      memo: isRefundTransaction(getCurrentTransactionType()) ? "返金対象" : ""
+      memo: ""
     });
     renderLines();
     showSalesPopup("追加完了", "商品を見積に追加しました", "ok");
@@ -1052,7 +1013,6 @@ function collectQuote() {
     reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
     memo: document.getElementById("quoteMemo").value,
     customerMemo: document.getElementById("quoteMemo").value,
-    autoRefundMemo: document.getElementById("quoteMemo")?.dataset.autoRefundMemo === "true",
     discountTemplate: document.getElementById("discountTemplate").value,
     lines: currentLines.map(({ stock, ...line }) => recalcSalesLine({ ...line, transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value) }))
   };
@@ -1204,8 +1164,6 @@ async function fillQuoteForm(quote) {
   setFieldValue("originalSlipNumber", quote.originalSlipNumber || "");
   setFieldValue("reasonMemo", quote.reasonMemo || "");
   document.getElementById("quoteMemo").value = quote.memo || "";
-  if (quote.autoRefundMemo) document.getElementById("quoteMemo").dataset.autoRefundMemo = "true";
-  else delete document.getElementById("quoteMemo").dataset.autoRefundMemo;
   document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
   applyTransactionTypeToLines();
   renderLines();

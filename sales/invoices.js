@@ -564,7 +564,6 @@ function applyInvoiceTransactionTypeToLines() {
       line.discountAmountInput = Number(line.manualDiscountAmountBeforeTransaction || 0);
       line.autoTransactionDiscount = false;
     }
-    if (isRefundTransaction(transactionType) && !line.memo) line.memo = "返金対象";
     recalcInvoiceLine(line);
   });
 }
