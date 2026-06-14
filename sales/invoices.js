@@ -486,7 +486,8 @@ function calcInvoiceTotals(invoice) {
 
 function buildStockDeductionLines(invoice) {
   return getInvoiceRawLines(invoice).map(line => {
-    const qty = Math.abs(Number(line.qty || line.quantity || 0));
+    const normalizedLine = recalcInvoiceLine({ ...line, transactionType: invoice.transactionType });
+    const qty = Math.abs(Number(normalizedLine.qty || normalizedLine.quantity || 0));
     const productId = String(line.smaregiProductId || line.smaregi_product_id || line.productId || "").trim();
     const barcode = String(line.barcode || line.productCode || "").trim();
     return {
@@ -494,8 +495,19 @@ function buildStockDeductionLines(invoice) {
       smaregiProductId: productId,
       productCode: barcode,
       barcode,
-      name: String(line.name || "").trim(),
-      quantity: qty
+      name: String(normalizedLine.name || line.name || "").trim(),
+      productName: String(normalizedLine.name || line.name || "").trim(),
+      quantity: qty,
+      qty,
+      unit: normalizedLine.unit || line.unit || "",
+      unitPrice: Number(normalizedLine.unitPrice || 0),
+      price: Number(normalizedLine.unitPrice || 0),
+      discountRate: Number(normalizedLine.discountRate ?? normalizedLine.discountValue ?? 0),
+      discountValue: Number(normalizedLine.discountValue ?? normalizedLine.discountRate ?? 0),
+      discountAmount: Number(normalizedLine.discountAmount || 0),
+      discountAmountInput: Number(normalizedLine.discountAmountInput || 0),
+      amount: Number(normalizedLine.amount || 0),
+      memo: normalizedLine.memo || line.memo || ""
     };
   }).filter(line => line.quantity > 0 && (line.productId || line.barcode || line.productCode));
 }

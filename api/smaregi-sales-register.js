@@ -229,7 +229,7 @@ function buildTransactionPayload(context, body, paymentMethod) {
   const lines = normalizeLines(body.lines);
   if (!lines.length) throw new Error("No Smaregi sale lines were provided.");
   const subtotal = lines.reduce((sum, line) => sum + toInt(line.aricoAmount), 0);
-  const total = toInt(body.total ?? subtotal);
+  const total = subtotal;
   const taxInclude = toInt(body.tax ?? Math.floor(total * 10 / 110));
   const terminalTranIdSource = String(body.invoiceNo || body.invoiceId || Date.now()).replace(/\D/g, "");
   const terminalTranId = terminalTranIdSource.slice(-10).padStart(1, "1");
@@ -279,6 +279,7 @@ module.exports = async function handler(req, res) {
   }
 
   let step = "init";
+  let requestJson = null;
   try {
     step = "parse_body";
     const body = parseBody(req);
@@ -293,6 +294,8 @@ module.exports = async function handler(req, res) {
     const paymentMethod = await resolveInvoicePaymentMethod(context, apiBase, token);
     step = "transaction_payload";
     const payload = buildTransactionPayload(context, body, paymentMethod);
+    requestJson = payload;
+    console.log("[smaregi-sales-register] request_json", JSON.stringify(payload));
     step = "transaction_register";
     const responseBody = await fetchJson(apiBase + context.transactionPath, token, {
       method: "POST",
@@ -305,6 +308,7 @@ module.exports = async function handler(req, res) {
       smaregiTransactionId: findTransactionId(responseBody),
       paymentMethod,
       lines: body.lines || [],
+      requestJson,
       response: responseBody,
       context: {
         accountKey: context.accountKey,
@@ -330,7 +334,8 @@ module.exports = async function handler(req, res) {
       error: message,
       errorType: message.includes("OAuth") ? "smaregi_auth_failed" : "smaregi_sales_register_failed",
       step,
-      status: 500
+      status: 500,
+      requestJson
     });
   }
 };
