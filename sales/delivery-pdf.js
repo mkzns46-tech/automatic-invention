@@ -10,11 +10,14 @@ function printDeliveryPdf(delivery) {
       <td>${Number(line.qty || 0)}</td>
       <td>${line.unit || ""}</td>
       <td>${money(line.unitPrice)}</td>
-      <td>${Number(line.discountValue || 0)}%</td>
+      <td>${Number(line.discountValue ?? line.discountRate ?? 0)}%</td>
       <td class="${amountClass(line.amount)}">${money(line.amount)}</td>
       <td>${line.memo || ""}</td>
     </tr>
   `).join("");
+  const shippingBox = delivery.shipmentDate || delivery.shippingCarrier || delivery.trackingNumber
+    ? `<div class="box">発送日：${delivery.shipmentDate || ""}<br>配送会社：${delivery.shippingCarrier || ""}<br>送り状番号：${delivery.trackingNumber || ""}<br>発送担当：${delivery.shippingStaff || ""}</div>`
+    : "";
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>納品書 ${delivery.deliveryNo || ""}</title>
   <style>
     body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#10251b;margin:32px}
@@ -27,6 +30,7 @@ function printDeliveryPdf(delivery) {
     <div class="head"><div><h1>納品書</h1><strong>${delivery.customerName || ""} 御中</strong><p>${delivery.subject || ""}</p></div>
     <div class="box">納品書番号：${delivery.deliveryNo || ""}<br>元請求書番号：${delivery.sourceInvoiceNo || ""}<br>請求日：${delivery.invoiceDate || ""}<br>発行日：${delivery.issuedAt || ""}</div></div>
     <div class="box">発行元：ARICO ARCHERY<br>登録番号：T8180001160066</div>
+    ${shippingBox}
     <table><thead><tr><th>商品名</th><th>数量</th><th>単位</th><th>税込単価</th><th>値引率</th><th>金額</th><th>備考</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="summary"><div><span>小計</span><strong>${money(delivery.subtotal)}</strong></div><div><span>値引き</span><strong>${money(delivery.discount)}</strong></div><div><span>合計</span><strong class="${amountClass(delivery.total)}">${money(delivery.total)}</strong></div><div><span>内消費税</span><strong>${money(delivery.tax)}</strong></div></div>
   </body></html>`);

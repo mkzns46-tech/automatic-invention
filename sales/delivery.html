@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 納品書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-customer-performance">
+<link rel="stylesheet" href="sales-style.css?v=20260615-shipping-status">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="delivery-pdf.js?v=20260614-lists-hidden"></script>
-<script src="delivery.js?v=20260614-progress-sort" defer></script>
+<script src="delivery.js?v=20260615-shipping-status" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -17,7 +17,7 @@
     <div>
       <div class="brand">ARICO ARCHERY</div>
       <h1>納品書</h1>
-      <p class="lead">請求書の発行確定時に作成された納品書を確認・PDF出力します。</p>
+      <p class="lead">請求書の発行確定時に作成された納品書を確認し、PDF出力と発送済処理を行います。</p>
     </div>
     <div class="sales-actions">
       <a class="pill" href="invoices.html">請求書</a>
@@ -39,7 +39,8 @@
           <select id="deliveryStatusFilter">
             <option value="">全て</option>
             <option value="未発行">未発行</option>
-            <option value="発行済み">発行済み</option>
+            <option value="納品書発行済">納品書発行済</option>
+            <option value="発送済">発送済</option>
             <option value="キャンセル">キャンセル</option>
           </select>
         </label>
@@ -89,16 +90,31 @@
     </div>
   </section>
 
+  <section class="card" id="deliveryShippingCard">
+    <h2>発送情報</h2>
+    <div class="row">
+      <label>発送日<input id="shipmentDate" type="date"></label>
+      <label>配送会社<input id="shippingCarrier" placeholder="ヤマト"></label>
+      <label>送り状番号<input id="trackingNumber" placeholder="送り状番号"></label>
+      <label>担当者<input id="shippingStaff" placeholder="担当者"></label>
+    </div>
+    <label>備考<textarea id="shippingMemo" rows="3" placeholder="発送に関する備考"></textarea></label>
+    <div class="sales-actions" style="margin-top:14px">
+      <button type="button" class="secondary" onclick="markCurrentDeliveryIssued();">納品書発行済にする</button>
+      <button type="button" class="invoice-issue-button" onclick="markCurrentDeliveryShipped();">発送済登録</button>
+    </div>
+  </section>
+
   <section class="card">
     <h2>納品商品</h2>
     <div id="deliveryLines" class="invoice-lines">
       <div class="message">納品書を選択してください。</div>
     </div>
     <div class="summary">
-      <div>小計<strong id="deliverySubtotalText">0円</strong></div>
+      <div>小計 <strong id="deliverySubtotalText">0円</strong></div>
       <div>値引き <strong id="deliveryDiscountText">0円</strong></div>
-      <div>合計<strong id="deliveryTotalText">0円</strong></div>
-      <div>内消費税<strong id="deliveryTaxText">0円</strong></div>
+      <div>合計 <strong id="deliveryTotalText">0円</strong></div>
+      <div>内消費税 <strong id="deliveryTaxText">0円</strong></div>
     </div>
     <div class="sales-actions" style="margin-top:14px">
       <button type="button" class="secondary" onclick="outputCurrentDeliveryPdf();">PDF出力</button>

@@ -7,7 +7,7 @@ const HOME_PROGRESS_KEYS = {
 };
 
 const HOME_TRANSACTION_OPTIONS = ["", "通常販売", "交換", "返金", "無償提供", "その他"];
-const HOME_STATUS_OPTIONS = ["", "下書き", "請求書変換済み", "請求書発行済", "未発行", "発行済み", "入金待ち", "一部入金", "入金済み", "入金不要", "支払期限超過", "納品待ち", "発送待ち", "未納品", "納品済み"];
+const HOME_STATUS_OPTIONS = ["", "下書き", "請求書変換済み", "請求書発行済", "未発行", "納品書発行済", "発送済", "発行済み", "入金待ち", "一部入金", "入金済み", "入金不要", "支払期限超過", "納品待ち", "発送待ち", "未納品", "納品済み"];
 
 const homeTicketFilters = {
   status: "",
@@ -60,9 +60,7 @@ function homeNormalizeDate(value) {
 }
 
 function homeNormalizeDateTime(value) {
-  const dateOnly = homeNormalizeDate(value);
-  if (dateOnly) return dateOnly;
-  return String(value || "");
+  return homeNormalizeDate(value) || String(value || "");
 }
 
 function homeNormalizeTransactionType(type) {
@@ -77,7 +75,9 @@ function homeStatusLabel(status, kind = "") {
   const lower = value.toLowerCase();
   if (!value) return "未作成";
   if (lower === "draft" || value === "下書き") return kind === "delivery" || kind === "receipt" ? "未発行" : "下書き";
-  if (lower === "issued" || value === "発行済み") return "発行済み";
+  if (lower === "issued") return kind === "delivery" ? "納品書発行済" : "発行済み";
+  if (lower === "shipped" || value === "発送済") return "発送済";
+  if (value === "納品書発行済" || value === "発送準備中") return "納品書発行済";
   if (lower === "waiting_payment" || lower === "payment_waiting" || value === "入金待ち") return "入金待ち";
   if (lower === "partial_payment" || lower === "partially_paid" || value === "一部入金") return "一部入金";
   if (lower === "paid" || value === "入金済み") return "入金済み";
@@ -85,15 +85,15 @@ function homeStatusLabel(status, kind = "") {
   if (lower === "cancel" || lower === "cancelled" || lower === "canceled" || value === "キャンセル") return "キャンセル";
   if (lower === "converted" || lower === "invoiced" || value === "請求書変換済み") return "請求書変換済み";
   if (lower === "invoice_issued" || value === "請求書発行済") return "請求書発行済";
-  if (value === "未発行" || value === "納品待ち" || value === "発送待ち" || value === "未納品" || value === "納品済み" || value === "支払期限超過") return value;
+  if (["未発行", "発行済み", "納品待ち", "発送待ち", "未納品", "納品済み", "支払期限超過"].includes(value)) return value;
   return value;
 }
 
 function homeStatusBadge(status, kind = "") {
   const label = homeStatusLabel(status, kind);
   let type = "muted";
-  if (["発行済み", "請求書発行済", "入金済み", "納品済み"].includes(label)) type = "ok";
-  if (["入金待ち", "一部入金", "支払期限超過", "下書き", "未発行", "請求書変換済み", "納品待ち", "発送待ち", "未納品"].includes(label)) type = "warn";
+  if (["発行済み", "請求書発行済", "入金済み", "納品済み", "発送済"].includes(label)) type = "ok";
+  if (["入金待ち", "一部入金", "支払期限超過", "下書き", "未発行", "納品書発行済", "請求書変換済み", "納品待ち", "発送待ち", "未納品"].includes(label)) type = "warn";
   if (label === "入金不要") type = "info";
   if (label === "キャンセル") type = "danger";
   return `<span class="status-badge ${type}">${homeEscapeHtml(label)}</span>`;
@@ -190,21 +190,6 @@ function homePaidAmount(invoice) {
   return homeActivePayments(invoice).reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 }
 
-function homePaymentStatus(invoice) {
-  if (!invoice) return "未作成";
-  const invoiceStatus = homeStatusLabel(invoice.status, "invoice");
-  if (invoiceStatus === "入金不要") return "入金不要";
-  if (invoiceStatus === "入金済み") return "入金済み";
-  if (invoiceStatus === "キャンセル") return "キャンセル";
-  const total = homeTotalAmount(invoice);
-  if (total <= 0) return "入金不要";
-  const paid = homePaidAmount(invoice);
-  if (paid >= total) return "入金済み";
-  if (paid > 0) return "一部入金";
-  if (invoiceStatus === "発行済み" || invoiceStatus === "入金待ち") return "入金待ち";
-  return "未作成";
-}
-
 function homeEnsureGroup(map, origin) {
   const key = origin || "未採番";
   if (!map.has(key)) map.set(key, { origin: key, quotes: [], invoices: [], deliveries: [], receipts: [] });
@@ -237,7 +222,6 @@ function homeMakeTicketRow(group) {
   const sortDate = [quote, invoice, delivery, receipt]
     .map(row => row?.updatedAt || row?.createdAt || "")
     .sort((a, b) => String(b).localeCompare(String(a)))[0] || "";
-  const status = homePrimaryStatus(quote, invoice, delivery);
   return {
     origin: group.origin,
     quote,
@@ -247,26 +231,30 @@ function homeMakeTicketRow(group) {
     organizationName: customer.organizationName,
     customerName: customer.customerName,
     total: homeTotalAmount(invoice, quote, delivery, receipt),
-    status,
+    status: homePrimaryStatus(quote, invoice, delivery),
     quoteStatus: quote ? homeStatusLabel(quote.status, "quote") : "未作成",
     invoiceStatus: invoice ? homeStatusLabel(invoice.status, "invoice") : "未作成",
     deliveryStatus: delivery ? homeStatusLabel(delivery.status, "delivery") : "未発行",
     sortDate,
     sortNumber: group.origin,
-    date: homePrimaryDate(quote, invoice, delivery, sortDate)
+    date: homePrimaryDate(quote, invoice, delivery, sortDate),
+    shipmentDate: delivery?.shipmentDate || "",
+    shippingCarrier: delivery?.shippingCarrier || "",
+    trackingNumber: delivery?.trackingNumber || ""
   };
 }
 
 function homePrimaryStatus(quote, invoice, delivery) {
-  const invoiceStatus = invoice ? homeStatusLabel(invoice.status, "invoice") : "";
-  if (invoiceStatus && invoiceStatus !== "未作成") return invoiceStatus;
   const deliveryStatus = delivery ? homeStatusLabel(delivery.status, "delivery") : "";
   if (deliveryStatus && deliveryStatus !== "未発行") return deliveryStatus;
+  const invoiceStatus = invoice ? homeStatusLabel(invoice.status, "invoice") : "";
+  if (invoiceStatus && invoiceStatus !== "未作成") return invoiceStatus;
   return quote ? homeStatusLabel(quote.status, "quote") : "未作成";
 }
 
 function homePrimaryDate(quote, invoice, delivery, fallback) {
-  return homeNormalizeDate(invoice?.invoiceDate) ||
+  return homeNormalizeDate(delivery?.shipmentDate) ||
+    homeNormalizeDate(invoice?.invoiceDate) ||
     homeNormalizeDate(invoice?.issuedAt) ||
     homeNormalizeDate(delivery?.deliveryDate) ||
     homeNormalizeDate(delivery?.issuedAt) ||
@@ -290,6 +278,7 @@ function homeRowDateValues(row) {
     row.invoice?.updatedAt,
     row.delivery?.deliveryDate,
     row.delivery?.issuedAt,
+    row.delivery?.shipmentDate,
     row.delivery?.updatedAt,
     row.date,
     row.sortDate
@@ -347,8 +336,11 @@ function renderHomeTicketRows() {
       <td>${homeEscapeHtml(row.customerName)}</td>
       <td class="${homeAmountClass(row)}">${homeMoney(row.total)}</td>
       <td>${homeEscapeHtml(homeNormalizeDateTime(row.date))}</td>
+      <td>${homeEscapeHtml(homeNormalizeDateTime(row.shipmentDate))}</td>
+      <td>${homeEscapeHtml(row.shippingCarrier)}</td>
+      <td>${homeEscapeHtml(row.trackingNumber)}</td>
     </tr>
-  `).join("") : `<tr><td colspan="7">伝票はありません。</td></tr>`;
+  `).join("") : `<tr><td colspan="10">伝票はありません。</td></tr>`;
 }
 
 function fillHomeSelect(id, options, allLabel = "全て") {

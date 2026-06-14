@@ -7,7 +7,7 @@ const PROGRESS_KEYS = {
 };
 
 const TRANSACTION_OPTIONS = ["", "通常販売", "交換", "返金", "無償提供", "その他"];
-const STATUS_OPTIONS = ["", "下書き", "請求書変換済み", "請求書発行済", "未発行", "発行済み", "入金待ち", "一部入金", "入金済み", "入金不要", "支払期限超過", "納品待ち", "発送待ち", "未納品", "納品済み"];
+const STATUS_OPTIONS = ["", "下書き", "請求書変換済み", "請求書発行済", "未発行", "納品書発行済", "発送済", "発行済み", "入金待ち", "一部入金", "入金済み", "入金不要", "支払期限超過", "納品待ち", "発送待ち", "未納品", "納品済み"];
 
 function emptyFilters() {
   return {
@@ -93,7 +93,10 @@ function statusLabel(status, kind = "") {
   const lower = value.toLowerCase();
   if (!value) return "未作成";
   if (lower === "draft" || value === "下書き") return kind === "delivery" || kind === "receipt" ? "未発行" : "下書き";
-  if (lower === "issued" || value === "発行済み") return "発行済み";
+  if (lower === "issued") return kind === "delivery" ? "納品書発行済" : "発行済み";
+  if (value === "発行済み") return "発行済み";
+  if (lower === "shipped" || value === "発送済") return "発送済";
+  if (value === "納品書発行済" || value === "発送準備中") return "納品書発行済";
   if (lower === "waiting_payment" || lower === "payment_waiting" || value === "入金待ち") return "入金待ち";
   if (lower === "partial_payment" || lower === "partially_paid" || value === "一部入金") return "一部入金";
   if (lower === "paid" || value === "入金済み") return "入金済み";
@@ -108,8 +111,8 @@ function statusLabel(status, kind = "") {
 function statusBadge(status, kind = "") {
   const label = statusLabel(status, kind);
   let type = "muted";
-  if (["発行済み", "請求書発行済", "入金済み", "納品済み"].includes(label)) type = "ok";
-  if (["入金待ち", "一部入金", "支払期限超過", "下書き", "未発行", "請求書変換済み", "納品待ち", "発送待ち", "未納品"].includes(label)) type = "warn";
+  if (["発行済み", "請求書発行済", "入金済み", "納品済み", "発送済"].includes(label)) type = "ok";
+  if (["入金待ち", "一部入金", "支払期限超過", "下書き", "未発行", "納品書発行済", "請求書変換済み", "納品待ち", "発送待ち", "未納品"].includes(label)) type = "warn";
   if (label === "入金不要") type = "info";
   if (label === "キャンセル") type = "danger";
   return `<span class="status-badge ${type}">${escapeHtml(label)}</span>`;
@@ -448,7 +451,7 @@ function renderUnpaidRows(allRows) {
 
 function renderUndeliveredRows(allRows) {
   const rows = allRows
-    .filter(row => !["発行済み", "納品済み", "キャンセル"].includes(row.deliveryStatus))
+    .filter(row => !["発送済", "納品済み", "キャンセル"].includes(row.deliveryStatus))
     .filter(row => !isCancelledRow(row))
     .filter(row => matchesFilters(row, "delivery"))
     .sort(sortNewest);
