@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 顧客管理</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-customer-performance">
+<link rel="stylesheet" href="sales-style.css?v=20260614-invoice-display-fix">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-customers-clean" defer></script>
 <script src="customers-storage.js?v=20260614-customers-clean"></script>
-<script src="customers.js?v=20260614-customer-performance" defer></script>
+<script src="customers.js?v=20260614-invoice-display-fix" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -45,8 +45,8 @@
         <label>終了日<input id="customerDateToFilter" type="date"></label>
       </div>
       <div class="table-wrap list-scroll">
-        <table>
-          <thead><tr><th>顧客コード</th><th>顧客名</th><th>団体名</th><th>顧客区分</th><th>電話番号</th><th>メールアドレス</th><th>スマレジ会員コード</th><th>担当者</th><th>更新日</th><th>操作</th></tr></thead>
+        <table class="customer-list-table">
+          <thead><tr><th>顧客コード</th><th>顧客名</th><th>団体名</th><th>顧客区分</th><th>更新日</th><th>操作</th></tr></thead>
           <tbody id="customerListBody"></tbody>
         </table>
       </div>

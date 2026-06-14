@@ -1,5 +1,6 @@
 const INVOICES_KEY = "arico_sales_invoices_v1";
 const DELIVERIES_KEY = "arico_sales_deliveries_v1";
+const QUOTES_KEY = "arico_sales_quotes_v1";
 const INVOICE_STATUS_OPTIONS = ["下書き", "発行済み", "入金待ち", "入金済み", "キャンセル"];
 const INVOICE_STATUS_DRAFT = "下書き";
 const INVOICE_STATUS_ISSUED = "発行済み";
@@ -29,6 +30,19 @@ function readDeliveries() {
 
 function writeDeliveries(deliveries) {
   localStorage.setItem(DELIVERIES_KEY, JSON.stringify(deliveries));
+}
+
+function readLinkedQuotes() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(QUOTES_KEY) || "[]");
+    return Array.isArray(rows) ? rows : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function writeLinkedQuotes(quotes) {
+  localStorage.setItem(QUOTES_KEY, JSON.stringify(quotes));
 }
 
 function today() {
@@ -170,7 +184,7 @@ function normalizeInvoiceLine(line) {
 }
 
 function getInvoiceRawLines(invoice) {
-  const candidates = [invoice?.items, invoice?.lines, invoice?.products, invoice?.details];
+  const candidates = [invoice?.items, invoice?.lines, invoice?.products, invoice?.details, invoice?.invoiceItems, invoice?.invoiceLines];
   const rows = candidates.find(value => Array.isArray(value) && value.length) || [];
   return rows.map(normalizeInvoiceLine);
 }
@@ -275,6 +289,37 @@ function ensureDeliveryForInvoice(invoice) {
   deliveries.push(delivery);
   writeDeliveries(deliveries);
   return delivery;
+}
+
+function markSourceQuoteIssued(invoice) {
+  const quotes = readLinkedQuotes();
+  if (!quotes.length) return;
+  const sourceKeys = [
+    invoice.sourceQuoteId,
+    invoice.sourceQuoteNo,
+    invoice.quoteNumber,
+    invoice.originNumber,
+    invoice.masterNumber
+  ].map(value => String(value || "").trim()).filter(Boolean);
+  if (!sourceKeys.length) return;
+  let changed = false;
+  const updatedQuotes = quotes.map(quote => {
+    const quoteKeys = [
+      quote.id,
+      quote.quoteNo,
+      quote.quoteNumber,
+      quote.originNumber,
+      quote.masterNumber
+    ].map(value => String(value || "").trim()).filter(Boolean);
+    if (!quoteKeys.some(key => sourceKeys.includes(key))) return quote;
+    changed = true;
+    return {
+      ...quote,
+      status: "請求書発行済",
+      updatedAt: new Date().toISOString()
+    };
+  });
+  if (changed) writeLinkedQuotes(updatedQuotes);
 }
 
 function showSalesMessage(text, type) {
@@ -775,6 +820,7 @@ async function issueInvoice() {
   invoice.issuedAt = issuedAtInput || new Date().toISOString();
   invoice.updatedAt = new Date().toISOString();
   ensureDeliveryForInvoice(invoice);
+  markSourceQuoteIssued(invoice);
   invoices[index] = invoice;
   writeInvoices(invoices);
   currentInvoiceId = invoice.id;

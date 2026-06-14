@@ -127,18 +127,14 @@ function renderCustomerList() {
     : `${visibleCustomers.length}件 / 全${customers.length}件`;
   body.innerHTML = visibleCustomers.length ? visibleCustomers.map(customer => `<tr>
     <td>${escapeHtml(customer.customerCode)}</td>
-    <td><button type="button" class="link-button" onclick="showCustomerDetail('${escapeHtml(customer.id)}');">${escapeHtml(customer.customerName)}</button> ${customerSyncBadge(customer)}</td>
-    <td>${escapeHtml(customer.organizationName || "")}</td>
+    <td title="${escapeHtml(customer.customerName)}"><button type="button" class="link-button" onclick="showCustomerDetail('${escapeHtml(customer.id)}');">${escapeHtml(customer.customerName)}</button> ${customerSyncBadge(customer)}</td>
+    <td title="${escapeHtml(customer.organizationName || "")}">${escapeHtml(customer.organizationName || "")}</td>
     <td>${escapeHtml(customer.customerType)}</td>
-    <td>${escapeHtml(customer.phone)}</td>
-    <td>${escapeHtml(customer.email)}</td>
-    <td>${escapeHtml(customer.smaregiMemberCode)}</td>
-    <td>${escapeHtml(customer.staff)}</td>
     <td>${escapeHtml(formatDate(customer.updatedAt))}</td>
     <td><button type="button" class="secondary" onclick="editCustomer('${escapeHtml(customer.id)}');">&#32232;&#38598;</button> ${canDeleteCustomer(customer) ? `<button type="button" class="danger" onclick="deleteCustomer('${escapeHtml(customer.id)}');">&#21066;&#38500;</button>` : ""}</td>
-  </tr>`).join("") : '<tr><td colspan="10">&#39015;&#23458;&#12487;&#12540;&#12479;&#12399;&#12354;&#12426;&#12414;&#12379;&#12435;&#12290;</td></tr>';
+  </tr>`).join("") : '<tr><td colspan="6">顧客データはありません。</td></tr>';
   if (!hasFilters && customers.length > visibleCustomers.length) {
-    body.innerHTML += `<tr><td colspan="10"><button type="button" class="secondary" onclick="showMoreCustomers();">さらに表示（次の${CUSTOMER_INITIAL_LIMIT}件）</button></td></tr>`;
+    body.innerHTML += `<tr><td colspan="6"><button type="button" class="secondary" onclick="showMoreCustomers();">さらに表示（次の${CUSTOMER_INITIAL_LIMIT}件）</button></td></tr>`;
   }
 }
 

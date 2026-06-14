@@ -7,6 +7,7 @@ const UNIT_OPTIONS = ["個", "本", "袋", "箱", "セット", "台", "式", "�
 const DEALER_BRANDS = ["FIVICS", "MK", "JET6", "WJ"];
 const QUOTE_STATUS_DRAFT = "下書き";
 const QUOTE_STATUS_INVOICED = "請求書変換済み";
+const QUOTE_STATUS_INVOICE_ISSUED = "請求書発行済";
 const QUOTE_STATUS_CANCELLED = "キャンセル";
 
 let currentQuoteId = null;
@@ -17,6 +18,7 @@ let quoteListStatusFilter = "";
 let quoteListDateFrom = "";
 let quoteListDateTo = "";
 let quoteListCollapsed = false;
+let currentQuoteLocked = false;
 
 function salesFetch(path) {
   return fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
@@ -118,14 +120,19 @@ function normalizeQuoteStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (!value || value === "draft" || value === "下書き") return QUOTE_STATUS_DRAFT;
   if (value === "converted" || value === "invoiced" || value === "invoice_created" || value === "請求書変換済み") return QUOTE_STATUS_INVOICED;
+  if (value === "invoice_issued" || value === "issued_invoice" || value === "請求書発行済") return QUOTE_STATUS_INVOICE_ISSUED;
   if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return QUOTE_STATUS_CANCELLED;
   return status || QUOTE_STATUS_DRAFT;
 }
 
 function quoteStatusBadge(status) {
   const value = normalizeQuoteStatus(status);
-  const type = value === QUOTE_STATUS_CANCELLED ? "danger" : value === QUOTE_STATUS_INVOICED ? "info" : "muted";
+  const type = value === QUOTE_STATUS_CANCELLED ? "danger" : value === QUOTE_STATUS_INVOICE_ISSUED ? "ok" : value === QUOTE_STATUS_INVOICED ? "info" : "muted";
   return `<span class="status-badge ${type}">${escapeHtml(value)}</span>`;
+}
+
+function isQuoteEditable(quoteOrStatus) {
+  return normalizeQuoteStatus(typeof quoteOrStatus === "string" ? quoteOrStatus : quoteOrStatus?.status) !== QUOTE_STATUS_INVOICE_ISSUED;
 }
 
 function canDeleteQuote(quoteOrStatus) {
@@ -477,8 +484,12 @@ function renderQuoteList() {
 }
 
 function renderQuoteListRow(q) {
+  const status = normalizeQuoteStatus(q.status);
   const deleteButton = canDeleteQuote(q)
     ? `<button type="button" class="danger" onclick="deleteQuote('${q.id}')">&#21066;&#38500;</button>`
+    : "";
+  const convertButton = status === QUOTE_STATUS_DRAFT || status === QUOTE_STATUS_INVOICED
+    ? `<button type="button" class="secondary next-step-button" onclick="convertQuoteToInvoice('${q.id}')">&#35531;&#27714;&#26360;&#12408;&#22793;&#25563;</button>`
     : "";
   return `<tr data-quote-id="${escapeHtml(q.id || "")}">
     <td><span class="number-with-status">${escapeHtml(q.quoteNo)} ${quoteStatusBadge(q.status)}</span></td>
@@ -489,10 +500,10 @@ function renderQuoteListRow(q) {
     <td>${quoteStatusBadge(q.status)}</td>
     <td>${escapeHtml(q.staff || "")}</td>
     <td>
-      <button type="button" class="secondary" onclick="editQuote('${q.id}')">&#32232;&#38598;</button>
+      <button type="button" class="secondary" onclick="editQuote('${q.id}')">${status === QUOTE_STATUS_INVOICE_ISSUED ? "詳細" : "&#32232;&#38598;"}</button>
       <button type="button" class="secondary" onclick="printQuoteById('${q.id}')">PDF&#20986;&#21147;</button>
       <button type="button" class="secondary" onclick="duplicateQuote('${q.id}')">&#35079;&#35069;</button>
-      <button type="button" class="secondary next-step-button" onclick="convertQuoteToInvoice('${q.id}')">&#35531;&#27714;&#26360;&#12408;&#22793;&#25563;</button>
+      ${convertButton}
       ${deleteButton}
     </td>
   </tr>`;
@@ -683,6 +694,7 @@ function convertQuoteToInvoice(id) {
 function newQuote(shouldScroll = false) {
   currentQuoteId = null;
   currentLines = [];
+  currentQuoteLocked = false;
   ["customerName", "customerAddress", "customerPhone", "customerEmail", "quoteSubject", "quoteMemo", "productSearchInput"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
@@ -700,6 +712,7 @@ function newQuote(shouldScroll = false) {
   if (customerResults) customerResults.innerHTML = "";
   renderLines();
   updateQuoteDeleteButton(null);
+  updateQuoteLockState({ status: QUOTE_STATUS_DRAFT });
   if (shouldScroll) {
     document.getElementById("quoteEditorCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -762,21 +775,27 @@ async function addProductLine(product) {
 
 function renderLines() {
   const area = document.getElementById("quoteLines");
+  const disabled = currentQuoteLocked ? "disabled" : "";
   area.innerHTML = currentLines.length ? currentLines.map((line, index) => `
     <div class="quote-line">
-      <label>商品名<input value="${escapeHtml(line.name)}" onchange="updateLine(${index}, 'name', this.value)"></label>
+      <label>商品名<input value="${escapeHtml(line.name)}" onchange="updateLine(${index}, 'name', this.value)" ${disabled}></label>
       <label>現在庫<div class="${stockClass(line.stock)}">${formatStock(line.stock)}</div></label>
-      <label>数量<input type="number" min="0" step="1" value="${line.qty}" onchange="updateLine(${index}, 'qty', this.value)"></label>
-      <label>単位<select onchange="updateLine(${index}, 'unit', this.value)">${UNIT_OPTIONS.map(unit => `<option value="${unit}" ${unit === line.unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label>
-      <label>税込単価<input type="number" min="0" step="1" value="${line.unitPrice}" onchange="updateLine(${index}, 'unitPrice', this.value)"></label>
-      <label>値引率%<input type="number" min="0" step="1" value="${line.discountValue}" onchange="updateLine(${index}, 'discountValue', this.value)"></label>
-      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateLine(${index}, 'memo', this.value)"></label>
-      <button type="button" class="danger" onclick="removeLine(${index})">削除</button>
+      <label>数量<input type="number" min="0" step="1" value="${line.qty}" onchange="updateLine(${index}, 'qty', this.value)" ${disabled}></label>
+      <label>単位<select onchange="updateLine(${index}, 'unit', this.value)" ${disabled}>${UNIT_OPTIONS.map(unit => `<option value="${unit}" ${unit === line.unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label>
+      <label>税込単価<input type="number" min="0" step="1" value="${line.unitPrice}" onchange="updateLine(${index}, 'unitPrice', this.value)" ${disabled}></label>
+      <label>値引率%<input type="number" min="0" step="1" value="${line.discountValue}" onchange="updateLine(${index}, 'discountValue', this.value)" ${disabled}></label>
+      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateLine(${index}, 'memo', this.value)" ${disabled}></label>
+      <button type="button" class="danger" onclick="removeLine(${index})" ${disabled}>削除</button>
     </div>`).join("") : '<div class="message">見積商品を追加してください。</div>';
   recalcTotals();
 }
 
 function updateLine(index, key, value) {
+  if (currentQuoteLocked) {
+    showSalesMessage("請求書発行済みの見積書は編集できません。", "warn");
+    renderLines();
+    return;
+  }
   const line = currentLines[index];
   if (!line) return;
   if (["qty", "unitPrice", "discountValue"].includes(key)) line[key] = Number(value || 0);
@@ -794,6 +813,10 @@ function updateLine(index, key, value) {
 }
 
 function removeLine(index) {
+  if (currentQuoteLocked) {
+    showSalesMessage("請求書発行済みの見積書は編集できません。", "warn");
+    return;
+  }
   currentLines.splice(index, 1);
   renderLines();
 }
@@ -859,6 +882,10 @@ function collectQuote() {
 }
 
 async function saveQuote() {
+  if (currentQuoteLocked) {
+    showSalesPopup("保存できません", "請求書発行済みの見積書は編集できません。", "warn");
+    return;
+  }
   if (!document.getElementById("salesCustomerId")?.value) {
     showSalesMessage("\u9867\u5ba2\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044", "err");
     showSalesPopup("\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093", "\u9867\u5ba2\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044", "warn");
@@ -900,6 +927,7 @@ function updateQuoteDeleteButton(quote) {
 
 async function fillQuoteForm(quote) {
   currentQuoteId = quote.id || null;
+  currentQuoteLocked = !isQuoteEditable(quote);
   currentLines = JSON.parse(JSON.stringify(quote.lines || [])).map(line => ({ ...line, stock: 0 }));
   setFieldValue("salesCustomerId", quote.customerId || "");
   setFieldValue("salesCustomerCode", quote.customerCode || "");
@@ -922,7 +950,35 @@ async function fillQuoteForm(quote) {
   document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
   renderLines();
   updateQuoteDeleteButton(quote);
+  updateQuoteLockState(quote);
   await refreshQuoteLineStocks().catch(() => {});
+}
+
+function updateQuoteLockState(quote) {
+  const locked = !isQuoteEditable(quote);
+  currentQuoteLocked = locked;
+  const editableIds = [
+    "quoteCustomerSearchInput",
+    "customerType",
+    "quoteSubject",
+    "quoteDate",
+    "validUntil",
+    "quoteStaff",
+    "discountTemplate",
+    "quoteMemo",
+    "productSearchInput"
+  ];
+  editableIds.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) element.disabled = locked;
+  });
+  const saveButton = document.querySelector('button[onclick="saveQuote();"]');
+  if (saveButton) {
+    saveButton.hidden = locked;
+    saveButton.disabled = locked;
+  }
+  document.getElementById("quoteEditorCard")?.classList.toggle("locked", locked);
+  if (locked) showSalesMessage("請求書発行済みの見積書は編集できません。PDF出力と複製は可能です。", "warn");
 }
 
 async function editQuote(id) {
