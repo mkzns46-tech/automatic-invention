@@ -59,6 +59,11 @@ function escapeHtml(value) {
   }[ch]));
 }
 
+function setFieldValue(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.value = value ?? "";
+}
+
 function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
@@ -166,7 +171,9 @@ function recalcInvoiceLine(line) {
   const unitPrice = Number(line.unitPrice || 0);
   const discountValue = Number(line.discountValue || 0);
   const gross = Math.round(qty * unitPrice);
-  line.discountAmount = Math.round(gross * discountValue / 100);
+  const rateDiscount = Math.round(gross * discountValue / 100);
+  const fixedDiscount = Math.max(0, Number(line.discountAmountInput || line.fixedDiscountAmount || line.manualDiscountAmount || 0));
+  line.discountAmount = Math.min(gross, Math.max(rateDiscount, fixedDiscount));
   line.amount = Math.max(0, gross - line.discountAmount);
   return line;
 }
@@ -179,6 +186,7 @@ function normalizeInvoiceLine(line) {
     unit: line?.unit || line?.unitName || "",
     unitPrice: Number(line?.unitPrice ?? line?.price ?? line?.taxIncludedPrice ?? line?.salePrice ?? 0),
     discountValue: Number(line?.discountValue ?? line?.discountRate ?? line?.discount ?? 0),
+    discountAmountInput: Number(line?.discountAmountInput ?? line?.fixedDiscountAmount ?? line?.manualDiscountAmount ?? 0),
     memo: line?.memo || line?.note || ""
   };
   return recalcInvoiceLine(normalized);
@@ -683,6 +691,7 @@ function renderInvoiceLines() {
       <label>単位<input value="${escapeHtml(line.unit || "")}" onchange="updateInvoiceLine(${index}, 'unit', this.value)" ${disabled}></label>
       <label>税込単価<input type="number" min="0" step="1" value="${Number(line.unitPrice || 0)}" onchange="updateInvoiceLine(${index}, 'unitPrice', this.value)" ${disabled}></label>
       <label>値引率%<input type="number" min="0" step="1" value="${Number(line.discountValue || 0)}" onchange="updateInvoiceLine(${index}, 'discountValue', this.value)" ${disabled}></label>
+      <label>値引額<input type="number" min="0" step="1" value="${Number(line.discountAmountInput || 0)}" onchange="updateInvoiceLine(${index}, 'discountAmountInput', this.value)" ${disabled}></label>
       <label>金額<div class="line-amount">${money(line.amount)}</div></label>
       <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateInvoiceLine(${index}, 'memo', this.value)" ${disabled}></label>
       <button type="button" class="danger" onclick="removeInvoiceLine(${index})" ${disabled}>削除</button>
@@ -699,7 +708,7 @@ function updateInvoiceLine(index, key, value) {
   }
   const line = currentInvoiceLines[index];
   if (!line) return;
-  if (["qty", "unitPrice", "discountValue"].includes(key)) line[key] = Number(value || 0);
+  if (["qty", "unitPrice", "discountValue", "discountAmountInput"].includes(key)) line[key] = Number(value || 0);
   else line[key] = value;
   recalcInvoiceLine(line);
   renderInvoiceLines();
