@@ -40,6 +40,7 @@ function money(value) {
 function normalizeInvoiceStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (value === "paid" || value === "入金済み") return "入金済み";
+  if (value === "no_payment_required" || value === "no_payment" || value === "payment_not_required" || value === "入金不要") return "入金不要";
   return status || "";
 }
 
@@ -195,7 +196,7 @@ function setReceiptListCollapsed(collapsed) {
 function getPaidInvoiceTargets() {
   const receipts = readReceipts();
   return readInvoices()
-    .filter(invoice => normalizeInvoiceStatus(invoice.status) === "入金済み")
+    .filter(invoice => ["入金済み", "入金不要"].includes(normalizeInvoiceStatus(invoice.status)))
     .filter(invoice => !receipts.some(receipt => receipt.sourceInvoiceNo === invoice.invoiceNo))
     .map(invoice => ({ type: "invoice", invoice }))
     .filter(matchesReceiptTargetFilters);
@@ -298,6 +299,9 @@ function buildReceiptFromInvoice(invoice, receipts) {
     invoiceNumber: invoice.invoiceNumber || invoice.invoiceNo || "",
     sourceInvoiceId: invoice.id || "",
     sourceInvoiceNo: invoice.invoiceNo || "",
+    transactionType: invoice.transactionType || "通常販売",
+    originalSlipNumber: invoice.originalSlipNumber || "",
+    reasonMemo: invoice.reasonMemo || "",
     customerName: invoice.customerName || "",
     subject: invoice.subject || "",
     paymentDate: payment.paymentDate || normalizeDateOnly(payment.createdAt),
@@ -315,8 +319,8 @@ function buildReceiptFromInvoice(invoice, receipts) {
 
 function createReceiptFromInvoice(invoiceId) {
   const invoice = readInvoices().find(row => row.id === invoiceId);
-  if (!invoice || normalizeInvoiceStatus(invoice.status) !== "入金済み") {
-    showSalesPopup("作成できません", "入金済み請求書のみ領収書を作成できます。", "warn");
+  if (!invoice || !["入金済み", "入金不要"].includes(normalizeInvoiceStatus(invoice.status))) {
+    showSalesPopup("作成できません", "入金済みまたは入金不要の請求書のみ領収書を作成できます。", "warn");
     return;
   }
   const receipts = readReceipts();

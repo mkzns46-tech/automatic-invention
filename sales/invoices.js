@@ -1,11 +1,12 @@
 const INVOICES_KEY = "arico_sales_invoices_v1";
 const DELIVERIES_KEY = "arico_sales_deliveries_v1";
 const QUOTES_KEY = "arico_sales_quotes_v1";
-const INVOICE_STATUS_OPTIONS = ["下書き", "発行済み", "入金待ち", "入金済み", "キャンセル"];
+const INVOICE_STATUS_OPTIONS = ["下書き", "発行済み", "入金待ち", "入金済み", "入金不要", "キャンセル"];
 const INVOICE_STATUS_DRAFT = "下書き";
 const INVOICE_STATUS_ISSUED = "発行済み";
 const INVOICE_STATUS_WAITING_PAYMENT = "入金待ち";
 const INVOICE_STATUS_PAID = "入金済み";
+const INVOICE_STATUS_NO_PAYMENT_REQUIRED = "入金不要";
 const INVOICE_STATUS_CANCELLED = "キャンセル";
 
 let currentInvoiceId = null;
@@ -68,12 +69,19 @@ function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
 
+function clampNumber(value, min, max) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return min;
+  return Math.min(max, Math.max(min, number));
+}
+
 function normalizeInvoiceStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (!value || value === "draft" || value === "下書き") return INVOICE_STATUS_DRAFT;
   if (value === "issued" || value === "発行済み") return INVOICE_STATUS_ISSUED;
   if (value === "waiting_payment" || value === "payment_waiting" || value === "入金待ち") return INVOICE_STATUS_WAITING_PAYMENT;
   if (value === "paid" || value === "入金済み") return INVOICE_STATUS_PAID;
+  if (value === "no_payment_required" || value === "no_payment" || value === "payment_not_required" || value === "入金不要") return INVOICE_STATUS_NO_PAYMENT_REQUIRED;
   if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return INVOICE_STATUS_CANCELLED;
   return status || INVOICE_STATUS_DRAFT;
 }
@@ -162,17 +170,21 @@ function statusBadge(status) {
         ? "warn"
         : value === INVOICE_STATUS_ISSUED
           ? "info"
-          : "ok";
+          : value === INVOICE_STATUS_NO_PAYMENT_REQUIRED
+            ? "info"
+            : "ok";
   return `<span class="status-badge ${type}">${escapeHtml(value)}</span>`;
 }
 
 function recalcInvoiceLine(line) {
   const qty = Number(line.qty || 0);
   const unitPrice = Number(line.unitPrice || 0);
-  const discountValue = Number(line.discountValue || 0);
-  const gross = Math.round(qty * unitPrice);
+  const discountValue = clampNumber(line.discountValue ?? line.discountRate ?? 0, 0, 100);
+  const gross = Math.max(0, Math.round(qty * unitPrice));
   const rateDiscount = Math.round(gross * discountValue / 100);
   const fixedDiscount = Math.max(0, Number(line.discountAmountInput || line.fixedDiscountAmount || line.manualDiscountAmount || 0));
+  line.discountValue = discountValue;
+  line.discountRate = discountValue;
   line.discountAmount = Math.min(gross, fixedDiscount > 0 ? fixedDiscount : rateDiscount);
   line.amount = Math.max(0, gross - line.discountAmount);
   return line;
@@ -281,7 +293,7 @@ function calcInvoiceTotals(invoice) {
   let total = 0;
   lines.forEach(line => {
     recalcInvoiceLine(line);
-    const gross = Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0));
+    const gross = Math.max(0, Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0)));
     subtotal += gross;
     discount += Number(line.discountAmount || 0);
     total += Number(line.amount || 0);
@@ -339,6 +351,9 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     email: customerView.email,
     subject: invoice.subject || "",
     staff: invoice.staff || "",
+    transactionType: invoice.transactionType || "通常販売",
+    originalSlipNumber: invoice.originalSlipNumber || "",
+    reasonMemo: invoice.reasonMemo || "",
     memo: invoice.memo || invoice.customerMemo || "",
     customerMemo: invoice.customerMemo || invoice.memo || "",
     items: JSON.parse(JSON.stringify(invoice.lines || invoice.items || [])),
@@ -544,7 +559,7 @@ function renderInvoiceList() {
   });
   const completedInvoices = invoices.filter(invoice => {
     const status = normalizeInvoiceStatus(invoice.status);
-    return status === INVOICE_STATUS_PAID || status === INVOICE_STATUS_CANCELLED;
+    return status === INVOICE_STATUS_PAID || status === INVOICE_STATUS_NO_PAYMENT_REQUIRED || status === INVOICE_STATUS_CANCELLED;
   });
   const count = document.getElementById("invoiceListCount");
   if (count) count.textContent = invoiceListSearchText || invoiceListStatusFilter || invoiceListDateFrom || invoiceListDateTo
@@ -617,7 +632,7 @@ function matchesDateRange(values, from, to) {
 function clearInvoiceEditor() {
   currentInvoiceId = null;
   currentInvoiceLines = [];
-  ["invoiceNo", "sourceQuoteNo", "customerName", "invoiceOrganizationName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo"].forEach(id => {
+  ["invoiceNo", "sourceQuoteNo", "customerName", "invoiceOrganizationName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo", "originalSlipNumber", "reasonMemo"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
@@ -626,6 +641,7 @@ function clearInvoiceEditor() {
     if (el) el.value = "";
   });
   document.getElementById("invoiceStatus").value = INVOICE_STATUS_DRAFT;
+  setFieldValue("transactionType", "通常販売");
   document.getElementById("issuedAt").value = "";
   document.getElementById("invoiceDate").value = today();
   document.getElementById("dueDate").value = today();
@@ -665,6 +681,9 @@ function fillInvoiceForm(invoice) {
   document.getElementById("invoiceSubject").value = invoice.subject || "";
   document.getElementById("invoiceDate").value = invoice.invoiceDate || today();
   document.getElementById("dueDate").value = invoice.dueDate || today();
+  setFieldValue("transactionType", invoice.transactionType || "通常販売");
+  setFieldValue("originalSlipNumber", invoice.originalSlipNumber || "");
+  setFieldValue("reasonMemo", invoice.reasonMemo || "");
   document.getElementById("invoiceMemo").value = invoice.memo || "";
   renderInvoiceLines();
   updateInvoiceLockState(invoice);
@@ -691,7 +710,7 @@ function renderInvoiceLines() {
       <label>数量<input type="number" min="0" step="1" value="${Number(line.qty || 0)}" onchange="updateInvoiceLine(${index}, 'qty', this.value)" ${disabled}></label>
       <label>単位<input value="${escapeHtml(line.unit || "")}" onchange="updateInvoiceLine(${index}, 'unit', this.value)" ${disabled}></label>
       <label>税込単価<input type="number" min="0" step="1" value="${Number(line.unitPrice || 0)}" onchange="updateInvoiceLine(${index}, 'unitPrice', this.value)" ${disabled}></label>
-      <label>値引率%<input type="number" min="0" step="1" value="${Number(line.discountValue || 0)}" onchange="updateInvoiceLine(${index}, 'discountValue', this.value)" ${disabled}></label>
+      <label>値引率%<input type="number" min="0" max="100" step="1" value="${Number(line.discountValue || 0)}" onchange="updateInvoiceLine(${index}, 'discountValue', this.value)" ${disabled}></label>
       <label>値引額<input type="number" min="0" step="1" value="${Number(line.discountAmountInput || 0)}" onchange="updateInvoiceLine(${index}, 'discountAmountInput', this.value)" ${disabled}></label>
       <label>金額<div class="line-amount">${money(line.amount)}</div></label>
       <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateInvoiceLine(${index}, 'memo', this.value)" ${disabled}></label>
@@ -709,7 +728,8 @@ function updateInvoiceLine(index, key, value) {
   }
   const line = currentInvoiceLines[index];
   if (!line) return;
-  if (["qty", "unitPrice", "discountValue", "discountAmountInput"].includes(key)) line[key] = Number(value || 0);
+  if (key === "discountValue") line[key] = clampNumber(value, 0, 100);
+  else if (["qty", "unitPrice", "discountAmountInput"].includes(key)) line[key] = Math.max(0, Number(value || 0));
   else line[key] = value;
   if (key === "discountValue") line.discountRate = Number(value || 0);
   recalcInvoiceLine(line);
@@ -743,6 +763,9 @@ function updateInvoiceLockState(invoice) {
     "issuedAt",
     "invoiceDate",
     "dueDate",
+    "transactionType",
+    "originalSlipNumber",
+    "reasonMemo",
     "invoiceMemo"
   ];
   if (issueButton) {
@@ -841,6 +864,9 @@ function collectInvoice() {
     invoiceDate: document.getElementById("invoiceDate").value,
     dueDate: document.getElementById("dueDate").value,
     staff: document.getElementById("invoiceStaff").value.trim(),
+    transactionType: document.getElementById("transactionType")?.value || existing?.transactionType || "通常販売",
+    originalSlipNumber: document.getElementById("originalSlipNumber")?.value?.trim() || "",
+    reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
     memo: document.getElementById("invoiceMemo").value,
     customerMemo: existing?.customerMemo || document.getElementById("invoiceMemo").value,
     items: currentInvoiceLines.map(line => ({ ...line })),
@@ -887,7 +913,8 @@ async function issueInvoice() {
     showSalesMessage("この請求書は発行確定済みです。", "warn");
     return;
   }
-  invoice.status = "waiting_payment";
+  const totals = calcInvoiceTotals(invoice);
+  invoice.status = totals.total === 0 ? "no_payment_required" : "waiting_payment";
   const issuedAtInput = document.getElementById("issuedAt")?.value;
   invoice.issuedAt = issuedAtInput || new Date().toISOString();
   invoice.updatedAt = new Date().toISOString();
@@ -898,7 +925,8 @@ async function issueInvoice() {
   currentInvoiceId = invoice.id;
   fillInvoiceForm(invoice);
   renderInvoiceList();
-  showSalesMessage("請求書を発行確定しました。ステータスを入金待ちに更新しました。", "ok");
+  const statusLabel = normalizeInvoiceStatus(invoice.status);
+  showSalesMessage(`請求書を発行確定しました。ステータスを${statusLabel}に更新しました。`, "ok");
   showSalesPopup("発行確定", "請求書を発行確定しました", "ok");
 }
 

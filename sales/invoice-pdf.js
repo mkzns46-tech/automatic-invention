@@ -12,10 +12,19 @@ function invoicePdfEscape(value) {
   }[ch]));
 }
 
+function invoicePdfClampNumber(value, min, max) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return min;
+  return Math.min(max, Math.max(min, number));
+}
+
 function invoicePdfRecalcLine(line) {
-  const gross = Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0));
-  const rateDiscount = Math.round(gross * Number(line.discountValue || 0) / 100);
+  const gross = Math.max(0, Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0)));
+  const discountRate = invoicePdfClampNumber(line.discountValue ?? line.discountRate ?? 0, 0, 100);
+  const rateDiscount = Math.round(gross * discountRate / 100);
   const fixedDiscount = Math.max(0, Number(line.discountAmountInput || line.fixedDiscountAmount || line.manualDiscountAmount || 0));
+  line.discountValue = discountRate;
+  line.discountRate = discountRate;
   line.discountAmount = Math.min(gross, fixedDiscount > 0 ? fixedDiscount : rateDiscount);
   line.amount = Math.max(0, gross - line.discountAmount);
   return line;
@@ -27,7 +36,7 @@ function calcInvoicePdfTotals(invoice) {
   let total = 0;
   (invoice.lines || []).forEach(line => {
     invoicePdfRecalcLine(line);
-    const gross = Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0));
+    const gross = Math.max(0, Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0)));
     subtotal += gross;
     discount += Number(line.discountAmount || 0);
     total += Number(line.amount || 0);
@@ -50,7 +59,7 @@ function printInvoicePdf(invoice) {
       <td class="num">${Number(line.qty || 0)}</td>
       <td>${invoicePdfEscape(line.unit || "")}</td>
       <td class="num">${invoicePdfMoney(line.unitPrice)}</td>
-      <td class="num">${invoicePdfMoney(line.discountAmount)}</td>
+      <td class="num">${Number(line.discountAmountInput || 0) > 0 ? invoicePdfMoney(line.discountAmountInput) : `${Number(line.discountValue || 0)}%`}</td>
       <td class="num">${invoicePdfMoney(line.amount)}</td>
     </tr>
   `).join("");
@@ -97,6 +106,9 @@ function printInvoicePdf(invoice) {
     <strong>${invoicePdfEscape(doc.customerName || "")} 御中</strong><br>
     ${invoicePdfEscape(doc.address || "")}<br>
     件名: ${invoicePdfEscape(doc.subject || "")}
+    <br>取引区分: ${invoicePdfEscape(doc.transactionType || "通常販売")}
+    ${doc.originalSlipNumber ? `<br>元伝票番号: ${invoicePdfEscape(doc.originalSlipNumber)}` : ""}
+    ${doc.reasonMemo ? `<br>理由メモ: ${invoicePdfEscape(doc.reasonMemo)}` : ""}
   </div>
   <div class="total">ご請求金額 ${invoicePdfMoney(totals.total)}</div>
   <table>

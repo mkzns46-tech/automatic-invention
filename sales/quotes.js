@@ -116,11 +116,17 @@ function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
 
+function clampNumber(value, min, max) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return min;
+  return Math.min(max, Math.max(min, number));
+}
+
 function recalcSalesLine(line) {
   const qty = Number(line?.qty || 0);
   const unitPrice = Number(line?.unitPrice || 0);
   const gross = Math.max(0, Math.round(qty * unitPrice));
-  const discountRate = Number(line?.discountRate ?? line?.discountValue ?? line?.discount ?? 0);
+  const discountRate = clampNumber(line?.discountRate ?? line?.discountValue ?? line?.discount ?? 0, 0, 100);
   const fixedDiscount = Math.max(0, Number(line?.discountAmountInput || line?.fixedDiscountAmount || line?.manualDiscountAmount || 0));
   const rateDiscount = Math.round(gross * discountRate / 100);
   line.discountRate = discountRate;
@@ -670,6 +676,9 @@ function buildInvoiceFromQuote(quote, invoices) {
     staff: quote.staff || "",
     memo: quote.memo || quote.customerMemo || linkedCustomer.memo || "",
     customerMemo: quote.customerMemo || quote.memo || linkedCustomer.memo || "",
+    transactionType: quote.transactionType || "通常販売",
+    originalSlipNumber: quote.originalSlipNumber || "",
+    reasonMemo: quote.reasonMemo || "",
     discountTemplate: quote.discountTemplate || "none",
     items: JSON.parse(JSON.stringify(lines)),
     lines: JSON.parse(JSON.stringify(lines))
@@ -731,11 +740,12 @@ function newQuote(shouldScroll = false) {
   currentQuoteId = null;
   currentLines = [];
   currentQuoteLocked = false;
-  ["customerName", "customerAddress", "customerPhone", "customerEmail", "quoteSubject", "quoteMemo", "productSearchInput"].forEach(id => {
+  ["customerName", "customerAddress", "customerPhone", "customerEmail", "quoteSubject", "quoteMemo", "productSearchInput", "originalSlipNumber", "reasonMemo"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
   document.getElementById("customerType").value = "個人";
+  setFieldValue("transactionType", "通常販売");
   document.getElementById("discountTemplate").value = "none";
   document.getElementById("quoteDate").value = today();
   document.getElementById("validUntil").value = today();
@@ -821,7 +831,7 @@ function renderLines() {
       <label>数量<input type="number" min="0" step="1" value="${line.qty}" onchange="updateLine(${index}, 'qty', this.value)" ${disabled}></label>
       <label>単位<select onchange="updateLine(${index}, 'unit', this.value)" ${disabled}>${UNIT_OPTIONS.map(unit => `<option value="${unit}" ${unit === line.unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label>
       <label>税込単価<input type="number" min="0" step="1" value="${line.unitPrice}" onchange="updateLine(${index}, 'unitPrice', this.value)" ${disabled}></label>
-      <label>値引率%<input type="number" min="0" step="1" value="${line.discountValue}" onchange="updateLine(${index}, 'discountValue', this.value)" ${disabled}></label>
+      <label>値引率%<input type="number" min="0" max="100" step="1" value="${line.discountValue}" onchange="updateLine(${index}, 'discountValue', this.value)" ${disabled}></label>
       <label>値引額<input type="number" min="0" step="1" value="${Number(line.discountAmountInput || 0)}" onchange="updateLine(${index}, 'discountAmountInput', this.value)" ${disabled}></label>
       <label>金額<div class="line-amount">${money(line.amount)}</div></label>
       <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateLine(${index}, 'memo', this.value)" ${disabled}></label>
@@ -838,7 +848,8 @@ function updateLine(index, key, value) {
   }
   const line = currentLines[index];
   if (!line) return;
-  if (["qty", "unitPrice", "discountValue", "discountRate", "discountAmountInput"].includes(key)) line[key] = Number(value || 0);
+  if (key === "discountValue" || key === "discountRate") line[key] = clampNumber(value, 0, 100);
+  else if (["qty", "unitPrice", "discountAmountInput"].includes(key)) line[key] = Math.max(0, Number(value || 0));
   else line[key] = value;
   if (key === "unit" && line.barcode) {
     const units = readUnits();
@@ -915,6 +926,9 @@ function collectQuote() {
     quoteDate: document.getElementById("quoteDate").value,
     validUntil: document.getElementById("validUntil").value,
     staff: document.getElementById("quoteStaff").value,
+    transactionType: document.getElementById("transactionType")?.value || existing?.transactionType || "通常販売",
+    originalSlipNumber: document.getElementById("originalSlipNumber")?.value?.trim() || "",
+    reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
     memo: document.getElementById("quoteMemo").value,
     customerMemo: document.getElementById("quoteMemo").value,
     discountTemplate: document.getElementById("discountTemplate").value,
@@ -975,6 +989,9 @@ function printQuotePdf(quote) {
     <strong>${escapeHtml(doc.customerName || "")} 御中</strong><br>
     ${escapeHtml(doc.address || "")}<br>
     件名: ${escapeHtml(doc.subject || "")}
+    <br>取引区分: ${escapeHtml(doc.transactionType || "通常販売")}
+    ${doc.originalSlipNumber ? `<br>元伝票番号: ${escapeHtml(doc.originalSlipNumber)}` : ""}
+    ${doc.reasonMemo ? `<br>理由メモ: ${escapeHtml(doc.reasonMemo)}` : ""}
   </div>
   <div class="total">見積金額 ${money(totals.total)}</div>
   <table>
@@ -1059,6 +1076,9 @@ async function fillQuoteForm(quote) {
   document.getElementById("quoteDate").value = quote.quoteDate || today();
   document.getElementById("validUntil").value = quote.validUntil || today();
   document.getElementById("quoteStaff").value = quote.staff || "";
+  setFieldValue("transactionType", quote.transactionType || "通常販売");
+  setFieldValue("originalSlipNumber", quote.originalSlipNumber || "");
+  setFieldValue("reasonMemo", quote.reasonMemo || "");
   document.getElementById("quoteMemo").value = quote.memo || "";
   document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
   renderLines();
@@ -1077,6 +1097,9 @@ function updateQuoteLockState(quote) {
     "quoteDate",
     "validUntil",
     "quoteStaff",
+    "transactionType",
+    "originalSlipNumber",
+    "reasonMemo",
     "discountTemplate",
     "quoteMemo",
     "productSearchInput"

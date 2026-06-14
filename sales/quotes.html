@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 見積書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-invoice-display-fix">
+<link rel="stylesheet" href="sales-style.css?v=20260614-zero-payment-transaction">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-lists-hidden" defer></script>
 <script src="sales-calculator.js"></script>
 <script src="quote-pdf.js"></script>
 <script src="customers-storage.js?v=20260614-html-repair"></script>
-<script src="quotes.js?v=20260614-zero-discount-fix" defer></script>
+<script src="quotes.js?v=20260614-zero-payment-transaction" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -94,6 +94,20 @@
       <label>件名<input id="quoteSubject"></label>
       <label>見積日<input id="quoteDate" type="date"></label>
       <label>有効期限<input id="validUntil" type="date"></label>
+    </div>
+    <div class="row three">
+      <label>取引区分
+        <select id="transactionType">
+          <option value="通常販売">通常販売</option>
+          <option value="交換">交換</option>
+          <option value="返品">返品</option>
+          <option value="返金">返金</option>
+          <option value="無償提供">無償提供</option>
+          <option value="その他">その他</option>
+        </select>
+      </label>
+      <label>元伝票番号<input id="originalSlipNumber" placeholder="交換・返品・返金時に入力"></label>
+      <label>理由メモ<input id="reasonMemo" placeholder="交換理由・返品理由など"></label>
     </div>
     <div class="row two">
       <label>値引きテンプレート
