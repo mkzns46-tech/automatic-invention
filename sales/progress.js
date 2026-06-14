@@ -285,7 +285,7 @@ function renderProgressList() {
 
 function renderProgressRow(row) {
   return `<tr>
-    <td><span class="number-with-status">${escapeHtml(row.originNumber)} ${row.completion === "incomplete" ? '<span class="status-badge warn">未完了</span>' : row.completion === "complete" ? '<span class="status-badge ok">完了</span>' : '<span class="status-badge danger">キャンセル含む</span>'}</span></td>
+    <td>${escapeHtml(row.originNumber)}</td>
     <td>${escapeHtml(row.transactionType)}</td>
     <td>${escapeHtml(row.organizationName)}</td>
     <td>${escapeHtml(row.customerName)}</td>

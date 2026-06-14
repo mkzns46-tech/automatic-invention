@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 入金確認</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-customer-performance">
+<link rel="stylesheet" href="sales-style.css?v=20260614-progress-unpaid">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="customers-storage.js?v=20260614-html-repair"></script>
-<script src="payments.js?v=20260614-zero-discount-fix" defer></script>
+<script src="payments.js?v=20260614-progress-unpaid" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -26,6 +26,34 @@
   </header>
 
   <div id="salesMessage" class="message">請求書を選択して入金確認できます。</div>
+
+  <section class="card" id="unpaidInvoiceListCard">
+    <div class="section-title">
+      <div>
+        <h2>未入金一覧</h2>
+        <p class="section-note">入金確認が必要な請求書を回収管理用に表示します。</p>
+      </div>
+      <span class="badge muted" id="unpaidInvoiceListCount">0件</span>
+    </div>
+    <div class="table-wrap list-scroll">
+      <table class="unpaid-list-table">
+        <thead>
+          <tr>
+            <th>伝票番号</th>
+            <th>請求日</th>
+            <th>支払期限</th>
+            <th>団体名</th>
+            <th>顧客名</th>
+            <th>請求額</th>
+            <th>入金額</th>
+            <th>未入金額</th>
+            <th>担当者</th>
+          </tr>
+        </thead>
+        <tbody id="unpaidInvoiceListBody"></tbody>
+      </table>
+    </div>
+  </section>
 
   <section class="card collapsible-list-card" id="paymentInvoiceListCard">
     <div class="sales-actions section-heading-row">

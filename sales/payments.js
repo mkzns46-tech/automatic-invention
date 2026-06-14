@@ -248,6 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   bindPaymentListControls();
   clearPaymentForm();
+  renderUnpaidInvoiceList();
   renderPaymentInvoiceList();
   const id = new URLSearchParams(location.search).get("id");
   if (id) selectPaymentInvoice(id);
@@ -303,6 +304,53 @@ function getPaymentTargetInvoices() {
   return readPaymentInvoices()
     .filter(invoice => PAYMENT_TARGET_STATUSES.includes(normalizePaymentStatus(invoice.status)))
     .sort((a, b) => String(b.issuedAt || b.invoiceDate || b.createdAt).localeCompare(String(a.issuedAt || a.invoiceDate || a.createdAt)));
+}
+
+function getUnpaidInvoices() {
+  return readPaymentInvoices()
+    .filter(invoice => {
+      const status = normalizePaymentStatus(invoice.status);
+      if (status === PAYMENT_STATUS_CANCELLED || status === PAYMENT_STATUS_PAID) return false;
+      const total = calcInvoiceTotal(invoice);
+      if (total <= 0) return false;
+      return Math.max(0, total - getPaidTotal(invoice)) > 0;
+    })
+    .sort((a, b) => String(a.dueDate || a.invoiceDate || "").localeCompare(String(b.dueDate || b.invoiceDate || "")));
+}
+
+function isPaymentOverdue(invoice) {
+  const dueDate = normalizeDateOnly(invoice?.dueDate);
+  return Boolean(dueDate && dueDate < today() && Math.max(0, calcInvoiceTotal(invoice) - getPaidTotal(invoice)) > 0);
+}
+
+function renderUnpaidInvoiceList() {
+  const body = document.getElementById("unpaidInvoiceListBody");
+  if (!body) return;
+  const invoices = getUnpaidInvoices();
+  const count = document.getElementById("unpaidInvoiceListCount");
+  if (count) count.textContent = `${invoices.length}件`;
+  body.innerHTML = invoices.length
+    ? invoices.map(renderUnpaidInvoiceRow).join("")
+    : '<tr><td colspan="9">未入金の請求書はありません。</td></tr>';
+}
+
+function renderUnpaidInvoiceRow(invoice) {
+  const total = calcInvoiceTotal(invoice);
+  const paid = getPaidTotal(invoice);
+  const unpaid = Math.max(0, total - paid);
+  const customerView = getPaymentCustomerView(invoice);
+  const overdue = isPaymentOverdue(invoice) ? " overdue-text" : "";
+  return `<tr>
+    <td>${escapeHtml(invoice.originNumber || invoice.masterNumber || invoice.quoteNumber || invoice.sourceQuoteNo || invoice.invoiceNo || "")}</td>
+    <td>${escapeHtml(invoice.invoiceDate || "")}</td>
+    <td class="${overdue}">${escapeHtml(invoice.dueDate || "")}</td>
+    <td>${escapeHtml(customerView.organizationName || "")}</td>
+    <td>${escapeHtml(customerView.customerName || "")}</td>
+    <td>${money(total)}</td>
+    <td>${money(paid)}</td>
+    <td class="${overdue}">${money(unpaid)}</td>
+    <td>${escapeHtml(invoice.staff || "")}</td>
+  </tr>`;
 }
 
 function renderPaymentInvoiceList() {
@@ -468,6 +516,7 @@ function savePayment() {
   }
   invoices[index] = invoice;
   writePaymentInvoices(invoices);
+  renderUnpaidInvoiceList();
   selectPaymentInvoice(invoice.id);
   renderPaymentInvoiceList();
   showSalesPopup("入金確認を保存しました", `${invoice.invoiceNo || ""}\nステータス: ${invoice.status}`, "ok");
@@ -513,6 +562,7 @@ async function cancelPayment(id) {
   invoice.updatedAt = now;
   invoices[index] = invoice;
   writePaymentInvoices(invoices);
+  renderUnpaidInvoiceList();
   selectPaymentInvoice(invoice.id);
   renderPaymentInvoiceList();
   showSalesPopup("入金確認を取り消しました", `${invoice.invoiceNo || ""}\nステータス: ${invoice.status}`, "ok");
