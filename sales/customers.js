@@ -116,7 +116,7 @@ function renderCustomerList() {
   if (count) count.textContent = `${customers.length}件`;
   body.innerHTML = customers.length ? customers.map(customer => `<tr>
     <td>${escapeHtml(customer.customerCode)}</td>
-    <td>${escapeHtml(customer.customerName)}</td>
+    <td><button type="button" class="link-button" onclick="showCustomerDetail('${escapeHtml(customer.id)}');">${escapeHtml(customer.customerName)}</button> ${customerSyncBadge(customer)}</td>
     <td>${escapeHtml(customer.customerType)}</td>
     <td>${escapeHtml(customer.phone)}</td>
     <td>${escapeHtml(customer.email)}</td>
@@ -125,6 +125,44 @@ function renderCustomerList() {
     <td>${escapeHtml(formatDate(customer.updatedAt))}</td>
     <td><button type="button" class="secondary" onclick="editCustomer('${escapeHtml(customer.id)}');">編集</button></td>
   </tr>`).join("") : '<tr><td colspan="9">顧客データはありません。</td></tr>';
+}
+
+function customerSyncBadge(customer) {
+  const linked = Boolean(customer.smaregiCustomerId || customer.smaregiMemberId);
+  return linked
+    ? '<span class="status-badge ok">&#12473;&#12510;&#12524;&#12472;&#36899;&#25658;&#28168;</span>'
+    : '<span class="status-badge muted">&#26410;&#36899;&#25658;</span>';
+}
+
+function startNewCustomerRegistration() {
+  clearCustomerForm();
+  showCustomerMessage("新規顧客を入力してください。", "ok");
+  document.getElementById("customerEditCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function showCustomerDetail(id) {
+  const customer = customerStorage().readCustomers().find(row => row.id === id);
+  const card = document.getElementById("customerDetailCard");
+  const body = document.getElementById("customerDetailBody");
+  if (!customer || !card || !body) return;
+  body.innerHTML = `
+    <div><span>&#39015;&#23458;&#12467;&#12540;&#12489;</span><strong>${escapeHtml(customer.customerCode)}</strong></div>
+    <div><span>&#39015;&#23458;&#21517;</span><strong>${escapeHtml(customer.customerName)}</strong></div>
+    <div><span>&#39015;&#23458;&#21306;&#20998;</span><strong>${escapeHtml(customer.customerType)}</strong></div>
+    <div><span>&#21516;&#26399;&#29366;&#24907;</span><strong>${customerSyncBadge(customer)}</strong></div>
+    <div><span>&#38651;&#35441;&#30058;&#21495;</span><strong>${escapeHtml(customer.phone)}</strong></div>
+    <div><span>&#12513;&#12540;&#12523;&#12450;&#12489;&#12524;&#12473;</span><strong>${escapeHtml(customer.email)}</strong></div>
+    <div><span>&#20303;&#25152;</span><strong>${escapeHtml(customer.address)}</strong></div>
+    <div><span>&#12473;&#12510;&#12524;&#12472;&#20250;&#21729;&#12467;&#12540;&#12489;</span><strong>${escapeHtml(customer.smaregiMemberCode || customer.smaregiCustomerCode)}</strong></div>
+    <div><span>&#30331;&#37682;&#26085;</span><strong>${escapeHtml(formatDate(customer.createdAt))}</strong></div>
+    <div><span>&#26356;&#26032;&#26085;</span><strong>${escapeHtml(formatDate(customer.updatedAt))}</strong></div>
+  `;
+  card.classList.remove("hidden");
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function hideCustomerDetail() {
+  document.getElementById("customerDetailCard")?.classList.add("hidden");
 }
 
 function matchesCustomerFilters(customer) {
@@ -250,6 +288,8 @@ function saveCustomer() {
     customerCode: getValue("customerCode") || customerStorage().nextCustomerCode(customers),
     smaregiMemberId: getValue("smaregiMemberId"),
     smaregiMemberCode: getValue("smaregiMemberCode"),
+    smaregiCustomerId: getValue("smaregiMemberId"),
+    smaregiCustomerCode: getValue("smaregiMemberCode"),
     customerName: getValue("customerName"),
     kana: getValue("customerKana"),
     customerType: customerStorage().normalizeCustomerType(getValue("customerType")),

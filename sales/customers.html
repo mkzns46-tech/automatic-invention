@@ -45,6 +45,7 @@
     <div class="sales-actions section-heading-row">
       <h2 class="list-heading" onclick="toggleCustomerList();">顧客一覧 <span class="status-badge muted" id="customerListCount">0件</span></h2>
       <button type="button" class="secondary list-toggle-button" id="customerListToggle" onclick="toggleCustomerList();">一覧を閉じる</button>
+      <button type="button" class="primary" onclick="startNewCustomerRegistration();">&#65291;&#26032;&#35215;&#39015;&#23458;</button>
     </div>
     <div class="list-panel" id="customerListPanel">
       <div class="list-filter-row customer-filter-row">
@@ -62,6 +63,27 @@
           <thead><tr><th>顧客コード</th><th>顧客名</th><th>顧客区分</th><th>電話番号</th><th>メールアドレス</th><th>スマレジ会員コード</th><th>担当者</th><th>更新日</th><th>操作</th></tr></thead>
           <tbody id="customerListBody"></tbody>
         </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card hidden" id="customerDetailCard">
+    <div class="section-title">
+      <div>
+        <h2>&#39015;&#23458;&#35443;&#32048;</h2>
+        <p class="section-note">&#39015;&#23458;&#24773;&#22577;&#12392;&#21516;&#26399;&#29366;&#24907;&#12434;&#30906;&#35469;&#12391;&#12365;&#12414;&#12377;&#12290;</p>
+      </div>
+      <button type="button" class="secondary" onclick="hideCustomerDetail();">&#38281;&#12376;&#12427;</button>
+    </div>
+    <div id="customerDetailBody" class="customer-detail-grid"></div>
+    <div class="customer-history-placeholder">
+      <h3>&#23653;&#27508;</h3>
+      <div class="shipping-roadmap">
+        <span class="badge muted">&#35211;&#31309;&#23653;&#27508;&#65306;&#28310;&#20633;&#20013;</span>
+        <span class="badge muted">&#35531;&#27714;&#23653;&#27508;&#65306;&#28310;&#20633;&#20013;</span>
+        <span class="badge muted">&#20837;&#37329;&#23653;&#27508;&#65306;&#28310;&#20633;&#20013;</span>
+        <span class="badge muted">&#32013;&#21697;&#23653;&#27508;&#65306;&#28310;&#20633;&#20013;</span>
+        <span class="badge muted">&#38936;&#21454;&#23653;&#27508;&#65306;&#28310;&#20633;&#20013;</span>
       </div>
     </div>
   </section>

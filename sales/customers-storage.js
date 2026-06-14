@@ -62,6 +62,36 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
     return `C-${String(max + 1).padStart(6, "0")}`;
   }
 
+  function createManualCustomer(data = {}) {
+    const timestamp = nowIso();
+    const customers = readCustomers();
+    const customer = {
+      id: makeCustomerId(),
+      customerCode: nextCustomerCode(customers),
+      customerName: String(data.customerName || "").trim(),
+      kana: String(data.kana || "").trim(),
+      customerType: normalizeCustomerType(data.customerType),
+      staff: String(data.staff || "").trim(),
+      postalCode: String(data.postalCode || "").trim(),
+      address: String(data.address || "").trim(),
+      phone: String(data.phone || "").trim(),
+      email: String(data.email || "").trim(),
+      memo: String(data.memo || "").trim(),
+      smaregiMemberId: "",
+      smaregiMemberCode: "",
+      smaregiCustomerId: "",
+      smaregiCustomerCode: "",
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    if (!customer.customerName) {
+      throw new Error("顧客名を入力してください。");
+    }
+    customers.push(customer);
+    writeCustomers(customers);
+    return customer;
+  }
+
   function findExistingIndex(customers, incoming) {
     const memberId = normalizeKey(incoming.smaregiMemberId);
     const memberCode = normalizeKey(incoming.smaregiMemberCode);
@@ -154,6 +184,7 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
     writeCustomers,
     normalizeCustomerType,
     nextCustomerCode,
+    createManualCustomer,
     searchCustomers,
     upsertSmaregiCustomers
   };

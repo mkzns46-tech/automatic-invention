@@ -127,6 +127,29 @@
     </div>
   </section>
 </main>
+<div id="quoteCustomerCreateModal" class="app-popup" style="display:none;">
+  <div class="app-popup-card customer-create-modal-card">
+    <div class="app-popup-title">&#26032;&#35215;&#39015;&#23458;&#30331;&#37682;</div>
+    <div class="row two">
+      <label>&#39015;&#23458;&#21517;<input id="quoteNewCustomerName"></label>
+      <label>&#39015;&#23458;&#21306;&#20998;<select id="quoteNewCustomerType"></select></label>
+    </div>
+    <div class="row two">
+      <label>&#25285;&#24403;&#32773;<input id="quoteNewCustomerStaff"></label>
+      <label>&#37109;&#20415;&#30058;&#21495;<input id="quoteNewCustomerPostalCode"></label>
+    </div>
+    <label>&#20303;&#25152;<input id="quoteNewCustomerAddress"></label>
+    <div class="row two">
+      <label>&#38651;&#35441;&#30058;&#21495;<input id="quoteNewCustomerPhone"></label>
+      <label>&#12513;&#12540;&#12523;&#12450;&#12489;&#12524;&#12473;<input id="quoteNewCustomerEmail" type="email"></label>
+    </div>
+    <label>&#20633;&#32771;<textarea id="quoteNewCustomerMemo"></textarea></label>
+    <div class="sales-actions">
+      <button type="button" onclick="saveQuoteNewCustomer();">&#20445;&#23384;&#12375;&#12390;&#36984;&#25246;</button>
+      <button type="button" class="secondary" onclick="closeQuoteNewCustomerModal();">&#12461;&#12515;&#12531;&#12475;&#12523;</button>
+    </div>
+  </div>
+</div>
 <div id="salesPopup" class="app-popup" style="display:none;">
   <div class="app-popup-card">
     <div id="salesPopupTitle" class="app-popup-title">完了</div>

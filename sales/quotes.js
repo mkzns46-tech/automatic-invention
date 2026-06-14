@@ -344,7 +344,7 @@ function renderQuoteCustomerSearchResults(query) {
     <td>${escapeHtml(customer.email)}</td>
     <td>${escapeHtml(customer.smaregiMemberCode)}</td>
     <td><button type="button" class="secondary" onclick="selectQuoteCustomer('${escapeHtml(customer.id)}')">選択</button></td>
-  </tr>`).join("")}</tbody></table></div>` : '<div class="message warn">該当する顧客がありません。</div>';
+  </tr>`).join("")}</tbody></table></div>` : `<div class="message warn">該当顧客が見つかりません</div><button type="button" class="secondary" onclick="openQuoteNewCustomerModal('${escapeHtml(text)}')">新規顧客登録</button>`;
 }
 
 function selectQuoteCustomer(customerId) {
@@ -369,6 +369,55 @@ function applyCustomerToQuote(customer) {
   setFieldValue("customerEmail", customer.email);
   const memo = document.getElementById("quoteMemo");
   if (memo && customer.memo && !memo.value) memo.value = customer.memo;
+}
+
+function openQuoteNewCustomerModal(seedName = "") {
+  const modal = document.getElementById("quoteCustomerCreateModal");
+  if (!modal) {
+    location.href = "customers.html";
+    return;
+  }
+  const typeSelect = document.getElementById("quoteNewCustomerType");
+  if (typeSelect && !typeSelect.options.length) {
+    typeSelect.innerHTML = ARICO_CUSTOMER_TYPES.map(type => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("");
+  }
+  setFieldValue("quoteNewCustomerName", seedName);
+  setFieldValue("quoteNewCustomerStaff", "");
+  setFieldValue("quoteNewCustomerPostalCode", "");
+  setFieldValue("quoteNewCustomerAddress", "");
+  setFieldValue("quoteNewCustomerPhone", "");
+  setFieldValue("quoteNewCustomerEmail", "");
+  setFieldValue("quoteNewCustomerMemo", "");
+  if (typeSelect) typeSelect.value = ARICO_CUSTOMER_TYPES[0] || "";
+  modal.style.display = "flex";
+}
+
+function closeQuoteNewCustomerModal() {
+  const modal = document.getElementById("quoteCustomerCreateModal");
+  if (modal) modal.style.display = "none";
+}
+
+function saveQuoteNewCustomer() {
+  try {
+    const customer = window.SalesCustomerStorage.createManualCustomer({
+      customerName: document.getElementById("quoteNewCustomerName")?.value,
+      customerType: document.getElementById("quoteNewCustomerType")?.value,
+      staff: document.getElementById("quoteNewCustomerStaff")?.value,
+      postalCode: document.getElementById("quoteNewCustomerPostalCode")?.value,
+      address: document.getElementById("quoteNewCustomerAddress")?.value,
+      phone: document.getElementById("quoteNewCustomerPhone")?.value,
+      email: document.getElementById("quoteNewCustomerEmail")?.value,
+      memo: document.getElementById("quoteNewCustomerMemo")?.value
+    });
+    closeQuoteNewCustomerModal();
+    applyCustomerToQuote(customer);
+    setFieldValue("quoteCustomerSearchInput", "");
+    const results = document.getElementById("quoteCustomerSearchResults");
+    if (results) results.innerHTML = "";
+    showSalesPopup("顧客登録", "顧客情報を反映しました", "ok");
+  } catch (error) {
+    showSalesPopup("保存できません", error?.message || String(error), "warn");
+  }
 }
 
 function setFieldValue(id, value) {

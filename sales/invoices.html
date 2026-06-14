@@ -8,7 +8,6 @@
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-lists-hidden" defer></script>
-<script src="customers-storage.js?v=20260614-customer-link"></script>
 <script src="invoice-pdf.js?v=20260614-lists-hidden"></script>
 <script src="invoices.js?v=20260614-customer-link" defer></script>
 </head>
@@ -75,10 +74,6 @@
     <input id="salesCustomerCode" type="hidden">
     <input id="salesSmaregiCustomerId" type="hidden">
     <input id="salesSmaregiCustomerCode" type="hidden">
-    <div class="customer-search-box">
-      <label>&#39015;&#23458;&#26908;&#32034;<input id="invoiceCustomerSearchInput" placeholder="&#39015;&#23458;&#21517;&#12539;&#38651;&#35441;&#30058;&#21495;&#12539;&#12513;&#12540;&#12523;&#12539;&#12473;&#12510;&#12524;&#12472;&#20250;&#21729;&#12467;&#12540;&#12489;"></label>
-      <div id="invoiceCustomerSearchResults" class="customer-search-results"></div>
-    </div>
     <div class="row">
       <label>請求書番号<input id="invoiceNo" readonly></label>
       <label>ステータス<select id="invoiceStatus"></select></label>
