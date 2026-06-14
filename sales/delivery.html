@@ -38,9 +38,11 @@
         <label>ステータス
           <select id="deliveryStatusFilter">
             <option value="">全て</option>
+            <option value="未発送">未発送</option>
             <option value="未発行">未発行</option>
             <option value="納品書発行済">納品書発行済</option>
             <option value="発送済">発送済</option>
+            <option value="完了済">完了済</option>
             <option value="キャンセル">キャンセル</option>
           </select>
         </label>
@@ -54,8 +56,8 @@
           <tbody id="deliveryListBody"></tbody>
         </table>
       </div>
-      <div class="list-panel completed-list-panel" id="deliveryCompletedListPanel" hidden>
-        <div class="list-subheading">完了済み・キャンセル済み</div>
+      <div class="list-panel completed-list-panel" id="deliveryCompletedListPanel">
+        <div class="list-subheading">発送済・完了済一覧</div>
         <div class="table-wrap list-scroll">
           <table>
             <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>

@@ -252,7 +252,13 @@ function renderDeliveryRow(delivery) {
 
 function matchesDeliveryFilters(delivery) {
   const status = normalizeDeliveryStatus(delivery.status);
-  if (deliveryStatusFilter && status !== deliveryStatusFilter) return false;
+  if (deliveryStatusFilter === "未発送") {
+    if (status === DELIVERY_STATUS_SHIPPED || status === DELIVERY_STATUS_CANCELLED) return false;
+  } else if (deliveryStatusFilter === "完了済") {
+    if (status !== DELIVERY_STATUS_SHIPPED) return false;
+  } else if (deliveryStatusFilter && status !== deliveryStatusFilter) {
+    return false;
+  }
   if (!matchesDateRange([delivery.createdAt, delivery.invoiceDate, delivery.issuedAt, delivery.shipmentDate, delivery.updatedAt], deliveryDateFrom, deliveryDateTo)) return false;
   if (!deliverySearchText) return true;
   const text = [
