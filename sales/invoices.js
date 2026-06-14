@@ -65,17 +65,18 @@ function isInvoiceEditable(invoiceOrStatus) {
 }
 
 function pickInvoiceCustomerFields(row) {
+  const info = row?.customerInfo || row?.customer_info || row?.customerDetail || {};
   return {
     customerId: row?.customerId || "",
     customerCode: row?.customerCode || "",
     smaregiCustomerId: row?.smaregiCustomerId || "",
     smaregiCustomerCode: row?.smaregiCustomerCode || "",
-    customerName: row?.customerName || row?.name || row?.customer || row?.clientName || "",
-    organizationName: row?.organizationName || row?.organization || row?.companyName || "",
-    customerType: row?.customerType || "",
-    address: row?.address || "",
-    phone: row?.phone || "",
-    email: row?.email || "",
+    customerName: row?.customerName || row?.name || row?.customer || row?.clientName || info.customerName || info.name || "",
+    organizationName: row?.organizationName || row?.organization || row?.companyName || info.organizationName || info.organization || info.companyName || "",
+    customerType: row?.customerType || info.customerType || "",
+    address: row?.address || info.address || "",
+    phone: row?.phone || info.phone || info.tel || "",
+    email: row?.email || info.email || "",
     customerMemo: row?.customerMemo || row?.memo || ""
   };
 }
@@ -112,14 +113,15 @@ function resolveInvoiceCustomer(invoice) {
 
 function getInvoiceCustomerView(invoice) {
   const customer = resolveInvoiceCustomer(invoice) || {};
+  const info = invoice?.customerInfo || invoice?.customer_info || invoice?.customerDetail || {};
   return {
-    customerName: customer.customerName || customer.name || invoice.customerName || invoice.name || invoice.customer || invoice.clientName || "",
-    organizationName: customer.organizationName || customer.organization || customer.companyName || invoice.organizationName || invoice.organization || invoice.companyName || "",
-    customerType: customer.customerType || invoice.customerType || "",
-    address: customer.address || invoice.address || "",
-    phone: customer.phone || invoice.phone || "",
-    email: customer.email || invoice.email || "",
-    customerMemo: customer.memo || customer.customerMemo || invoice.customerMemo || invoice.memo || ""
+    customerName: customer.customerName || customer.name || invoice.customerName || invoice.name || invoice.customer || invoice.clientName || info.customerName || info.name || "",
+    organizationName: customer.organizationName || customer.organization || customer.companyName || invoice.organizationName || invoice.organization || invoice.companyName || info.organizationName || info.organization || info.companyName || "",
+    customerType: customer.customerType || invoice.customerType || info.customerType || "",
+    address: customer.address || invoice.address || info.address || "",
+    phone: customer.phone || invoice.phone || info.phone || info.tel || "",
+    email: customer.email || invoice.email || info.email || "",
+    customerMemo: customer.memo || customer.customerMemo || invoice.customerMemo || invoice.memo || info.memo || ""
   };
 }
 

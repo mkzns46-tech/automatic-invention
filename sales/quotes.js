@@ -583,6 +583,8 @@ function buildInvoiceFromQuote(quote, invoices) {
   console.log("convert quote customer fields", pickCustomerFields(quote));
   const originNumber = quote.originNumber || quote.masterNumber || quote.quoteNumber || quote.quoteNo || "";
   const newInvoiceNo = nextInvoiceNo(invoices);
+  const customerName = quote.customerName || quote.name || quote.customer || quote.clientName || linkedCustomer.customerName || linkedCustomer.name || "";
+  const organizationName = quote.organizationName || quote.organization || quote.companyName || linkedCustomer.organizationName || linkedCustomer.organization || linkedCustomer.companyName || "";
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     invoiceNo: newInvoiceNo,
@@ -599,12 +601,12 @@ function buildInvoiceFromQuote(quote, invoices) {
     createdAt: now,
     updatedAt: now,
     status: "draft",
-    customerName: "",
-    organizationName: "",
-    customerType: "",
-    address: "",
-    phone: "",
-    email: "",
+    customerName,
+    organizationName,
+    customerType: quote.customerType || linkedCustomer.customerType || "",
+    address: quote.address || linkedCustomer.address || "",
+    phone: quote.phone || linkedCustomer.phone || "",
+    email: quote.email || linkedCustomer.email || "",
     subject: quote.subject || "",
     invoiceDate: today(),
     dueDate: today(),
