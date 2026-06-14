@@ -127,7 +127,7 @@ function renderCustomerList() {
     : `${visibleCustomers.length}件 / 全${customers.length}件`;
   body.innerHTML = visibleCustomers.length ? visibleCustomers.map(customer => `<tr>
     <td>${escapeHtml(customer.customerCode)}</td>
-    <td title="${escapeHtml(customer.customerName)}"><button type="button" class="link-button" onclick="showCustomerDetail('${escapeHtml(customer.id)}');">${escapeHtml(customer.customerName)}</button> ${customerSyncBadge(customer)}</td>
+    <td title="${escapeHtml(customer.customerName)}"><button type="button" class="link-button" onclick="showCustomerDetail('${escapeHtml(customer.id)}');">${escapeHtml(customer.customerName)}</button></td>
     <td title="${escapeHtml(customer.organizationName || "")}">${escapeHtml(customer.organizationName || "")}</td>
     <td>${escapeHtml(customer.customerType)}</td>
     <td>${escapeHtml(formatDate(customer.updatedAt))}</td>

@@ -79,19 +79,20 @@ function isInvoiceEditable(invoiceOrStatus) {
 }
 
 function pickInvoiceCustomerFields(row) {
-  const info = row?.customerInfo || row?.customer_info || row?.customerDetail || {};
+  const customerObject = typeof row?.customer === "object" && row.customer ? row.customer : {};
+  const info = row?.customerInfo || row?.customer_info || row?.customerDetail || row?.customerData || row?.billingCustomer || customerObject || {};
   return {
-    customerId: row?.customerId || "",
-    customerCode: row?.customerCode || "",
-    smaregiCustomerId: row?.smaregiCustomerId || "",
-    smaregiCustomerCode: row?.smaregiCustomerCode || "",
-    customerName: row?.customerName || row?.name || row?.customer || row?.clientName || row?.billingName || row?.customer_name || info.customerName || info.name || "",
+    customerId: row?.customerId || info.customerId || info.id || "",
+    customerCode: row?.customerCode || info.customerCode || info.code || "",
+    smaregiCustomerId: row?.smaregiCustomerId || info.smaregiCustomerId || info.smaregiMemberId || "",
+    smaregiCustomerCode: row?.smaregiCustomerCode || info.smaregiCustomerCode || info.smaregiMemberCode || "",
+    customerName: row?.customerName || row?.name || row?.clientName || row?.billingName || row?.customer_name || info.customerName || info.name || "",
     organizationName: row?.organizationName || row?.organization || row?.companyName || row?.company || row?.organization_name || info.organizationName || info.organization || info.companyName || "",
     customerType: row?.customerType || row?.customer_type || info.customerType || "",
     address: row?.address || row?.customerAddress || row?.customer_address || info.address || "",
     phone: row?.phone || row?.tel || row?.customerPhone || row?.customer_phone || info.phone || info.tel || "",
     email: row?.email || row?.customerEmail || row?.customer_email || info.email || "",
-    customerMemo: row?.customerMemo || row?.memo || ""
+    customerMemo: row?.customerMemo || row?.memo || info.customerMemo || info.memo || ""
   };
 }
 
@@ -183,9 +184,29 @@ function normalizeInvoiceLine(line) {
   return recalcInvoiceLine(normalized);
 }
 
+function firstLineArray(...values) {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length) return value;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const rows = Object.values(value).filter(row => row && typeof row === "object");
+      if (rows.length) return rows;
+    }
+  }
+  return [];
+}
+
 function getInvoiceRawLines(invoice) {
-  const candidates = [invoice?.items, invoice?.lines, invoice?.products, invoice?.details, invoice?.invoiceItems, invoice?.invoiceLines];
-  const rows = candidates.find(value => Array.isArray(value) && value.length) || [];
+  const rows = firstLineArray(
+    invoice?.lines,
+    invoice?.items,
+    invoice?.products,
+    invoice?.details,
+    invoice?.invoiceItems,
+    invoice?.invoiceLines,
+    invoice?.quoteLines,
+    invoice?.lineItems,
+    invoice?.orderItems
+  );
   return rows.map(normalizeInvoiceLine);
 }
 
@@ -193,6 +214,11 @@ function normalizeInvoiceForView(invoice) {
   const normalized = { ...(invoice || {}) };
   const customerView = getInvoiceCustomerView(normalized);
   const lines = getInvoiceRawLines(normalized);
+  const customerFields = pickInvoiceCustomerFields(normalized);
+  normalized.customerId = normalized.customerId || customerFields.customerId;
+  normalized.customerCode = normalized.customerCode || customerFields.customerCode;
+  normalized.smaregiCustomerId = normalized.smaregiCustomerId || customerFields.smaregiCustomerId;
+  normalized.smaregiCustomerCode = normalized.smaregiCustomerCode || customerFields.smaregiCustomerCode;
   normalized.customerName = customerView.customerName;
   normalized.organizationName = customerView.organizationName;
   normalized.customerType = customerView.customerType;
@@ -202,6 +228,40 @@ function normalizeInvoiceForView(invoice) {
   normalized.customerMemo = customerView.customerMemo;
   normalized.items = lines;
   normalized.lines = lines;
+  return normalized;
+}
+
+function persistNormalizedInvoiceIfNeeded(invoice) {
+  if (!invoice?.id) return invoice;
+  const invoices = readInvoices();
+  const index = invoices.findIndex(row => row.id === invoice.id);
+  if (index < 0) return invoice;
+  const original = invoices[index];
+  const normalized = normalizeInvoiceForView(original);
+  const shouldPersist = Boolean(
+    normalized.customerName && !original.customerName ||
+    normalized.organizationName && !original.organizationName ||
+    normalized.lines.length && (!Array.isArray(original.lines) || !original.lines.length)
+  );
+  if (shouldPersist) {
+    invoices[index] = {
+      ...original,
+      customerId: normalized.customerId || original.customerId || "",
+      customerCode: normalized.customerCode || original.customerCode || "",
+      smaregiCustomerId: normalized.smaregiCustomerId || original.smaregiCustomerId || "",
+      smaregiCustomerCode: normalized.smaregiCustomerCode || original.smaregiCustomerCode || "",
+      customerName: normalized.customerName || original.customerName || "",
+      organizationName: normalized.organizationName || original.organizationName || "",
+      customerType: normalized.customerType || original.customerType || "",
+      address: normalized.address || original.address || "",
+      phone: normalized.phone || original.phone || "",
+      email: normalized.email || original.email || "",
+      items: normalized.items,
+      lines: normalized.lines
+    };
+    writeInvoices(invoices);
+    return invoices[index];
+  }
   return normalized;
 }
 
@@ -565,6 +625,7 @@ function clearInvoiceEditor() {
 }
 
 function fillInvoiceForm(invoice) {
+  invoice = persistNormalizedInvoiceIfNeeded(invoice);
   invoice = normalizeInvoiceForView(invoice);
   const customerView = getInvoiceCustomerView(invoice);
   console.log("render invoice customer fields", {
@@ -837,10 +898,10 @@ function cancelInvoice() {
 }
 
 function outputCurrentInvoicePdf() {
-  printInvoicePdf(collectInvoice());
+  printInvoicePdf(normalizeInvoiceForView(collectInvoice()));
 }
 
 function printInvoiceById(id) {
   const invoice = readInvoices().find(row => row.id === id);
-  if (invoice) printInvoicePdf(invoice);
+  if (invoice) printInvoicePdf(normalizeInvoiceForView(invoice));
 }
