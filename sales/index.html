@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 販売管理</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-delivery">
+<link rel="stylesheet" href="sales-style.css?v=20260615-home-ticket-list">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="sales.js?v=20260614-progress" defer></script>
+<script src="sales-home-progress.js?v=20260615-home-ticket-list" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -35,6 +36,42 @@
       <div class="badge muted">v1</div>
     </div>
     <section id="salesMenuGrid" class="grid"></section>
+  </section>
+
+  <section class="card sales-home-ticket-card">
+    <div class="section-title">
+      <div>
+        <h2>伝票一覧 <span class="status-badge muted" id="homeTicketCount">0件 / 合計 0円</span></h2>
+        <p class="section-note">直近50件を表示します。検索時は条件に一致した伝票へ切り替わります。</p>
+      </div>
+      <a class="secondary" href="progress.html">販売進捗確認を開く</a>
+    </div>
+
+    <div class="progress-list-filter sales-home-ticket-filter">
+      <label>ステータス<select id="homeTicketStatusFilter"></select></label>
+      <label>取引区分<select id="homeTicketTransactionFilter"></select></label>
+      <label>団体名<input id="homeTicketOrganizationFilter" placeholder="団体名"></label>
+      <label>顧客名<input id="homeTicketCustomerFilter" placeholder="顧客名"></label>
+      <label>開始日<input id="homeTicketDateFromFilter" type="date"></label>
+      <label>終了日<input id="homeTicketDateToFilter" type="date"></label>
+    </div>
+
+    <div class="table-wrap sales-home-ticket-scroll">
+      <table class="sales-home-ticket-table">
+        <thead>
+          <tr>
+            <th>伝票番号</th>
+            <th>ステータス</th>
+            <th>取引区分</th>
+            <th>団体名</th>
+            <th>顧客名</th>
+            <th>金額</th>
+            <th>日付</th>
+          </tr>
+        </thead>
+        <tbody id="homeTicketBody"></tbody>
+      </table>
+    </div>
   </section>
 </main>
 </body>
