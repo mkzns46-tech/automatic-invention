@@ -72,7 +72,11 @@ function normalizeCustomer(row) {
     row.member_name,
     row.name,
     row.fullName,
-    row.full_name
+    row.full_name,
+    [row.lastName, row.firstName].map(value => String(value ?? "").trim()).filter(Boolean).join(" "),
+    [row.last_name, row.first_name].map(value => String(value ?? "").trim()).filter(Boolean).join(" "),
+    [row.familyName, row.givenName].map(value => String(value ?? "").trim()).filter(Boolean).join(" "),
+    [row.family_name, row.given_name].map(value => String(value ?? "").trim()).filter(Boolean).join(" ")
   );
 
   return {
@@ -90,6 +94,81 @@ function normalizeCustomer(row) {
     registeredAt: firstString(row.registeredAt, row.registered_at, row.createdAt, row.created_at, row.entryDate, row.entry_date),
     updatedAt: firstString(row.updatedAt, row.updated_at, row.modifiedAt, row.modified_at, row.updateDate, row.update_date)
   };
+}
+
+function sampleRows(rows, count = 5) {
+  return rows.slice(0, count).map(row => {
+    const sample = {};
+    for (const [key, value] of Object.entries(row || {})) {
+      if (value && typeof value === "object") {
+        sample[key] = Array.isArray(value) ? `[array:${value.length}]` : "[object]";
+      } else {
+        sample[key] = value;
+      }
+    }
+    return sample;
+  });
+}
+
+function collectRawKeys(rows) {
+  const keys = new Set();
+  rows.forEach(row => {
+    if (!row || typeof row !== "object") return;
+    Object.keys(row).forEach(key => keys.add(key));
+  });
+  return [...keys].sort();
+}
+
+function analyzeCustomerRows(rows) {
+  const skipReasons = {
+    customerNameMissing: 0,
+    smaregiMemberCodeMissing: 0,
+    smaregiMemberIdMissing: 0,
+    phoneMissing: 0,
+    emailMissing: 0
+  };
+  const fieldHits = {
+    customerName: {},
+    smaregiMemberCode: {},
+    smaregiMemberId: {},
+    phone: {},
+    email: {}
+  };
+
+  const fieldCandidates = {
+    customerName: ["customerName", "customer_name", "memberName", "member_name", "name", "fullName", "full_name", "lastName+firstName", "last_name+first_name", "familyName+givenName", "family_name+given_name"],
+    smaregiMemberCode: ["customerCode", "customer_code", "memberCode", "member_code", "code"],
+    smaregiMemberId: ["customerId", "customer_id", "memberId", "member_id", "id"],
+    phone: ["phoneNumber", "phone_number", "tel", "telephone", "mobilePhoneNumber", "mobile_phone_number", "mobile"],
+    email: ["email", "mailAddress", "mail_address", "emailAddress", "email_address"]
+  };
+
+  const valueForCandidate = (row, candidate) => {
+    if (candidate === "lastName+firstName") return firstString([row.lastName, row.firstName].map(value => String(value ?? "").trim()).filter(Boolean).join(" "));
+    if (candidate === "last_name+first_name") return firstString([row.last_name, row.first_name].map(value => String(value ?? "").trim()).filter(Boolean).join(" "));
+    if (candidate === "familyName+givenName") return firstString([row.familyName, row.givenName].map(value => String(value ?? "").trim()).filter(Boolean).join(" "));
+    if (candidate === "family_name+given_name") return firstString([row.family_name, row.given_name].map(value => String(value ?? "").trim()).filter(Boolean).join(" "));
+    return firstString(row[candidate]);
+  };
+
+  for (const row of rows) {
+    const normalized = normalizeCustomer(row || {});
+    if (!normalized.customerName) skipReasons.customerNameMissing += 1;
+    if (!normalized.smaregiMemberCode) skipReasons.smaregiMemberCodeMissing += 1;
+    if (!normalized.smaregiMemberId) skipReasons.smaregiMemberIdMissing += 1;
+    if (!normalized.phone) skipReasons.phoneMissing += 1;
+    if (!normalized.email) skipReasons.emailMissing += 1;
+
+    for (const [field, candidates] of Object.entries(fieldCandidates)) {
+      for (const candidate of candidates) {
+        if (valueForCandidate(row || {}, candidate)) {
+          fieldHits[field][candidate] = (fieldHits[field][candidate] || 0) + 1;
+        }
+      }
+    }
+  }
+
+  return { skipReasons, fieldHits };
 }
 
 function resolveSmaregiContext() {
@@ -221,6 +300,7 @@ module.exports = async function handler(req, res) {
     step = "customers_fetch";
     const { rows, path, attempts } = await fetchCustomerRows(apiBase, context.customerPath, token);
     step = "normalize";
+    const diagnostics = analyzeCustomerRows(rows);
     let skipped = 0;
     const customers = rows.map(normalizeCustomer).filter(customer => {
       const keep = Boolean(customer.customerName);
@@ -232,8 +312,15 @@ module.exports = async function handler(req, res) {
     return sendJson(res, 200, {
       ok: true,
       customers,
-      count: customers.length,
+      count: rows.length,
+      importableCount: customers.length,
       skipped,
+      diagnostics: {
+        rawSample: sampleRows(rows, 5),
+        rawKeys: collectRawKeys(rows),
+        skipReasons: diagnostics.skipReasons,
+        fieldHits: diagnostics.fieldHits
+      },
       source: {
         path,
         rawCount: rows.length,

@@ -170,14 +170,24 @@ async function importSmaregiCustomers() {
       throw new Error(data?.error || `スマレジ会員データ取込に失敗しました。HTTP ${response.status}`);
     }
 
+    console.log("[smaregi-customers] raw sample", data.diagnostics?.rawSample || []);
+    console.log("[smaregi-customers] raw keys", data.diagnostics?.rawKeys || []);
+    console.log("[smaregi-customers] skip reasons", data.diagnostics?.skipReasons || {});
+    console.log("[smaregi-customers] field hits", data.diagnostics?.fieldHits || {});
+
     const result = customerStorage().upsertSmaregiCustomers(data.customers || []);
     const skipped = Number(data.skipped || 0) + Number(result.skipped || 0);
+    const skipReasons = data.diagnostics?.skipReasons || {};
     const message = [
       "スマレジ会員データを取り込みました。",
       `取得件数：${data.count || 0}件`,
+      `取込可能件数：${data.importableCount || 0}件`,
       `新規：${result.created}件`,
       `更新：${result.updated}件`,
-      `スキップ：${skipped}件`
+      `スキップ：${skipped}件`,
+      `顧客名なし：${skipReasons.customerNameMissing || 0}件`,
+      `会員コードなし：${skipReasons.smaregiMemberCodeMissing || 0}件`,
+      `会員IDなし：${skipReasons.smaregiMemberIdMissing || 0}件`
     ].join("\n");
     renderCustomerList();
     showCustomerMessage(message, "ok");
