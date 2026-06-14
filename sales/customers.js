@@ -8,6 +8,8 @@ let customerSearchText = "";
 let customerTypeFilter = "";
 let customerDateFrom = "";
 let customerDateTo = "";
+let customerVisibleLimit = 50;
+const CUSTOMER_INITIAL_LIMIT = 50;
 
 function customerStorage() {
   if (window.SalesCustomerStorage) return window.SalesCustomerStorage;
@@ -60,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindCustomerListControls();
   populateCustomerTypeOptions();
   clearCustomerForm();
+  updateOrganizationSuggestions();
   renderCustomerList();
 });
 
@@ -77,18 +80,22 @@ function populateCustomerTypeOptions() {
 function bindCustomerListControls() {
   document.getElementById("customerSearch")?.addEventListener("input", event => {
     customerSearchText = normalizeSearchText(event.target.value);
+    customerVisibleLimit = CUSTOMER_INITIAL_LIMIT;
     renderCustomerList();
   });
   document.getElementById("customerTypeFilter")?.addEventListener("change", event => {
     customerTypeFilter = event.target.value;
+    customerVisibleLimit = CUSTOMER_INITIAL_LIMIT;
     renderCustomerList();
   });
   document.getElementById("customerDateFromFilter")?.addEventListener("input", event => {
     customerDateFrom = event.target.value;
+    customerVisibleLimit = CUSTOMER_INITIAL_LIMIT;
     renderCustomerList();
   });
   document.getElementById("customerDateToFilter")?.addEventListener("input", event => {
     customerDateTo = event.target.value;
+    customerVisibleLimit = CUSTOMER_INITIAL_LIMIT;
     renderCustomerList();
   });
   setCustomerListCollapsed(false);
@@ -112,9 +119,13 @@ function renderCustomerList() {
   const allCustomers = customerStorage().readCustomers();
   const customers = allCustomers.filter(matchesCustomerFilters)
     .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+  const hasFilters = Boolean(customerSearchText || customerTypeFilter || customerDateFrom || customerDateTo);
+  const visibleCustomers = hasFilters ? customers : customers.slice(0, customerVisibleLimit);
   const count = document.getElementById("customerListCount");
-  if (count) count.textContent = `${customers.length}\u4ef6`;
-  body.innerHTML = customers.length ? customers.map(customer => `<tr>
+  if (count) count.textContent = hasFilters || customers.length <= visibleCustomers.length
+    ? `${customers.length}件`
+    : `${visibleCustomers.length}件 / 全${customers.length}件`;
+  body.innerHTML = visibleCustomers.length ? visibleCustomers.map(customer => `<tr>
     <td>${escapeHtml(customer.customerCode)}</td>
     <td><button type="button" class="link-button" onclick="showCustomerDetail('${escapeHtml(customer.id)}');">${escapeHtml(customer.customerName)}</button> ${customerSyncBadge(customer)}</td>
     <td>${escapeHtml(customer.organizationName || "")}</td>
@@ -126,6 +137,30 @@ function renderCustomerList() {
     <td>${escapeHtml(formatDate(customer.updatedAt))}</td>
     <td><button type="button" class="secondary" onclick="editCustomer('${escapeHtml(customer.id)}');">&#32232;&#38598;</button> ${canDeleteCustomer(customer) ? `<button type="button" class="danger" onclick="deleteCustomer('${escapeHtml(customer.id)}');">&#21066;&#38500;</button>` : ""}</td>
   </tr>`).join("") : '<tr><td colspan="10">&#39015;&#23458;&#12487;&#12540;&#12479;&#12399;&#12354;&#12426;&#12414;&#12379;&#12435;&#12290;</td></tr>';
+  if (!hasFilters && customers.length > visibleCustomers.length) {
+    body.innerHTML += `<tr><td colspan="10"><button type="button" class="secondary" onclick="showMoreCustomers();">さらに表示（次の${CUSTOMER_INITIAL_LIMIT}件）</button></td></tr>`;
+  }
+}
+
+function showMoreCustomers() {
+  customerVisibleLimit += CUSTOMER_INITIAL_LIMIT;
+  renderCustomerList();
+}
+
+function getOrganizationNames() {
+  return [...new Set(customerStorage().readCustomers()
+    .map(customer => String(customer.organizationName || "").trim())
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "ja"));
+}
+
+function updateOrganizationSuggestions() {
+  const datalist = document.getElementById("customerOrganizationSuggestions");
+  if (!datalist) return;
+  datalist.innerHTML = getOrganizationNames()
+    .slice(0, 300)
+    .map(name => `<option value="${escapeHtml(name)}"></option>`)
+    .join("");
 }
 
 function customerSyncBadge(customer) {
@@ -291,6 +326,7 @@ async function importSmaregiCustomers() {
       `会員IDなし：${skipReasons.smaregiMemberIdMissing || 0}件`
     ].join("\n");
     renderCustomerList();
+    updateOrganizationSuggestions();
     showCustomerMessage(message, "ok");
     showSalesPopup("取込完了", message, "ok");
   } catch (error) {
@@ -393,6 +429,7 @@ function saveCustomer() {
   setCustomerFormMode("edit");
   updateCustomerDeleteButton(customer);
   renderCustomerList();
+  updateOrganizationSuggestions();
   showCustomerMessage("顧客情報を保存しました。", "ok");
   showSalesPopup("保存完了", "顧客情報を保存しました。", "ok");
 }
@@ -416,6 +453,7 @@ async function deleteCustomer(id) {
   const selectedId = getValue("customerId");
   if (selectedId === id) clearCustomerForm();
   else updateCustomerDeleteButton(null);
+  updateOrganizationSuggestions();
   showSalesPopup("\u524a\u9664\u5b8c\u4e86", "\u9867\u5ba2\u3092\u524a\u9664\u3057\u307e\u3057\u305f", "ok");
   const popup = document.getElementById("salesPopup");
   if (popup) popup.dataset.afterClose = "renderCustomerList";

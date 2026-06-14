@@ -147,8 +147,9 @@ function renderDeliveryList() {
 
 function renderDeliveryRow(delivery) {
   const status = normalizeDeliveryStatus(delivery.status);
+  const displayNumber = delivery.originNumber || delivery.masterNumber || delivery.quoteNumber || delivery.deliveryNo || "";
   return `<tr>
-    <td><span class="number-with-status">${escapeHtml(delivery.deliveryNo || "")} ${statusBadge(status)}</span></td>
+    <td><span class="number-with-status">${escapeHtml(displayNumber)} ${statusBadge(status)}</span></td>
     <td>${escapeHtml(normalizeDateOnly(delivery.issuedAt) || delivery.deliveryDate || delivery.invoiceDate || "")}</td>
     <td>${escapeHtml(delivery.organizationName || delivery.organization || delivery.companyName || "")}</td>
     <td>${escapeHtml(delivery.customerName || delivery.name || delivery.customer || "")}</td>
@@ -168,6 +169,9 @@ function matchesDeliveryFilters(delivery) {
   if (!matchesDateRange([delivery.createdAt, delivery.invoiceDate, delivery.issuedAt], deliveryDateFrom, deliveryDateTo)) return false;
   if (!deliverySearchText) return true;
   const text = [
+    delivery.originNumber,
+    delivery.masterNumber,
+    delivery.quoteNumber,
     delivery.deliveryNo,
     delivery.sourceInvoiceNo,
     delivery.customerName,

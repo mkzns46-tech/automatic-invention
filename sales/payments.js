@@ -340,7 +340,7 @@ function renderPaymentInvoiceRow(invoice) {
     <td>${escapeHtml(invoice.invoiceDate || "")}</td>
     <td>${escapeHtml(paymentDate || "")}</td>
     <td>${escapeHtml(invoice.dueDate || "")}</td>
-    <td><span class="number-with-status">${escapeHtml(customerLabel || customerView.customerName)} ${statusBadge(status)}</span></td>
+    <td>${escapeHtml(customerLabel || customerView.customerName)}</td>
     <td>${money(total)}</td>
     <td>${statusBadge(status)}</td>
     <td>${escapeHtml(invoice.staff || "")}</td>

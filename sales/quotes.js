@@ -96,6 +96,16 @@ function nextInvoiceNo(invoices) {
   return invoiceNo(max + 1);
 }
 
+function normalizeInvoiceStatusForQuote(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (!value || value === "draft" || value === "下書き") return "draft";
+  if (value === "issued" || value === "発行済み") return "issued";
+  if (value === "waiting_payment" || value === "payment_waiting" || value === "入金待ち") return "waiting_payment";
+  if (value === "paid" || value === "入金済み") return "paid";
+  if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return "canceled";
+  return value;
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -629,6 +639,27 @@ function convertQuoteToInvoice(id) {
   const invoices = readInvoices();
   const existing = invoices.find(invoice => invoice.sourceQuoteId === quote.id);
   if (existing) {
+    if (normalizeInvoiceStatusForQuote(existing.status) === "draft") {
+      const updatedInvoice = {
+        ...buildInvoiceFromQuote(quote, invoices),
+        id: existing.id,
+        invoiceNo: existing.invoiceNo,
+        invoiceNumber: existing.invoiceNumber || existing.invoiceNo,
+        createdAt: existing.createdAt || new Date().toISOString(),
+        status: existing.status || "draft",
+        issuedAt: existing.issuedAt || "",
+        updatedAt: new Date().toISOString()
+      };
+      const existingIndex = invoices.findIndex(invoice => invoice.id === existing.id);
+      if (existingIndex >= 0) invoices[existingIndex] = updatedInvoice;
+      writeInvoices(invoices);
+      quote.status = QUOTE_STATUS_INVOICED;
+      writeQuotes(quotes);
+      renderQuoteList();
+      showSalesMessage(`下書き請求書を最新の見積内容で更新しました: ${updatedInvoice.invoiceNo}`, "ok");
+      location.href = `invoices.html?id=${encodeURIComponent(updatedInvoice.id)}`;
+      return;
+    }
     quote.status = QUOTE_STATUS_INVOICED;
     writeQuotes(quotes);
     renderQuoteList();

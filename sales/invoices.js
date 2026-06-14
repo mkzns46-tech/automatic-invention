@@ -71,12 +71,12 @@ function pickInvoiceCustomerFields(row) {
     customerCode: row?.customerCode || "",
     smaregiCustomerId: row?.smaregiCustomerId || "",
     smaregiCustomerCode: row?.smaregiCustomerCode || "",
-    customerName: row?.customerName || row?.name || row?.customer || row?.clientName || info.customerName || info.name || "",
-    organizationName: row?.organizationName || row?.organization || row?.companyName || info.organizationName || info.organization || info.companyName || "",
-    customerType: row?.customerType || info.customerType || "",
-    address: row?.address || info.address || "",
-    phone: row?.phone || info.phone || info.tel || "",
-    email: row?.email || info.email || "",
+    customerName: row?.customerName || row?.name || row?.customer || row?.clientName || row?.billingName || row?.customer_name || info.customerName || info.name || "",
+    organizationName: row?.organizationName || row?.organization || row?.companyName || row?.company || row?.organization_name || info.organizationName || info.organization || info.companyName || "",
+    customerType: row?.customerType || row?.customer_type || info.customerType || "",
+    address: row?.address || row?.customerAddress || row?.customer_address || info.address || "",
+    phone: row?.phone || row?.tel || row?.customerPhone || row?.customer_phone || info.phone || info.tel || "",
+    email: row?.email || row?.customerEmail || row?.customer_email || info.email || "",
     customerMemo: row?.customerMemo || row?.memo || ""
   };
 }
@@ -113,15 +113,15 @@ function resolveInvoiceCustomer(invoice) {
 
 function getInvoiceCustomerView(invoice) {
   const customer = resolveInvoiceCustomer(invoice) || {};
-  const info = invoice?.customerInfo || invoice?.customer_info || invoice?.customerDetail || {};
+  const fallback = pickInvoiceCustomerFields(invoice || {});
   return {
-    customerName: customer.customerName || customer.name || invoice.customerName || invoice.name || invoice.customer || invoice.clientName || info.customerName || info.name || "",
-    organizationName: customer.organizationName || customer.organization || customer.companyName || invoice.organizationName || invoice.organization || invoice.companyName || info.organizationName || info.organization || info.companyName || "",
-    customerType: customer.customerType || invoice.customerType || info.customerType || "",
-    address: customer.address || invoice.address || info.address || "",
-    phone: customer.phone || invoice.phone || info.phone || info.tel || "",
-    email: customer.email || invoice.email || info.email || "",
-    customerMemo: customer.memo || customer.customerMemo || invoice.customerMemo || invoice.memo || info.memo || ""
+    customerName: customer.customerName || customer.name || fallback.customerName,
+    organizationName: customer.organizationName || customer.organization || customer.companyName || fallback.organizationName,
+    customerType: customer.customerType || fallback.customerType,
+    address: customer.address || fallback.address,
+    phone: customer.phone || fallback.phone,
+    email: customer.email || fallback.email,
+    customerMemo: customer.memo || customer.customerMemo || fallback.customerMemo
   };
 }
 
@@ -777,8 +777,10 @@ async function issueInvoice() {
   ensureDeliveryForInvoice(invoice);
   invoices[index] = invoice;
   writeInvoices(invoices);
+  currentInvoiceId = invoice.id;
   fillInvoiceForm(invoice);
   renderInvoiceList();
+  showSalesMessage("請求書を発行確定しました。ステータスを入金待ちに更新しました。", "ok");
   showSalesPopup("発行確定", "請求書を発行確定しました", "ok");
 }
 

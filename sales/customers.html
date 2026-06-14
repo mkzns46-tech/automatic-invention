@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 顧客管理</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-customers-clean">
+<link rel="stylesheet" href="sales-style.css?v=20260614-customer-performance">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-customers-clean" defer></script>
 <script src="customers-storage.js?v=20260614-customers-clean"></script>
-<script src="customers.js?v=20260614-customers-clean" defer></script>
+<script src="customers.js?v=20260614-customer-performance" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -90,7 +90,8 @@
     </div>
     <div class="row three">
       <label>顧客名 <span class="required-badge">必須</span><input id="customerName"></label>
-      <label>団体名<input id="customerOrganizationName"></label>
+      <label>団体名<input id="customerOrganizationName" list="customerOrganizationSuggestions"></label>
+      <datalist id="customerOrganizationSuggestions"></datalist>
       <label>カナ<input id="customerKana"></label>
       <label>顧客区分<select id="customerType"></select></label>
     </div>
