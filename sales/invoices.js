@@ -614,10 +614,13 @@ async function applyInvoiceStockDeduction(invoice) {
         invoiceId: next.id,
         invoiceNo: next.invoiceNo,
         invoiceDate: next.invoiceDate,
+        confirmedAt: next.confirmedAt,
         issuedAt: next.issuedAt,
         updatedAt: next.updatedAt,
         originNumber: next.originNumber || next.masterNumber || next.sourceQuoteNo || "",
         transactionType: next.transactionType,
+        customerName: next.customerName || "",
+        organizationName: next.organizationName || "",
         total: totals.total,
         tax: totals.tax,
         smaregiCustomerId: next.smaregiCustomerId || "",
@@ -1351,9 +1354,12 @@ async function issueInvoice() {
     return;
   }
   const totals = calcInvoiceTotals(invoice);
+  const confirmedAt = new Date().toISOString();
   invoice.status = totals.total <= 0 ? "no_payment_required" : "waiting_payment";
   const issuedAtInput = document.getElementById("issuedAt")?.value;
   invoice.issuedAt = issuedAtInput || new Date().toISOString();
+  invoice.confirmedAt = confirmedAt;
+  invoice.invoiceConfirmedAt = confirmedAt;
   invoice.updatedAt = new Date().toISOString();
   invoice = await applyInvoiceStockDeduction(invoice);
   ensureDeliveryForInvoice(invoice);

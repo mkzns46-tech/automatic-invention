@@ -58,13 +58,14 @@ function firstString(...values) {
 function smaregiDateTime(value) {
   const date = value ? new Date(value) : new Date();
   const safe = Number.isNaN(date.getTime()) ? new Date() : date;
+  const jst = new Date(safe.getTime() + 9 * 60 * 60 * 1000);
   const pad = number => String(number).padStart(2, "0");
-  const yyyy = safe.getFullYear();
-  const mm = pad(safe.getMonth() + 1);
-  const dd = pad(safe.getDate());
-  const hh = pad(safe.getHours());
-  const mi = pad(safe.getMinutes());
-  const ss = pad(safe.getSeconds());
+  const yyyy = jst.getUTCFullYear();
+  const mm = pad(jst.getUTCMonth() + 1);
+  const dd = pad(jst.getUTCDate());
+  const hh = pad(jst.getUTCHours());
+  const mi = pad(jst.getUTCMinutes());
+  const ss = pad(jst.getUTCSeconds());
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}+09:00`;
 }
 
@@ -235,6 +236,11 @@ function buildTransactionPayload(context, body, paymentMethod) {
   const terminalTranId = terminalTranIdSource.slice(-10).padStart(1, "1");
   const smaregiCustomerId = toPositiveIntegerString(body.smaregiCustomerId);
   const smaregiCustomerCode = firstString(body.smaregiCustomerCode);
+  const memo = [
+    `顧客名:${firstString(body.customerName, body.name, body.customer) || "-"}`,
+    `団体名:${firstString(body.organizationName, body.organization, body.companyName) || "-"}`,
+    `販売管理伝票:${firstString(body.invoiceNo, body.originNumber) || "-"}`
+  ].join(" ").slice(0, 100);
   const payload = {
     transactionHeadDivision: "1",
     cancelDivision: "0",
@@ -245,8 +251,8 @@ function buildTransactionPayload(context, body, paymentMethod) {
     storeId: String(context.storeId),
     terminalId: String(context.terminalId),
     terminalTranId,
-    terminalTranDateTime: smaregiDateTime(body.issuedAt || body.invoiceDate || body.updatedAt),
-    memo: ["ARICO", body.invoiceNo || "", body.originNumber || "", body.transactionType || ""].filter(Boolean).join(" ").slice(0, 100),
+    terminalTranDateTime: smaregiDateTime(body.confirmedAt || body.invoiceConfirmedAt || body.issuedAt || body.invoiceDate || body.updatedAt),
+    memo,
     sellDivision: "0",
     taxRate: "10",
     details: lines.map(({ aricoAmount, aricoQuantity, ...line }) => line),
