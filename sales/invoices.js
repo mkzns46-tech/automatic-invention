@@ -73,6 +73,21 @@ function amountClass(value, transactionType = "") {
   return Number(value || 0) < 0 || isRefundTransaction(transactionType) ? "amount-negative refund-amount" : "";
 }
 
+function extractSlipNumber(value) {
+  const matches = String(value || "").match(/\d+/g);
+  return matches ? Number(matches[matches.length - 1]) : 0;
+}
+
+function sortNewestFirst(a, b) {
+  const aDate = a.updatedAt || a.createdAt || "";
+  const bDate = b.updatedAt || b.createdAt || "";
+  if (aDate || bDate) {
+    const diff = String(bDate).localeCompare(String(aDate));
+    if (diff) return diff;
+  }
+  return extractSlipNumber(b.invoiceNo || b.invoiceNumber || b.originNumber) - extractSlipNumber(a.invoiceNo || a.invoiceNumber || a.originNumber);
+}
+
 function refundBadge(transactionType) {
   return isRefundTransaction(transactionType) ? '<span class="status-badge danger">返金</span>' : "";
 }
@@ -617,7 +632,7 @@ function setInvoiceListCollapsed(collapsed) {
 function renderInvoiceList() {
   const body = document.getElementById("invoiceListBody");
   const completedBody = document.getElementById("invoiceCompletedListBody");
-  const allInvoices = readInvoices().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const allInvoices = readInvoices().sort(sortNewestFirst);
   const invoices = allInvoices.filter(matchesInvoiceListFilters);
   const activeInvoices = invoices.filter(invoice => {
     const status = normalizeInvoiceStatus(invoice.status);

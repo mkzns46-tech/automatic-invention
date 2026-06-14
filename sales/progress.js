@@ -8,6 +8,7 @@ const PROGRESS_KEYS = {
 
 let progressSearchText = "";
 let progressTransactionFilter = "";
+const progressCollapsed = { ticket: false, sales: false, unpaid: false, delivery: false };
 
 function readJson(key) {
   try {
@@ -43,6 +44,12 @@ function normalizeDateOnly(value) {
   return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
 }
 
+function normalizeDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("ja-JP");
+}
+
 function normalizeTransactionType(type) {
   const value = String(type || "").trim();
   if (!value) return "通常販売";
@@ -70,8 +77,7 @@ function statusLabel(status, kind = "") {
   if (lower === "cancel" || lower === "cancelled" || lower === "canceled" || value === "キャンセル") return "キャンセル";
   if (lower === "converted" || lower === "invoiced" || value === "請求書変換済み") return "請求書変換済み";
   if (value === "請求書発行済") return "請求書発行済";
-  if (value === "未発行") return "未発行";
-  if (value === "納品待ち" || value === "発送待ち" || value === "納品済み") return value;
+  if (value === "未発行" || value === "納品待ち" || value === "発送待ち" || value === "未納品" || value === "納品済み") return value;
   return value;
 }
 
@@ -79,7 +85,7 @@ function statusBadge(status, kind = "") {
   const label = statusLabel(status, kind);
   let type = "muted";
   if (["発行済み", "請求書発行済", "入金済み", "納品済み"].includes(label)) type = "ok";
-  if (["入金待ち", "下書き", "未発行", "請求書変換済み", "納品待ち", "発送待ち", "一部入金", "支払期限超過"].includes(label)) type = "warn";
+  if (["入金待ち", "一部入金", "支払期限超過", "下書き", "未発行", "請求書変換済み", "納品待ち", "発送待ち", "未納品"].includes(label)) type = "warn";
   if (label === "入金不要") type = "info";
   if (label === "キャンセル") type = "danger";
   return `<span class="status-badge ${type}">${escapeHtml(label)}</span>`;
@@ -91,6 +97,21 @@ function getOriginNumber(row, fallback = "") {
 
 function getInvoiceOrigin(invoice) {
   return getOriginNumber(invoice, invoice?.invoiceNo || invoice?.invoiceNumber || "");
+}
+
+function extractNumber(value) {
+  const matches = String(value || "").match(/\d+/g);
+  return matches ? Number(matches[matches.length - 1]) : 0;
+}
+
+function sortNewest(a, b) {
+  const aDate = a.sortDate || a.updatedAt || a.createdAt || "";
+  const bDate = b.sortDate || b.updatedAt || b.createdAt || "";
+  if (aDate || bDate) {
+    const diff = String(bDate).localeCompare(String(aDate));
+    if (diff) return diff;
+  }
+  return extractNumber(b.sortNumber || b.origin || b.invoiceNo || b.quoteNo) - extractNumber(a.sortNumber || a.origin || a.invoiceNo || a.quoteNo);
 }
 
 function sameKey(a, b) {
@@ -186,64 +207,79 @@ function paymentStatus(invoice) {
   return "未作成";
 }
 
+function unpaidAmount(invoice) {
+  return Math.max(0, totalAmount(invoice) - paidAmount(invoice));
+}
+
 function isPaymentOverdue(invoice) {
   const dueDate = normalizeDateOnly(invoice?.dueDate);
   return Boolean(dueDate && dueDate < today() && unpaidAmount(invoice) > 0);
 }
 
-function unpaidAmount(invoice) {
-  return Math.max(0, totalAmount(invoice) - paidAmount(invoice));
-}
-
-function readQuotes() {
-  return readJson(PROGRESS_KEYS.quotes);
-}
-
-function readInvoices() {
-  return readJson(PROGRESS_KEYS.invoices);
-}
-
-function readDeliveries() {
-  return readJson(PROGRESS_KEYS.deliveries);
-}
-
-function readReceipts() {
-  return readJson(PROGRESS_KEYS.receipts);
-}
+function readQuotes() { return readJson(PROGRESS_KEYS.quotes); }
+function readInvoices() { return readJson(PROGRESS_KEYS.invoices); }
+function readDeliveries() { return readJson(PROGRESS_KEYS.deliveries); }
+function readReceipts() { return readJson(PROGRESS_KEYS.receipts); }
 
 function findByOrigin(rows, origin) {
   return rows.find(row => getOriginNumber(row, row.deliveryNo || row.receiptNo || row.quoteNo || row.invoiceNo) === origin) || null;
 }
 
-function buildInvoiceRows() {
-  const quotes = readQuotes();
-  const deliveries = readDeliveries();
-  const receipts = readReceipts();
-  return readInvoices().map(invoice => {
-    const origin = getInvoiceOrigin(invoice);
-    const quote = findByOrigin(quotes, origin);
-    const delivery = findByOrigin(deliveries, origin);
-    const receipt = findByOrigin(receipts, origin);
-    const customer = customerView(invoice, quote, delivery, receipt);
-    return {
-      origin,
-      quote,
-      invoice,
-      delivery,
-      receipt,
-      transactionType: normalizeTransactionType(invoice.transactionType || quote?.transactionType || delivery?.transactionType || receipt?.transactionType),
-      organizationName: customer.organizationName,
-      customerName: customer.customerName,
-      total: totalAmount(invoice, quote, delivery, receipt),
-      paid: paidAmount(invoice),
-      unpaid: unpaidAmount(invoice),
-      paymentStatus: paymentStatus(invoice),
-      invoiceStatus: statusLabel(invoice.status, "invoice"),
-      deliveryStatus: delivery ? statusLabel(delivery.status, "delivery") : "未発行",
-      receiptStatus: receipt ? statusLabel(receipt.status, "receipt") : "未発行",
-      staff: invoice.staff || quote?.staff || delivery?.staff || receipt?.staff || ""
-    };
-  });
+function ensureGroup(map, origin) {
+  const key = origin || "未採番";
+  if (!map.has(key)) map.set(key, { origin: key, quotes: [], invoices: [], deliveries: [], receipts: [] });
+  return map.get(key);
+}
+
+function buildGroups() {
+  const groups = new Map();
+  readQuotes().forEach(quote => ensureGroup(groups, getOriginNumber(quote, quote.quoteNo)).quotes.push(quote));
+  readInvoices().forEach(invoice => ensureGroup(groups, getInvoiceOrigin(invoice)).invoices.push(invoice));
+  readDeliveries().forEach(delivery => ensureGroup(groups, getOriginNumber(delivery, delivery.deliveryNo)).deliveries.push(delivery));
+  readReceipts().forEach(receipt => ensureGroup(groups, getOriginNumber(receipt, receipt.receiptNo)).receipts.push(receipt));
+  return Array.from(groups.values());
+}
+
+function latestRow(rows) {
+  return rows.slice().sort((a, b) => sortNewest(
+    { sortDate: a.updatedAt || a.createdAt, sortNumber: a.quoteNo || a.invoiceNo || a.deliveryNo || a.receiptNo },
+    { sortDate: b.updatedAt || b.createdAt, sortNumber: b.quoteNo || b.invoiceNo || b.deliveryNo || b.receiptNo }
+  ))[0] || null;
+}
+
+function makeProgressRow(group) {
+  const quote = latestRow(group.quotes);
+  const invoice = latestRow(group.invoices);
+  const delivery = latestRow(group.deliveries);
+  const receipt = latestRow(group.receipts);
+  const customer = customerView(invoice, quote, delivery, receipt);
+  const transactionType = normalizeTransactionType(invoice?.transactionType || quote?.transactionType || delivery?.transactionType || receipt?.transactionType);
+  const sortDate = [quote, invoice, delivery, receipt].map(row => row?.updatedAt || row?.createdAt || "").sort((a, b) => String(b).localeCompare(String(a)))[0] || "";
+  return {
+    origin: group.origin,
+    quote,
+    invoice,
+    delivery,
+    receipt,
+    transactionType,
+    organizationName: customer.organizationName,
+    customerName: customer.customerName,
+    total: totalAmount(invoice, quote, delivery, receipt),
+    paid: paidAmount(invoice),
+    unpaid: invoice ? unpaidAmount(invoice) : 0,
+    quoteStatus: quote ? statusLabel(quote.status, "quote") : "未作成",
+    invoiceStatus: invoice ? statusLabel(invoice.status, "invoice") : "未作成",
+    paymentStatus: paymentStatus(invoice),
+    deliveryStatus: delivery ? statusLabel(delivery.status, "delivery") : "未発行",
+    staff: invoice?.staff || quote?.staff || delivery?.staff || receipt?.staff || "",
+    sortDate,
+    sortNumber: group.origin,
+    updatedAt: sortDate
+  };
+}
+
+function buildProgressRows() {
+  return buildGroups().map(makeProgressRow);
 }
 
 function matchesSearch(row, extra = []) {
@@ -255,10 +291,15 @@ function matchesSearch(row, extra = []) {
     row.organizationName,
     row.customerName,
     row.staff,
+    row.quoteStatus,
     row.invoiceStatus,
     row.paymentStatus,
     row.deliveryStatus,
-    row.receiptStatus,
+    row.invoice?.invoiceDate,
+    row.invoice?.dueDate,
+    row.delivery?.deliveryDate,
+    row.delivery?.issuedAt,
+    row.updatedAt,
     ...extra
   ].join(" ").toLowerCase();
   return text.includes(progressSearchText);
@@ -271,25 +312,42 @@ function pageLink(page, id, label) {
 
 function actionLinks(row, kinds) {
   const links = [];
+  if (kinds.includes("quote")) links.push(pageLink("quotes.html", row.quote?.id, "見積"));
   if (kinds.includes("invoice")) links.push(pageLink("invoices.html", row.invoice?.id, "請求"));
   if (kinds.includes("payment")) links.push(pageLink("payments.html", row.invoice?.id, "入金"));
   if (kinds.includes("delivery")) links.push(pageLink("delivery.html", row.delivery?.id, "納品"));
-  if (kinds.includes("receipt")) links.push(pageLink("receipts.html", row.receipt?.id, "領収"));
   return `<div class="progress-actions">${links.join("")}</div>`;
 }
 
-function renderRows(bodyId, countId, rows, renderer, emptyMessage) {
+function renderRows(bodyId, countId, rows, renderer, emptyMessage, colspan) {
   const body = document.getElementById(bodyId);
   const count = document.getElementById(countId);
   if (count) count.textContent = `${rows.length}件`;
   if (!body) return;
-  body.innerHTML = rows.length ? rows.map(renderer).join("") : `<tr><td colspan="13">${escapeHtml(emptyMessage)}</td></tr>`;
+  body.innerHTML = rows.length ? rows.map(renderer).join("") : `<tr><td colspan="${colspan}">${escapeHtml(emptyMessage)}</td></tr>`;
+}
+
+function renderTicketRows(allRows) {
+  const rows = allRows.filter(row => matchesSearch(row)).sort(sortNewest);
+  renderRows("ticketProgressBody", "ticketProgressCount", rows, row => `
+    <tr>
+      <td>${escapeHtml(row.origin)}</td>
+      <td>${escapeHtml(row.transactionType)}</td>
+      <td>${escapeHtml(row.organizationName)}</td>
+      <td>${escapeHtml(row.customerName)}</td>
+      <td>${statusBadge(row.quoteStatus, "quote")}</td>
+      <td>${statusBadge(row.invoiceStatus, "invoice")}</td>
+      <td>${statusBadge(row.paymentStatus, "payment")}</td>
+      <td>${statusBadge(row.deliveryStatus, "delivery")}</td>
+      <td class="${amountClass(row.total, row)}">${money(row.total)}</td>
+      <td>${escapeHtml(row.staff)}</td>
+      <td>${escapeHtml(normalizeDateTime(row.updatedAt))}</td>
+      <td>${actionLinks(row, ["quote", "invoice", "payment", "delivery"])}</td>
+    </tr>`, "伝票ごとの進捗はありません。", 12);
 }
 
 function renderSalesRows(allRows) {
-  const rows = allRows
-    .filter(row => matchesSearch(row))
-    .sort((a, b) => String(b.invoice.invoiceDate || b.invoice.issuedAt || "").localeCompare(String(a.invoice.invoiceDate || a.invoice.issuedAt || "")));
+  const rows = allRows.filter(row => row.invoice).filter(row => matchesSearch(row)).sort(sortNewest);
   renderRows("salesProgressBody", "salesProgressCount", rows, row => `
     <tr>
       <td>${escapeHtml(row.origin)}</td>
@@ -300,21 +358,21 @@ function renderSalesRows(allRows) {
       <td>${statusBadge(row.invoiceStatus, "invoice")}</td>
       <td>${escapeHtml(row.staff)}</td>
       <td>${actionLinks(row, ["invoice"])}</td>
-    </tr>`, "売上確認対象はありません。");
+    </tr>`, "売上確認対象はありません。", 8);
 }
 
 function renderUnpaidRows(allRows) {
   const rows = allRows
-    .filter(row => !["入金不要", "入金済み", "キャンセル"].includes(row.paymentStatus))
+    .filter(row => !["入金済み", "入金不要", "キャンセル"].includes(row.paymentStatus))
     .filter(row => row.unpaid > 0 || row.paymentStatus === "入金待ち" || row.paymentStatus === "一部入金" || isPaymentOverdue(row.invoice))
     .filter(row => matchesSearch(row))
-    .sort((a, b) => String(a.invoice.dueDate || a.invoice.invoiceDate || "").localeCompare(String(b.invoice.dueDate || b.invoice.invoiceDate || "")));
+    .sort(sortNewest);
   renderRows("unpaidProgressBody", "unpaidProgressCount", rows, row => {
     const overdue = isPaymentOverdue(row.invoice) ? " overdue-text" : "";
     return `<tr>
       <td>${escapeHtml(row.origin)}</td>
-      <td>${escapeHtml(row.invoice.invoiceDate || "")}</td>
-      <td class="${overdue}">${escapeHtml(row.invoice.dueDate || "")}</td>
+      <td>${escapeHtml(row.invoice?.invoiceDate || "")}</td>
+      <td class="${overdue}">${escapeHtml(row.invoice?.dueDate || "")}</td>
       <td>${escapeHtml(row.organizationName)}</td>
       <td>${escapeHtml(row.customerName)}</td>
       <td class="${amountClass(row.total, row)}">${money(row.total)}</td>
@@ -324,7 +382,7 @@ function renderUnpaidRows(allRows) {
       <td>${escapeHtml(row.staff)}</td>
       <td>${actionLinks(row, ["payment"])}</td>
     </tr>`;
-  }, "未入金の請求書はありません。");
+  }, "未入金の請求書はありません。", 11);
 }
 
 function renderUndeliveredRows(allRows) {
@@ -332,7 +390,7 @@ function renderUndeliveredRows(allRows) {
     .filter(row => !["発行済み", "納品済み", "キャンセル"].includes(row.deliveryStatus))
     .filter(row => row.invoiceStatus !== "キャンセル")
     .filter(row => matchesSearch(row))
-    .sort((a, b) => String(a.delivery?.deliveryDate || a.delivery?.issuedAt || a.invoice.invoiceDate || "").localeCompare(String(b.delivery?.deliveryDate || b.delivery?.issuedAt || b.invoice.invoiceDate || "")));
+    .sort(sortNewest);
   renderRows("undeliveredProgressBody", "undeliveredProgressCount", rows, row => `
     <tr>
       <td>${escapeHtml(row.origin)}</td>
@@ -343,34 +401,15 @@ function renderUndeliveredRows(allRows) {
       <td>${statusBadge(row.deliveryStatus, "delivery")}</td>
       <td>${escapeHtml(row.staff)}</td>
       <td>${actionLinks(row, ["delivery"])}</td>
-    </tr>`, "未納品の伝票はありません。");
-}
-
-function renderReceiptRows(allRows) {
-  const rows = allRows
-    .filter(row => row.paymentStatus === "入金済み" || row.paymentStatus === "入金不要" || row.receipt)
-    .filter(row => row.invoiceStatus !== "キャンセル")
-    .filter(row => matchesSearch(row))
-    .sort((a, b) => String(b.invoice.paymentDate || b.invoice.paidAt || latestPaymentDate(b.invoice) || "").localeCompare(String(a.invoice.paymentDate || a.invoice.paidAt || latestPaymentDate(a.invoice) || "")));
-  renderRows("receiptProgressBody", "receiptProgressCount", rows, row => `
-    <tr>
-      <td>${escapeHtml(row.origin)}</td>
-      <td>${escapeHtml(row.invoice.paymentDate || normalizeDateOnly(row.invoice.paidAt) || latestPaymentDate(row.invoice))}</td>
-      <td>${escapeHtml(row.organizationName)}</td>
-      <td>${escapeHtml(row.customerName)}</td>
-      <td class="${amountClass(row.total, row)}">${money(row.total)}</td>
-      <td>${statusBadge(row.receiptStatus, "receipt")}</td>
-      <td>${escapeHtml(row.staff)}</td>
-      <td>${actionLinks(row, ["receipt"])}</td>
-    </tr>`, "領収書確認対象はありません。");
+    </tr>`, "未納品の伝票はありません。", 8);
 }
 
 function renderProgressSections() {
-  const rows = buildInvoiceRows();
+  const rows = buildProgressRows();
+  renderTicketRows(rows);
   renderSalesRows(rows);
   renderUnpaidRows(rows);
   renderUndeliveredRows(rows);
-  renderReceiptRows(rows);
 }
 
 function bindProgressControls() {
@@ -382,6 +421,14 @@ function bindProgressControls() {
     progressTransactionFilter = event.target.value;
     renderProgressSections();
   });
+}
+
+function toggleProgressSection(name) {
+  progressCollapsed[name] = !progressCollapsed[name];
+  const panel = document.getElementById(`${name}ProgressPanel`);
+  const button = document.getElementById(`${name}ProgressToggle`);
+  if (panel) panel.hidden = progressCollapsed[name];
+  if (button) button.textContent = progressCollapsed[name] ? "一覧を開く" : "一覧を閉じる";
 }
 
 document.addEventListener("DOMContentLoaded", () => {

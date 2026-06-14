@@ -37,6 +37,21 @@ function amountClass(value, deliveryOrType = "") {
   return Number(value || 0) < 0 || isRefundDelivery(deliveryOrType) ? "amount-negative refund-amount" : "";
 }
 
+function extractSlipNumber(value) {
+  const matches = String(value || "").match(/\d+/g);
+  return matches ? Number(matches[matches.length - 1]) : 0;
+}
+
+function sortNewestFirst(a, b) {
+  const aDate = a.updatedAt || a.createdAt || "";
+  const bDate = b.updatedAt || b.createdAt || "";
+  if (aDate || bDate) {
+    const diff = String(bDate).localeCompare(String(aDate));
+    if (diff) return diff;
+  }
+  return extractSlipNumber(b.originNumber || b.masterNumber || b.quoteNumber || b.deliveryNo) - extractSlipNumber(a.originNumber || a.masterNumber || a.quoteNumber || a.deliveryNo);
+}
+
 function normalizeDeliveryStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (!value || value === "draft" || value === "未発行") return DELIVERY_STATUS_DRAFT;
@@ -141,7 +156,7 @@ function setDeliveryListCollapsed(collapsed) {
 }
 
 function renderDeliveryList() {
-  const allDeliveries = readDeliveries().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const allDeliveries = readDeliveries().sort(sortNewestFirst);
   const deliveries = allDeliveries.filter(matchesDeliveryFilters);
   const activeDeliveries = deliveries.filter(delivery => normalizeDeliveryStatus(delivery.status) === DELIVERY_STATUS_DRAFT);
   const completedDeliveries = deliveries.filter(delivery => normalizeDeliveryStatus(delivery.status) !== DELIVERY_STATUS_DRAFT);

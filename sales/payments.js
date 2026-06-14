@@ -47,6 +47,21 @@ function normalizePaymentStatus(status) {
   return status || "";
 }
 
+function extractSlipNumber(value) {
+  const matches = String(value || "").match(/\d+/g);
+  return matches ? Number(matches[matches.length - 1]) : 0;
+}
+
+function sortNewestFirst(a, b) {
+  const aDate = a.updatedAt || a.createdAt || "";
+  const bDate = b.updatedAt || b.createdAt || "";
+  if (aDate || bDate) {
+    const diff = String(bDate).localeCompare(String(aDate));
+    if (diff) return diff;
+  }
+  return extractSlipNumber(b.invoiceNo || b.invoiceNumber || b.originNumber) - extractSlipNumber(a.invoiceNo || a.invoiceNumber || a.originNumber);
+}
+
 function statusBadge(status) {
   const value = normalizePaymentStatus(status);
   const type = value === PAYMENT_STATUS_CANCELLED ? "danger" : value === PAYMENT_STATUS_PAID ? "ok" : value === PAYMENT_STATUS_WAITING ? "warn" : "info";
@@ -302,7 +317,7 @@ function setPaymentListCollapsed(collapsed) {
 function getPaymentTargetInvoices() {
   return readPaymentInvoices()
     .filter(invoice => PAYMENT_TARGET_STATUSES.includes(normalizePaymentStatus(invoice.status)))
-    .sort((a, b) => String(b.issuedAt || b.invoiceDate || b.createdAt).localeCompare(String(a.issuedAt || a.invoiceDate || a.createdAt)));
+    .sort(sortNewestFirst);
 }
 
 function renderPaymentInvoiceList() {

@@ -113,12 +113,26 @@ function setCustomerListCollapsed(collapsed) {
   if (button) button.textContent = customerListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
+function extractCustomerNumber(value) {
+  const matches = String(value || "").match(/\d+/g);
+  return matches ? Number(matches[matches.length - 1]) : 0;
+}
+
+function sortCustomerNewestFirst(a, b) {
+  const aDate = a.updatedAt || a.createdAt || "";
+  const bDate = b.updatedAt || b.createdAt || "";
+  if (aDate || bDate) {
+    const diff = String(bDate).localeCompare(String(aDate));
+    if (diff) return diff;
+  }
+  return extractCustomerNumber(b.customerCode || b.code) - extractCustomerNumber(a.customerCode || a.code);
+}
+
 function renderCustomerList() {
   const body = document.getElementById("customerListBody");
   if (!body) return;
   const allCustomers = customerStorage().readCustomers();
-  const customers = allCustomers.filter(matchesCustomerFilters)
-    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+  const customers = allCustomers.filter(matchesCustomerFilters).sort(sortCustomerNewestFirst);
   const hasFilters = Boolean(customerSearchText || customerTypeFilter || customerDateFrom || customerDateTo);
   const visibleCustomers = hasFilters ? customers : customers.slice(0, customerVisibleLimit);
   const count = document.getElementById("customerListCount");

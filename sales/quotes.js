@@ -78,6 +78,21 @@ function nextQuoteNo(quotes) {
   return quoteNo(max + 1);
 }
 
+function extractSlipNumber(value) {
+  const matches = String(value || "").match(/\d+/g);
+  return matches ? Number(matches[matches.length - 1]) : 0;
+}
+
+function sortNewestFirst(a, b) {
+  const aDate = a.updatedAt || a.createdAt || "";
+  const bDate = b.updatedAt || b.createdAt || "";
+  if (aDate || bDate) {
+    const diff = String(bDate).localeCompare(String(aDate));
+    if (diff) return diff;
+  }
+  return extractSlipNumber(b.quoteNo || b.quoteNumber || b.originNumber) - extractSlipNumber(a.quoteNo || a.quoteNumber || a.originNumber);
+}
+
 function readInvoices() {
   return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
 }
@@ -577,7 +592,7 @@ async function loadStaffOptions() {
 function renderQuoteList() {
   const body = document.getElementById("quoteListBody");
   const completedBody = document.getElementById("quoteCompletedListBody");
-  const allQuotes = readQuotes().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const allQuotes = readQuotes().sort(sortNewestFirst);
   const quotes = allQuotes.filter(matchesQuoteListFilters);
   const activeQuotes = quotes.filter(quote => normalizeQuoteStatus(quote.status) === QUOTE_STATUS_DRAFT);
   const completedQuotes = quotes.filter(quote => normalizeQuoteStatus(quote.status) !== QUOTE_STATUS_DRAFT);
