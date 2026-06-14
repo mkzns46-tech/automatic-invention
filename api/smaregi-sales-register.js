@@ -248,7 +248,6 @@ function buildTransactionPayload(context, body, paymentMethod) {
     terminalId: String(context.terminalId),
     terminalTranId,
     terminalTranDateTime: smaregiDateTime(body.issuedAt || body.invoiceDate || body.updatedAt),
-    sumDivision: "0",
     memo: ["ARICO", body.invoiceNo || "", body.originNumber || "", body.transactionType || ""].filter(Boolean).join(" ").slice(0, 100),
     sellDivision: "0",
     taxRate: "10",
