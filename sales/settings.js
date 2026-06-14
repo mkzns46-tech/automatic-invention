@@ -43,6 +43,72 @@ function showSalesPopup(title, body, type = "ok") {
   playSalesNoticeSound(type);
 }
 
+function settingsCustomerStorage() {
+  return window.SalesCustomerStorage || {
+    upsertSmaregiCustomers: () => ({ imported: 0, created: 0, updated: 0, skipped: 0, total: 0 })
+  };
+}
+
+async function importSettingsSmaregiCustomers() {
+  const button = document.getElementById("customerSmaregiImportBtn");
+  const resultBox = document.getElementById("customerImportResult");
+  if (button) button.disabled = true;
+  if (resultBox) {
+    resultBox.textContent = "スマレジ会員データを取り込んでいます。";
+    resultBox.className = "message";
+  }
+  showSalesMessage("スマレジ会員データを取り込んでいます。");
+  try {
+    const response = await fetch("/api/smaregi-customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    });
+    const text = await response.text();
+    console.log("[smaregi-customers]", response.status, text);
+    if (!text) throw new Error(`API応答が空です。HTTP ${response.status}`);
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (_) {
+      throw new Error(`JSON解析に失敗しました。HTTP ${response.status}: ${text.slice(0, 300)}`);
+    }
+    if (!response.ok || !data.ok) {
+      throw new Error(data?.error || `スマレジ会員データ取込に失敗しました。HTTP ${response.status}`);
+    }
+    const result = settingsCustomerStorage().upsertSmaregiCustomers(data.customers || []);
+    const skipped = Number(data.skipped || 0) + Number(result.skipped || 0);
+    const skipReasons = data.diagnostics?.skipReasons || {};
+    const message = [
+      "スマレジ会員データを取り込みました。",
+      `取得件数：${data.count || 0}件`,
+      `取込可能件数：${data.importableCount || 0}件`,
+      `新規：${result.created}件`,
+      `更新：${result.updated}件`,
+      `スキップ：${skipped}件`,
+      `顧客名なし：${skipReasons.customerNameMissing || 0}件`,
+      `会員コードなし：${skipReasons.smaregiMemberCodeMissing || 0}件`,
+      `会員IDなし：${skipReasons.smaregiMemberIdMissing || 0}件`
+    ].join("\n");
+    if (resultBox) {
+      resultBox.textContent = message;
+      resultBox.className = "message ok";
+    }
+    showSalesMessage(message, "ok");
+    showSalesPopup("取込完了", message, "ok");
+  } catch (error) {
+    const message = error?.message || String(error);
+    if (resultBox) {
+      resultBox.textContent = message;
+      resultBox.className = "message err";
+    }
+    showSalesMessage(message, "err");
+    showSalesPopup("取込失敗", message, "err");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
-  if (!requireSalesAuth()) return;
+  if (typeof requireSalesAuth === "function" && !requireSalesAuth()) return;
 });
