@@ -1,4 +1,5 @@
 const SALES_MENU_ITEMS = [
+  ["販売進捗確認", "progress.html", "見積から領収まで確認"],
   ["見積書", "quotes.html", "作成・一覧・PDF"],
   ["請求書", "invoices.html", "変換・編集・PDF"],
   ["入金確認", "payments.html", "手動確認"],
@@ -10,6 +11,7 @@ const SALES_MENU_ITEMS = [
 ];
 
 const SALES_MENU_ITEMS_KO = [
+  ["販売進捗確認", "progress.html", "進捗確認"],
   ["견적서", "quotes.html", "작성・목록・PDF"],
   ["청구서", "invoices.html", "변환・편집・PDF"],
   ["입금 확인", "payments.html", "수동 확인"],

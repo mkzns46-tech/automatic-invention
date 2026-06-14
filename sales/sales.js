@@ -11,6 +11,7 @@ function comingSoonSales(name) {
 
 function renderSalesHome() {
   const menus = [
+    ["販売進捗確認", "progress.html", "見積から領収までの進捗を確認", false],
     ["見積書", "quotes.html", "見積書作成・一覧・PDF出力", false],
     ["請求書", "invoices.html", "見積から変換・編集・PDF出力", false],
     ["入金確認", "payments.html", "請求書発行後の入金状態を確認", false],

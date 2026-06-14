@@ -249,6 +249,8 @@ document.addEventListener("DOMContentLoaded", () => {
   bindPaymentListControls();
   clearPaymentForm();
   renderPaymentInvoiceList();
+  const id = new URLSearchParams(location.search).get("id");
+  if (id) selectPaymentInvoice(id);
 });
 
 function bindPaymentListControls() {
