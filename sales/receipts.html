@@ -1,52 +1,52 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARICO ARCHERY 領収書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-lists-hidden">
+<title>ARICO ARCHERY 鬆伜庶譖ｸ</title>
+<link rel="stylesheet" href="sales-style.css?v=20260614-table-invoice-payment-fix">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-lists-hidden" defer></script>
 <script src="receipt-pdf.js?v=20260614-lists-hidden"></script>
-<script src="receipts.js?v=20260614-lists-hidden" defer></script>
+<script src="receipts.js?v=20260614-table-invoice-payment-fix" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
   <header class="sales-header">
     <div>
       <div class="brand">ARICO ARCHERY</div>
-      <h1>領収書</h1>
-      <p class="lead">入金済み請求書から領収書を作成し、PDF出力します。在庫とスマレジ売上は変更しません。</p>
+      <h1>鬆伜庶譖ｸ</h1>
+      <p class="lead">蜈･驥第ｸ医∩隲区ｱよ嶌縺九ｉ鬆伜庶譖ｸ繧剃ｽ懈・縺励￣DF蜃ｺ蜉帙＠縺ｾ縺吶ょ惠蠎ｫ縺ｨ繧ｹ繝槭Ξ繧ｸ螢ｲ荳翫・螟画峩縺励∪縺帙ｓ縲・/p>
     </div>
     <div class="sales-actions">
-      <a class="pill" href="payments.html">入金確認</a>
-      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+      <a class="pill" href="payments.html">蜈･驥醍｢ｺ隱・/a>
+      <button type="button" class="secondary" onclick="logoutSales();">繝ｭ繧ｰ繧､繝ｳ逕ｻ髱｢縺ｫ謌ｻ繧・/button>
     </div>
   </header>
 
-  <div id="salesMessage" class="message">入金済み請求書から領収書を作成できます。</div>
+  <div id="salesMessage" class="message">蜈･驥第ｸ医∩隲区ｱよ嶌縺九ｉ鬆伜庶譖ｸ繧剃ｽ懈・縺ｧ縺阪∪縺吶・/div>
 
   <section class="card collapsible-list-card">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleIssuedReceiptList();">▶ 領収書一覧 <span class="status-badge muted" id="receiptTargetCount">0件</span></h2>
-      <button type="button" class="secondary list-toggle-button" id="receiptIssuedToggle" onclick="toggleIssuedReceiptList();">一覧を開く</button>
+      <h2 class="list-heading" onclick="toggleIssuedReceiptList();">笆ｶ 鬆伜庶譖ｸ荳隕ｧ <span class="status-badge muted" id="receiptTargetCount">0莉ｶ</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="receiptIssuedToggle" onclick="toggleIssuedReceiptList();">荳隕ｧ繧帝幕縺・/button>
     </div>
     <div class="list-panel" id="receiptListPanel" hidden>
       <div class="list-filter-row">
-        <label>一覧検索<input id="receiptSearch" placeholder="顧客名・件名・請求書番号・領収書番号・ステータス"></label>
-        <label>ステータス
+        <label>荳隕ｧ讀懃ｴ｢<input id="receiptSearch" placeholder="鬘ｧ螳｢蜷阪・莉ｶ蜷阪・隲区ｱよ嶌逡ｪ蜿ｷ繝ｻ鬆伜庶譖ｸ逡ｪ蜿ｷ繝ｻ繧ｹ繝・・繧ｿ繧ｹ"></label>
+        <label>繧ｹ繝・・繧ｿ繧ｹ
           <select id="receiptStatusFilter">
-            <option value="">全て</option>
-            <option value="未発行">未発行</option>
-            <option value="発行済み">発行済み</option>
-            <option value="キャンセル">キャンセル</option>
+            <option value="">蜈ｨ縺ｦ</option>
+            <option value="譛ｪ逋ｺ陦・>譛ｪ逋ｺ陦・/option>
+            <option value="逋ｺ陦梧ｸ医∩">逋ｺ陦梧ｸ医∩</option>
+            <option value="繧ｭ繝｣繝ｳ繧ｻ繝ｫ">繧ｭ繝｣繝ｳ繧ｻ繝ｫ</option>
           </select>
         </label>
-        <label>開始日<input id="receiptDateFromFilter" type="date"></label>
-        <label>終了日<input id="receiptDateToFilter" type="date"></label>
+        <label>髢句ｧ区律<input id="receiptDateFromFilter" type="date"></label>
+        <label>邨ゆｺ・律<input id="receiptDateToFilter" type="date"></label>
       </div>
-      <div class="list-subheading">未発行の領収書 / 入金済み請求書</div>
+      <div class="list-subheading">譛ｪ逋ｺ陦後・鬆伜庶譖ｸ / 蜈･驥第ｸ医∩隲区ｱよ嶌</div>
       <div class="table-wrap list-scroll">
         <table>
           <thead><tr><th>&#20253;&#31080;&#30058;&#21495;</th><th>&#26085;&#20184;</th><th>&#22243;&#20307;&#21517;</th><th>&#39015;&#23458;&#21517;</th><th>&#21512;&#35336;&#37329;&#38989;</th><th>&#12473;&#12486;&#12540;&#12479;&#12473;</th><th>&#25285;&#24403;&#32773;</th><th>&#25805;&#20316;</th></tr></thead>
@@ -54,7 +54,7 @@
         </table>
       </div>
       <div class="list-panel completed-list-panel" id="issuedReceiptListPanel" hidden>
-        <div class="list-subheading">発行済み・キャンセル済み</div>
+        <div class="list-subheading">逋ｺ陦梧ｸ医∩繝ｻ繧ｭ繝｣繝ｳ繧ｻ繝ｫ貂医∩</div>
         <div class="table-wrap list-scroll">
           <table>
             <thead><tr><th>&#20253;&#31080;&#30058;&#21495;</th><th>&#26085;&#20184;</th><th>&#22243;&#20307;&#21517;</th><th>&#39015;&#23458;&#21517;</th><th>&#21512;&#35336;&#37329;&#38989;</th><th>&#12473;&#12486;&#12540;&#12479;&#12473;</th><th>&#25285;&#24403;&#32773;</th><th>&#25805;&#20316;</th></tr></thead>
@@ -93,7 +93,7 @@
 </main>
 <div id="salesPopup" class="app-popup" style="display:none;">
   <div class="app-popup-card">
-    <div id="salesPopupTitle" class="app-popup-title">完了</div>
+    <div id="salesPopupTitle" class="app-popup-title">螳御ｺ・/div>
     <div id="salesPopupBody" class="app-popup-body"></div>
     <button type="button" id="salesPopupClose">OK</button>
   </div>

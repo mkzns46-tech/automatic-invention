@@ -53,6 +53,52 @@ function statusBadge(status) {
   return `<span class="status-badge ${type}">${escapeHtml(value || "未設定")}</span>`;
 }
 
+function readPaymentCustomers() {
+  if (window.SalesCustomerStorage?.readCustomers) return window.SalesCustomerStorage.readCustomers();
+  try {
+    return JSON.parse(localStorage.getItem("arico_sales_customers_v1") || "[]");
+  } catch (_) {
+    return [];
+  }
+}
+
+function samePaymentCustomerKey(a, b) {
+  return String(a || "").trim() && String(a || "").trim() === String(b || "").trim();
+}
+
+function resolvePaymentCustomer(invoice) {
+  const customers = readPaymentCustomers();
+  if (!customers.length) return null;
+  return customers.find(customer =>
+    samePaymentCustomerKey(customer.id, invoice.customerId) ||
+    samePaymentCustomerKey(customer.customerId, invoice.customerId) ||
+    samePaymentCustomerKey(customer.customerCode, invoice.customerCode) ||
+    samePaymentCustomerKey(customer.code, invoice.customerCode) ||
+    samePaymentCustomerKey(customer.smaregiMemberId, invoice.smaregiCustomerId) ||
+    samePaymentCustomerKey(customer.smaregiCustomerId, invoice.smaregiCustomerId) ||
+    samePaymentCustomerKey(customer.smaregiMemberCode, invoice.smaregiCustomerCode) ||
+    samePaymentCustomerKey(customer.smaregiCustomerCode, invoice.smaregiCustomerCode)
+  ) || null;
+}
+
+function getPaymentCustomerView(invoice) {
+  const customer = resolvePaymentCustomer(invoice) || {};
+  const info = invoice?.customerInfo || invoice?.customer_info || invoice?.customerDetail || {};
+  return {
+    customerName: customer.customerName || customer.name || invoice.customerName || invoice.name || invoice.customer || invoice.clientName || info.customerName || info.name || "",
+    organizationName: customer.organizationName || customer.organization || customer.companyName || invoice.organizationName || invoice.organization || invoice.companyName || info.organizationName || info.organization || info.companyName || "",
+    customerType: customer.customerType || invoice.customerType || info.customerType || "",
+    address: customer.address || invoice.address || info.address || "",
+    phone: customer.phone || invoice.phone || info.phone || info.tel || "",
+    email: customer.email || invoice.email || info.email || ""
+  };
+}
+
+function getPaymentInvoiceLines(invoice) {
+  const candidates = [invoice?.items, invoice?.lines, invoice?.products, invoice?.details];
+  return candidates.find(value => Array.isArray(value) && value.length) || [];
+}
+
 function recalcPaymentLine(line) {
   const qty = Number(line.qty || 0);
   const unitPrice = Number(line.unitPrice || 0);
@@ -64,7 +110,7 @@ function recalcPaymentLine(line) {
 }
 
 function calcInvoiceTotal(invoice) {
-  return (invoice?.lines || []).reduce((total, line) => total + Number(recalcPaymentLine(line).amount || 0), 0);
+  return getPaymentInvoiceLines(invoice).reduce((total, line) => total + Number(recalcPaymentLine(line).amount || 0), 0);
 }
 
 function getInvoicePayments(invoice) {
@@ -284,6 +330,8 @@ function renderPaymentInvoiceRow(invoice) {
   const total = calcInvoiceTotal(invoice);
   const status = normalizePaymentStatus(invoice.status);
   const paymentDate = getLatestPaymentDate(invoice);
+  const customerView = getPaymentCustomerView(invoice);
+  const customerLabel = [customerView.organizationName, customerView.customerName].filter(Boolean).join(" / ");
   const cancelButton = status === PAYMENT_STATUS_PAID
     ? `<button type="button" class="danger" onclick="cancelPayment('${invoice.id}')">&#20837;&#37329;&#21462;&#28040;</button>`
     : "";
@@ -292,7 +340,7 @@ function renderPaymentInvoiceRow(invoice) {
     <td>${escapeHtml(invoice.invoiceDate || "")}</td>
     <td>${escapeHtml(paymentDate || "")}</td>
     <td>${escapeHtml(invoice.dueDate || "")}</td>
-    <td><span class="number-with-status">${escapeHtml(invoice.customerName || invoice.name || invoice.customer || "")} ${statusBadge(status)}</span></td>
+    <td><span class="number-with-status">${escapeHtml(customerLabel || customerView.customerName)} ${statusBadge(status)}</span></td>
     <td>${money(total)}</td>
     <td>${statusBadge(status)}</td>
     <td>${escapeHtml(invoice.staff || "")}</td>
@@ -302,12 +350,14 @@ function renderPaymentInvoiceRow(invoice) {
 
 function matchesPaymentInvoiceFilters(invoice) {
   const status = normalizePaymentStatus(invoice.status);
+  const customerView = getPaymentCustomerView(invoice);
   if (paymentStatusFilter && status !== paymentStatusFilter) return false;
   if (!matchesDateRange([invoice.invoiceDate, invoice.issuedAt, invoice.dueDate], paymentDateFrom, paymentDateTo)) return false;
   if (!paymentSearchText) return true;
   const text = [
     invoice.invoiceNo,
-    invoice.customerName,
+    customerView.customerName,
+    customerView.organizationName,
     invoice.staff,
     invoice.subject,
     status,
@@ -324,6 +374,10 @@ function clearPaymentForm() {
   document.getElementById("paymentInvoiceNo").value = "";
   document.getElementById("paymentCustomerName").value = "";
   document.getElementById("paymentInvoiceTotal").value = "";
+  ["paymentOrganizationName", "paymentCustomerType", "paymentCustomerAddress", "paymentCustomerPhone", "paymentCustomerEmail"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
   document.getElementById("paymentDate").value = today();
   document.getElementById("paymentAmount").value = "";
   document.getElementById("paymentMethod").value = "振込";
@@ -344,13 +398,23 @@ function selectPaymentInvoice(id) {
   selectedPaymentInvoiceId = invoice.id;
   const total = calcInvoiceTotal(invoice);
   const paid = getPaidTotal(invoice);
+  const customerView = getPaymentCustomerView(invoice);
   document.getElementById("paymentInvoiceNo").value = invoice.invoiceNo || "";
-  document.getElementById("paymentCustomerName").value = invoice.customerName || "";
+  document.getElementById("paymentCustomerName").value = customerView.customerName || "";
+  const setReadonlyCustomer = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value || "";
+  };
+  setReadonlyCustomer("paymentOrganizationName", customerView.organizationName);
+  setReadonlyCustomer("paymentCustomerType", customerView.customerType);
+  setReadonlyCustomer("paymentCustomerAddress", customerView.address);
+  setReadonlyCustomer("paymentCustomerPhone", customerView.phone);
+  setReadonlyCustomer("paymentCustomerEmail", customerView.email);
   document.getElementById("paymentInvoiceTotal").value = `${money(total)}（入金済 ${money(paid)}）`;
   document.getElementById("paymentDate").value = today();
   document.getElementById("paymentAmount").value = Math.max(0, total - paid);
   document.getElementById("paymentMethod").value = "振込";
-  document.getElementById("paymentPayerName").value = invoice.customerName || "";
+  document.getElementById("paymentPayerName").value = customerView.customerName || "";
   document.getElementById("paymentStaff").value = invoice.staff || "";
   document.getElementById("paymentCurrentStatus").value = normalizePaymentStatus(invoice.status);
   document.getElementById("paymentMemo").value = "";

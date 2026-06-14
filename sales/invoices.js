@@ -156,8 +156,43 @@ function recalcInvoiceLine(line) {
   return line;
 }
 
+function normalizeInvoiceLine(line) {
+  const normalized = {
+    ...line,
+    name: line?.name || line?.productName || line?.itemName || line?.product_name || "",
+    qty: Number(line?.qty ?? line?.quantity ?? line?.count ?? 0),
+    unit: line?.unit || line?.unitName || "",
+    unitPrice: Number(line?.unitPrice ?? line?.price ?? line?.taxIncludedPrice ?? line?.salePrice ?? 0),
+    discountValue: Number(line?.discountValue ?? line?.discountRate ?? line?.discount ?? 0),
+    memo: line?.memo || line?.note || ""
+  };
+  return recalcInvoiceLine(normalized);
+}
+
+function getInvoiceRawLines(invoice) {
+  const candidates = [invoice?.items, invoice?.lines, invoice?.products, invoice?.details];
+  const rows = candidates.find(value => Array.isArray(value) && value.length) || [];
+  return rows.map(normalizeInvoiceLine);
+}
+
+function normalizeInvoiceForView(invoice) {
+  const normalized = { ...(invoice || {}) };
+  const customerView = getInvoiceCustomerView(normalized);
+  const lines = getInvoiceRawLines(normalized);
+  normalized.customerName = customerView.customerName;
+  normalized.organizationName = customerView.organizationName;
+  normalized.customerType = customerView.customerType;
+  normalized.address = customerView.address;
+  normalized.phone = customerView.phone;
+  normalized.email = customerView.email;
+  normalized.customerMemo = customerView.customerMemo;
+  normalized.items = lines;
+  normalized.lines = lines;
+  return normalized;
+}
+
 function calcInvoiceTotals(invoice) {
-  const lines = invoice?.lines || [];
+  const lines = getInvoiceRawLines(invoice);
   let subtotal = 0;
   let discount = 0;
   let total = 0;
@@ -408,6 +443,7 @@ function renderInvoiceList() {
 }
 
 function renderInvoiceListRow(invoice) {
+  invoice = normalizeInvoiceForView(invoice);
   const totals = calcInvoiceTotals(invoice);
   const status = normalizeInvoiceStatus(invoice.status);
   const customerView = getInvoiceCustomerView(invoice);
@@ -484,6 +520,7 @@ function clearInvoiceEditor() {
 }
 
 function fillInvoiceForm(invoice) {
+  invoice = normalizeInvoiceForView(invoice);
   const customerView = getInvoiceCustomerView(invoice);
   console.log("render invoice customer fields", {
     ...pickInvoiceCustomerFields(invoice),
@@ -493,10 +530,8 @@ function fillInvoiceForm(invoice) {
     resolvedPhone: customerView.phone,
     resolvedEmail: customerView.email
   });
-  invoice.items = invoice.items || invoice.lines || [];
-  invoice.lines = invoice.lines || invoice.items || [];
   currentInvoiceId = invoice.id || null;
-  currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || invoice.items || []));
+  currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || []));
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
   document.getElementById("invoiceStatus").value = normalizeInvoiceStatus(invoice.status);
   document.getElementById("sourceQuoteNo").value = invoice.sourceQuoteNo || "";
