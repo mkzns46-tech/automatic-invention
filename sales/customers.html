@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 顧客管理</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-lists-hidden">
+<link rel="stylesheet" href="sales-style.css?v=20260614-customers">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-nav.js?v=20260614-lists-hidden" defer></script>
-<script src="customers.js?v=20260614-lists-hidden" defer></script>
+<script src="sales-nav.js?v=20260614-customers" defer></script>
+<script src="customers-storage.js?v=20260614-customers"></script>
+<script src="customers.js?v=20260614-customers" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -16,7 +17,7 @@
     <div>
       <div class="brand">ARICO ARCHERY</div>
       <h1>顧客管理</h1>
-      <p class="lead">見積書・請求書に登録された顧客を一覧で確認します。</p>
+      <p class="lead">スマレジ会員データを取り込み、販売管理用の顧客マスターを管理します。</p>
     </div>
     <div class="sales-actions">
       <a class="pill" href="index.html">販売管理トップ</a>
@@ -24,7 +25,21 @@
     </div>
   </header>
 
-  <div id="salesMessage" class="message">顧客一覧を確認できます。</div>
+  <div id="salesMessage" class="message">顧客管理を確認できます。</div>
+
+  <section class="card sales-smaregi-card">
+    <div class="section-title">
+      <div>
+        <h2>スマレジ会員データ取込</h2>
+        <p class="section-note">新スマレジの会員データを販売管理の顧客マスターへ取り込みます。店舗選択は不要です。</p>
+      </div>
+      <span class="badge muted">新スマレジ固定</span>
+    </div>
+    <div class="settings-import-panel">
+      <button type="button" id="customerSmaregiImportBtn" onclick="importSmaregiCustomers();">スマレジ会員データ取込</button>
+      <div id="customerImportResult" class="message">未取込です。</div>
+    </div>
+  </section>
 
   <section class="card collapsible-list-card">
     <div class="sales-actions section-heading-row">
@@ -32,18 +47,11 @@
       <button type="button" class="secondary list-toggle-button" id="customerListToggle" onclick="toggleCustomerList();">一覧を閉じる</button>
     </div>
     <div class="list-panel" id="customerListPanel">
-      <div class="list-filter-row">
-        <label>一覧検索<input id="customerSearch" placeholder="顧客名・顧客区分・電話番号・メールアドレス・担当者"></label>
+      <div class="list-filter-row customer-filter-row">
+        <label>一覧検索<input id="customerSearch" placeholder="顧客名・電話番号・メール・区分・担当者・スマレジ会員コード"></label>
         <label>顧客区分
           <select id="customerTypeFilter">
             <option value="">全て</option>
-            <option value="個人">個人</option>
-            <option value="学校">学校</option>
-            <option value="協会">協会</option>
-            <option value="企業">企業</option>
-            <option value="ショップ">ショップ</option>
-            <option value="卸">卸</option>
-            <option value="その他">その他</option>
           </select>
         </label>
         <label>開始日<input id="customerDateFromFilter" type="date"></label>
@@ -51,12 +59,56 @@
       </div>
       <div class="table-wrap list-scroll">
         <table>
-          <thead><tr><th>顧客名</th><th>顧客区分</th><th>電話番号</th><th>メールアドレス</th><th>担当者</th><th>最終取引日</th><th>見積数</th><th>請求数</th></tr></thead>
+          <thead><tr><th>顧客コード</th><th>顧客名</th><th>顧客区分</th><th>電話番号</th><th>メールアドレス</th><th>スマレジ会員コード</th><th>担当者</th><th>更新日</th><th>操作</th></tr></thead>
           <tbody id="customerListBody"></tbody>
         </table>
       </div>
     </div>
   </section>
+
+  <section class="card" id="customerEditCard">
+    <div class="section-title">
+      <div>
+        <h2>顧客編集</h2>
+        <p class="section-note">顧客区分、担当者、備考は販売管理側で手動更新できます。</p>
+      </div>
+      <button type="button" class="secondary" onclick="clearCustomerForm();">新規入力をクリア</button>
+    </div>
+    <input id="customerId" type="hidden">
+    <div class="row three">
+      <label>顧客コード<input id="customerCode" readonly></label>
+      <label>スマレジ会員ID<input id="smaregiMemberId" readonly></label>
+      <label>スマレジ会員コード<input id="smaregiMemberCode" readonly></label>
+    </div>
+    <div class="row three">
+      <label>顧客名<input id="customerName"></label>
+      <label>カナ<input id="customerKana"></label>
+      <label>顧客区分<select id="customerType"></select></label>
+    </div>
+    <div class="row three">
+      <label>担当者<input id="customerStaff"></label>
+      <label>郵便番号<input id="customerPostalCode"></label>
+      <label>電話番号<input id="customerPhone"></label>
+    </div>
+    <div class="row two">
+      <label>住所<input id="customerAddress"></label>
+      <label>メールアドレス<input id="customerEmail" type="email"></label>
+    </div>
+    <label>備考<textarea id="customerMemo"></textarea></label>
+    <div class="sales-actions">
+      <button type="button" onclick="saveCustomer();">保存</button>
+    </div>
+  </section>
 </main>
+
+<div id="salesPopup" class="app-popup hidden" role="dialog" aria-modal="true">
+  <div class="app-popup-card">
+    <div id="salesPopupTitle" class="app-popup-title">通知</div>
+    <div id="salesPopupBody" class="app-popup-body"></div>
+    <div class="sales-actions">
+      <button type="button" onclick="closeSalesPopup();">OK</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
