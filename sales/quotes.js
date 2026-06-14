@@ -252,6 +252,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("quoteDate").value = today();
   document.getElementById("validUntil").value = today();
   bindProductAutoSearch();
+  bindQuoteCustomerSearch();
   bindQuoteListControls();
   await loadStaffOptions();
   renderQuoteList();
@@ -317,6 +318,62 @@ function bindProductAutoSearch() {
     clearTimeout(productSearchTimer);
     searchProducts();
   });
+}
+
+function bindQuoteCustomerSearch() {
+  const input = document.getElementById("quoteCustomerSearchInput");
+  if (!input) return;
+  input.addEventListener("input", () => renderQuoteCustomerSearchResults(input.value));
+}
+
+function renderQuoteCustomerSearchResults(query) {
+  const results = document.getElementById("quoteCustomerSearchResults");
+  if (!results) return;
+  const text = String(query || "").trim();
+  if (!text) {
+    results.innerHTML = "";
+    return;
+  }
+  const customers = window.SalesCustomerStorage?.searchCustomers
+    ? window.SalesCustomerStorage.searchCustomers(text, 20)
+    : [];
+  results.innerHTML = customers.length ? `<div class="table-wrap"><table><thead><tr><th>顧客名</th><th>顧客区分</th><th>電話番号</th><th>メールアドレス</th><th>スマレジ会員コード</th><th>操作</th></tr></thead><tbody>${customers.map(customer => `<tr>
+    <td>${escapeHtml(customer.customerName)}</td>
+    <td>${escapeHtml(customer.customerType)}</td>
+    <td>${escapeHtml(customer.phone)}</td>
+    <td>${escapeHtml(customer.email)}</td>
+    <td>${escapeHtml(customer.smaregiMemberCode)}</td>
+    <td><button type="button" class="secondary" onclick="selectQuoteCustomer('${escapeHtml(customer.id)}')">選択</button></td>
+  </tr>`).join("")}</tbody></table></div>` : '<div class="message warn">該当する顧客がありません。</div>';
+}
+
+function selectQuoteCustomer(customerId) {
+  const customer = window.SalesCustomerStorage?.readCustomers().find(row => row.id === customerId);
+  if (!customer) return;
+  applyCustomerToQuote(customer);
+  setFieldValue("quoteCustomerSearchInput", "");
+  const results = document.getElementById("quoteCustomerSearchResults");
+  if (results) results.innerHTML = "";
+  showSalesPopup("顧客選択", "顧客情報を反映しました", "ok");
+}
+
+function applyCustomerToQuote(customer) {
+  setFieldValue("salesCustomerId", customer.id);
+  setFieldValue("salesCustomerCode", customer.customerCode);
+  setFieldValue("salesSmaregiCustomerId", customer.smaregiMemberId);
+  setFieldValue("salesSmaregiCustomerCode", customer.smaregiMemberCode);
+  setFieldValue("customerName", customer.customerName);
+  setFieldValue("customerType", customer.customerType || "個人");
+  setFieldValue("customerAddress", customer.address);
+  setFieldValue("customerPhone", customer.phone);
+  setFieldValue("customerEmail", customer.email);
+  const memo = document.getElementById("quoteMemo");
+  if (memo && customer.memo && !memo.value) memo.value = customer.memo;
+}
+
+function setFieldValue(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.value = value || "";
 }
 
 async function loadStaffOptions() {
@@ -413,6 +470,10 @@ function buildInvoiceFromQuote(quote, invoices) {
     invoiceNo: nextInvoiceNo(invoices),
     sourceQuoteId: quote.id,
     sourceQuoteNo: quote.quoteNo || "",
+    customerId: quote.customerId || "",
+    customerCode: quote.customerCode || "",
+    smaregiCustomerId: quote.smaregiCustomerId || "",
+    smaregiCustomerCode: quote.smaregiCustomerCode || "",
     createdAt: now,
     updatedAt: now,
     status: "下書き",
@@ -470,6 +531,12 @@ function newQuote() {
   document.getElementById("quoteDate").value = today();
   document.getElementById("validUntil").value = today();
   document.getElementById("productSearchResults").innerHTML = "";
+  ["salesCustomerId", "salesCustomerCode", "salesSmaregiCustomerId", "salesSmaregiCustomerCode", "quoteCustomerSearchInput"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const customerResults = document.getElementById("quoteCustomerSearchResults");
+  if (customerResults) customerResults.innerHTML = "";
   renderLines();
   updateQuoteDeleteButton(null);
 }
@@ -600,6 +667,10 @@ function collectQuote() {
     quoteNo: existing?.quoteNo || nextQuoteNo(quotes),
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    customerId: document.getElementById("salesCustomerId")?.value || existing?.customerId || "",
+    customerCode: document.getElementById("salesCustomerCode")?.value || existing?.customerCode || "",
+    smaregiCustomerId: document.getElementById("salesSmaregiCustomerId")?.value || existing?.smaregiCustomerId || "",
+    smaregiCustomerCode: document.getElementById("salesSmaregiCustomerCode")?.value || existing?.smaregiCustomerCode || "",
     status: existing?.status || "下書き",
     customerName: document.getElementById("customerName").value.trim(),
     customerType: document.getElementById("customerType").value,
@@ -653,6 +724,13 @@ function updateQuoteDeleteButton(quote) {
 async function fillQuoteForm(quote) {
   currentQuoteId = quote.id || null;
   currentLines = JSON.parse(JSON.stringify(quote.lines || [])).map(line => ({ ...line, stock: 0 }));
+  setFieldValue("salesCustomerId", quote.customerId || "");
+  setFieldValue("salesCustomerCode", quote.customerCode || "");
+  setFieldValue("salesSmaregiCustomerId", quote.smaregiCustomerId || "");
+  setFieldValue("salesSmaregiCustomerCode", quote.smaregiCustomerCode || "");
+  setFieldValue("quoteCustomerSearchInput", "");
+  const customerResults = document.getElementById("quoteCustomerSearchResults");
+  if (customerResults) customerResults.innerHTML = "";
   document.getElementById("customerName").value = quote.customerName || "";
   document.getElementById("customerType").value = quote.customerType || "個人";
   document.getElementById("customerAddress").value = quote.address || "";

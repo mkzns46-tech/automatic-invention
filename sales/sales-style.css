@@ -39,6 +39,9 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 .product-search-row label{flex:1;margin-bottom:0}
 .product-search-row button{flex:0 0 120px}
 .product-search-row input{max-width:640px}
+.customer-search-box{margin:4px 0 14px}
+.customer-search-results{margin-top:8px}
+.customer-search-results .table-wrap{max-height:260px}
 .app-popup{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(16,37,27,.38);padding:18px}
 .app-popup-card{width:min(420px,100%);border:1px solid #cfe6d7;border-radius:16px;background:#fff;padding:22px;box-shadow:0 24px 72px rgba(16,37,27,.24);text-align:center}
 .app-popup-title{font-size:22px;font-weight:900;color:var(--main-dark);margin-bottom:10px}.app-popup-body{white-space:pre-wrap;color:#315b48;font-weight:800;line-height:1.6;margin-bottom:18px}.app-popup[data-type="err"] .app-popup-title{color:#9d0208}.app-popup[data-type="warn"] .app-popup-title{color:var(--warn)}

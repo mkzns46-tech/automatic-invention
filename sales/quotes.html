@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 見積書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-lists-hidden">
+<link rel="stylesheet" href="sales-style.css?v=20260614-customer-link">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-lists-hidden" defer></script>
-<script src="customers-storage.js?v=20260614-customers"></script>
-<script src="customers.js?v=20260614-customers"></script>
+<script src="customers-storage.js?v=20260614-customer-link"></script>
+<script src="customers.js?v=20260614-customer-link"></script>
 <script src="sales-calculator.js"></script>
 <script src="quote-pdf.js?v=20260614-lists-hidden"></script>
-<script src="quotes.js?v=20260614-lists-hidden" defer></script>
+<script src="quotes.js?v=20260614-customer-link" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -71,6 +71,14 @@
 
   <section class="card" id="quoteEditorCard">
     <h2>顧客情報</h2>
+    <input id="salesCustomerId" type="hidden">
+    <input id="salesCustomerCode" type="hidden">
+    <input id="salesSmaregiCustomerId" type="hidden">
+    <input id="salesSmaregiCustomerCode" type="hidden">
+    <div class="customer-search-box">
+      <label>&#39015;&#23458;&#26908;&#32034;<input id="quoteCustomerSearchInput" placeholder="&#39015;&#23458;&#21517;&#12539;&#38651;&#35441;&#30058;&#21495;&#12539;&#12513;&#12540;&#12523;&#12539;&#12473;&#12510;&#12524;&#12472;&#20250;&#21729;&#12467;&#12540;&#12489;"></label>
+      <div id="quoteCustomerSearchResults" class="customer-search-results"></div>
+    </div>
     <div class="row three">
       <label>顧客名<input id="customerName"></label>
       <label>顧客区分<select id="customerType"></select></label>

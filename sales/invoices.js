@@ -135,6 +135,10 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     deliveryNo: nextDeliveryNo(deliveries),
     sourceInvoiceId: invoice.id || "",
     sourceInvoiceNo: invoice.invoiceNo || "",
+    customerId: invoice.customerId || "",
+    customerCode: invoice.customerCode || "",
+    smaregiCustomerId: invoice.smaregiCustomerId || "",
+    smaregiCustomerCode: invoice.smaregiCustomerCode || "",
     invoiceDate: invoice.invoiceDate || "",
     issuedAt: invoice.issuedAt || "",
     createdAt: now,
@@ -255,6 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .map(status => `<option value="${status}">${status}</option>`)
     .join("");
   document.getElementById("invoiceStatus").disabled = true;
+  bindInvoiceCustomerSearch();
   bindInvoiceListControls();
   renderInvoiceList();
   const id = new URLSearchParams(location.search).get("id");
@@ -292,6 +297,70 @@ function bindInvoiceListControls() {
     });
   }
   setInvoiceListCollapsed(false);
+}
+
+function bindInvoiceCustomerSearch() {
+  const input = document.getElementById("invoiceCustomerSearchInput");
+  if (!input) return;
+  input.addEventListener("input", () => renderInvoiceCustomerSearchResults(input.value));
+}
+
+function renderInvoiceCustomerSearchResults(query) {
+  const results = document.getElementById("invoiceCustomerSearchResults");
+  if (!results) return;
+  const text = String(query || "").trim();
+  if (!text) {
+    results.innerHTML = "";
+    return;
+  }
+  if (!isInvoiceEditable(document.getElementById("invoiceStatus")?.value)) {
+    results.innerHTML = '<div class="message warn">発行済みの請求書は顧客変更できません。</div>';
+    return;
+  }
+  const customers = window.SalesCustomerStorage?.searchCustomers
+    ? window.SalesCustomerStorage.searchCustomers(text, 20)
+    : [];
+  results.innerHTML = customers.length ? `<div class="table-wrap"><table><thead><tr><th>顧客名</th><th>顧客区分</th><th>電話番号</th><th>メールアドレス</th><th>スマレジ会員コード</th><th>操作</th></tr></thead><tbody>${customers.map(customer => `<tr>
+    <td>${escapeHtml(customer.customerName)}</td>
+    <td>${escapeHtml(customer.customerType)}</td>
+    <td>${escapeHtml(customer.phone)}</td>
+    <td>${escapeHtml(customer.email)}</td>
+    <td>${escapeHtml(customer.smaregiMemberCode)}</td>
+    <td><button type="button" class="secondary" onclick="selectInvoiceCustomer('${escapeHtml(customer.id)}')">選択</button></td>
+  </tr>`).join("")}</tbody></table></div>` : '<div class="message warn">該当する顧客がありません。</div>';
+}
+
+function selectInvoiceCustomer(customerId) {
+  if (!isInvoiceEditable(document.getElementById("invoiceStatus")?.value)) {
+    showSalesPopup("変更できません", "発行済みの請求書は顧客変更できません。", "warn");
+    return;
+  }
+  const customer = window.SalesCustomerStorage?.readCustomers().find(row => row.id === customerId);
+  if (!customer) return;
+  applyCustomerToInvoice(customer);
+  setFieldValue("invoiceCustomerSearchInput", "");
+  const results = document.getElementById("invoiceCustomerSearchResults");
+  if (results) results.innerHTML = "";
+  showSalesPopup("顧客選択", "顧客情報を反映しました", "ok");
+}
+
+function applyCustomerToInvoice(customer) {
+  setFieldValue("salesCustomerId", customer.id);
+  setFieldValue("salesCustomerCode", customer.customerCode);
+  setFieldValue("salesSmaregiCustomerId", customer.smaregiMemberId);
+  setFieldValue("salesSmaregiCustomerCode", customer.smaregiMemberCode);
+  setFieldValue("customerName", customer.customerName);
+  setFieldValue("customerType", customer.customerType || "個人");
+  setFieldValue("customerAddress", customer.address);
+  setFieldValue("customerPhone", customer.phone);
+  setFieldValue("customerEmail", customer.email);
+  const memo = document.getElementById("invoiceMemo");
+  if (memo && customer.memo && !memo.value) memo.value = customer.memo;
+}
+
+function setFieldValue(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.value = value || "";
 }
 
 function toggleInvoiceList() {
@@ -392,6 +461,12 @@ function clearInvoiceEditor() {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
+  ["salesCustomerId", "salesCustomerCode", "salesSmaregiCustomerId", "salesSmaregiCustomerCode", "invoiceCustomerSearchInput"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const customerResults = document.getElementById("invoiceCustomerSearchResults");
+  if (customerResults) customerResults.innerHTML = "";
   document.getElementById("invoiceStatus").value = INVOICE_STATUS_DRAFT;
   document.getElementById("issuedAt").value = "";
   document.getElementById("invoiceDate").value = today();
@@ -406,6 +481,13 @@ function fillInvoiceForm(invoice) {
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
   document.getElementById("invoiceStatus").value = normalizeInvoiceStatus(invoice.status);
   document.getElementById("sourceQuoteNo").value = invoice.sourceQuoteNo || "";
+  setFieldValue("salesCustomerId", invoice.customerId || "");
+  setFieldValue("salesCustomerCode", invoice.customerCode || "");
+  setFieldValue("salesSmaregiCustomerId", invoice.smaregiCustomerId || "");
+  setFieldValue("salesSmaregiCustomerCode", invoice.smaregiCustomerCode || "");
+  setFieldValue("invoiceCustomerSearchInput", "");
+  const customerResults = document.getElementById("invoiceCustomerSearchResults");
+  if (customerResults) customerResults.innerHTML = "";
   document.getElementById("issuedAt").value = formatDateTime(invoice.issuedAt);
   document.getElementById("customerName").value = invoice.customerName || "";
   document.getElementById("customerType").value = invoice.customerType || "";
@@ -485,6 +567,7 @@ function updateInvoiceLockState(invoice) {
     "customerAddress",
     "customerPhone",
     "customerEmail",
+    "invoiceCustomerSearchInput",
     "invoiceSubject",
     "invoiceDate",
     "dueDate",
@@ -554,6 +637,10 @@ function collectInvoice() {
     invoiceNo: document.getElementById("invoiceNo").value || existing?.invoiceNo || "",
     sourceQuoteId: existing?.sourceQuoteId || "",
     sourceQuoteNo: document.getElementById("sourceQuoteNo").value || existing?.sourceQuoteNo || "",
+    customerId: document.getElementById("salesCustomerId")?.value || existing?.customerId || "",
+    customerCode: document.getElementById("salesCustomerCode")?.value || existing?.customerCode || "",
+    smaregiCustomerId: document.getElementById("salesSmaregiCustomerId")?.value || existing?.smaregiCustomerId || "",
+    smaregiCustomerCode: document.getElementById("salesSmaregiCustomerCode")?.value || existing?.smaregiCustomerCode || "",
     issuedAt: existing?.issuedAt || "",
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),

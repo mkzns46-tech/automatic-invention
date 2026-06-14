@@ -35,6 +35,25 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
     return String(value || "").trim().toLowerCase();
   }
 
+  function searchCustomers(query, limit = 20) {
+    const text = normalizeKey(query);
+    if (!text) return [];
+    return readCustomers().filter(customer => {
+      const haystack = [
+        customer.customerName,
+        customer.kana,
+        customer.phone,
+        customer.email,
+        customer.customerType,
+        customer.staff,
+        customer.smaregiMemberCode,
+        customer.smaregiMemberId,
+        customer.customerCode
+      ].map(value => normalizeKey(value)).join(" ");
+      return haystack.includes(text);
+    }).slice(0, limit);
+  }
+
   function nextCustomerCode(customers) {
     const max = customers.reduce((number, customer) => {
       const match = String(customer.customerCode || "").match(/^C-(\d+)$/);
@@ -135,6 +154,7 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
     writeCustomers,
     normalizeCustomerType,
     nextCustomerCode,
+    searchCustomers,
     upsertSmaregiCustomers
   };
 })();
