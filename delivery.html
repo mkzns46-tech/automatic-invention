@@ -4,18 +4,140 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 納品書</title>
-<link rel="stylesheet" href="sales-style.css">
+<link rel="stylesheet" href="sales-style.css?v=20260615-shipping-status">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-placeholder.js" defer></script>
+<script src="sales-nav.js?v=20260614-progress" defer></script>
+<script src="delivery-pdf.js?v=20260614-lists-hidden"></script>
+<script src="delivery.js?v=20260615-shipping-status" defer></script>
 </head>
-<body data-sales-title="納品書">
+<body>
 <main class="sales-wrap">
   <header class="sales-header">
-    <div><div class="brand">ARICO ARCHERY</div><h1 id="salesPlaceholderTitle">納品書</h1></div>
-    <div class="sales-actions"><a class="pill" href="index.html">販売管理トップ</a><button type="button" class="secondary" onclick="logoutSales();">ログアウト</button></div>
+    <div>
+      <div class="brand">ARICO ARCHERY</div>
+      <h1>納品書</h1>
+      <p class="lead">請求書の発行確定時に作成された納品書を確認し、PDF出力と発送済処理を行います。</p>
+    </div>
+    <div class="sales-actions">
+      <a class="pill" href="invoices.html">請求書</a>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+    </div>
   </header>
-  <section class="card"><p id="salesPlaceholderMessage">準備中です。</p></section>
+
+  <div id="salesMessage" class="message">納品書を確認できます。</div>
+
+  <section class="card collapsible-list-card" id="deliveryListCard">
+    <div class="sales-actions section-heading-row">
+      <h2 class="list-heading" onclick="toggleDeliveryList();">納品書一覧 <span class="status-badge muted" id="deliveryListCount">0件</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="deliveryListToggle" onclick="toggleDeliveryList();">一覧を閉じる</button>
+    </div>
+    <div class="list-panel" id="deliveryListPanel">
+      <div class="list-filter-row">
+        <label>一覧検索<input id="deliverySearch" placeholder="顧客名・担当者・件名・納品書番号・ステータス"></label>
+        <label>ステータス
+          <select id="deliveryStatusFilter">
+            <option value="">全て</option>
+            <option value="未発送">未発送</option>
+            <option value="未発行">未発行</option>
+            <option value="納品書発行済">納品書発行済</option>
+            <option value="発送済">発送済</option>
+            <option value="手渡し済">手渡し済</option>
+            <option value="担当者手持ち済">担当者手持ち済</option>
+            <option value="完了済">完了済</option>
+            <option value="キャンセル">キャンセル</option>
+          </select>
+        </label>
+        <label>開始日<input id="deliveryDateFromFilter" type="date"></label>
+        <label>終了日<input id="deliveryDateToFilter" type="date"></label>
+      </div>
+      <div class="list-subheading">対応が必要な納品書</div>
+      <div class="table-wrap list-scroll">
+        <table>
+          <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <tbody id="deliveryListBody"></tbody>
+        </table>
+      </div>
+      <div class="list-panel completed-list-panel" id="deliveryCompletedListPanel">
+        <div class="list-subheading">発送済・完了済一覧</div>
+        <div class="table-wrap list-scroll">
+          <table>
+            <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+            <tbody id="deliveryCompletedListBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="deliveryDetailCard">
+    <h2>納品情報</h2>
+    <div class="row">
+      <label>納品書番号<input id="deliveryNo" readonly></label>
+      <label>元請求書番号<input id="sourceInvoiceNo" readonly></label>
+      <label>ステータス<input id="deliveryStatus" readonly></label>
+      <label>発行日<input id="deliveryIssuedAt" readonly></label>
+    </div>
+    <div class="row three">
+      <label>顧客名<input id="deliveryCustomerName" readonly></label>
+      <label>顧客区分<input id="deliveryCustomerType" readonly></label>
+      <label>担当者<input id="deliveryStaff" readonly></label>
+    </div>
+    <div class="row three">
+      <label>住所<input id="deliveryAddress" readonly></label>
+      <label>電話番号<input id="deliveryPhone" readonly></label>
+      <label>メールアドレス<input id="deliveryEmail" readonly></label>
+    </div>
+    <div class="row two">
+      <label>件名<input id="deliverySubject" readonly></label>
+      <label>請求日<input id="deliveryInvoiceDate" readonly></label>
+    </div>
+  </section>
+
+  <section class="card" id="deliveryShippingCard">
+    <h2>発送情報</h2>
+    <div class="row">
+      <label>発送方法
+        <select id="shippingMethod">
+          <option value="配送">配送</option>
+          <option value="手渡し">手渡し</option>
+          <option value="担当者手持ち">担当者手持ち</option>
+        </select>
+      </label>
+      <label><span id="shipmentDateLabelText">発送日</span><input id="shipmentDate" type="date"></label>
+      <label id="shippingCarrierLabel">配送会社<input id="shippingCarrier" placeholder="ヤマト"></label>
+      <label id="trackingNumberLabel">送り状番号<input id="trackingNumber" placeholder="送り状番号"></label>
+      <label>担当者<input id="shippingStaff" placeholder="担当者"></label>
+    </div>
+    <label>備考<textarea id="shippingMemo" rows="3" placeholder="発送に関する備考"></textarea></label>
+    <div class="sales-actions" style="margin-top:14px">
+      <button type="button" class="secondary" onclick="markCurrentDeliveryIssued();">納品書発行済にする</button>
+      <button type="button" class="invoice-issue-button" onclick="markCurrentDeliveryShipped();">発送済登録</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>納品商品</h2>
+    <div id="deliveryLines" class="invoice-lines">
+      <div class="message">納品書を選択してください。</div>
+    </div>
+    <div class="summary">
+      <div>小計 <strong id="deliverySubtotalText">0円</strong></div>
+      <div>値引き <strong id="deliveryDiscountText">0円</strong></div>
+      <div>合計 <strong id="deliveryTotalText">0円</strong></div>
+      <div>内消費税 <strong id="deliveryTaxText">0円</strong></div>
+    </div>
+    <div class="sales-actions" style="margin-top:14px">
+      <button type="button" class="secondary" onclick="outputCurrentDeliveryPdf();">PDF出力</button>
+    </div>
+  </section>
 </main>
+<div id="salesPopup" class="app-popup" style="display:none;">
+  <div class="app-popup-card">
+    <div id="salesPopupTitle" class="app-popup-title">完了</div>
+    <div id="salesPopupBody" class="app-popup-body"></div>
+    <button type="button" id="salesPopupClose">OK</button>
+  </div>
+</div>
 </body>
 </html>
