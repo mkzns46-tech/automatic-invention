@@ -37,6 +37,14 @@ function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
 
+function isRefundReceipt(row) {
+  return String(row?.transactionType || "").trim() === "返金" || Number(row?.amount || 0) < 0;
+}
+
+function amountClass(value, row = {}) {
+  return Number(value || 0) < 0 || isRefundReceipt(row) ? "amount-negative refund-amount" : "";
+}
+
 function normalizeInvoiceStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (value === "paid" || value === "入金済み") return "入金済み";
@@ -72,6 +80,18 @@ function getLatestActivePayment(invoice) {
 
 function getPaidTotal(invoice) {
   return getActivePayments(invoice).reduce((total, payment) => total + Number(payment.amount || 0), 0);
+}
+
+function getReceiptInvoiceTotal(invoice) {
+  if (Number.isFinite(Number(invoice?.total))) return Number(invoice.total || 0);
+  const lines = Array.isArray(invoice?.lines) ? invoice.lines : Array.isArray(invoice?.items) ? invoice.items : [];
+  return lines.reduce((total, line) => total + Number(line.amount || 0), 0);
+}
+
+function getReceiptDisplayAmount(invoice) {
+  const paidTotal = getPaidTotal(invoice);
+  if (paidTotal) return paidTotal;
+  return getReceiptInvoiceTotal(invoice);
 }
 
 function normalizeDateOnly(value) {
@@ -240,7 +260,7 @@ function renderReceiptTargetRow(row) {
       <td>${escapeHtml(normalizeDateOnly(invoice.issuedAt) || payment.paymentDate || "")}</td>
       <td>${escapeHtml(invoice.organizationName || invoice.organization || invoice.companyName || "")}</td>
       <td>${escapeHtml(invoice.customerName || invoice.name || invoice.customer || "")}</td>
-      <td>${money(getPaidTotal(invoice))}</td>
+      <td class="${amountClass(getReceiptDisplayAmount(invoice), invoice)}">${money(getReceiptDisplayAmount(invoice))}</td>
       <td><span class="status-badge muted">&#26410;&#30330;&#34892;</span></td>
       <td>${escapeHtml(payment.staff || invoice.staff || "")}</td>
       <td><button type="button" class="primary" onclick="createReceiptFromInvoice('${invoice.id}')">&#38936;&#21454;&#26360;&#20316;&#25104;</button></td>
@@ -252,7 +272,7 @@ function renderReceiptTargetRow(row) {
     <td>${escapeHtml(normalizeDateOnly(receipt.issuedAt) || receipt.paymentDate || "")}</td>
     <td>${escapeHtml(receipt.organizationName || receipt.organization || receipt.companyName || "")}</td>
     <td>${escapeHtml(receipt.customerName || receipt.name || receipt.customer || "")}</td>
-    <td>${money(receipt.amount)}</td>
+    <td class="${amountClass(receipt.amount, receipt)}">${money(receipt.amount)}</td>
     <td>${statusBadge(receipt.status)}</td>
     <td>${escapeHtml(receipt.staff || "")}</td>
     <td>
@@ -305,7 +325,7 @@ function buildReceiptFromInvoice(invoice, receipts) {
     customerName: invoice.customerName || "",
     subject: invoice.subject || "",
     paymentDate: payment.paymentDate || normalizeDateOnly(payment.createdAt),
-    amount: getPaidTotal(invoice),
+    amount: getReceiptDisplayAmount(invoice),
     method: "振込",
     payerName: payment.payerName || "",
     staff: payment.staff || invoice.staff || "",

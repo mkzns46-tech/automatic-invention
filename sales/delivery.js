@@ -28,6 +28,15 @@ function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
 
+function isRefundDelivery(deliveryOrType) {
+  const type = typeof deliveryOrType === "string" ? deliveryOrType : deliveryOrType?.transactionType;
+  return String(type || "").trim() === "返金";
+}
+
+function amountClass(value, deliveryOrType = "") {
+  return Number(value || 0) < 0 || isRefundDelivery(deliveryOrType) ? "amount-negative refund-amount" : "";
+}
+
 function normalizeDeliveryStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (!value || value === "draft" || value === "未発行") return DELIVERY_STATUS_DRAFT;
@@ -69,13 +78,15 @@ function matchesDateRange(values, from, to) {
 }
 
 function recalcDeliveryLine(line) {
+  const transactionType = line.transactionType || "";
   const qty = Number(line.qty || 0);
   const unitPrice = Number(line.unitPrice || 0);
   const discountValue = Number(line.discountValue ?? line.discountRate ?? 0);
-  const gross = Math.round(qty * unitPrice);
+  const gross = Math.max(0, Math.round(Math.abs(qty) * Math.abs(unitPrice)));
   const fixedDiscount = Math.max(0, Number(line.discountAmountInput || line.fixedDiscountAmount || line.manualDiscountAmount || 0));
   line.discountAmount = Math.min(gross, fixedDiscount > 0 ? fixedDiscount : Math.round(gross * discountValue / 100));
-  line.amount = Math.max(0, gross - line.discountAmount);
+  const netAmount = Math.max(0, gross - line.discountAmount);
+  line.amount = isRefundDelivery(transactionType) ? -netAmount : netAmount;
   return line;
 }
 
@@ -154,7 +165,7 @@ function renderDeliveryRow(delivery) {
     <td>${escapeHtml(normalizeDateOnly(delivery.issuedAt) || delivery.deliveryDate || delivery.invoiceDate || "")}</td>
     <td>${escapeHtml(delivery.organizationName || delivery.organization || delivery.companyName || "")}</td>
     <td>${escapeHtml(delivery.customerName || delivery.name || delivery.customer || "")}</td>
-    <td>${money(delivery.total)}</td>
+    <td class="${amountClass(delivery.total, delivery)}">${money(delivery.total)}</td>
     <td>${statusBadge(status)}</td>
     <td>${escapeHtml(delivery.staff || "")}</td>
     <td>
@@ -223,6 +234,7 @@ function renderDeliveryLines(delivery) {
   const area = document.getElementById("deliveryLines");
   const lines = delivery.lines || [];
   area.innerHTML = lines.length ? lines.map(line => {
+    line.transactionType = line.transactionType || delivery.transactionType || "";
     recalcDeliveryLine(line);
     return `<div class="invoice-line">
       <label>商品名<input value="${escapeHtml(line.name || "")}" readonly></label>
@@ -230,7 +242,7 @@ function renderDeliveryLines(delivery) {
       <label>単位<input value="${escapeHtml(line.unit || "")}" readonly></label>
       <label>税込単価<input value="${Number(line.unitPrice || 0)}" readonly></label>
       <label>値引率%<input value="${Number(line.discountValue || 0)}" readonly></label>
-      <label>金額<div class="line-amount">${money(line.amount)}</div></label>
+      <label>金額<div class="line-amount ${amountClass(line.amount, line.transactionType)}">${money(line.amount)}</div></label>
       <label>備考<input value="${escapeHtml(line.memo || "")}" readonly></label>
     </div>`;
   }).join("") : '<div class="message">納品商品がありません。</div>';
@@ -239,7 +251,10 @@ function renderDeliveryLines(delivery) {
 function updateTotals(delivery) {
   document.getElementById("deliverySubtotalText").textContent = money(delivery.subtotal);
   document.getElementById("deliveryDiscountText").textContent = money(delivery.discount);
-  document.getElementById("deliveryTotalText").textContent = money(delivery.total);
+  const totalText = document.getElementById("deliveryTotalText");
+  totalText.textContent = money(delivery.total);
+  totalText.classList.toggle("amount-negative", Number(delivery.total || 0) < 0 || isRefundDelivery(delivery));
+  totalText.classList.toggle("refund-amount", Number(delivery.total || 0) < 0 || isRefundDelivery(delivery));
   document.getElementById("deliveryTaxText").textContent = money(delivery.tax);
 }
 

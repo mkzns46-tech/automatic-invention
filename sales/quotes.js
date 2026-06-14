@@ -116,6 +116,14 @@ function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
 
+function amountClass(value, transactionType = "") {
+  return Number(value || 0) < 0 || isRefundTransaction(transactionType) ? "amount-negative refund-amount" : "";
+}
+
+function refundBadge(transactionType) {
+  return isRefundTransaction(transactionType) ? '<span class="status-badge danger">返金</span>' : "";
+}
+
 function clampNumber(value, min, max) {
   const number = Number(value || 0);
   if (!Number.isFinite(number)) return min;
@@ -408,11 +416,22 @@ function bindTransactionTypeControls() {
 function applyTransactionTypeToLines() {
   const transactionType = normalizeTransactionType(getCurrentTransactionType());
   currentLines.forEach(line => {
+    const wasAuto = Boolean(line.autoTransactionDiscount);
     line.transactionType = transactionType;
     if (isFreeTransaction(transactionType)) {
+      if (!wasAuto) {
+        line.manualDiscountRateBeforeTransaction = Number(line.discountValue ?? line.discountRate ?? 0);
+        line.manualDiscountAmountBeforeTransaction = Number(line.discountAmountInput || 0);
+      }
       line.discountValue = 100;
       line.discountRate = 100;
       line.discountAmountInput = 0;
+      line.autoTransactionDiscount = true;
+    } else if (wasAuto) {
+      line.discountValue = Number(line.manualDiscountRateBeforeTransaction || 0);
+      line.discountRate = Number(line.manualDiscountRateBeforeTransaction || 0);
+      line.discountAmountInput = Number(line.manualDiscountAmountBeforeTransaction || 0);
+      line.autoTransactionDiscount = false;
     }
     if (isRefundTransaction(transactionType) && !line.memo) line.memo = "返金対象";
     recalcSalesLine(line);
@@ -585,7 +604,7 @@ function renderQuoteListRow(q) {
     <td>${escapeHtml(normalizeDateOnly(q.createdAt) || q.quoteDate || "")}</td>
     <td>${escapeHtml(q.organizationName || q.organization || q.companyName || "")}</td>
     <td>${escapeHtml(q.customerName || q.name || q.customer || "")}</td>
-    <td>${money(calcQuoteTotals(q).total)}</td>
+    <td class="${amountClass(calcQuoteTotals(q).total, q.transactionType)}">${money(calcQuoteTotals(q).total)}</td>
     <td>${quoteStatusBadge(q.status)}</td>
     <td>${escapeHtml(q.staff || "")}</td>
     <td>
@@ -858,6 +877,7 @@ async function addProductLine(product) {
       discountValue: isFreeTransaction(getCurrentTransactionType()) ? 100 : 0,
       discountRate: isFreeTransaction(getCurrentTransactionType()) ? 100 : 0,
       discountAmountInput: 0,
+      autoTransactionDiscount: isFreeTransaction(getCurrentTransactionType()),
       discountAmount: 0,
       amount: 0,
       memo: isRefundTransaction(getCurrentTransactionType()) ? "返金対象" : ""
@@ -881,7 +901,7 @@ function renderLines() {
       <label>税込単価<input type="number" min="0" step="1" value="${line.unitPrice}" onchange="updateLine(${index}, 'unitPrice', this.value)" ${disabled}></label>
       <label>値引率%<input type="number" min="0" max="100" step="1" value="${line.discountValue}" onchange="updateLine(${index}, 'discountValue', this.value)" ${disabled}></label>
       <label>値引額<input type="number" min="0" step="1" value="${Number(line.discountAmountInput || 0)}" onchange="updateLine(${index}, 'discountAmountInput', this.value)" ${disabled}></label>
-      <label>金額<div class="line-amount">${money(line.amount)}</div></label>
+      <label>金額<div class="line-amount ${amountClass(line.amount, line.transactionType)}">${money(line.amount)} ${refundBadge(line.transactionType)}</div></label>
       <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateLine(${index}, 'memo', this.value)" ${disabled}></label>
       <button type="button" class="danger" onclick="removeLine(${index})" ${disabled}>削除</button>
     </div>`).join("") : '<div class="message">見積商品を追加してください。</div>';
@@ -896,8 +916,13 @@ function updateLine(index, key, value) {
   }
   const line = currentLines[index];
   if (!line) return;
-  if (key === "discountValue" || key === "discountRate") line[key] = clampNumber(value, 0, 100);
-  else if (["qty", "unitPrice", "discountAmountInput"].includes(key)) line[key] = Math.max(0, Number(value || 0));
+  if (key === "discountValue" || key === "discountRate") {
+    line[key] = clampNumber(value, 0, 100);
+    line.autoTransactionDiscount = false;
+  } else if (key === "discountAmountInput") {
+    line[key] = Math.max(0, Number(value || 0));
+    line.autoTransactionDiscount = false;
+  } else if (["qty", "unitPrice"].includes(key)) line[key] = Math.max(0, Number(value || 0));
   else line[key] = value;
   if (key === "unit" && line.barcode) {
     const units = readUnits();
@@ -930,7 +955,10 @@ function applyDiscountTemplate(render = true) {
   const transactionType = getCurrentTransactionType();
   currentLines.forEach(line => {
     line.transactionType = transactionType;
-    if (isFreeTransaction(transactionType)) line.discountValue = 100;
+    if (isFreeTransaction(transactionType)) {
+      line.discountValue = 100;
+      line.autoTransactionDiscount = true;
+    }
     else if (template === "all10") line.discountValue = 10;
     else if (template === "dealer10") line.discountValue = isDealerBrand(line.name) ? 10 : 0;
     else if (template === "none") line.discountValue = 0;
@@ -945,7 +973,10 @@ function recalcTotals() {
   const totals = calcQuoteTotals({ lines: currentLines });
   document.getElementById("subtotalText").textContent = money(totals.subtotal);
   document.getElementById("discountText").textContent = money(totals.discount);
-  document.getElementById("totalText").textContent = money(totals.total);
+  const totalText = document.getElementById("totalText");
+  totalText.textContent = money(totals.total);
+  totalText.classList.toggle("amount-negative", totals.total < 0 || isRefundTransaction(getCurrentTransactionType()));
+  totalText.classList.toggle("refund-amount", totals.total < 0 || isRefundTransaction(getCurrentTransactionType()));
   document.getElementById("taxText").textContent = money(totals.tax);
 }
 
@@ -989,6 +1020,7 @@ function collectQuote() {
 
 function printQuotePdf(quote) {
   const doc = JSON.parse(JSON.stringify(quote || {}));
+  doc.transactionType = normalizeTransactionType(doc.transactionType);
   const lines = (doc.lines || doc.items || []).map(line => recalcSalesLine({ ...line, transactionType: doc.transactionType || line.transactionType || "通常販売" }));
   const totals = calcQuoteTotals({ lines });
   const rows = lines.map((line, index) => `
@@ -999,7 +1031,7 @@ function printQuotePdf(quote) {
       <td>${escapeHtml(line.unit || "")}</td>
       <td class="num">${money(line.unitPrice)}</td>
       <td class="num">${Number(line.discountAmountInput || 0) > 0 ? money(line.discountAmountInput) : `${Number(line.discountValue || 0)}%`}</td>
-      <td class="num">${money(line.amount)}</td>
+      <td class="num ${amountClass(line.amount, line.transactionType)}">${money(line.amount)}</td>
     </tr>
   `).join("");
   const win = window.open("", "_blank");
@@ -1022,6 +1054,7 @@ function printQuotePdf(quote) {
   th{background:#dcf5e2;color:#1b4332}
   th,td{border:1px solid #cfe6d7;padding:8px;text-align:left}
   .num{text-align:right}
+  .amount-negative,.refund-amount{color:#b91c1c!important;font-weight:900}
   .summary{width:320px;margin:18px 0 0 auto}
   .summary div{display:flex;justify-content:space-between;border-bottom:1px solid #cfe6d7;padding:7px 0}
   .note{margin-top:22px;white-space:pre-wrap;line-height:1.7}
@@ -1044,7 +1077,7 @@ function printQuotePdf(quote) {
     ${doc.originalSlipNumber ? `<br>元伝票番号: ${escapeHtml(doc.originalSlipNumber)}` : ""}
     ${doc.reasonMemo ? `<br>理由メモ: ${escapeHtml(doc.reasonMemo)}` : ""}
   </div>
-  <div class="total">見積金額 ${money(totals.total)}</div>
+  <div class="total ${amountClass(totals.total, doc.transactionType)}">見積金額 ${money(totals.total)}</div>
   <table>
     <thead><tr><th>No.</th><th>商品名</th><th>数量</th><th>単位</th><th>税込単価</th><th>値引</th><th>金額</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="7">明細なし</td></tr>'}</tbody>
@@ -1052,7 +1085,7 @@ function printQuotePdf(quote) {
   <div class="summary">
     <div><span>小計</span><strong>${money(totals.subtotal)}</strong></div>
     <div><span>値引</span><strong>${money(totals.discount)}</strong></div>
-    <div><span>合計</span><strong>${money(totals.total)}</strong></div>
+    <div><span>合計</span><strong class="${amountClass(totals.total, doc.transactionType)}">${money(totals.total)}</strong></div>
     <div><span>内消費税 10%</span><strong>${money(totals.tax)}</strong></div>
   </div>
   <div class="note">${escapeHtml(doc.memo || "")}</div>

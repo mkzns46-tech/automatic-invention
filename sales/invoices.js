@@ -69,6 +69,14 @@ function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
 
+function amountClass(value, transactionType = "") {
+  return Number(value || 0) < 0 || isRefundTransaction(transactionType) ? "amount-negative refund-amount" : "";
+}
+
+function refundBadge(transactionType) {
+  return isRefundTransaction(transactionType) ? '<span class="status-badge danger">返金</span>' : "";
+}
+
 function clampNumber(value, min, max) {
   const number = Number(value || 0);
   if (!Number.isFinite(number)) return min;
@@ -538,11 +546,22 @@ function bindInvoiceTransactionTypeControls() {
 function applyInvoiceTransactionTypeToLines() {
   const transactionType = normalizeTransactionType(getCurrentTransactionType());
   currentInvoiceLines.forEach(line => {
+    const wasAuto = Boolean(line.autoTransactionDiscount);
     line.transactionType = transactionType;
     if (isFreeTransaction(transactionType)) {
+      if (!wasAuto) {
+        line.manualDiscountRateBeforeTransaction = Number(line.discountValue ?? line.discountRate ?? 0);
+        line.manualDiscountAmountBeforeTransaction = Number(line.discountAmountInput || 0);
+      }
       line.discountValue = 100;
       line.discountRate = 100;
       line.discountAmountInput = 0;
+      line.autoTransactionDiscount = true;
+    } else if (wasAuto) {
+      line.discountValue = Number(line.manualDiscountRateBeforeTransaction || 0);
+      line.discountRate = Number(line.manualDiscountRateBeforeTransaction || 0);
+      line.discountAmountInput = Number(line.manualDiscountAmountBeforeTransaction || 0);
+      line.autoTransactionDiscount = false;
     }
     if (isRefundTransaction(transactionType) && !line.memo) line.memo = "返金対象";
     recalcInvoiceLine(line);
@@ -628,7 +647,7 @@ function renderInvoiceListRow(invoice) {
     <td>${escapeHtml(invoice.invoiceDate || "")}</td>
     <td>${escapeHtml(customerView.organizationName)}</td>
     <td>${escapeHtml(customerView.customerName)}</td>
-    <td>${money(totals.total)}</td>
+    <td class="${amountClass(totals.total, invoice.transactionType)}">${money(totals.total)}</td>
     <td>${statusBadge(status)}</td>
     <td>${escapeHtml(invoice.staff || "")}</td>
     <td>
@@ -760,7 +779,7 @@ function renderInvoiceLines() {
       <label>税込単価<input type="number" min="0" step="1" value="${Number(line.unitPrice || 0)}" onchange="updateInvoiceLine(${index}, 'unitPrice', this.value)" ${disabled}></label>
       <label>値引率%<input type="number" min="0" max="100" step="1" value="${Number(line.discountValue || 0)}" onchange="updateInvoiceLine(${index}, 'discountValue', this.value)" ${disabled}></label>
       <label>値引額<input type="number" min="0" step="1" value="${Number(line.discountAmountInput || 0)}" onchange="updateInvoiceLine(${index}, 'discountAmountInput', this.value)" ${disabled}></label>
-      <label>金額<div class="line-amount">${money(line.amount)}</div></label>
+      <label>金額<div class="line-amount ${amountClass(line.amount, line.transactionType)}">${money(line.amount)} ${refundBadge(line.transactionType)}</div></label>
       <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateInvoiceLine(${index}, 'memo', this.value)" ${disabled}></label>
       <button type="button" class="danger" onclick="removeInvoiceLine(${index})" ${disabled}>削除</button>
     </div>`;
@@ -776,8 +795,13 @@ function updateInvoiceLine(index, key, value) {
   }
   const line = currentInvoiceLines[index];
   if (!line) return;
-  if (key === "discountValue") line[key] = clampNumber(value, 0, 100);
-  else if (["qty", "unitPrice", "discountAmountInput"].includes(key)) line[key] = Math.max(0, Number(value || 0));
+  if (key === "discountValue") {
+    line[key] = clampNumber(value, 0, 100);
+    line.autoTransactionDiscount = false;
+  } else if (key === "discountAmountInput") {
+    line[key] = Math.max(0, Number(value || 0));
+    line.autoTransactionDiscount = false;
+  } else if (["qty", "unitPrice"].includes(key)) line[key] = Math.max(0, Number(value || 0));
   else line[key] = value;
   if (key === "discountValue") line.discountRate = clampNumber(value, 0, 100);
   recalcInvoiceLine(line);
@@ -875,7 +899,10 @@ function recalcTotals() {
   const totals = calcInvoiceTotals({ lines: currentInvoiceLines });
   document.getElementById("subtotalText").textContent = money(totals.subtotal);
   document.getElementById("discountText").textContent = money(totals.discount);
-  document.getElementById("totalText").textContent = money(totals.total);
+  const totalText = document.getElementById("totalText");
+  totalText.textContent = money(totals.total);
+  totalText.classList.toggle("amount-negative", totals.total < 0 || isRefundTransaction(getCurrentTransactionType()));
+  totalText.classList.toggle("refund-amount", totals.total < 0 || isRefundTransaction(getCurrentTransactionType()));
   document.getElementById("taxText").textContent = money(totals.tax);
 }
 

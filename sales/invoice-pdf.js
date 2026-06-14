@@ -2,6 +2,10 @@ function invoicePdfMoney(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
 
+function invoicePdfAmountClass(value, transactionType = "") {
+  return Number(value || 0) < 0 || invoicePdfIsRefundTransaction(transactionType) ? "amount-negative refund-amount" : "";
+}
+
 function invoicePdfEscape(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
     "&": "&amp;",
@@ -83,7 +87,7 @@ function printInvoicePdf(invoice) {
       <td>${invoicePdfEscape(line.unit || "")}</td>
       <td class="num">${invoicePdfMoney(line.unitPrice)}</td>
       <td class="num">${Number(line.discountAmountInput || 0) > 0 ? invoicePdfMoney(line.discountAmountInput) : `${Number(line.discountValue || 0)}%`}</td>
-      <td class="num">${invoicePdfMoney(line.amount)}</td>
+      <td class="num ${invoicePdfAmountClass(line.amount, line.transactionType)}">${invoicePdfMoney(line.amount)}</td>
     </tr>
   `).join("");
   const win = window.open("", "_blank");
@@ -106,6 +110,7 @@ function printInvoicePdf(invoice) {
   th{background:#dcf5e2;color:#1b4332}
   th,td{border:1px solid #cfe6d7;padding:8px;text-align:left}
   .num{text-align:right}
+  .amount-negative,.refund-amount{color:#b91c1c!important;font-weight:900}
   .summary{width:320px;margin:18px 0 0 auto}
   .summary div{display:flex;justify-content:space-between;border-bottom:1px solid #cfe6d7;padding:7px 0}
   .note{margin-top:22px;white-space:pre-wrap;line-height:1.7}
@@ -133,7 +138,7 @@ function printInvoicePdf(invoice) {
     ${doc.originalSlipNumber ? `<br>元伝票番号: ${invoicePdfEscape(doc.originalSlipNumber)}` : ""}
     ${doc.reasonMemo ? `<br>理由メモ: ${invoicePdfEscape(doc.reasonMemo)}` : ""}
   </div>
-  <div class="total">ご請求金額 ${invoicePdfMoney(totals.total)}</div>
+  <div class="total ${invoicePdfAmountClass(totals.total, doc.transactionType)}">ご請求金額 ${invoicePdfMoney(totals.total)}</div>
   <table>
     <thead><tr><th>No.</th><th>商品名</th><th>数量</th><th>単位</th><th>税込単価</th><th>値引</th><th>金額</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="7">明細なし</td></tr>'}</tbody>
@@ -141,7 +146,7 @@ function printInvoicePdf(invoice) {
   <div class="summary">
     <div><span>小計</span><strong>${invoicePdfMoney(totals.subtotal)}</strong></div>
     <div><span>値引</span><strong>${invoicePdfMoney(totals.discount)}</strong></div>
-    <div><span>合計</span><strong>${invoicePdfMoney(totals.total)}</strong></div>
+    <div><span>合計</span><strong class="${invoicePdfAmountClass(totals.total, doc.transactionType)}">${invoicePdfMoney(totals.total)}</strong></div>
     <div><span>内消費税 10%</span><strong>${invoicePdfMoney(totals.tax)}</strong></div>
   </div>
   <div class="note">${invoicePdfEscape(doc.memo || "")}</div>

@@ -1,12 +1,14 @@
 function printReceiptPdf(receipt) {
   if (!receipt) return;
   const money = value => Number(value || 0).toLocaleString("ja-JP") + "円";
+  const isRefund = String(receipt.transactionType || "").trim() === "返金" || Number(receipt.amount || 0) < 0;
+  const amountClass = value => Number(value || 0) < 0 || isRefund ? "amount-negative refund-amount" : "";
   const win = window.open("", "_blank");
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>領収書 ${receipt.receiptNo || ""}</title>
   <style>
     body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#10251b;margin:38px}
     h1{font-size:30px;margin:0 0 24px;text-align:center}.row{display:flex;justify-content:space-between;gap:24px;margin-bottom:18px}
-    .box{border:1px solid #cfe6d7;border-radius:10px;padding:14px;margin-bottom:16px}.amount{font-size:28px;font-weight:900;border-bottom:3px double #10251b;padding:14px 0;margin:18px 0}
+    .box{border:1px solid #cfe6d7;border-radius:10px;padding:14px;margin-bottom:16px}.amount{font-size:28px;font-weight:900;border-bottom:3px double #10251b;padding:14px 0;margin:18px 0}.amount-negative,.refund-amount{color:#b91c1c!important;font-weight:900}
     table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #cfe6d7;padding:9px;text-align:left}th{background:#eaf6ee;width:180px}
   </style></head><body>
     <h1>領収書</h1>
@@ -14,7 +16,7 @@ function printReceiptPdf(receipt) {
       <div><strong>${receipt.customerName || ""} 御中</strong><p>${receipt.subject || ""}</p></div>
       <div class="box">領収書番号：${receipt.receiptNo || ""}<br>請求書番号：${receipt.sourceInvoiceNo || ""}<br>発行日：${receipt.issuedAt || ""}</div>
     </div>
-    <div class="amount">金額 ${money(receipt.amount)}</div>
+    <div class="amount ${amountClass(receipt.amount)}">金額 ${money(receipt.amount)}</div>
     <p>上記正に領収いたしました。</p>
     <table>
       <tr><th>入金日</th><td>${receipt.paymentDate || ""}</td></tr>
