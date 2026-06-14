@@ -136,7 +136,7 @@ function customerSyncBadge(customer) {
 
 function startNewCustomerRegistration() {
   clearCustomerForm();
-  showCustomerMessage("新規顧客を入力してください。", "ok");
+  showCustomerMessage("\u65b0\u898f\u9867\u5ba2\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002", "ok");
   document.getElementById("customerEditCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -242,6 +242,7 @@ async function importSmaregiCustomers() {
 function editCustomer(id) {
   const customer = customerStorage().readCustomers().find(row => row.id === id);
   if (!customer) return;
+  setCustomerFormMode("edit");
   setValue("customerId", customer.id);
   setValue("customerCode", customer.customerCode);
   setValue("smaregiMemberId", customer.smaregiMemberId);
@@ -277,6 +278,14 @@ function clearCustomerForm() {
   setValue("customerType", "個人");
 }
 
+function setCustomerFormMode(mode) {
+  const isNew = mode === "new";
+  const title = document.getElementById("customerFormTitle");
+  const button = document.getElementById("customerSaveButton");
+  if (title) title.textContent = isNew ? "\u9867\u5ba2\u65b0\u898f\u767b\u9332" : "\u9867\u5ba2\u7de8\u96c6";
+  if (button) button.textContent = isNew ? "\u767b\u9332" : "\u4fdd\u5b58";
+}
+
 function saveCustomer() {
   const customers = customerStorage().readCustomers();
   const id = getValue("customerId") || makeCustomerId();
@@ -303,7 +312,7 @@ function saveCustomer() {
     updatedAt: now
   };
   if (!customer.customerName) {
-    showSalesPopup("保存できません", "顧客名を入力してください。", "warn");
+    showSalesPopup("\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093", "\u9867\u5ba2\u540d\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044", "warn");
     return;
   }
   if (existingIndex >= 0) customers[existingIndex] = customer;
@@ -311,6 +320,7 @@ function saveCustomer() {
   customerStorage().writeCustomers(customers);
   setValue("customerId", customer.id);
   setValue("customerCode", customer.customerCode);
+  setCustomerFormMode("edit");
   renderCustomerList();
   showCustomerMessage("顧客情報を保存しました。", "ok");
   showSalesPopup("保存完了", "顧客情報を保存しました。", "ok");

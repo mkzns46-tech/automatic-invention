@@ -568,7 +568,7 @@ function convertQuoteToInvoice(id) {
   location.href = `invoices.html?id=${encodeURIComponent(invoice.id)}`;
 }
 
-function newQuote() {
+function newQuote(shouldScroll = false) {
   currentQuoteId = null;
   currentLines = [];
   ["customerName", "customerAddress", "customerPhone", "customerEmail", "quoteSubject", "quoteMemo", "productSearchInput"].forEach(id => {
@@ -588,6 +588,9 @@ function newQuote() {
   if (customerResults) customerResults.innerHTML = "";
   renderLines();
   updateQuoteDeleteButton(null);
+  if (shouldScroll) {
+    document.getElementById("quoteEditorCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 async function searchProducts() {

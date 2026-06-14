@@ -62,9 +62,18 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
     return `C-${String(max + 1).padStart(6, "0")}`;
   }
 
+  function inferPostalCodeFromAddress(address) {
+    const match = String(address || "").match(/(\d{3})-?(\d{4})/);
+    if (!match) return { postalCode: "", inferred: false };
+    return { postalCode: `${match[1]}-${match[2]}`, inferred: true };
+  }
+
   function createManualCustomer(data = {}) {
     const timestamp = nowIso();
     const customers = readCustomers();
+    const address = String(data.address || "").trim();
+    const postal = String(data.postalCode || "").trim();
+    const inferredPostal = postal ? { postalCode: postal, inferred: false } : inferPostalCodeFromAddress(address);
     const customer = {
       id: makeCustomerId(),
       customerCode: nextCustomerCode(customers),
@@ -72,8 +81,9 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
       kana: String(data.kana || "").trim(),
       customerType: normalizeCustomerType(data.customerType),
       staff: String(data.staff || "").trim(),
-      postalCode: String(data.postalCode || "").trim(),
-      address: String(data.address || "").trim(),
+      postalCode: inferredPostal.postalCode,
+      postalCodeInferred: inferredPostal.inferred,
+      address,
       phone: String(data.phone || "").trim(),
       email: String(data.email || "").trim(),
       memo: String(data.memo || "").trim(),
@@ -110,7 +120,8 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
       kana: String(incoming.kana || "").trim(),
       customerType: "個人",
       staff: "",
-      postalCode: String(incoming.postalCode || "").trim(),
+      postalCode: String(incoming.postalCode || "").trim() || inferPostalCodeFromAddress(incoming.address).postalCode,
+      postalCodeInferred: !String(incoming.postalCode || "").trim() && inferPostalCodeFromAddress(incoming.address).inferred,
       address: String(incoming.address || "").trim(),
       phone: String(incoming.phone || "").trim(),
       email: String(incoming.email || "").trim(),
@@ -132,7 +143,8 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
       customerName: String(incoming.customerName || existing.customerName || "").trim(),
       kana: String(incoming.kana || existing.kana || "").trim(),
       customerType: normalizeCustomerType(existing.customerType),
-      postalCode: String(incoming.postalCode || existing.postalCode || "").trim(),
+      postalCode: String(incoming.postalCode || existing.postalCode || "").trim() || inferPostalCodeFromAddress(incoming.address || existing.address).postalCode,
+      postalCodeInferred: Boolean(existing.postalCodeInferred) || (!String(incoming.postalCode || existing.postalCode || "").trim() && inferPostalCodeFromAddress(incoming.address || existing.address).inferred),
       address: String(incoming.address || existing.address || "").trim(),
       phone: String(incoming.phone || existing.phone || "").trim(),
       email: String(incoming.email || existing.email || "").trim(),

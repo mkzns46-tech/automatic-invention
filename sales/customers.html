@@ -30,7 +30,7 @@
   <section class="card sales-smaregi-card">
     <div class="section-title">
       <div>
-        <h2>スマレジ会員データ取込</h2>
+        <h2>&#12473;&#12510;&#12524;&#12472;&#20250;&#21729;&#12487;&#12540;&#12479;&#21462;&#36796;</h2>
         <p class="section-note">新スマレジの会員データを販売管理の顧客マスターへ取り込みます。店舗選択は不要です。</p>
       </div>
       <span class="badge muted">新スマレジ固定</span>
@@ -91,7 +91,7 @@
   <section class="card" id="customerEditCard">
     <div class="section-title">
       <div>
-        <h2>顧客編集</h2>
+        <h2 id="customerFormTitle">&#39015;&#23458;&#32232;&#38598;</h2>
         <p class="section-note">顧客区分、担当者、備考は販売管理側で手動更新できます。</p>
       </div>
       <button type="button" class="secondary" onclick="clearCustomerForm();">新規入力をクリア</button>
@@ -103,7 +103,7 @@
       <label>スマレジ会員コード<input id="smaregiMemberCode" readonly></label>
     </div>
     <div class="row three">
-      <label>顧客名<input id="customerName"></label>
+      <label>&#39015;&#23458;&#21517; <span class="required-badge">&#24517;&#38920;</span><input id="customerName"></label>
       <label>カナ<input id="customerKana"></label>
       <label>顧客区分<select id="customerType"></select></label>
     </div>
@@ -118,7 +118,7 @@
     </div>
     <label>備考<textarea id="customerMemo"></textarea></label>
     <div class="sales-actions">
-      <button type="button" onclick="saveCustomer();">保存</button>
+      <button type="button" id="customerSaveButton" onclick="saveCustomer();">&#20445;&#23384;</button>
     </div>
   </section>
 </main>
