@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 請求書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-customer-link">
+<link rel="stylesheet" href="sales-style.css?v=20260614-invoice-customer-fix">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-lists-hidden" defer></script>
 <script src="invoice-pdf.js?v=20260614-lists-hidden"></script>
-<script src="invoices.js?v=20260614-customer-link" defer></script>
+<script src="invoices.js?v=20260614-invoice-customer-fix" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -69,33 +69,37 @@
   </section>
 
   <section class="card" id="invoiceEditorCard">
-    <h2>請求情報</h2>
+    <h2>&#35531;&#27714;&#24773;&#22577;</h2>
     <input id="salesCustomerId" type="hidden">
     <input id="salesCustomerCode" type="hidden">
     <input id="salesSmaregiCustomerId" type="hidden">
     <input id="salesSmaregiCustomerCode" type="hidden">
     <div class="row">
-      <label>請求書番号<input id="invoiceNo" readonly></label>
-      <label>ステータス<select id="invoiceStatus"></select></label>
-      <label>元見積番号<input id="sourceQuoteNo" readonly></label>
+      <label>&#35531;&#27714;&#26360;&#30058;&#21495;<input id="invoiceNo" readonly></label>
+      <label>&#12473;&#12486;&#12540;&#12479;&#12473;<select id="invoiceStatus"></select></label>
+      <label>&#20803;&#35211;&#31309;&#30058;&#21495;<input id="sourceQuoteNo" readonly></label>
       <label>&#30330;&#34892;&#26085;&#26178;<input id="issuedAt"></label>
     </div>
+    <p class="section-note customer-readonly-note">&#39015;&#23458;&#24773;&#22577;&#12399;&#35211;&#31309;&#26360;&#12363;&#12425;&#24341;&#12365;&#32153;&#12366;&#12414;&#12377;</p>
     <div class="row three">
-      <label>顧客名<input id="customerName"></label>
-      <label>顧客区分<input id="customerType"></label>
-      <label>担当者<input id="invoiceStaff"></label>
+      <label>&#39015;&#23458;&#21517;<input class="customer-readonly-input" id="customerName" readonly></label>
+      <label>&#22243;&#20307;&#21517;<input class="customer-readonly-input" id="invoiceOrganizationName" readonly></label>
+      <label>&#39015;&#23458;&#21306;&#20998;<input class="customer-readonly-input" id="customerType" readonly></label>
     </div>
     <div class="row three">
-      <label>住所<input id="customerAddress"></label>
-      <label>電話番号<input id="customerPhone"></label>
-      <label>メールアドレス<input id="customerEmail"></label>
+      <label>&#20303;&#25152;<input class="customer-readonly-input" id="customerAddress" readonly></label>
+      <label>&#38651;&#35441;&#30058;&#21495;<input class="customer-readonly-input" id="customerPhone" readonly></label>
+      <label>&#12513;&#12540;&#12523;&#12450;&#12489;&#12524;&#12473;<input class="customer-readonly-input" id="customerEmail" readonly></label>
     </div>
     <div class="row three">
-      <label>件名<input id="invoiceSubject"></label>
-      <label>請求日<input id="invoiceDate" type="date"></label>
-      <label>支払期限<input id="dueDate" type="date"></label>
+      <label>&#25285;&#24403;&#32773;<input id="invoiceStaff"></label>
+      <label>&#20214;&#21517;<input id="invoiceSubject"></label>
+      <label>&#35531;&#27714;&#26085;<input id="invoiceDate" type="date"></label>
     </div>
-    <label>備考<textarea id="invoiceMemo"></textarea></label>
+    <div class="row three">
+      <label>&#25903;&#25173;&#26399;&#38480;<input id="dueDate" type="date"></label>
+    </div>
+    <label>&#20633;&#32771;<textarea id="invoiceMemo"></textarea></label>
   </section>
 
   <section class="card">

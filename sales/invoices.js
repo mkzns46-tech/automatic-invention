@@ -144,8 +144,8 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     createdAt: now,
     updatedAt: now,
     status: "draft",
-    customerName: invoice.customerName || invoice.name || "",
-    organizationName: invoice.organizationName || "",
+    customerName: invoice.customerName || invoice.name || invoice.customer || "",
+    organizationName: invoice.organizationName || invoice.organization || invoice.companyName || "",
     customerType: invoice.customerType || "",
     address: invoice.address || "",
     phone: invoice.phone || "",
@@ -395,7 +395,7 @@ function matchesDateRange(values, from, to) {
 function clearInvoiceEditor() {
   currentInvoiceId = null;
   currentInvoiceLines = [];
-  ["invoiceNo", "sourceQuoteNo", "customerName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo"].forEach(id => {
+  ["invoiceNo", "sourceQuoteNo", "customerName", "invoiceOrganizationName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
@@ -412,7 +412,7 @@ function clearInvoiceEditor() {
 }
 
 function fillInvoiceForm(invoice) {
-  invoice.customerName = invoice.customerName || invoice.name || "";
+  invoice.customerName = invoice.customerName || invoice.name || invoice.customer || "";
   invoice.organizationName = invoice.organizationName || invoice.organization || invoice.companyName || "";
   invoice.items = invoice.items || invoice.lines || [];
   invoice.lines = invoice.lines || invoice.items || [];
@@ -427,6 +427,7 @@ function fillInvoiceForm(invoice) {
   setFieldValue("salesSmaregiCustomerCode", invoice.smaregiCustomerCode || "");
   document.getElementById("issuedAt").value = formatDateTime(invoice.issuedAt);
   document.getElementById("customerName").value = invoice.customerName || "";
+  setFieldValue("invoiceOrganizationName", invoice.organizationName || "");
   document.getElementById("customerType").value = invoice.customerType || "";
   document.getElementById("invoiceStaff").value = invoice.staff || "";
   document.getElementById("customerAddress").value = invoice.address || "";
@@ -497,13 +498,16 @@ function updateInvoiceLockState(invoice) {
   const editable = isInvoiceEditable(invoice);
   const issueButton = ensureIssueInvoiceButton();
   const saveButton = document.getElementById("saveInvoiceBtn");
-  const lockTargets = [
+  const alwaysReadonlyCustomerTargets = [
     "customerName",
+    "invoiceOrganizationName",
     "customerType",
-    "invoiceStaff",
     "customerAddress",
     "customerPhone",
-    "customerEmail",
+    "customerEmail"
+  ];
+  const lockTargets = [
+    "invoiceStaff",
     "invoiceSubject",
     "issuedAt",
     "invoiceDate",
@@ -522,6 +526,14 @@ function updateInvoiceLockState(invoice) {
     saveButton.hidden = !editable;
     saveButton.disabled = !editable;
   }
+  alwaysReadonlyCustomerTargets.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.readOnly = true;
+      element.disabled = false;
+      element.classList.add("customer-readonly-input");
+    }
+  });
   lockTargets.forEach(id => {
     const element = document.getElementById(id);
     if (element) element.disabled = !editable;
@@ -582,12 +594,12 @@ function collectInvoice() {
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     status: normalizeInvoiceStatus(document.getElementById("invoiceStatus").value),
-    customerName: document.getElementById("customerName").value.trim(),
-    organizationName: existing?.organizationName || existing?.organization || existing?.companyName || "",
-    customerType: document.getElementById("customerType").value.trim(),
-    address: document.getElementById("customerAddress").value.trim(),
-    phone: document.getElementById("customerPhone").value.trim(),
-    email: document.getElementById("customerEmail").value.trim(),
+    customerName: document.getElementById("customerName").value.trim() || existing?.customerName || existing?.name || existing?.customer || "",
+    organizationName: document.getElementById("invoiceOrganizationName")?.value.trim() || existing?.organizationName || existing?.organization || existing?.companyName || "",
+    customerType: document.getElementById("customerType").value.trim() || existing?.customerType || "",
+    address: document.getElementById("customerAddress").value.trim() || existing?.address || "",
+    phone: document.getElementById("customerPhone").value.trim() || existing?.phone || "",
+    email: document.getElementById("customerEmail").value.trim() || existing?.email || "",
     subject: document.getElementById("invoiceSubject").value.trim(),
     invoiceDate: document.getElementById("invoiceDate").value,
     dueDate: document.getElementById("dueDate").value,

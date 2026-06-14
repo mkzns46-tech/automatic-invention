@@ -515,35 +515,57 @@ function matchesDateRange(values, from, to) {
   });
 }
 
+function resolveQuoteCustomer(quote) {
+  const keys = [
+    quote.customerId,
+    quote.customerCode,
+    quote.smaregiCustomerId,
+    quote.smaregiCustomerCode
+  ].map(value => String(value || "").trim()).filter(Boolean);
+  if (!keys.length || !window.SalesCustomerStorage?.readCustomers) return null;
+  return window.SalesCustomerStorage.readCustomers().find(customer => {
+    const customerKeys = [
+      customer.id,
+      customer.customerCode,
+      customer.smaregiMemberId,
+      customer.smaregiMemberCode,
+      customer.smaregiCustomerId,
+      customer.smaregiCustomerCode
+    ].map(value => String(value || "").trim()).filter(Boolean);
+    return customerKeys.some(key => keys.includes(key));
+  }) || null;
+}
+
 function buildInvoiceFromQuote(quote, invoices) {
   const now = new Date().toISOString();
   const lines = quote.lines || quote.items || [];
-  const customerName = quote.customerName || quote.name || "";
-  const organizationName = quote.organizationName || quote.organization || quote.companyName || "";
+  const linkedCustomer = resolveQuoteCustomer(quote) || {};
+  const customerName = quote.customerName || quote.name || quote.customer || linkedCustomer.customerName || linkedCustomer.name || "";
+  const organizationName = quote.organizationName || quote.organization || quote.companyName || linkedCustomer.organizationName || linkedCustomer.organization || linkedCustomer.companyName || "";
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     invoiceNo: nextInvoiceNo(invoices),
     sourceQuoteId: quote.id,
     sourceQuoteNo: quote.quoteNo || "",
-    customerId: quote.customerId || "",
-    customerCode: quote.customerCode || "",
-    smaregiCustomerId: quote.smaregiCustomerId || "",
-    smaregiCustomerCode: quote.smaregiCustomerCode || "",
+    customerId: quote.customerId || linkedCustomer.id || "",
+    customerCode: quote.customerCode || linkedCustomer.customerCode || "",
+    smaregiCustomerId: quote.smaregiCustomerId || linkedCustomer.smaregiCustomerId || linkedCustomer.smaregiMemberId || "",
+    smaregiCustomerCode: quote.smaregiCustomerCode || linkedCustomer.smaregiCustomerCode || linkedCustomer.smaregiMemberCode || "",
     createdAt: now,
     updatedAt: now,
     status: "draft",
     customerName,
     organizationName,
-    customerType: quote.customerType || "",
-    address: quote.address || "",
-    phone: quote.phone || "",
-    email: quote.email || "",
+    customerType: quote.customerType || linkedCustomer.customerType || "",
+    address: quote.address || linkedCustomer.address || "",
+    phone: quote.phone || linkedCustomer.phone || "",
+    email: quote.email || linkedCustomer.email || "",
     subject: quote.subject || "",
     invoiceDate: today(),
     dueDate: today(),
     staff: quote.staff || "",
-    memo: quote.memo || quote.customerMemo || "",
-    customerMemo: quote.customerMemo || quote.memo || "",
+    memo: quote.memo || quote.customerMemo || linkedCustomer.memo || "",
+    customerMemo: quote.customerMemo || quote.memo || linkedCustomer.memo || "",
     discountTemplate: quote.discountTemplate || "none",
     items: JSON.parse(JSON.stringify(lines)),
     lines: JSON.parse(JSON.stringify(lines))
