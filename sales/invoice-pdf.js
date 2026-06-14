@@ -18,15 +18,36 @@ function invoicePdfClampNumber(value, min, max) {
   return Math.min(max, Math.max(min, number));
 }
 
+function invoicePdfIsRefundTransaction(type) {
+  return String(type || "").trim() === "返金";
+}
+
+function invoicePdfIsFreeTransaction(type) {
+  return String(type || "").trim() === "無償提供";
+}
+
+function invoicePdfNormalizeTransactionType(type) {
+  const value = String(type || "").trim();
+  if (value === "返品") return "返金";
+  return value || "通常販売";
+}
+
 function invoicePdfRecalcLine(line) {
-  const gross = Math.max(0, Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0)));
-  const discountRate = invoicePdfClampNumber(line.discountValue ?? line.discountRate ?? 0, 0, 100);
+  const transactionType = invoicePdfNormalizeTransactionType(line.transactionType);
+  const gross = Math.max(0, Math.round(Math.abs(Number(line.qty || 0)) * Math.abs(Number(line.unitPrice || 0))));
+  const discountRate = invoicePdfIsFreeTransaction(transactionType)
+    ? 100
+    : invoicePdfClampNumber(line.discountValue ?? line.discountRate ?? 0, 0, 100);
   const rateDiscount = Math.round(gross * discountRate / 100);
   const fixedDiscount = Math.max(0, Number(line.discountAmountInput || line.fixedDiscountAmount || line.manualDiscountAmount || 0));
+  const appliedFixedDiscount = invoicePdfIsFreeTransaction(transactionType) ? 0 : fixedDiscount;
+  line.transactionType = transactionType;
   line.discountValue = discountRate;
   line.discountRate = discountRate;
-  line.discountAmount = Math.min(gross, fixedDiscount > 0 ? fixedDiscount : rateDiscount);
-  line.amount = Math.max(0, gross - line.discountAmount);
+  line.discountAmountInput = appliedFixedDiscount;
+  line.discountAmount = Math.min(gross, appliedFixedDiscount > 0 ? appliedFixedDiscount : rateDiscount);
+  const netAmount = Math.max(0, gross - line.discountAmount);
+  line.amount = invoicePdfIsRefundTransaction(transactionType) ? -netAmount : netAmount;
   return line;
 }
 
@@ -36,7 +57,7 @@ function calcInvoicePdfTotals(invoice) {
   let total = 0;
   (invoice.lines || []).forEach(line => {
     invoicePdfRecalcLine(line);
-    const gross = Math.max(0, Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0)));
+    const gross = Math.max(0, Math.round(Math.abs(Number(line.qty || 0)) * Math.abs(Number(line.unitPrice || 0))));
     subtotal += gross;
     discount += Number(line.discountAmount || 0);
     total += Number(line.amount || 0);
@@ -51,6 +72,8 @@ function calcInvoicePdfTotals(invoice) {
 
 function printInvoicePdf(invoice) {
   const doc = JSON.parse(JSON.stringify(invoice || {}));
+  doc.transactionType = invoicePdfNormalizeTransactionType(doc.transactionType);
+  doc.lines = (doc.lines || []).map(line => ({ ...line, transactionType: doc.transactionType || line.transactionType || "通常販売" }));
   const totals = calcInvoicePdfTotals(doc);
   const rows = (doc.lines || []).map((line, index) => `
     <tr>

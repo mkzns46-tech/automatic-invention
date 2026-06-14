@@ -75,6 +75,24 @@ function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, number));
 }
 
+function getCurrentTransactionType() {
+  return document.getElementById("transactionType")?.value || "通常販売";
+}
+
+function isRefundTransaction(type) {
+  return String(type || "").trim() === "返金";
+}
+
+function isFreeTransaction(type) {
+  return String(type || "").trim() === "無償提供";
+}
+
+function normalizeTransactionType(type) {
+  const value = String(type || "").trim();
+  if (value === "返品") return "返金";
+  return value || "通常販売";
+}
+
 function normalizeInvoiceStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (!value || value === "draft" || value === "下書き") return INVOICE_STATUS_DRAFT;
@@ -177,16 +195,21 @@ function statusBadge(status) {
 }
 
 function recalcInvoiceLine(line) {
+  const transactionType = normalizeTransactionType(line.transactionType || getCurrentTransactionType());
   const qty = Number(line.qty || 0);
   const unitPrice = Number(line.unitPrice || 0);
-  const discountValue = clampNumber(line.discountValue ?? line.discountRate ?? 0, 0, 100);
-  const gross = Math.max(0, Math.round(qty * unitPrice));
+  const discountValue = isFreeTransaction(transactionType) ? 100 : clampNumber(line.discountValue ?? line.discountRate ?? 0, 0, 100);
+  const gross = Math.max(0, Math.round(Math.abs(qty) * Math.abs(unitPrice)));
   const rateDiscount = Math.round(gross * discountValue / 100);
   const fixedDiscount = Math.max(0, Number(line.discountAmountInput || line.fixedDiscountAmount || line.manualDiscountAmount || 0));
+  const appliedFixedDiscount = isFreeTransaction(transactionType) ? 0 : fixedDiscount;
+  line.transactionType = transactionType;
   line.discountValue = discountValue;
   line.discountRate = discountValue;
-  line.discountAmount = Math.min(gross, fixedDiscount > 0 ? fixedDiscount : rateDiscount);
-  line.amount = Math.max(0, gross - line.discountAmount);
+  line.discountAmountInput = appliedFixedDiscount;
+  line.discountAmount = Math.min(gross, appliedFixedDiscount > 0 ? appliedFixedDiscount : rateDiscount);
+  const netAmount = Math.max(0, gross - line.discountAmount);
+  line.amount = isRefundTransaction(transactionType) ? -netAmount : netAmount;
   return line;
 }
 
@@ -293,7 +316,7 @@ function calcInvoiceTotals(invoice) {
   let total = 0;
   lines.forEach(line => {
     recalcInvoiceLine(line);
-    const gross = Math.max(0, Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0)));
+    const gross = Math.max(0, Math.round(Math.abs(Number(line.qty || 0)) * Math.abs(Number(line.unitPrice || 0))));
     subtotal += gross;
     discount += Number(line.discountAmount || 0);
     total += Number(line.amount || 0);
@@ -351,7 +374,7 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     email: customerView.email,
     subject: invoice.subject || "",
     staff: invoice.staff || "",
-    transactionType: invoice.transactionType || "通常販売",
+    transactionType: normalizeTransactionType(invoice.transactionType),
     originalSlipNumber: invoice.originalSlipNumber || "",
     reasonMemo: invoice.reasonMemo || "",
     memo: invoice.memo || invoice.customerMemo || "",
@@ -495,12 +518,36 @@ document.addEventListener("DOMContentLoaded", () => {
     .map(status => `<option value="${status}">${status}</option>`)
     .join("");
   document.getElementById("invoiceStatus").disabled = true;
+  bindInvoiceTransactionTypeControls();
   bindInvoiceListControls();
   renderInvoiceList();
   const id = new URLSearchParams(location.search).get("id");
   if (id) editInvoice(id);
   else clearInvoiceEditor();
 });
+
+function bindInvoiceTransactionTypeControls() {
+  const transactionType = document.getElementById("transactionType");
+  if (!transactionType) return;
+  transactionType.addEventListener("change", () => {
+    applyInvoiceTransactionTypeToLines();
+    renderInvoiceLines();
+  });
+}
+
+function applyInvoiceTransactionTypeToLines() {
+  const transactionType = normalizeTransactionType(getCurrentTransactionType());
+  currentInvoiceLines.forEach(line => {
+    line.transactionType = transactionType;
+    if (isFreeTransaction(transactionType)) {
+      line.discountValue = 100;
+      line.discountRate = 100;
+      line.discountAmountInput = 0;
+    }
+    if (isRefundTransaction(transactionType) && !line.memo) line.memo = "返金対象";
+    recalcInvoiceLine(line);
+  });
+}
 
 function bindInvoiceListControls() {
   const search = document.getElementById("invoiceListSearch");
@@ -681,10 +728,11 @@ function fillInvoiceForm(invoice) {
   document.getElementById("invoiceSubject").value = invoice.subject || "";
   document.getElementById("invoiceDate").value = invoice.invoiceDate || today();
   document.getElementById("dueDate").value = invoice.dueDate || today();
-  setFieldValue("transactionType", invoice.transactionType || "通常販売");
+  setFieldValue("transactionType", normalizeTransactionType(invoice.transactionType));
   setFieldValue("originalSlipNumber", invoice.originalSlipNumber || "");
   setFieldValue("reasonMemo", invoice.reasonMemo || "");
   document.getElementById("invoiceMemo").value = invoice.memo || "";
+  applyInvoiceTransactionTypeToLines();
   renderInvoiceLines();
   updateInvoiceLockState(invoice);
 }
@@ -731,7 +779,7 @@ function updateInvoiceLine(index, key, value) {
   if (key === "discountValue") line[key] = clampNumber(value, 0, 100);
   else if (["qty", "unitPrice", "discountAmountInput"].includes(key)) line[key] = Math.max(0, Number(value || 0));
   else line[key] = value;
-  if (key === "discountValue") line.discountRate = Number(value || 0);
+  if (key === "discountValue") line.discountRate = clampNumber(value, 0, 100);
   recalcInvoiceLine(line);
   renderInvoiceLines();
 }
@@ -864,13 +912,13 @@ function collectInvoice() {
     invoiceDate: document.getElementById("invoiceDate").value,
     dueDate: document.getElementById("dueDate").value,
     staff: document.getElementById("invoiceStaff").value.trim(),
-    transactionType: document.getElementById("transactionType")?.value || existing?.transactionType || "通常販売",
+    transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value || existing?.transactionType),
     originalSlipNumber: document.getElementById("originalSlipNumber")?.value?.trim() || "",
     reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
     memo: document.getElementById("invoiceMemo").value,
     customerMemo: existing?.customerMemo || document.getElementById("invoiceMemo").value,
-    items: currentInvoiceLines.map(line => ({ ...line })),
-    lines: currentInvoiceLines.map(line => ({ ...line }))
+    items: currentInvoiceLines.map(line => recalcInvoiceLine({ ...line, transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value) })),
+    lines: currentInvoiceLines.map(line => recalcInvoiceLine({ ...line, transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value) }))
   };
 }
 
@@ -914,7 +962,7 @@ async function issueInvoice() {
     return;
   }
   const totals = calcInvoiceTotals(invoice);
-  invoice.status = totals.total === 0 ? "no_payment_required" : "waiting_payment";
+  invoice.status = totals.total <= 0 ? "no_payment_required" : "waiting_payment";
   const issuedAtInput = document.getElementById("issuedAt")?.value;
   invoice.issuedAt = issuedAtInput || new Date().toISOString();
   invoice.updatedAt = new Date().toISOString();

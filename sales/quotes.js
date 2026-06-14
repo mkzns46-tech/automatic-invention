@@ -122,18 +122,42 @@ function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, number));
 }
 
+function getCurrentTransactionType() {
+  return document.getElementById("transactionType")?.value || "通常販売";
+}
+
+function isRefundTransaction(type) {
+  return String(type || "").trim() === "返金";
+}
+
+function isFreeTransaction(type) {
+  return String(type || "").trim() === "無償提供";
+}
+
+function normalizeTransactionType(type) {
+  const value = String(type || "").trim();
+  if (value === "返品") return "返金";
+  return value || "通常販売";
+}
+
 function recalcSalesLine(line) {
+  const transactionType = normalizeTransactionType(line?.transactionType || getCurrentTransactionType());
   const qty = Number(line?.qty || 0);
   const unitPrice = Number(line?.unitPrice || 0);
-  const gross = Math.max(0, Math.round(qty * unitPrice));
-  const discountRate = clampNumber(line?.discountRate ?? line?.discountValue ?? line?.discount ?? 0, 0, 100);
+  const gross = Math.max(0, Math.round(Math.abs(qty) * Math.abs(unitPrice)));
+  const discountRate = isFreeTransaction(transactionType)
+    ? 100
+    : clampNumber(line?.discountRate ?? line?.discountValue ?? line?.discount ?? 0, 0, 100);
   const fixedDiscount = Math.max(0, Number(line?.discountAmountInput || line?.fixedDiscountAmount || line?.manualDiscountAmount || 0));
   const rateDiscount = Math.round(gross * discountRate / 100);
+  line.transactionType = transactionType;
   line.discountRate = discountRate;
   line.discountValue = discountRate;
-  line.discountAmountInput = fixedDiscount;
-  line.discountAmount = Math.min(gross, fixedDiscount > 0 ? fixedDiscount : rateDiscount);
-  line.amount = Math.max(0, gross - line.discountAmount);
+  const appliedFixedDiscount = isFreeTransaction(transactionType) ? 0 : fixedDiscount;
+  line.discountAmountInput = appliedFixedDiscount;
+  line.discountAmount = Math.min(gross, appliedFixedDiscount > 0 ? appliedFixedDiscount : rateDiscount);
+  const netAmount = Math.max(0, gross - line.discountAmount);
+  line.amount = isRefundTransaction(transactionType) ? -netAmount : netAmount;
   return line;
 }
 
@@ -144,12 +168,11 @@ function calcQuoteTotals(quote) {
   let total = 0;
   lines.forEach(line => {
     recalcSalesLine(line);
-    const gross = Math.max(0, Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0)));
+    const gross = Math.max(0, Math.round(Math.abs(Number(line.qty || 0)) * Math.abs(Number(line.unitPrice || 0))));
     subtotal += gross;
     discount += Number(line.discountAmount || 0);
     total += Number(line.amount || 0);
   });
-  total = Math.max(0, total);
   return {
     subtotal,
     discount,
@@ -321,6 +344,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindProductAutoSearch();
   bindQuoteCustomerSearch();
   bindQuoteListControls();
+  bindTransactionTypeControls();
   await loadStaffOptions();
   renderQuoteList();
   newQuote();
@@ -370,6 +394,29 @@ function setQuoteListCollapsed(collapsed) {
   if (listPanel) listPanel.hidden = quoteListCollapsed;
   if (panel) panel.hidden = quoteListCollapsed;
   if (button) button.textContent = quoteListCollapsed ? "一覧を開く" : "一覧を閉じる";
+}
+
+function bindTransactionTypeControls() {
+  const transactionType = document.getElementById("transactionType");
+  if (!transactionType) return;
+  transactionType.addEventListener("change", () => {
+    applyTransactionTypeToLines();
+    renderLines();
+  });
+}
+
+function applyTransactionTypeToLines() {
+  const transactionType = normalizeTransactionType(getCurrentTransactionType());
+  currentLines.forEach(line => {
+    line.transactionType = transactionType;
+    if (isFreeTransaction(transactionType)) {
+      line.discountValue = 100;
+      line.discountRate = 100;
+      line.discountAmountInput = 0;
+    }
+    if (isRefundTransaction(transactionType) && !line.memo) line.memo = "返金対象";
+    recalcSalesLine(line);
+  });
 }
 
 function bindProductAutoSearch() {
@@ -676,7 +723,7 @@ function buildInvoiceFromQuote(quote, invoices) {
     staff: quote.staff || "",
     memo: quote.memo || quote.customerMemo || linkedCustomer.memo || "",
     customerMemo: quote.customerMemo || quote.memo || linkedCustomer.memo || "",
-    transactionType: quote.transactionType || "通常販売",
+    transactionType: normalizeTransactionType(quote.transactionType),
     originalSlipNumber: quote.originalSlipNumber || "",
     reasonMemo: quote.reasonMemo || "",
     discountTemplate: quote.discountTemplate || "none",
@@ -807,12 +854,13 @@ async function addProductLine(product) {
       qty: 1,
       unit,
       unitPrice: price.hasPrice ? price.value : 0,
-      discountValue: 0,
-      discountRate: 0,
+      transactionType: normalizeTransactionType(getCurrentTransactionType()),
+      discountValue: isFreeTransaction(getCurrentTransactionType()) ? 100 : 0,
+      discountRate: isFreeTransaction(getCurrentTransactionType()) ? 100 : 0,
       discountAmountInput: 0,
       discountAmount: 0,
       amount: 0,
-      memo: ""
+      memo: isRefundTransaction(getCurrentTransactionType()) ? "返金対象" : ""
     });
     renderLines();
     showSalesPopup("追加完了", "商品を見積に追加しました", "ok");
@@ -856,7 +904,7 @@ function updateLine(index, key, value) {
     units[line.barcode] = value;
     writeUnits(units);
   }
-  if (document.getElementById("discountTemplate").value !== "custom" && key !== "unit") {
+  if (document.getElementById("discountTemplate").value !== "custom" && !["unit", "discountValue", "discountRate", "discountAmountInput"].includes(key)) {
     applyDiscountTemplate(false);
   }
   recalcSalesLine(line);
@@ -879,10 +927,13 @@ function isDealerBrand(name) {
 
 function applyDiscountTemplate(render = true) {
   const template = document.getElementById("discountTemplate").value;
+  const transactionType = getCurrentTransactionType();
   currentLines.forEach(line => {
-    if (template === "all10") line.discountValue = 10;
-    if (template === "dealer10") line.discountValue = isDealerBrand(line.name) ? 10 : 0;
-    if (template === "none") line.discountValue = 0;
+    line.transactionType = transactionType;
+    if (isFreeTransaction(transactionType)) line.discountValue = 100;
+    else if (template === "all10") line.discountValue = 10;
+    else if (template === "dealer10") line.discountValue = isDealerBrand(line.name) ? 10 : 0;
+    else if (template === "none") line.discountValue = 0;
     line.discountRate = line.discountValue;
     recalcSalesLine(line);
   });
@@ -926,19 +977,19 @@ function collectQuote() {
     quoteDate: document.getElementById("quoteDate").value,
     validUntil: document.getElementById("validUntil").value,
     staff: document.getElementById("quoteStaff").value,
-    transactionType: document.getElementById("transactionType")?.value || existing?.transactionType || "通常販売",
+    transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value || existing?.transactionType),
     originalSlipNumber: document.getElementById("originalSlipNumber")?.value?.trim() || "",
     reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
     memo: document.getElementById("quoteMemo").value,
     customerMemo: document.getElementById("quoteMemo").value,
     discountTemplate: document.getElementById("discountTemplate").value,
-    lines: currentLines.map(({ stock, ...line }) => ({ ...line }))
+    lines: currentLines.map(({ stock, ...line }) => recalcSalesLine({ ...line, transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value) }))
   };
 }
 
 function printQuotePdf(quote) {
   const doc = JSON.parse(JSON.stringify(quote || {}));
-  const lines = (doc.lines || doc.items || []).map(recalcSalesLine);
+  const lines = (doc.lines || doc.items || []).map(line => recalcSalesLine({ ...line, transactionType: doc.transactionType || line.transactionType || "通常販売" }));
   const totals = calcQuoteTotals({ lines });
   const rows = lines.map((line, index) => `
     <tr>
@@ -1058,7 +1109,7 @@ function updateQuoteDeleteButton(quote) {
 async function fillQuoteForm(quote) {
   currentQuoteId = quote.id || null;
   currentQuoteLocked = !isQuoteEditable(quote);
-  currentLines = JSON.parse(JSON.stringify(quote.lines || [])).map(line => ({ ...line, stock: 0 }));
+  currentLines = JSON.parse(JSON.stringify(quote.lines || [])).map(line => ({ ...line, transactionType: normalizeTransactionType(quote.transactionType || line.transactionType), stock: 0 }));
   setFieldValue("salesCustomerId", quote.customerId || "");
   setFieldValue("salesCustomerCode", quote.customerCode || "");
   setFieldValue("salesSmaregiCustomerId", quote.smaregiCustomerId || "");
@@ -1076,11 +1127,12 @@ async function fillQuoteForm(quote) {
   document.getElementById("quoteDate").value = quote.quoteDate || today();
   document.getElementById("validUntil").value = quote.validUntil || today();
   document.getElementById("quoteStaff").value = quote.staff || "";
-  setFieldValue("transactionType", quote.transactionType || "通常販売");
+  setFieldValue("transactionType", normalizeTransactionType(quote.transactionType));
   setFieldValue("originalSlipNumber", quote.originalSlipNumber || "");
   setFieldValue("reasonMemo", quote.reasonMemo || "");
   document.getElementById("quoteMemo").value = quote.memo || "";
   document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
+  applyTransactionTypeToLines();
   renderLines();
   updateQuoteDeleteButton(quote);
   updateQuoteLockState(quote);
