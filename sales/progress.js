@@ -94,7 +94,7 @@ function statusLabel(status, kind = "") {
   if (!value) return "未作成";
   if (lower === "draft" || value === "下書き") return kind === "delivery" || kind === "receipt" ? "未発行" : "下書き";
   if (lower === "issued") return kind === "delivery" ? "納品書発行済" : "発行済み";
-  if (value === "発行済み") return "発行済み";
+  if (value === "発行済み") return kind === "delivery" ? "納品書発行済" : "発行済み";
   if (lower === "shipped" || value === "発送済") return "発送済";
   if (value === "納品書発行済" || value === "発送準備中") return "納品書発行済";
   if (lower === "waiting_payment" || lower === "payment_waiting" || value === "入金待ち") return "入金待ち";

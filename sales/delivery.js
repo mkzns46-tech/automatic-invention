@@ -380,6 +380,16 @@ function updateDelivery(id, updater) {
   return next;
 }
 
+function markDeliveryIssuedById(id) {
+  return updateDelivery(id, current => {
+    const status = normalizeDeliveryStatus(current.status);
+    if (status === DELIVERY_STATUS_CANCELLED || status === DELIVERY_STATUS_SHIPPED) return current;
+    if (!current.issuedAt) current.issuedAt = new Date().toISOString();
+    current.status = DELIVERY_STATUS_ISSUED;
+    return current;
+  });
+}
+
 function markCurrentDeliveryIssued() {
   if (!currentDeliveryId) {
     showSalesPopup("確認", "納品書を選択してください。", "warn");
@@ -453,11 +463,21 @@ function quickShipDelivery(id) {
 }
 
 function outputCurrentDeliveryPdf() {
-  const delivery = readDeliveries().find(row => row.id === currentDeliveryId);
-  if (delivery) printDeliveryPdf(delivery);
+  if (!currentDeliveryId) return;
+  const issued = markDeliveryIssuedById(currentDeliveryId);
+  const delivery = issued || readDeliveries().find(row => row.id === currentDeliveryId);
+  if (delivery) {
+    selectDelivery(delivery.id);
+    renderDeliveryList();
+    printDeliveryPdf(delivery);
+  }
 }
 
 function printDeliveryById(id) {
-  const delivery = readDeliveries().find(row => row.id === id);
-  if (delivery) printDeliveryPdf(delivery);
+  const issued = markDeliveryIssuedById(id);
+  const delivery = issued || readDeliveries().find(row => row.id === id);
+  if (delivery) {
+    renderDeliveryList();
+    printDeliveryPdf(delivery);
+  }
 }
