@@ -80,7 +80,9 @@ async function syncLine(line) {
     return { ...line, ok: false, error: "products row not found" };
   }
   const before = Number(found.row.base_stock || 0);
-  const after = Math.max(0, before - Number(line.quantity || 0));
+  const mode = String(line.mode || "").trim() === "restore" ? "restore" : "decrement";
+  const quantity = Number(line.quantity || 0);
+  const after = mode === "restore" ? before + quantity : Math.max(0, before - quantity);
   await supabaseFetch(`products?${found.filter}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
@@ -91,9 +93,10 @@ async function syncLine(line) {
     ok: true,
     before,
     after,
-    quantity: Number(line.quantity || 0),
+    quantity,
+    mode,
     matchedBy: found.filter.startsWith("barcode=") ? "barcode" : "smaregi_product_id",
-    note: before <= 0 ? "base_stock was already 0; kept at 0" : ""
+    note: mode === "decrement" && before <= 0 ? "base_stock was already 0; kept at 0" : ""
   };
 }
 
@@ -108,7 +111,8 @@ module.exports = async function handler(req, res) {
     step = "parse_body";
     const body = parseBody(req);
     step = "normalize_lines";
-    const lines = normalizeLines(body.lines);
+    const mode = String(body.mode || "").trim() === "restore" ? "restore" : "decrement";
+    const lines = normalizeLines(body.lines).map(line => ({ ...line, mode }));
     if (!lines.length) {
       return sendJson(res, 200, {
         ok: false,

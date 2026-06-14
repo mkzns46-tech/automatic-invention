@@ -552,11 +552,11 @@ async function findProductForStockLine(line) {
   return null;
 }
 
-async function syncProductsBaseStock(lines) {
+async function syncProductsBaseStock(lines, mode = "decrement") {
   const response = await fetch("/api/products-base-stock-sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lines })
+    body: JSON.stringify({ lines, mode })
   });
   const text = await response.text().catch(() => "");
   let data = null;
@@ -574,6 +574,95 @@ async function syncProductsBaseStock(lines) {
     throw new Error(data?.error || `products.base_stock sync API error HTTP ${response.status}: ${text.slice(0, 500)}`);
   }
   return Array.isArray(data?.results) ? data.results : [];
+}
+
+async function cancelSmaregiSale(invoice, reason) {
+  const lines = Array.isArray(invoice.smaregiSaleLines) && invoice.smaregiSaleLines.length
+    ? invoice.smaregiSaleLines
+    : buildStockDeductionLines(invoice);
+  const totals = calcInvoiceTotals(invoice);
+  const response = await fetch("/api/smaregi-sales-cancel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      invoiceId: invoice.id,
+      invoiceNo: invoice.invoiceNo,
+      originNumber: invoice.originNumber || invoice.masterNumber || invoice.sourceQuoteNo || "",
+      smaregiTransactionId: invoice.smaregiTransactionId || "",
+      cancelReason: reason || "",
+      cancelledAt: invoice.cancelledAt || invoice.canceledAt || new Date().toISOString(),
+      tax: totals.tax,
+      lines
+    })
+  });
+  const text = await response.text().catch(() => "");
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (_) {
+    throw new Error(`Smaregi sale cancel JSON parse failed HTTP ${response.status}: ${text.slice(0, 500)}`);
+  }
+  console.log("[Smaregi sale cancel response]", {
+    ok: response.ok,
+    status: response.status,
+    body: data || text
+  });
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || `Smaregi sale cancel API error HTTP ${response.status}: ${text.slice(0, 500)}`);
+  }
+  return { data, lines };
+}
+
+async function restoreProductsBaseStock(lines) {
+  return syncProductsBaseStock(lines, "restore");
+}
+
+async function applyInvoiceCancel(invoice, reason) {
+  const next = { ...invoice };
+  const now = new Date().toISOString();
+  if (normalizeInvoiceStatus(next.status) === INVOICE_STATUS_CANCELLED || next.cancelStatus === "success") {
+    throw new Error("This invoice is already canceled.");
+  }
+  next.cancelStatus = "pending";
+  next.cancelReason = reason || "";
+  next.cancelledAt = now;
+  next.canceledAt = now;
+
+  const saleSucceeded = normalizeSmaregiSaleStatus(next.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS;
+  const baseStockWasSynced = next.stockBaseStockSyncStatus === "success";
+  if (!saleSucceeded) {
+    next.smaregiCancelStatus = "skipped";
+    next.stockRestoreStatus = "skipped";
+  } else {
+    if (next.smaregiCancelStatus === "success") {
+      throw new Error("Smaregi sale cancel is already completed.");
+    }
+    next.smaregiCancelStatus = "pending";
+    const cancelResult = await cancelSmaregiSale(next, reason);
+    next.smaregiCancelStatus = "success";
+    next.smaregiCancelError = "";
+    next.smaregiCancelTransactionId = cancelResult.data.smaregiCancelTransactionId || "";
+    next.smaregiCanceledAt = now;
+    next.smaregiCancelLines = cancelResult.lines.map(line => ({ ...line }));
+
+    if (baseStockWasSynced) {
+      next.stockRestoreStatus = "pending";
+      const restoreResults = await restoreProductsBaseStock(cancelResult.lines);
+      next.stockRestoreStatus = restoreResults.every(row => row.ok) ? "success" : "failed";
+      next.stockRestoreError = next.stockRestoreStatus === "failed" ? "Some products.base_stock restore lines failed." : "";
+      next.stockRestoredAt = next.stockRestoreStatus === "success" ? new Date().toISOString() : "";
+      next.stockRestoreLines = restoreResults;
+    } else {
+      next.stockRestoreStatus = "skipped";
+      next.stockRestoreError = "";
+      next.stockRestoreLines = [];
+    }
+  }
+
+  next.status = INVOICE_STATUS_CANCELLED;
+  next.cancelStatus = "success";
+  next.updatedAt = new Date().toISOString();
+  return next;
 }
 
 async function applyInvoiceStockDeduction(invoice) {
@@ -1429,10 +1518,32 @@ function retryCurrentInvoiceStockDeduction() {
   retryInvoiceStockDeduction(currentInvoiceId);
 }
 
-function cancelInvoice() {
+async function cancelInvoice() {
   if (!currentInvoiceId) return;
-  document.getElementById("invoiceStatus").value = INVOICE_STATUS_CANCELLED;
-  saveInvoice();
+  const confirmed = await confirmSalesPopup("請求書キャンセル", "この請求書をキャンセルしますか？", "warn");
+  if (!confirmed) return;
+  const reason = window.prompt("キャンセル理由を入力してください。\n例：注文キャンセル / 誤発行 / 商品変更 / 数量変更 / 返金対応 / その他", "") || "";
+  const invoices = readInvoices();
+  const index = invoices.findIndex(row => row.id === currentInvoiceId);
+  if (index < 0) {
+    showSalesMessage("請求書が見つかりません。", "err");
+    return;
+  }
+  const invoice = normalizeInvoiceForView(invoices[index]);
+  try {
+    const updated = await applyInvoiceCancel(invoice, reason);
+    invoices[index] = updated;
+    writeInvoices(invoices);
+    fillInvoiceForm(updated);
+    renderInvoiceList();
+    const restoreMessage = updated.stockRestoreStatus === "failed"
+      ? "\nproducts.base_stock復帰に失敗しました。詳細を確認してください。"
+      : "";
+    showSalesPopup("請求書キャンセル", `請求書をキャンセルしました${restoreMessage}`, updated.stockRestoreStatus === "failed" ? "warn" : "ok");
+  } catch (error) {
+    const message = error?.message || String(error);
+    showSalesPopup("請求書キャンセル失敗", message, "err");
+  }
 }
 
 function outputCurrentInvoicePdf() {
