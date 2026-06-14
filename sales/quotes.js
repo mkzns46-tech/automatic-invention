@@ -139,7 +139,8 @@ function isRefundTransaction(type) {
 }
 
 function isFreeTransaction(type) {
-  return String(type || "").trim() === "無償提供";
+  const value = String(type || "").trim();
+  return value === "無償提供" || value === "交換";
 }
 
 function normalizeTransactionType(type) {
@@ -1089,7 +1090,7 @@ function printQuotePdf(quote) {
     <div><span>内消費税 10%</span><strong>${money(totals.tax)}</strong></div>
   </div>
   <div class="note">${escapeHtml(doc.memo || "")}</div>
-  <script>window.onload = () => window.print();</script>
+  <script>window.onload = () => { window.print(); setTimeout(() => { if (window.opener) window.opener.focus(); }, 300); };</script>
 </body>
 </html>`);
   win.document.close();
@@ -1247,10 +1248,22 @@ async function deleteQuote(id) {
 }
 
 function outputCurrentQuotePdf() {
-  printQuotePdf(collectQuote());
+  try {
+    printQuotePdf(collectQuote());
+  } finally {
+    restoreQuoteEditorAfterPdf();
+  }
 }
 
 function printQuoteById(id) {
   const quote = readQuotes().find(q => q.id === id);
   if (quote) printQuotePdf(quote);
+}
+
+function restoreQuoteEditorAfterPdf() {
+  window.setTimeout(() => {
+    const quote = currentQuoteId ? readQuotes().find(q => q.id === currentQuoteId) : { status: QUOTE_STATUS_DRAFT };
+    updateQuoteLockState(quote || { status: QUOTE_STATUS_DRAFT });
+    window.focus();
+  }, 300);
 }

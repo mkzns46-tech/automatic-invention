@@ -27,7 +27,8 @@ function invoicePdfIsRefundTransaction(type) {
 }
 
 function invoicePdfIsFreeTransaction(type) {
-  return String(type || "").trim() === "無償提供";
+  const value = String(type || "").trim();
+  return value === "無償提供" || value === "交換";
 }
 
 function invoicePdfNormalizeTransactionType(type) {
@@ -151,7 +152,7 @@ function printInvoicePdf(invoice) {
   </div>
   <div class="note">${invoicePdfEscape(doc.memo || "")}</div>
   <div class="registration">登録番号 T8180001160066</div>
-  <script>window.onload = () => window.print();</script>
+  <script>window.onload = () => { window.print(); setTimeout(() => { if (window.opener) window.opener.focus(); }, 300); };</script>
 </body>
 </html>`);
   win.document.close();

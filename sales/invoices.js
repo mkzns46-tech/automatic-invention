@@ -92,7 +92,8 @@ function isRefundTransaction(type) {
 }
 
 function isFreeTransaction(type) {
-  return String(type || "").trim() === "無償提供";
+  const value = String(type || "").trim();
+  return value === "無償提供" || value === "交換";
 }
 
 function normalizeTransactionType(type) {
@@ -1012,10 +1013,22 @@ function cancelInvoice() {
 }
 
 function outputCurrentInvoicePdf() {
-  printInvoicePdf(normalizeInvoiceForView(collectInvoice()));
+  try {
+    printInvoicePdf(normalizeInvoiceForView(collectInvoice()));
+  } finally {
+    restoreInvoiceEditorAfterPdf();
+  }
 }
 
 function printInvoiceById(id) {
   const invoice = readInvoices().find(row => row.id === id);
   if (invoice) printInvoicePdf(normalizeInvoiceForView(invoice));
+}
+
+function restoreInvoiceEditorAfterPdf() {
+  window.setTimeout(() => {
+    const invoice = currentInvoiceId ? readInvoices().find(row => row.id === currentInvoiceId) : { status: INVOICE_STATUS_DRAFT };
+    updateInvoiceLockState(invoice || { status: INVOICE_STATUS_DRAFT });
+    window.focus();
+  }, 300);
 }
