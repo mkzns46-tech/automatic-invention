@@ -255,7 +255,6 @@ function buildTransactionPayload(context, body, paymentMethod) {
     details: lines.map(({ aricoAmount, aricoQuantity, ...line }) => line),
     payments: [
       {
-        no: 1,
         paymentMethodId: paymentMethod.paymentMethodId,
         paymentMethodName: paymentMethod.paymentMethodName,
         receivedAmount: total,
