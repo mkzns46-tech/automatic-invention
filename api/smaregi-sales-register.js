@@ -39,6 +39,14 @@ function toInt(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function toPositiveIntegerString(value) {
+  const text = String(value ?? "").trim();
+  if (!/^\d+$/.test(text)) return "";
+  const number = Number(text);
+  if (!Number.isSafeInteger(number) || number <= 0) return "";
+  return String(number);
+}
+
 function firstString(...values) {
   for (const value of values) {
     const text = String(value ?? "").trim();
@@ -225,8 +233,9 @@ function buildTransactionPayload(context, body, paymentMethod) {
   const taxInclude = toInt(body.tax ?? Math.floor(total * 10 / 110));
   const terminalTranIdSource = String(body.invoiceNo || body.invoiceId || Date.now()).replace(/\D/g, "");
   const terminalTranId = terminalTranIdSource.slice(-10).padStart(1, "1");
-
-  return {
+  const smaregiCustomerId = toPositiveIntegerString(body.smaregiCustomerId);
+  const smaregiCustomerCode = firstString(body.smaregiCustomerCode);
+  const payload = {
     transactionHeadDivision: "1",
     cancelDivision: "0",
     subtotal: String(total),
@@ -240,8 +249,6 @@ function buildTransactionPayload(context, body, paymentMethod) {
     terminalTranId,
     terminalTranDateTime: smaregiDateTime(body.issuedAt || body.invoiceDate || body.updatedAt),
     sumDivision: "0",
-    customerId: firstString(body.smaregiCustomerId),
-    customerCode: firstString(body.smaregiCustomerCode),
     memo: ["ARICO", body.invoiceNo || "", body.originNumber || "", body.transactionType || ""].filter(Boolean).join(" ").slice(0, 100),
     sellDivision: "0",
     taxRate: "10",
@@ -257,6 +264,9 @@ function buildTransactionPayload(context, body, paymentMethod) {
       }
     ]
   };
+  if (smaregiCustomerId) payload.customerId = smaregiCustomerId;
+  if (smaregiCustomerCode) payload.customerCode = smaregiCustomerCode;
+  return payload;
 }
 
 function findTransactionId(body) {
