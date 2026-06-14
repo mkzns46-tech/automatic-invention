@@ -6,8 +6,7 @@ const PROGRESS_KEYS = {
   customers: "arico_sales_customers_v1"
 };
 
-let progressSearchText = "";
-let progressTransactionFilter = "";
+const progressSearch = { ticket: "", sales: "", unpaid: "", delivery: "" };
 const progressCollapsed = { ticket: false, sales: false, unpaid: false, delivery: false };
 
 function readJson(key) {
@@ -282,9 +281,13 @@ function buildProgressRows() {
   return buildGroups().map(makeProgressRow);
 }
 
-function matchesSearch(row, extra = []) {
-  if (progressTransactionFilter && row.transactionType !== progressTransactionFilter) return false;
-  if (!progressSearchText) return true;
+function isCancelledRow(row) {
+  return [row.quoteStatus, row.invoiceStatus, row.paymentStatus, row.deliveryStatus].includes("キャンセル");
+}
+
+function matchesSearch(row, section, extra = []) {
+  const searchText = progressSearch[section] || "";
+  if (!searchText) return true;
   const text = [
     row.origin,
     row.transactionType,
@@ -302,7 +305,7 @@ function matchesSearch(row, extra = []) {
     row.updatedAt,
     ...extra
   ].join(" ").toLowerCase();
-  return text.includes(progressSearchText);
+  return text.includes(searchText);
 }
 
 function pageLink(page, id, label) {
@@ -322,13 +325,13 @@ function actionLinks(row, kinds) {
 function renderRows(bodyId, countId, rows, renderer, emptyMessage, colspan) {
   const body = document.getElementById(bodyId);
   const count = document.getElementById(countId);
-  if (count) count.textContent = `${rows.length}件`;
+  if (count) count.textContent = `${rows.length}件 / 合計 ${money(rows.reduce((sum, row) => sum + Number(row.total || 0), 0))}`;
   if (!body) return;
   body.innerHTML = rows.length ? rows.map(renderer).join("") : `<tr><td colspan="${colspan}">${escapeHtml(emptyMessage)}</td></tr>`;
 }
 
 function renderTicketRows(allRows) {
-  const rows = allRows.filter(row => matchesSearch(row)).sort(sortNewest);
+  const rows = allRows.filter(row => !isCancelledRow(row)).filter(row => matchesSearch(row, "ticket")).sort(sortNewest);
   renderRows("ticketProgressBody", "ticketProgressCount", rows, row => `
     <tr>
       <td>${escapeHtml(row.origin)}</td>
@@ -347,7 +350,7 @@ function renderTicketRows(allRows) {
 }
 
 function renderSalesRows(allRows) {
-  const rows = allRows.filter(row => row.invoice).filter(row => matchesSearch(row)).sort(sortNewest);
+  const rows = allRows.filter(row => row.invoice).filter(row => !isCancelledRow(row)).filter(row => matchesSearch(row, "sales")).sort(sortNewest);
   renderRows("salesProgressBody", "salesProgressCount", rows, row => `
     <tr>
       <td>${escapeHtml(row.origin)}</td>
@@ -365,7 +368,8 @@ function renderUnpaidRows(allRows) {
   const rows = allRows
     .filter(row => !["入金済み", "入金不要", "キャンセル"].includes(row.paymentStatus))
     .filter(row => row.unpaid > 0 || row.paymentStatus === "入金待ち" || row.paymentStatus === "一部入金" || isPaymentOverdue(row.invoice))
-    .filter(row => matchesSearch(row))
+    .filter(row => !isCancelledRow(row))
+    .filter(row => matchesSearch(row, "unpaid"))
     .sort(sortNewest);
   renderRows("unpaidProgressBody", "unpaidProgressCount", rows, row => {
     const overdue = isPaymentOverdue(row.invoice) ? " overdue-text" : "";
@@ -388,8 +392,8 @@ function renderUnpaidRows(allRows) {
 function renderUndeliveredRows(allRows) {
   const rows = allRows
     .filter(row => !["発行済み", "納品済み", "キャンセル"].includes(row.deliveryStatus))
-    .filter(row => row.invoiceStatus !== "キャンセル")
-    .filter(row => matchesSearch(row))
+    .filter(row => !isCancelledRow(row))
+    .filter(row => matchesSearch(row, "delivery"))
     .sort(sortNewest);
   renderRows("undeliveredProgressBody", "undeliveredProgressCount", rows, row => `
     <tr>
@@ -413,13 +417,16 @@ function renderProgressSections() {
 }
 
 function bindProgressControls() {
-  document.getElementById("progressSearch")?.addEventListener("input", event => {
-    progressSearchText = event.target.value.trim().toLowerCase();
-    renderProgressSections();
-  });
-  document.getElementById("progressTransactionFilter")?.addEventListener("change", event => {
-    progressTransactionFilter = event.target.value;
-    renderProgressSections();
+  [
+    ["ticketProgressSearch", "ticket"],
+    ["salesProgressSearch", "sales"],
+    ["unpaidProgressSearch", "unpaid"],
+    ["deliveryProgressSearch", "delivery"]
+  ].forEach(([id, section]) => {
+    document.getElementById(id)?.addEventListener("input", event => {
+      progressSearch[section] = event.target.value.trim().toLowerCase();
+      renderProgressSections();
+    });
   });
 }
 

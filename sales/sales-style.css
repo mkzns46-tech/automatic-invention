@@ -87,6 +87,13 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 .progress-table th:nth-child(13),.progress-table td:nth-child(13){width:260px}
 .progress-actions{display:flex;gap:6px;flex-wrap:wrap}
 .progress-action-link{min-height:34px;padding:6px 9px;border-radius:9px;font-size:12px}
+.progress-list-filter{display:grid;grid-template-columns:minmax(260px,520px);gap:12px;margin:4px 0 12px}
+.progress-list-filter label{margin:0}
+.progress-table{min-width:1460px}
+.progress-table th:nth-child(9),.progress-table td:nth-child(9){width:120px}
+.progress-table th:nth-child(10),.progress-table td:nth-child(10){width:120px}
+.progress-table th:nth-child(11),.progress-table td:nth-child(11){width:160px}
+.progress-table th:nth-child(12),.progress-table td:nth-child(12){width:220px}
 .progress-section-card .table-wrap{max-height:360px}
 .progress-sales-table{min-width:1060px}
 .progress-unpaid-table{min-width:1360px}
