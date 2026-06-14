@@ -27,15 +27,17 @@ function parseBody(req) {
 }
 
 function resolveSmaregiContext() {
-  const clientId = env("SMAREGI_NEW_CLIENT_ID", "NEW_SMAREGI_CLIENT_ID");
-  const clientSecret = env("SMAREGI_NEW_CLIENT_SECRET", "NEW_SMAREGI_CLIENT_SECRET");
+  const clientId = env("SMAREGI_NEW_CLIENT_ID", "NEW_SMAREGI_CLIENT_ID", "SMAREGI_CLIENT_ID");
+  const clientSecret = env("SMAREGI_NEW_CLIENT_SECRET", "NEW_SMAREGI_CLIENT_SECRET", "SMAREGI_CLIENT_SECRET");
   const contractId = env(
     "SMAREGI_NEW_CONTRACT_ID",
     "SMAREGI_NEW_CONTRACTID",
     "NEW_SMAREGI_CONTRACT_ID",
-    "NEW_SMAREGI_CONTRACTID"
+    "NEW_SMAREGI_CONTRACTID",
+    "SMAREGI_CONTRACT_ID",
+    "SMAREGI_CONTRACTID"
   );
-  const apiBase = env("SMAREGI_NEW_POS_API_BASE_URL", "NEW_SMAREGI_POS_API_BASE_URL");
+  const apiBase = env("SMAREGI_NEW_POS_API_BASE_URL", "NEW_SMAREGI_POS_API_BASE_URL", "SMAREGI_POS_API_BASE_URL");
   const storeId = env(
     "SMAREGI_NEW_TOKYO_STORE_ID",
     "NEW_SMAREGI_TOKYO_STORE_ID",
@@ -97,7 +99,12 @@ function resolveStockUrl(context, apiBase, line) {
 async function getAccessToken(context) {
   const { contractId, clientId, clientSecret, stockScope } = context;
   if (!contractId || !clientId || !clientSecret) {
-    throw new Error(`Smaregi OAuth settings are missing: ${context.accountName} / stock decrement`);
+    const missing = [
+      !contractId ? "contractId(SMAREGI_NEW_CONTRACT_ID or SMAREGI_CONTRACT_ID)" : "",
+      !clientId ? "clientId(SMAREGI_NEW_CLIENT_ID or SMAREGI_CLIENT_ID)" : "",
+      !clientSecret ? "clientSecret(SMAREGI_NEW_CLIENT_SECRET or SMAREGI_CLIENT_SECRET)" : ""
+    ].filter(Boolean).join(", ");
+    throw new Error(`Smaregi OAuth settings are missing: ${context.accountName} / stock decrement. Missing: ${missing}`);
   }
   const tokenUrl = `https://id.smaregi.jp/app/${contractId}/token`;
   const response = await fetch(tokenUrl, {
