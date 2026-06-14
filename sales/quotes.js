@@ -46,6 +46,14 @@ function writeUnits(units) {
   localStorage.setItem(PRODUCT_UNITS_KEY, JSON.stringify(units));
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\u3000]+/g, "")
+    .replace(/[\u30a1-\u30f6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
     "&": "&amp;",
@@ -462,11 +470,11 @@ function renderQuoteListRow(q) {
   const deleteButton = canDeleteQuote(q)
     ? `<button type="button" class="danger" onclick="deleteQuote('${q.id}')">&#21066;&#38500;</button>`
     : "";
-  return `<tr>
+  return `<tr data-quote-id="${escapeHtml(q.id || "")}">
     <td><span class="number-with-status">${escapeHtml(q.quoteNo)} ${quoteStatusBadge(q.status)}</span></td>
-    <td>${escapeHtml(q.quoteDate || "")}</td>
-    <td>${escapeHtml(q.customerName || "")}</td>
-    <td>${escapeHtml(q.subject || "")}</td>
+    <td>${escapeHtml(normalizeDateOnly(q.createdAt) || q.quoteDate || "")}</td>
+    <td>${escapeHtml(q.organizationName || q.organization || q.companyName || "")}</td>
+    <td>${escapeHtml(q.customerName || q.name || q.customer || "")}</td>
     <td>${money(calcQuoteTotals(q).total)}</td>
     <td>${quoteStatusBadge(q.status)}</td>
     <td>${escapeHtml(q.staff || "")}</td>
@@ -478,6 +486,22 @@ function renderQuoteListRow(q) {
       ${deleteButton}
     </td>
   </tr>`;
+}
+
+function scrollToSavedQuote(quoteId) {
+  if (!quoteId) return;
+  setQuoteListCollapsed(false);
+  window.requestAnimationFrame(() => {
+    const escapedId = window.CSS?.escape ? CSS.escape(String(quoteId)) : String(quoteId);
+    const row = document.querySelector(`[data-quote-id="${escapedId}"]`);
+    const target = row || document.getElementById("quoteListPanel");
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (row) {
+      row.classList.add("saved-row-highlight");
+      setTimeout(() => row.classList.remove("saved-row-highlight"), 2400);
+    }
+  });
 }
 
 function matchesQuoteListFilters(quote) {
@@ -515,6 +539,22 @@ function matchesDateRange(values, from, to) {
   });
 }
 
+function pickCustomerFields(row) {
+  return {
+    customerId: row?.customerId || "",
+    customerCode: row?.customerCode || "",
+    smaregiCustomerId: row?.smaregiCustomerId || "",
+    smaregiCustomerCode: row?.smaregiCustomerCode || "",
+    customerName: row?.customerName || row?.name || row?.customer || row?.clientName || "",
+    organizationName: row?.organizationName || row?.organization || row?.companyName || "",
+    customerType: row?.customerType || "",
+    address: row?.address || "",
+    phone: row?.phone || "",
+    email: row?.email || "",
+    customerMemo: row?.customerMemo || row?.memo || ""
+  };
+}
+
 function resolveQuoteCustomer(quote) {
   const keys = [
     quote.customerId,
@@ -540,7 +580,8 @@ function buildInvoiceFromQuote(quote, invoices) {
   const now = new Date().toISOString();
   const lines = quote.lines || quote.items || [];
   const linkedCustomer = resolveQuoteCustomer(quote) || {};
-  const customerName = quote.customerName || quote.name || quote.customer || linkedCustomer.customerName || linkedCustomer.name || "";
+  console.log("convert quote customer fields", pickCustomerFields(quote));
+  const customerName = quote.customerName || quote.name || quote.customer || quote.clientName || linkedCustomer.customerName || linkedCustomer.name || "";
   const organizationName = quote.organizationName || quote.organization || quote.companyName || linkedCustomer.organizationName || linkedCustomer.organization || linkedCustomer.companyName || "";
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
@@ -590,8 +631,11 @@ function convertQuoteToInvoice(id) {
     return;
   }
   const invoice = buildInvoiceFromQuote(quote, invoices);
+  console.log("created invoice customer fields", pickCustomerFields(invoice));
   invoices.push(invoice);
   writeInvoices(invoices);
+  const savedInvoice = readInvoices().find(row => row.id === invoice.id);
+  console.log("saved invoice customer fields", pickCustomerFields(savedInvoice || invoice));
   quote.status = QUOTE_STATUS_INVOICED;
   writeQuotes(quotes);
   renderQuoteList();
@@ -788,6 +832,7 @@ async function saveQuote() {
     showSalesMessage("\u6700\u65b0\u5728\u5eab\u306e\u518d\u78ba\u8a8d\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\u898b\u7a4d\u306f\u4fdd\u5b58\u3067\u304d\u307e\u3059\u304c\u3001\u73fe\u5728\u5eab\u8868\u793a\u3092\u78ba\u8a8d\u3057\u3066\u304f\u3060\u3055\u3044\u3002", "warn");
   }
   const quote = collectQuote();
+  console.log("save quote customer fields", pickCustomerFields(quote));
   const quotes = readQuotes();
   const index = quotes.findIndex(q => q.id === quote.id);
   const isNewQuote = index < 0;
@@ -800,6 +845,7 @@ async function saveQuote() {
   const savedMessage = isNewQuote ? "\u898b\u7a4d\u66f8\u3092\u4fdd\u5b58\u3057\u307e\u3057\u305f" : "\u898b\u7a4d\u66f8\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f";
   showSalesMessage(savedMessage, "ok");
   showSalesPopup("\u4fdd\u5b58\u5b8c\u4e86", savedMessage, "ok");
+  scrollToSavedQuote(quote.id);
 }
 
 function updateQuoteDeleteButton(quote) {

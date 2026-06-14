@@ -64,6 +64,22 @@ function isInvoiceEditable(invoiceOrStatus) {
   return status === INVOICE_STATUS_DRAFT;
 }
 
+function pickInvoiceCustomerFields(row) {
+  return {
+    customerId: row?.customerId || "",
+    customerCode: row?.customerCode || "",
+    smaregiCustomerId: row?.smaregiCustomerId || "",
+    smaregiCustomerCode: row?.smaregiCustomerCode || "",
+    customerName: row?.customerName || row?.name || row?.customer || row?.clientName || "",
+    organizationName: row?.organizationName || row?.organization || row?.companyName || "",
+    customerType: row?.customerType || "",
+    address: row?.address || "",
+    phone: row?.phone || "",
+    email: row?.email || "",
+    customerMemo: row?.customerMemo || row?.memo || ""
+  };
+}
+
 function formatDateTime(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -339,21 +355,21 @@ function renderInvoiceList() {
 }
 
 function renderInvoiceListRow(invoice) {
-    const totals = calcInvoiceTotals(invoice);
-    const status = normalizeInvoiceStatus(invoice.status);
-    return `<tr>
-      <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo)} ${statusBadge(status)}</span></td>
-      <td>${escapeHtml(invoice.invoiceDate || "")}</td>
-      <td>${escapeHtml(invoice.customerName || "")}</td>
-      <td>${escapeHtml(invoice.subject || "")}</td>
-      <td>${money(totals.total)}</td>
-      <td>${statusBadge(status)}</td>
-      <td>${escapeHtml(invoice.sourceQuoteNo || "")}</td>
-      <td>
-        <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">編集</button>
-        <button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF出力</button>
-      </td>
-    </tr>`;
+  const totals = calcInvoiceTotals(invoice);
+  const status = normalizeInvoiceStatus(invoice.status);
+  return `<tr>
+    <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo)} ${statusBadge(status)}</span></td>
+    <td>${escapeHtml(invoice.invoiceDate || "")}</td>
+    <td>${escapeHtml(invoice.organizationName || invoice.organization || invoice.companyName || "")}</td>
+    <td>${escapeHtml(invoice.customerName || invoice.name || invoice.customer || "")}</td>
+    <td>${money(totals.total)}</td>
+    <td>${statusBadge(status)}</td>
+    <td>${escapeHtml(invoice.staff || "")}</td>
+    <td>
+      <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">${status === INVOICE_STATUS_DRAFT ? "&#32232;&#38598;" : "&#35443;&#32048;"}</button>
+      <button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>
+    </td>
+  </tr>`;
 }
 
 function matchesInvoiceListFilters(invoice) {
@@ -412,7 +428,8 @@ function clearInvoiceEditor() {
 }
 
 function fillInvoiceForm(invoice) {
-  invoice.customerName = invoice.customerName || invoice.name || invoice.customer || "";
+  invoice.customerName = invoice.customerName || invoice.name || invoice.customer || invoice.clientName || "";
+  console.log("render invoice customer fields", pickInvoiceCustomerFields(invoice));
   invoice.organizationName = invoice.organizationName || invoice.organization || invoice.companyName || "";
   invoice.items = invoice.items || invoice.lines || [];
   invoice.lines = invoice.lines || invoice.items || [];

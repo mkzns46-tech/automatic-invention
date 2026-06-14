@@ -31,8 +31,16 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
     return ARICO_CUSTOMER_TYPES.includes(value) ? value : "個人";
   }
 
+  function normalizeSearchText(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s\u3000]+/g, "")
+      .replace(/[\u30a1-\u30f6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+  }
+
   function normalizeKey(value) {
-    return String(value || "").trim().toLowerCase();
+    return normalizeSearchText(value);
   }
 
   function searchCustomers(query, limit = 20) {

@@ -274,32 +274,30 @@ function renderPaymentInvoiceList() {
     ? `入金待ち ${activeInvoices.length}件 / 全${invoices.length}件`
     : `入金待ち ${activeInvoices.length}件`;
   if (!body) return;
-  body.innerHTML = activeInvoices.length ? activeInvoices.map(renderPaymentInvoiceRow).join("") : '<tr><td colspan="11">対応が必要な入金確認はありません。</td></tr>';
+  body.innerHTML = activeInvoices.length ? activeInvoices.map(renderPaymentInvoiceRow).join("") : '<tr><td colspan="9">対応が必要な入金確認はありません。</td></tr>';
   if (completedBody) {
-    completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderPaymentInvoiceRow).join("") : '<tr><td colspan="11">完了済み・キャンセル済みの入金確認はありません。</td></tr>';
+    completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderPaymentInvoiceRow).join("") : '<tr><td colspan="9">完了済み・キャンセル済みの入金確認はありません。</td></tr>';
   }
 }
 
 function renderPaymentInvoiceRow(invoice) {
-    const total = calcInvoiceTotal(invoice);
-    const status = normalizePaymentStatus(invoice.status);
-    const paymentDate = getLatestPaymentDate(invoice);
-    const cancelButton = status === PAYMENT_STATUS_PAID
-      ? `<button type="button" class="danger" onclick="cancelPayment('${invoice.id}')">入金取消</button>`
-      : "";
-    return `<tr>
-      <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo || "")} ${statusBadge(status)}</span></td>
-      <td>${escapeHtml(invoice.invoiceDate || "")}</td>
-      <td>${escapeHtml(normalizeDateOnly(invoice.issuedAt))}</td>
-      <td>${escapeHtml(invoice.dueDate || "")}</td>
-      <td>${escapeHtml(invoice.customerName || "")}</td>
-      <td>${escapeHtml(invoice.subject || "")}</td>
-      <td>${money(total)}</td>
-      <td>${escapeHtml(paymentDate || (status === PAYMENT_STATUS_PAID ? "" : "未入金"))}</td>
-      <td>${statusBadge(status)}</td>
-      <td>${escapeHtml(invoice.staff || "")}</td>
-      <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">選択</button>${cancelButton}</td>
-    </tr>`;
+  const total = calcInvoiceTotal(invoice);
+  const status = normalizePaymentStatus(invoice.status);
+  const paymentDate = getLatestPaymentDate(invoice);
+  const cancelButton = status === PAYMENT_STATUS_PAID
+    ? `<button type="button" class="danger" onclick="cancelPayment('${invoice.id}')">&#20837;&#37329;&#21462;&#28040;</button>`
+    : "";
+  return `<tr>
+    <td>${escapeHtml(invoice.invoiceDate || "")}</td>
+    <td>${escapeHtml(paymentDate || (status === PAYMENT_STATUS_PAID ? "" : "???"))}</td>
+    <td>${escapeHtml(invoice.dueDate || "")}</td>
+    <td>${escapeHtml(invoice.organizationName || invoice.organization || invoice.companyName || "")}</td>
+    <td><span class="number-with-status">${escapeHtml(invoice.customerName || invoice.name || invoice.customer || "")} ${statusBadge(status)}</span></td>
+    <td>${money(total)}</td>
+    <td>${statusBadge(status)}</td>
+    <td>${escapeHtml(invoice.staff || "")}</td>
+    <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">&#36984;&#25246;</button>${cancelButton}</td>
+  </tr>`;
 }
 
 function matchesPaymentInvoiceFilters(invoice) {

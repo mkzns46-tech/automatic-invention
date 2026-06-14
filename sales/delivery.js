@@ -139,27 +139,25 @@ function renderDeliveryList() {
     : `未発行 ${activeDeliveries.length}件`;
   document.getElementById("deliveryListBody").innerHTML = activeDeliveries.length
     ? activeDeliveries.map(renderDeliveryRow).join("")
-    : '<tr><td colspan="10">対応が必要な納品書はありません。</td></tr>';
+    : '<tr><td colspan="8">対応が必要な納品書はありません。</td></tr>';
   document.getElementById("deliveryCompletedListBody").innerHTML = completedDeliveries.length
     ? completedDeliveries.map(renderDeliveryRow).join("")
-    : '<tr><td colspan="10">完了済み・キャンセル済みの納品書はありません。</td></tr>';
+    : '<tr><td colspan="8">完了済み・キャンセル済みの納品書はありません。</td></tr>';
 }
 
 function renderDeliveryRow(delivery) {
   const status = normalizeDeliveryStatus(delivery.status);
   return `<tr>
     <td><span class="number-with-status">${escapeHtml(delivery.deliveryNo || "")} ${statusBadge(status)}</span></td>
-    <td>${escapeHtml(delivery.sourceInvoiceNo || "")}</td>
-    <td>${escapeHtml(delivery.invoiceDate || "")}</td>
-    <td>${escapeHtml(normalizeDateOnly(delivery.issuedAt))}</td>
-    <td>${escapeHtml(delivery.customerName || "")}</td>
-    <td>${escapeHtml(delivery.subject || "")}</td>
+    <td>${escapeHtml(normalizeDateOnly(delivery.issuedAt) || delivery.deliveryDate || delivery.invoiceDate || "")}</td>
+    <td>${escapeHtml(delivery.organizationName || delivery.organization || delivery.companyName || "")}</td>
+    <td>${escapeHtml(delivery.customerName || delivery.name || delivery.customer || "")}</td>
     <td>${money(delivery.total)}</td>
     <td>${statusBadge(status)}</td>
     <td>${escapeHtml(delivery.staff || "")}</td>
     <td>
-      <button type="button" class="secondary" onclick="selectDelivery('${delivery.id}')">詳細</button>
-      <button type="button" class="secondary" onclick="printDeliveryById('${delivery.id}')">PDF出力</button>
+      <button type="button" class="secondary" onclick="selectDelivery('${delivery.id}')">&#35443;&#32048;</button>
+      <button type="button" class="secondary" onclick="printDeliveryById('${delivery.id}')">PDF&#20986;&#21147;</button>
     </td>
   </tr>`;
 }

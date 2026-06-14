@@ -218,10 +218,10 @@ function renderReceiptLists() {
   if (count) count.textContent = `未発行 ${activeRows.length}件`;
   document.getElementById("receiptTargetListBody").innerHTML = activeRows.length
     ? activeRows.map(renderReceiptTargetRow).join("")
-    : '<tr><td colspan="9">領収書発行対象はありません。</td></tr>';
+    : '<tr><td colspan="8">領収書発行対象はありません。</td></tr>';
   document.getElementById("issuedReceiptListBody").innerHTML = completedRows.length
     ? completedRows.map(renderReceiptTargetRow).join("")
-    : '<tr><td colspan="9">発行済み・キャンセル済みの領収書はありません。</td></tr>';
+    : '<tr><td colspan="8">発行済み・キャンセル済みの領収書はありません。</td></tr>';
 }
 
 function sortReceiptRows(a, b) {
@@ -235,30 +235,28 @@ function renderReceiptTargetRow(row) {
     const invoice = row.invoice;
     const payment = getLatestActivePayment(invoice) || {};
     return `<tr>
-      <td><span class="status-badge muted">未作成</span></td>
-      <td>${escapeHtml(invoice.invoiceNo || "")}</td>
-      <td>${escapeHtml(payment.paymentDate || "")}</td>
-      <td>${escapeHtml(invoice.customerName || "")}</td>
-      <td>${escapeHtml(invoice.subject || "")}</td>
+      <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo || "")} <span class="status-badge muted">&#26410;&#20316;&#25104;</span></span></td>
+      <td>${escapeHtml(normalizeDateOnly(invoice.issuedAt) || payment.paymentDate || "")}</td>
+      <td>${escapeHtml(invoice.organizationName || invoice.organization || invoice.companyName || "")}</td>
+      <td>${escapeHtml(invoice.customerName || invoice.name || invoice.customer || "")}</td>
       <td>${money(getPaidTotal(invoice))}</td>
-      <td><span class="status-badge muted">未発行</span></td>
+      <td><span class="status-badge muted">&#26410;&#30330;&#34892;</span></td>
       <td>${escapeHtml(payment.staff || invoice.staff || "")}</td>
-      <td><button type="button" class="primary" onclick="createReceiptFromInvoice('${invoice.id}')">領収書作成</button></td>
+      <td><button type="button" class="primary" onclick="createReceiptFromInvoice('${invoice.id}')">&#38936;&#21454;&#26360;&#20316;&#25104;</button></td>
     </tr>`;
   }
   const receipt = row.receipt;
   return `<tr>
     <td><span class="number-with-status">${escapeHtml(receipt.receiptNo || "")} ${statusBadge(receipt.status)}</span></td>
-    <td>${escapeHtml(receipt.sourceInvoiceNo || "")}</td>
-    <td>${escapeHtml(receipt.paymentDate || "")}</td>
-    <td>${escapeHtml(receipt.customerName || "")}</td>
-    <td>${escapeHtml(receipt.subject || "")}</td>
+    <td>${escapeHtml(normalizeDateOnly(receipt.issuedAt) || receipt.paymentDate || "")}</td>
+    <td>${escapeHtml(receipt.organizationName || receipt.organization || receipt.companyName || "")}</td>
+    <td>${escapeHtml(receipt.customerName || receipt.name || receipt.customer || "")}</td>
     <td>${money(receipt.amount)}</td>
     <td>${statusBadge(receipt.status)}</td>
     <td>${escapeHtml(receipt.staff || "")}</td>
     <td>
-      <button type="button" class="secondary" onclick="selectReceipt('${receipt.id}')">詳細</button>
-      <button type="button" class="secondary" onclick="printReceiptById('${receipt.id}')">PDF出力</button>
+      <button type="button" class="secondary" onclick="selectReceipt('${receipt.id}')">&#35443;&#32048;</button>
+      <button type="button" class="secondary" onclick="printReceiptById('${receipt.id}')">PDF&#20986;&#21147;</button>
     </td>
   </tr>`;
 }

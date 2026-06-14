@@ -76,7 +76,7 @@ function populateCustomerTypeOptions() {
 
 function bindCustomerListControls() {
   document.getElementById("customerSearch")?.addEventListener("input", event => {
-    customerSearchText = event.target.value.trim().toLowerCase();
+    customerSearchText = normalizeSearchText(event.target.value);
     renderCustomerList();
   });
   document.getElementById("customerTypeFilter")?.addEventListener("change", event => {
@@ -219,6 +219,14 @@ function hideCustomerDetail() {
   document.getElementById("customerDetailCard")?.classList.add("hidden");
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\u3000]+/g, "")
+    .replace(/[\u30a1-\u30f6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+
 function matchesCustomerFilters(customer) {
   if (customerTypeFilter && customer.customerType !== customerTypeFilter) return false;
   const dateTarget = customer.updatedAt || customer.smaregiUpdatedAt || customer.createdAt;
@@ -234,7 +242,7 @@ function matchesCustomerFilters(customer) {
     customer.staff,
     customer.smaregiMemberCode,
     customer.customerCode
-  ].map(value => String(value || "").toLowerCase()).join(" ");
+  ].map(value => normalizeSearchText(value)).join(" ");
   return text.includes(customerSearchText);
 }
 

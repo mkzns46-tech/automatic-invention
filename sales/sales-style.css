@@ -58,3 +58,6 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 
 .customer-readonly-input,input[readonly].customer-readonly-input{background:#f3f4f6;color:#4b5563;cursor:default;border-color:#d1d5db}
 .customer-readonly-note{margin:6px 0 12px;color:#4b5563}
+
+.saved-row-highlight{animation:savedRowFlash 2.4s ease-out;background:#e0f2fe!important}
+@keyframes savedRowFlash{0%{background:#bae6fd}70%{background:#e0f2fe}100%{background:transparent}}
