@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 販売進捗確認</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-progress-section-search">
+<link rel="stylesheet" href="sales-style.css?v=20260614-progress-filter-ui">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
-<script src="progress.js?v=20260614-progress-section-search" defer></script>
+<script src="progress.js?v=20260614-progress-filter-ui" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -16,7 +16,7 @@
     <div>
       <div class="brand">ARICO ARCHERY</div>
       <h1>販売進捗確認</h1>
-      <p class="lead">伝票ごとの進捗、売上、未入金、未納品を確認します。</p>
+      <p class="lead">伝票ごとの進捗、請求、未入金、未納品を確認します。</p>
     </div>
     <div class="sales-actions">
       <a class="pill" href="index.html">トップ</a>
@@ -28,12 +28,19 @@
 
   <section class="card collapsible-list-card progress-section-card">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleProgressSection('ticket')">伝票ごとの進捗一覧 <span class="status-badge muted" id="ticketProgressCount">0件</span></h2>
+      <h2 class="list-heading" onclick="toggleProgressSection('ticket')">伝票一覧 <span class="status-badge muted" id="ticketProgressCount">0件 / 合計 0円</span></h2>
       <button type="button" class="secondary list-toggle-button" id="ticketProgressToggle" onclick="toggleProgressSection('ticket')">一覧を閉じる</button>
     </div>
     <div class="list-panel" id="ticketProgressPanel">
       <div class="progress-list-filter">
-        <label>検索<input id="ticketProgressSearch" placeholder="伝票番号・団体名・顧客名・担当者・日付・ステータス"></label>
+        <label>伝票番号<input id="ticketSlipFilter" placeholder="Q-000001 / INV-000001"></label>
+        <label>団体名<input id="ticketOrganizationFilter" placeholder="団体名"></label>
+        <label>顧客名<input id="ticketCustomerFilter" placeholder="顧客名"></label>
+        <label>担当者<input id="ticketStaffFilter" placeholder="担当者"></label>
+        <label>取引区分<select id="ticketTransactionFilter"></select></label>
+        <label>ステータス<select id="ticketStatusFilter"></select></label>
+        <label>開始日<input id="ticketDateFromFilter" type="date"></label>
+        <label>終了日<input id="ticketDateToFilter" type="date"></label>
       </div>
       <div class="table-wrap list-scroll progress-scroll">
         <table class="progress-table">
@@ -46,12 +53,19 @@
 
   <section class="card collapsible-list-card progress-section-card">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleProgressSection('sales')">請求書一覧 <span class="status-badge muted" id="salesProgressCount">0件</span></h2>
+      <h2 class="list-heading" onclick="toggleProgressSection('sales')">請求書一覧 <span class="status-badge muted" id="salesProgressCount">0件 / 合計 0円</span></h2>
       <button type="button" class="secondary list-toggle-button" id="salesProgressToggle" onclick="toggleProgressSection('sales')">一覧を閉じる</button>
     </div>
     <div class="list-panel" id="salesProgressPanel">
       <div class="progress-list-filter">
-        <label>検索<input id="salesProgressSearch" placeholder="伝票番号・団体名・顧客名・担当者・請求日・ステータス"></label>
+        <label>伝票番号<input id="salesSlipFilter" placeholder="伝票番号"></label>
+        <label>団体名<input id="salesOrganizationFilter" placeholder="団体名"></label>
+        <label>顧客名<input id="salesCustomerFilter" placeholder="顧客名"></label>
+        <label>担当者<input id="salesStaffFilter" placeholder="担当者"></label>
+        <label>取引区分<select id="salesTransactionFilter"></select></label>
+        <label>ステータス<select id="salesStatusFilter"></select></label>
+        <label>開始日<input id="salesDateFromFilter" type="date"></label>
+        <label>終了日<input id="salesDateToFilter" type="date"></label>
       </div>
       <div class="table-wrap list-scroll progress-scroll">
         <table class="progress-sales-table">
@@ -64,12 +78,19 @@
 
   <section class="card collapsible-list-card progress-section-card">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleProgressSection('unpaid')">未入金一覧 <span class="status-badge muted" id="unpaidProgressCount">0件</span></h2>
+      <h2 class="list-heading" onclick="toggleProgressSection('unpaid')">未入金一覧 <span class="status-badge muted" id="unpaidProgressCount">0件 / 合計 0円</span></h2>
       <button type="button" class="secondary list-toggle-button" id="unpaidProgressToggle" onclick="toggleProgressSection('unpaid')">一覧を閉じる</button>
     </div>
     <div class="list-panel" id="unpaidProgressPanel">
       <div class="progress-list-filter">
-        <label>検索<input id="unpaidProgressSearch" placeholder="伝票番号・団体名・顧客名・担当者・請求日・支払期限・ステータス"></label>
+        <label>伝票番号<input id="unpaidSlipFilter" placeholder="伝票番号"></label>
+        <label>団体名<input id="unpaidOrganizationFilter" placeholder="団体名"></label>
+        <label>顧客名<input id="unpaidCustomerFilter" placeholder="顧客名"></label>
+        <label>担当者<input id="unpaidStaffFilter" placeholder="担当者"></label>
+        <label>取引区分<select id="unpaidTransactionFilter"></select></label>
+        <label>ステータス<select id="unpaidStatusFilter"></select></label>
+        <label>開始日<input id="unpaidDateFromFilter" type="date"></label>
+        <label>終了日<input id="unpaidDateToFilter" type="date"></label>
       </div>
       <div class="table-wrap list-scroll progress-scroll">
         <table class="progress-unpaid-table">
@@ -82,12 +103,19 @@
 
   <section class="card collapsible-list-card progress-section-card">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleProgressSection('delivery')">未納品一覧 <span class="status-badge muted" id="undeliveredProgressCount">0件</span></h2>
+      <h2 class="list-heading" onclick="toggleProgressSection('delivery')">未納品一覧 <span class="status-badge muted" id="undeliveredProgressCount">0件 / 合計 0円</span></h2>
       <button type="button" class="secondary list-toggle-button" id="deliveryProgressToggle" onclick="toggleProgressSection('delivery')">一覧を閉じる</button>
     </div>
     <div class="list-panel" id="deliveryProgressPanel">
       <div class="progress-list-filter">
-        <label>検索<input id="deliveryProgressSearch" placeholder="伝票番号・団体名・顧客名・担当者・納品日・ステータス"></label>
+        <label>伝票番号<input id="deliverySlipFilter" placeholder="伝票番号"></label>
+        <label>団体名<input id="deliveryOrganizationFilter" placeholder="団体名"></label>
+        <label>顧客名<input id="deliveryCustomerFilter" placeholder="顧客名"></label>
+        <label>担当者<input id="deliveryStaffFilter" placeholder="担当者"></label>
+        <label>取引区分<select id="deliveryTransactionFilter"></select></label>
+        <label>ステータス<select id="deliveryStatusFilter"></select></label>
+        <label>開始日<input id="deliveryDateFromFilter" type="date"></label>
+        <label>終了日<input id="deliveryDateToFilter" type="date"></label>
       </div>
       <div class="table-wrap list-scroll progress-scroll">
         <table class="progress-delivery-table">

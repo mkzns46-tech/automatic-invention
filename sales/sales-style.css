@@ -87,8 +87,9 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 .progress-table th:nth-child(13),.progress-table td:nth-child(13){width:260px}
 .progress-actions{display:flex;gap:6px;flex-wrap:wrap}
 .progress-action-link{min-height:34px;padding:6px 9px;border-radius:9px;font-size:12px}
-.progress-list-filter{display:grid;grid-template-columns:minmax(260px,520px);gap:12px;margin:4px 0 12px}
+.progress-list-filter{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px;margin:4px 0 12px;align-items:end}
 .progress-list-filter label{margin:0}
+.progress-list-filter input,.progress-list-filter select{min-height:42px;font-size:14px;padding:9px 10px}
 .progress-table{min-width:1460px}
 .progress-table th:nth-child(9),.progress-table td:nth-child(9){width:120px}
 .progress-table th:nth-child(10),.progress-table td:nth-child(10){width:120px}
@@ -148,6 +149,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 .app-popup-card{width:min(420px,100%);border:1px solid #cfe6d7;border-radius:16px;background:#fff;padding:22px;box-shadow:0 24px 72px rgba(16,37,27,.24);text-align:center}
 .app-popup-title{font-size:22px;font-weight:900;color:var(--main-dark);margin-bottom:10px}.app-popup-body{white-space:pre-wrap;color:#315b48;font-weight:800;line-height:1.6;margin-bottom:18px}.app-popup[data-type="err"] .app-popup-title{color:#9d0208}.app-popup[data-type="warn"] .app-popup-title{color:var(--warn)}
 @media(max-width:900px){.sales-has-sidebar .sales-wrap,.sales-wrap{margin-left:0;padding:10px}.sales-sidebar{position:static;width:auto;margin:10px;border-radius:16px}.sales-sidebar nav{grid-template-columns:1fr 1fr}.sales-header{display:block;padding:18px 16px}.sales-header h1{font-size:24px}.sales-actions{justify-content:flex-start;margin-top:12px}.login-topbar{display:block}.login-actions{min-width:0}.grid,.row,.row.two,.row.three,.list-filter-row,.customer-detail-grid{grid-template-columns:1fr}.quote-line,.invoice-line{grid-template-columns:1fr}.summary{grid-template-columns:1fr}table{min-width:760px}.pill,.secondary,button{width:100%}.section-title{display:block}.badge{margin-top:10px}.product-search-row{display:grid;grid-template-columns:1fr}.product-search-row input{max-width:none}.settings-import-panel{display:grid}.settings-import-panel button{min-width:0;width:100%}.list-scroll{max-height:320px}}
+@media(max-width:900px){.progress-list-filter{grid-template-columns:1fr}}
 
 .customer-readonly-input,input[readonly].customer-readonly-input{background:#f3f4f6;color:#4b5563;cursor:default;border-color:#d1d5db}
 .customer-readonly-note{margin:6px 0 12px;color:#4b5563}

@@ -6,7 +6,28 @@ const PROGRESS_KEYS = {
   customers: "arico_sales_customers_v1"
 };
 
-const progressSearch = { ticket: "", sales: "", unpaid: "", delivery: "" };
+const TRANSACTION_OPTIONS = ["", "通常販売", "交換", "返金", "無償提供", "その他"];
+const STATUS_OPTIONS = ["", "下書き", "請求書変換済み", "請求書発行済", "未発行", "発行済み", "入金待ち", "一部入金", "入金済み", "入金不要", "支払期限超過", "納品待ち", "発送待ち", "未納品", "納品済み"];
+
+function emptyFilters() {
+  return {
+    slip: "",
+    organization: "",
+    customer: "",
+    staff: "",
+    transaction: "",
+    status: "",
+    dateFrom: "",
+    dateTo: ""
+  };
+}
+
+const progressFilters = {
+  ticket: emptyFilters(),
+  sales: emptyFilters(),
+  unpaid: emptyFilters(),
+  delivery: emptyFilters()
+};
 const progressCollapsed = { ticket: false, sales: false, unpaid: false, delivery: false };
 
 function readJson(key) {
@@ -28,17 +49,28 @@ function escapeHtml(value) {
 }
 
 function money(value) {
-  return Number(value || 0).toLocaleString("ja-JP") + "円";
+  return `${Number(value || 0).toLocaleString("ja-JP")}円`;
 }
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeSearchText(value) {
+  return String(value ?? "").toLowerCase().replace(/[ \u3000\r\n\t-]/g, "").trim();
+}
+
+function textMatches(value, search) {
+  const needle = normalizeSearchText(search);
+  if (!needle) return true;
+  return normalizeSearchText(value).includes(needle);
+}
+
 function normalizeDateOnly(value) {
   if (!value) return "";
   const text = String(value);
   if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  if (/^\d{4}\/\d{2}\/\d{2}/.test(text)) return text.slice(0, 10).replaceAll("/", "-");
   const date = new Date(text);
   return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
 }
@@ -56,14 +88,6 @@ function normalizeTransactionType(type) {
   return value;
 }
 
-function isRefund(row) {
-  return normalizeTransactionType(row?.transactionType) === "返金" || Number(row?.total || row?.amount || 0) < 0;
-}
-
-function amountClass(value, row = {}) {
-  return Number(value || 0) < 0 || isRefund(row) ? "amount-negative refund-amount" : "";
-}
-
 function statusLabel(status, kind = "") {
   const value = String(status || "").trim();
   const lower = value.toLowerCase();
@@ -71,12 +95,13 @@ function statusLabel(status, kind = "") {
   if (lower === "draft" || value === "下書き") return kind === "delivery" || kind === "receipt" ? "未発行" : "下書き";
   if (lower === "issued" || value === "発行済み") return "発行済み";
   if (lower === "waiting_payment" || lower === "payment_waiting" || value === "入金待ち") return "入金待ち";
+  if (lower === "partial_payment" || lower === "partially_paid" || value === "一部入金") return "一部入金";
   if (lower === "paid" || value === "入金済み") return "入金済み";
   if (lower === "no_payment_required" || lower === "no_payment" || lower === "payment_not_required" || value === "入金不要") return "入金不要";
   if (lower === "cancel" || lower === "cancelled" || lower === "canceled" || value === "キャンセル") return "キャンセル";
   if (lower === "converted" || lower === "invoiced" || value === "請求書変換済み") return "請求書変換済み";
-  if (value === "請求書発行済") return "請求書発行済";
-  if (value === "未発行" || value === "納品待ち" || value === "発送待ち" || value === "未納品" || value === "納品済み") return value;
+  if (lower === "invoice_issued" || value === "請求書発行済") return "請求書発行済";
+  if (value === "未発行" || value === "納品待ち" || value === "発送待ち" || value === "未納品" || value === "納品済み" || value === "支払期限超過") return value;
   return value;
 }
 
@@ -89,6 +114,16 @@ function statusBadge(status, kind = "") {
   if (label === "キャンセル") type = "danger";
   return `<span class="status-badge ${type}">${escapeHtml(label)}</span>`;
 }
+
+function sameKey(a, b) {
+  return String(a || "").trim() && String(a || "").trim() === String(b || "").trim();
+}
+
+function readQuotes() { return readJson(PROGRESS_KEYS.quotes); }
+function readInvoices() { return readJson(PROGRESS_KEYS.invoices); }
+function readDeliveries() { return readJson(PROGRESS_KEYS.deliveries); }
+function readReceipts() { return readJson(PROGRESS_KEYS.receipts); }
+function readCustomers() { return readJson(PROGRESS_KEYS.customers); }
 
 function getOriginNumber(row, fallback = "") {
   return row?.originNumber || row?.masterNumber || row?.quoteNumber || row?.quoteNo || row?.sourceQuoteNo || fallback || "";
@@ -111,15 +146,6 @@ function sortNewest(a, b) {
     if (diff) return diff;
   }
   return extractNumber(b.sortNumber || b.origin || b.invoiceNo || b.quoteNo) - extractNumber(a.sortNumber || a.origin || a.invoiceNo || a.quoteNo);
-}
-
-function sameKey(a, b) {
-  return String(a || "").trim() && String(a || "").trim() === String(b || "").trim();
-}
-
-function readCustomers() {
-  if (window.SalesCustomerStorage?.readCustomers) return window.SalesCustomerStorage.readCustomers();
-  return readJson(PROGRESS_KEYS.customers);
 }
 
 function resolveCustomer(row) {
@@ -156,11 +182,12 @@ function getLines(row) {
 
 function lineAmount(line, transactionType) {
   if (Number.isFinite(Number(line?.amount))) return Number(line.amount || 0);
-  const qty = Number(line?.qty || 0);
-  const unitPrice = Number(line?.unitPrice || 0);
+  const qty = Number(line?.qty || line?.quantity || 0);
+  const unitPrice = Number(line?.unitPrice || line?.price || 0);
   const gross = Math.round(Math.abs(qty) * Math.abs(unitPrice));
   const rate = Math.min(100, Math.max(0, Number(line?.discountValue ?? line?.discountRate ?? 0)));
-  const fixed = Math.max(0, Number(line?.discountAmountInput || line?.fixedDiscountAmount || line?.manualDiscountAmount || 0));
+  const fixedSource = line?.discountAmount ?? line?.discountAmountInput ?? line?.fixedDiscountAmount ?? line?.manualDiscountAmount ?? 0;
+  const fixed = Math.max(0, Number(fixedSource));
   const discount = Math.min(gross, fixed > 0 ? fixed : Math.round(gross * rate / 100));
   const net = Math.max(0, gross - discount);
   return normalizeTransactionType(transactionType || line?.transactionType) === "返金" ? -net : net;
@@ -185,12 +212,6 @@ function paidAmount(invoice) {
   return getActivePayments(invoice).reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 }
 
-function latestPaymentDate(invoice) {
-  return getActivePayments(invoice)
-    .slice()
-    .sort((a, b) => String(b.paymentDate || b.createdAt || "").localeCompare(String(a.paymentDate || a.createdAt || "")))[0]?.paymentDate || "";
-}
-
 function paymentStatus(invoice) {
   if (!invoice) return "未作成";
   const invoiceStatus = statusLabel(invoice.status, "invoice");
@@ -213,15 +234,6 @@ function unpaidAmount(invoice) {
 function isPaymentOverdue(invoice) {
   const dueDate = normalizeDateOnly(invoice?.dueDate);
   return Boolean(dueDate && dueDate < today() && unpaidAmount(invoice) > 0);
-}
-
-function readQuotes() { return readJson(PROGRESS_KEYS.quotes); }
-function readInvoices() { return readJson(PROGRESS_KEYS.invoices); }
-function readDeliveries() { return readJson(PROGRESS_KEYS.deliveries); }
-function readReceipts() { return readJson(PROGRESS_KEYS.receipts); }
-
-function findByOrigin(rows, origin) {
-  return rows.find(row => getOriginNumber(row, row.deliveryNo || row.receiptNo || row.quoteNo || row.invoiceNo) === origin) || null;
 }
 
 function ensureGroup(map, origin) {
@@ -253,7 +265,9 @@ function makeProgressRow(group) {
   const receipt = latestRow(group.receipts);
   const customer = customerView(invoice, quote, delivery, receipt);
   const transactionType = normalizeTransactionType(invoice?.transactionType || quote?.transactionType || delivery?.transactionType || receipt?.transactionType);
-  const sortDate = [quote, invoice, delivery, receipt].map(row => row?.updatedAt || row?.createdAt || "").sort((a, b) => String(b).localeCompare(String(a)))[0] || "";
+  const sortDate = [quote, invoice, delivery, receipt]
+    .map(row => row?.updatedAt || row?.createdAt || "")
+    .sort((a, b) => String(b).localeCompare(String(a)))[0] || "";
   return {
     origin: group.origin,
     quote,
@@ -281,31 +295,73 @@ function buildProgressRows() {
   return buildGroups().map(makeProgressRow);
 }
 
-function isCancelledRow(row) {
-  return [row.quoteStatus, row.invoiceStatus, row.paymentStatus, row.deliveryStatus].includes("キャンセル");
+function isCancelStatus(status) {
+  return statusLabel(status) === "キャンセル";
 }
 
-function matchesSearch(row, section, extra = []) {
-  const searchText = progressSearch[section] || "";
-  if (!searchText) return true;
-  const text = [
-    row.origin,
-    row.transactionType,
-    row.organizationName,
-    row.customerName,
-    row.staff,
-    row.quoteStatus,
-    row.invoiceStatus,
-    row.paymentStatus,
-    row.deliveryStatus,
+function isCancelledRow(row) {
+  return [row.quoteStatus, row.invoiceStatus, row.paymentStatus, row.deliveryStatus].some(isCancelStatus);
+}
+
+function rowStatusValues(row, section) {
+  if (section === "sales") return [row.invoiceStatus];
+  if (section === "unpaid") return [isPaymentOverdue(row.invoice) ? "支払期限超過" : row.paymentStatus];
+  if (section === "delivery") return [row.deliveryStatus];
+  return [row.quoteStatus, row.invoiceStatus, row.paymentStatus, row.deliveryStatus];
+}
+
+function rowDateValues(row, section) {
+  if (section === "sales") {
+    return [row.invoice?.invoiceDate, row.invoice?.issuedAt, row.invoice?.updatedAt, row.invoice?.createdAt];
+  }
+  if (section === "unpaid") {
+    return [row.invoice?.invoiceDate, row.invoice?.dueDate, row.invoice?.issuedAt, row.invoice?.updatedAt, row.invoice?.createdAt];
+  }
+  if (section === "delivery") {
+    return [row.delivery?.deliveryDate, row.delivery?.issuedAt, row.delivery?.updatedAt, row.delivery?.createdAt, row.invoice?.invoiceDate];
+  }
+  return [
+    row.quote?.quoteDate,
+    row.quote?.validUntil,
+    row.quote?.updatedAt,
+    row.quote?.createdAt,
     row.invoice?.invoiceDate,
     row.invoice?.dueDate,
+    row.invoice?.issuedAt,
     row.delivery?.deliveryDate,
     row.delivery?.issuedAt,
-    row.updatedAt,
-    ...extra
-  ].join(" ").toLowerCase();
-  return text.includes(searchText);
+    row.updatedAt
+  ];
+}
+
+function matchesDateRange(row, section) {
+  const filters = progressFilters[section];
+  const from = normalizeDateOnly(filters.dateFrom);
+  const to = normalizeDateOnly(filters.dateTo);
+  if (!from && !to) return true;
+  const dates = rowDateValues(row, section).map(normalizeDateOnly).filter(Boolean);
+  if (!dates.length) return false;
+  return dates.some(date => (!from || date >= from) && (!to || date <= to));
+}
+
+function matchesFilters(row, section) {
+  const filters = progressFilters[section];
+  if (!textMatches(row.origin, filters.slip)) return false;
+  if (!textMatches(row.organizationName, filters.organization)) return false;
+  if (!textMatches(row.customerName, filters.customer)) return false;
+  if (!textMatches(row.staff, filters.staff)) return false;
+  if (filters.transaction && normalizeTransactionType(row.transactionType) !== filters.transaction) return false;
+  if (filters.status && !rowStatusValues(row, section).some(status => statusLabel(status) === filters.status)) return false;
+  if (!matchesDateRange(row, section)) return false;
+  return true;
+}
+
+function isRefund(row) {
+  return normalizeTransactionType(row?.transactionType) === "返金" || Number(row?.total || row?.amount || 0) < 0;
+}
+
+function amountClass(value, row = {}) {
+  return Number(value || 0) < 0 || isRefund(row) ? "amount-negative refund-amount" : "";
 }
 
 function pageLink(page, id, label) {
@@ -325,13 +381,14 @@ function actionLinks(row, kinds) {
 function renderRows(bodyId, countId, rows, renderer, emptyMessage, colspan) {
   const body = document.getElementById(bodyId);
   const count = document.getElementById(countId);
-  if (count) count.textContent = `${rows.length}件 / 合計 ${money(rows.reduce((sum, row) => sum + Number(row.total || 0), 0))}`;
+  const total = rows.reduce((sum, row) => sum + Number(row.total || 0), 0);
+  if (count) count.textContent = `${rows.length}件 / 合計 ${money(total)}`;
   if (!body) return;
   body.innerHTML = rows.length ? rows.map(renderer).join("") : `<tr><td colspan="${colspan}">${escapeHtml(emptyMessage)}</td></tr>`;
 }
 
 function renderTicketRows(allRows) {
-  const rows = allRows.filter(row => !isCancelledRow(row)).filter(row => matchesSearch(row, "ticket")).sort(sortNewest);
+  const rows = allRows.filter(row => !isCancelledRow(row)).filter(row => matchesFilters(row, "ticket")).sort(sortNewest);
   renderRows("ticketProgressBody", "ticketProgressCount", rows, row => `
     <tr>
       <td>${escapeHtml(row.origin)}</td>
@@ -350,7 +407,7 @@ function renderTicketRows(allRows) {
 }
 
 function renderSalesRows(allRows) {
-  const rows = allRows.filter(row => row.invoice).filter(row => !isCancelledRow(row)).filter(row => matchesSearch(row, "sales")).sort(sortNewest);
+  const rows = allRows.filter(row => row.invoice).filter(row => !isCancelledRow(row)).filter(row => matchesFilters(row, "sales")).sort(sortNewest);
   renderRows("salesProgressBody", "salesProgressCount", rows, row => `
     <tr>
       <td>${escapeHtml(row.origin)}</td>
@@ -361,7 +418,7 @@ function renderSalesRows(allRows) {
       <td>${statusBadge(row.invoiceStatus, "invoice")}</td>
       <td>${escapeHtml(row.staff)}</td>
       <td>${actionLinks(row, ["invoice"])}</td>
-    </tr>`, "売上確認対象はありません。", 8);
+    </tr>`, "請求書はありません。", 8);
 }
 
 function renderUnpaidRows(allRows) {
@@ -369,7 +426,7 @@ function renderUnpaidRows(allRows) {
     .filter(row => !["入金済み", "入金不要", "キャンセル"].includes(row.paymentStatus))
     .filter(row => row.unpaid > 0 || row.paymentStatus === "入金待ち" || row.paymentStatus === "一部入金" || isPaymentOverdue(row.invoice))
     .filter(row => !isCancelledRow(row))
-    .filter(row => matchesSearch(row, "unpaid"))
+    .filter(row => matchesFilters(row, "unpaid"))
     .sort(sortNewest);
   renderRows("unpaidProgressBody", "unpaidProgressCount", rows, row => {
     const overdue = isPaymentOverdue(row.invoice) ? " overdue-text" : "";
@@ -393,7 +450,7 @@ function renderUndeliveredRows(allRows) {
   const rows = allRows
     .filter(row => !["発行済み", "納品済み", "キャンセル"].includes(row.deliveryStatus))
     .filter(row => !isCancelledRow(row))
-    .filter(row => matchesSearch(row, "delivery"))
+    .filter(row => matchesFilters(row, "delivery"))
     .sort(sortNewest);
   renderRows("undeliveredProgressBody", "undeliveredProgressCount", rows, row => `
     <tr>
@@ -416,17 +473,63 @@ function renderProgressSections() {
   renderUndeliveredRows(rows);
 }
 
+function fillSelect(id, options, allLabel = "全て") {
+  const select = document.getElementById(id);
+  if (!select) return;
+  select.innerHTML = options.map(option => {
+    const label = option || allLabel;
+    return `<option value="${escapeHtml(option)}">${escapeHtml(label)}</option>`;
+  }).join("");
+}
+
 function bindProgressControls() {
+  ["ticket", "sales", "unpaid", "delivery"].forEach(section => {
+    fillSelect(`${section}TransactionFilter`, TRANSACTION_OPTIONS);
+    fillSelect(`${section}StatusFilter`, STATUS_OPTIONS);
+  });
+
   [
-    ["ticketProgressSearch", "ticket"],
-    ["salesProgressSearch", "sales"],
-    ["unpaidProgressSearch", "unpaid"],
-    ["deliveryProgressSearch", "delivery"]
-  ].forEach(([id, section]) => {
-    document.getElementById(id)?.addEventListener("input", event => {
-      progressSearch[section] = event.target.value.trim().toLowerCase();
+    ["ticketSlipFilter", "ticket", "slip"],
+    ["ticketOrganizationFilter", "ticket", "organization"],
+    ["ticketCustomerFilter", "ticket", "customer"],
+    ["ticketStaffFilter", "ticket", "staff"],
+    ["ticketTransactionFilter", "ticket", "transaction"],
+    ["ticketStatusFilter", "ticket", "status"],
+    ["ticketDateFromFilter", "ticket", "dateFrom"],
+    ["ticketDateToFilter", "ticket", "dateTo"],
+    ["salesSlipFilter", "sales", "slip"],
+    ["salesOrganizationFilter", "sales", "organization"],
+    ["salesCustomerFilter", "sales", "customer"],
+    ["salesStaffFilter", "sales", "staff"],
+    ["salesTransactionFilter", "sales", "transaction"],
+    ["salesStatusFilter", "sales", "status"],
+    ["salesDateFromFilter", "sales", "dateFrom"],
+    ["salesDateToFilter", "sales", "dateTo"],
+    ["unpaidSlipFilter", "unpaid", "slip"],
+    ["unpaidOrganizationFilter", "unpaid", "organization"],
+    ["unpaidCustomerFilter", "unpaid", "customer"],
+    ["unpaidStaffFilter", "unpaid", "staff"],
+    ["unpaidTransactionFilter", "unpaid", "transaction"],
+    ["unpaidStatusFilter", "unpaid", "status"],
+    ["unpaidDateFromFilter", "unpaid", "dateFrom"],
+    ["unpaidDateToFilter", "unpaid", "dateTo"],
+    ["deliverySlipFilter", "delivery", "slip"],
+    ["deliveryOrganizationFilter", "delivery", "organization"],
+    ["deliveryCustomerFilter", "delivery", "customer"],
+    ["deliveryStaffFilter", "delivery", "staff"],
+    ["deliveryTransactionFilter", "delivery", "transaction"],
+    ["deliveryStatusFilter", "delivery", "status"],
+    ["deliveryDateFromFilter", "delivery", "dateFrom"],
+    ["deliveryDateToFilter", "delivery", "dateTo"]
+  ].forEach(([id, section, key]) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    const update = event => {
+      progressFilters[section][key] = event.target.value.trim();
       renderProgressSections();
-    });
+    };
+    input.addEventListener("input", update);
+    input.addEventListener("change", update);
   });
 }
 
