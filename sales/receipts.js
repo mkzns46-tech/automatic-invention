@@ -286,9 +286,16 @@ function matchesReceiptTargetFilters(row) {
 function buildReceiptFromInvoice(invoice, receipts) {
   const payment = getLatestActivePayment(invoice) || {};
   const now = new Date().toISOString();
+  const newReceiptNo = nextReceiptNo(receipts);
+  const originNumber = invoice.originNumber || invoice.masterNumber || invoice.quoteNumber || invoice.sourceQuoteNo || "";
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
-    receiptNo: nextReceiptNo(receipts),
+    receiptNo: newReceiptNo,
+    receiptNumber: newReceiptNo,
+    originNumber,
+    masterNumber: originNumber,
+    quoteNumber: invoice.quoteNumber || invoice.sourceQuoteNo || originNumber,
+    invoiceNumber: invoice.invoiceNumber || invoice.invoiceNo || "",
     sourceInvoiceId: invoice.id || "",
     sourceInvoiceNo: invoice.invoiceNo || "",
     customerName: invoice.customerName || "",

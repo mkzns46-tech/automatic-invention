@@ -288,10 +288,10 @@ function renderPaymentInvoiceRow(invoice) {
     ? `<button type="button" class="danger" onclick="cancelPayment('${invoice.id}')">&#20837;&#37329;&#21462;&#28040;</button>`
     : "";
   return `<tr>
+    <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo || "")} ${statusBadge(status)}</span></td>
     <td>${escapeHtml(invoice.invoiceDate || "")}</td>
-    <td>${escapeHtml(paymentDate || (status === PAYMENT_STATUS_PAID ? "" : "???"))}</td>
+    <td>${escapeHtml(paymentDate || "")}</td>
     <td>${escapeHtml(invoice.dueDate || "")}</td>
-    <td>${escapeHtml(invoice.organizationName || invoice.organization || invoice.companyName || "")}</td>
     <td><span class="number-with-status">${escapeHtml(invoice.customerName || invoice.name || invoice.customer || "")} ${statusBadge(status)}</span></td>
     <td>${money(total)}</td>
     <td>${statusBadge(status)}</td>

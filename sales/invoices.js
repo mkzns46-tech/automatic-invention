@@ -80,6 +80,49 @@ function pickInvoiceCustomerFields(row) {
   };
 }
 
+function readCustomerMaster() {
+  if (window.SalesCustomerStorage?.readCustomers) {
+    return window.SalesCustomerStorage.readCustomers();
+  }
+  try {
+    return JSON.parse(localStorage.getItem("arico_sales_customers_v1") || "[]");
+  } catch (_) {
+    return [];
+  }
+}
+
+function sameCustomerKey(a, b) {
+  return String(a || "").trim() && String(a || "").trim() === String(b || "").trim();
+}
+
+function resolveInvoiceCustomer(invoice) {
+  const customers = readCustomerMaster();
+  if (!customers.length) return null;
+  return customers.find(customer =>
+    sameCustomerKey(customer.id, invoice.customerId) ||
+    sameCustomerKey(customer.customerId, invoice.customerId) ||
+    sameCustomerKey(customer.customerCode, invoice.customerCode) ||
+    sameCustomerKey(customer.code, invoice.customerCode) ||
+    sameCustomerKey(customer.smaregiCustomerId, invoice.smaregiCustomerId) ||
+    sameCustomerKey(customer.smaregiMemberId, invoice.smaregiCustomerId) ||
+    sameCustomerKey(customer.smaregiCustomerCode, invoice.smaregiCustomerCode) ||
+    sameCustomerKey(customer.smaregiMemberCode, invoice.smaregiCustomerCode)
+  ) || null;
+}
+
+function getInvoiceCustomerView(invoice) {
+  const customer = resolveInvoiceCustomer(invoice) || {};
+  return {
+    customerName: customer.customerName || customer.name || invoice.customerName || invoice.name || invoice.customer || invoice.clientName || "",
+    organizationName: customer.organizationName || customer.organization || customer.companyName || invoice.organizationName || invoice.organization || invoice.companyName || "",
+    customerType: customer.customerType || invoice.customerType || "",
+    address: customer.address || invoice.address || "",
+    phone: customer.phone || invoice.phone || "",
+    email: customer.email || invoice.email || "",
+    customerMemo: customer.memo || customer.customerMemo || invoice.customerMemo || invoice.memo || ""
+  };
+}
+
 function formatDateTime(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -146,9 +189,17 @@ function nextDeliveryNo(deliveries) {
 function buildDeliveryFromInvoice(invoice, deliveries) {
   const totals = calcInvoiceTotals(invoice);
   const now = new Date().toISOString();
+  const originNumber = invoice.originNumber || invoice.masterNumber || invoice.quoteNumber || invoice.sourceQuoteNo || "";
+  const customerView = getInvoiceCustomerView(invoice);
+  const newDeliveryNo = nextDeliveryNo(deliveries);
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
-    deliveryNo: nextDeliveryNo(deliveries),
+    deliveryNo: newDeliveryNo,
+    deliveryNumber: newDeliveryNo,
+    originNumber,
+    masterNumber: originNumber,
+    quoteNumber: invoice.quoteNumber || invoice.sourceQuoteNo || originNumber,
+    invoiceNumber: invoice.invoiceNumber || invoice.invoiceNo || "",
     sourceInvoiceId: invoice.id || "",
     sourceInvoiceNo: invoice.invoiceNo || "",
     customerId: invoice.customerId || "",
@@ -160,12 +211,12 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     createdAt: now,
     updatedAt: now,
     status: "draft",
-    customerName: invoice.customerName || invoice.name || invoice.customer || "",
-    organizationName: invoice.organizationName || invoice.organization || invoice.companyName || "",
-    customerType: invoice.customerType || "",
-    address: invoice.address || "",
-    phone: invoice.phone || "",
-    email: invoice.email || "",
+    customerName: customerView.customerName,
+    organizationName: customerView.organizationName,
+    customerType: customerView.customerType,
+    address: customerView.address,
+    phone: customerView.phone,
+    email: customerView.email,
     subject: invoice.subject || "",
     staff: invoice.staff || "",
     memo: invoice.memo || invoice.customerMemo || "",
@@ -357,11 +408,12 @@ function renderInvoiceList() {
 function renderInvoiceListRow(invoice) {
   const totals = calcInvoiceTotals(invoice);
   const status = normalizeInvoiceStatus(invoice.status);
+  const customerView = getInvoiceCustomerView(invoice);
   return `<tr>
     <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo)} ${statusBadge(status)}</span></td>
     <td>${escapeHtml(invoice.invoiceDate || "")}</td>
-    <td>${escapeHtml(invoice.organizationName || invoice.organization || invoice.companyName || "")}</td>
-    <td>${escapeHtml(invoice.customerName || invoice.name || invoice.customer || "")}</td>
+    <td>${escapeHtml(customerView.organizationName)}</td>
+    <td>${escapeHtml(customerView.customerName)}</td>
     <td>${money(totals.total)}</td>
     <td>${statusBadge(status)}</td>
     <td>${escapeHtml(invoice.staff || "")}</td>
@@ -374,13 +426,15 @@ function renderInvoiceListRow(invoice) {
 
 function matchesInvoiceListFilters(invoice) {
   const status = normalizeInvoiceStatus(invoice.status);
+  const customerView = getInvoiceCustomerView(invoice);
   if (invoiceListStatusFilter && status !== invoiceListStatusFilter) return false;
   if (!matchesDateRange([invoice.invoiceDate, invoice.issuedAt, invoice.dueDate], invoiceListDateFrom, invoiceListDateTo)) return false;
   if (!invoiceListSearchText) return true;
   const text = [
     invoice.invoiceNo,
     invoice.sourceQuoteNo,
-    invoice.customerName,
+    customerView.customerName,
+    customerView.organizationName,
     invoice.staff,
     invoice.subject,
     status,
@@ -428,9 +482,15 @@ function clearInvoiceEditor() {
 }
 
 function fillInvoiceForm(invoice) {
-  invoice.customerName = invoice.customerName || invoice.name || invoice.customer || invoice.clientName || "";
-  console.log("render invoice customer fields", pickInvoiceCustomerFields(invoice));
-  invoice.organizationName = invoice.organizationName || invoice.organization || invoice.companyName || "";
+  const customerView = getInvoiceCustomerView(invoice);
+  console.log("render invoice customer fields", {
+    ...pickInvoiceCustomerFields(invoice),
+    resolvedCustomerName: customerView.customerName,
+    resolvedOrganizationName: customerView.organizationName,
+    resolvedAddress: customerView.address,
+    resolvedPhone: customerView.phone,
+    resolvedEmail: customerView.email
+  });
   invoice.items = invoice.items || invoice.lines || [];
   invoice.lines = invoice.lines || invoice.items || [];
   currentInvoiceId = invoice.id || null;
@@ -443,13 +503,13 @@ function fillInvoiceForm(invoice) {
   setFieldValue("salesSmaregiCustomerId", invoice.smaregiCustomerId || "");
   setFieldValue("salesSmaregiCustomerCode", invoice.smaregiCustomerCode || "");
   document.getElementById("issuedAt").value = formatDateTime(invoice.issuedAt);
-  document.getElementById("customerName").value = invoice.customerName || "";
-  setFieldValue("invoiceOrganizationName", invoice.organizationName || "");
-  document.getElementById("customerType").value = invoice.customerType || "";
+  document.getElementById("customerName").value = customerView.customerName;
+  setFieldValue("invoiceOrganizationName", customerView.organizationName);
+  document.getElementById("customerType").value = customerView.customerType;
   document.getElementById("invoiceStaff").value = invoice.staff || "";
-  document.getElementById("customerAddress").value = invoice.address || "";
-  document.getElementById("customerPhone").value = invoice.phone || "";
-  document.getElementById("customerEmail").value = invoice.email || "";
+  document.getElementById("customerAddress").value = customerView.address;
+  document.getElementById("customerPhone").value = customerView.phone;
+  document.getElementById("customerEmail").value = customerView.email;
   document.getElementById("invoiceSubject").value = invoice.subject || "";
   document.getElementById("invoiceDate").value = invoice.invoiceDate || today();
   document.getElementById("dueDate").value = invoice.dueDate || today();
@@ -597,10 +657,16 @@ function recalcTotals() {
 function collectInvoice() {
   const invoices = readInvoices();
   const existing = currentInvoiceId ? invoices.find(invoice => invoice.id === currentInvoiceId) : null;
+  const originNumber = existing?.originNumber || existing?.masterNumber || existing?.quoteNumber || existing?.sourceQuoteNo || "";
+  const customerView = getInvoiceCustomerView(existing || {});
   return {
     ...(existing || {}),
     id: currentInvoiceId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
     invoiceNo: document.getElementById("invoiceNo").value || existing?.invoiceNo || "",
+    invoiceNumber: document.getElementById("invoiceNo").value || existing?.invoiceNumber || existing?.invoiceNo || "",
+    originNumber,
+    masterNumber: originNumber,
+    quoteNumber: existing?.quoteNumber || existing?.sourceQuoteNo || originNumber,
     sourceQuoteId: existing?.sourceQuoteId || "",
     sourceQuoteNo: document.getElementById("sourceQuoteNo").value || existing?.sourceQuoteNo || "",
     customerId: document.getElementById("salesCustomerId")?.value || existing?.customerId || "",
@@ -611,12 +677,12 @@ function collectInvoice() {
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     status: normalizeInvoiceStatus(document.getElementById("invoiceStatus").value),
-    customerName: document.getElementById("customerName").value.trim() || existing?.customerName || existing?.name || existing?.customer || "",
-    organizationName: document.getElementById("invoiceOrganizationName")?.value.trim() || existing?.organizationName || existing?.organization || existing?.companyName || "",
-    customerType: document.getElementById("customerType").value.trim() || existing?.customerType || "",
-    address: document.getElementById("customerAddress").value.trim() || existing?.address || "",
-    phone: document.getElementById("customerPhone").value.trim() || existing?.phone || "",
-    email: document.getElementById("customerEmail").value.trim() || existing?.email || "",
+    customerName: customerView.customerName,
+    organizationName: customerView.organizationName,
+    customerType: customerView.customerType,
+    address: customerView.address,
+    phone: customerView.phone,
+    email: customerView.email,
     subject: document.getElementById("invoiceSubject").value.trim(),
     invoiceDate: document.getElementById("invoiceDate").value,
     dueDate: document.getElementById("dueDate").value,

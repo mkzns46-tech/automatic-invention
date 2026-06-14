@@ -581,11 +581,15 @@ function buildInvoiceFromQuote(quote, invoices) {
   const lines = quote.lines || quote.items || [];
   const linkedCustomer = resolveQuoteCustomer(quote) || {};
   console.log("convert quote customer fields", pickCustomerFields(quote));
-  const customerName = quote.customerName || quote.name || quote.customer || quote.clientName || linkedCustomer.customerName || linkedCustomer.name || "";
-  const organizationName = quote.organizationName || quote.organization || quote.companyName || linkedCustomer.organizationName || linkedCustomer.organization || linkedCustomer.companyName || "";
+  const originNumber = quote.originNumber || quote.masterNumber || quote.quoteNumber || quote.quoteNo || "";
+  const newInvoiceNo = nextInvoiceNo(invoices);
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
-    invoiceNo: nextInvoiceNo(invoices),
+    invoiceNo: newInvoiceNo,
+    invoiceNumber: newInvoiceNo,
+    originNumber,
+    masterNumber: originNumber,
+    quoteNumber: quote.quoteNumber || quote.quoteNo || originNumber,
     sourceQuoteId: quote.id,
     sourceQuoteNo: quote.quoteNo || "",
     customerId: quote.customerId || linkedCustomer.id || "",
@@ -595,12 +599,12 @@ function buildInvoiceFromQuote(quote, invoices) {
     createdAt: now,
     updatedAt: now,
     status: "draft",
-    customerName,
-    organizationName,
-    customerType: quote.customerType || linkedCustomer.customerType || "",
-    address: quote.address || linkedCustomer.address || "",
-    phone: quote.phone || linkedCustomer.phone || "",
-    email: quote.email || linkedCustomer.email || "",
+    customerName: "",
+    organizationName: "",
+    customerType: "",
+    address: "",
+    phone: "",
+    email: "",
     subject: quote.subject || "",
     invoiceDate: today(),
     dueDate: today(),
@@ -789,9 +793,14 @@ function recalcTotals() {
 function collectQuote() {
   const quotes = readQuotes();
   const existing = currentQuoteId ? quotes.find(q => q.id === currentQuoteId) : null;
+  const quoteNo = existing?.quoteNo || nextQuoteNo(quotes);
+  const originNumber = existing?.originNumber || existing?.masterNumber || existing?.quoteNumber || quoteNo;
   return {
     id: currentQuoteId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
-    quoteNo: existing?.quoteNo || nextQuoteNo(quotes),
+    quoteNo,
+    quoteNumber: existing?.quoteNumber || quoteNo,
+    originNumber,
+    masterNumber: originNumber,
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     customerId: document.getElementById("salesCustomerId")?.value || existing?.customerId || "",
