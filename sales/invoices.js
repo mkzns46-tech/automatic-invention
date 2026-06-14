@@ -1,7 +1,7 @@
 const INVOICES_KEY = "arico_sales_invoices_v1";
 const DELIVERIES_KEY = "arico_sales_deliveries_v1";
 const QUOTES_KEY = "arico_sales_quotes_v1";
-const ARICO_SUPABASE_URL = "https://ciciykfuwxawszujdohq.supabase.co";
+const ARICO_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
 const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 const INVOICE_STATUS_OPTIONS = ["下書き", "発行済み", "入金待ち", "入金済み", "入金不要", "キャンセル"];
 const INVOICE_STATUS_DRAFT = "下書き";
@@ -57,18 +57,24 @@ function writeLinkedQuotes(quotes) {
 }
 
 async function salesRestFetch(path, options = {}) {
-  const response = await fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: ARICO_SUPABASE_API_KEY,
-      Authorization: `Bearer ${ARICO_SUPABASE_API_KEY}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
-  });
+  const url = `${ARICO_SUPABASE_URL}/rest/v1/${path}`;
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        apikey: ARICO_SUPABASE_API_KEY,
+        Authorization: `Bearer ${ARICO_SUPABASE_API_KEY}`,
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
+    });
+  } catch (error) {
+    throw new Error(`Supabase fetch failed: ${url}: ${error?.message || error}`);
+  }
   const text = await response.text().catch(() => "");
   if (!response.ok) {
-    throw new Error(`Supabase API ${response.status}: ${text.slice(0, 500)}`);
+    throw new Error(`Supabase API ${response.status}: ${url}: ${text.slice(0, 500)}`);
   }
   return text ? JSON.parse(text) : null;
 }
@@ -547,23 +553,27 @@ async function findProductForStockLine(line) {
 }
 
 async function syncProductsBaseStock(lines) {
-  const results = [];
-  for (const line of lines) {
-    const found = await findProductForStockLine(line);
-    if (!found) {
-      results.push({ ...line, ok: false, error: "products row not found" });
-      continue;
-    }
-    const before = Number(found.row.base_stock || 0);
-    const after = Math.max(0, before - Number(line.quantity || 0));
-    await salesRestFetch(`products?${found.filter}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ base_stock: after })
-    });
-    results.push({ ...line, ok: true, before, after });
+  const response = await fetch("/api/products-base-stock-sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lines })
+  });
+  const text = await response.text().catch(() => "");
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (_) {
+    throw new Error(`products.base_stock sync JSON parse failed HTTP ${response.status}: ${text.slice(0, 500)}`);
   }
-  return results;
+  console.log("[products.base_stock sync response]", {
+    ok: response.ok,
+    status: response.status,
+    body: data || text
+  });
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || `products.base_stock sync API error HTTP ${response.status}: ${text.slice(0, 500)}`);
+  }
+  return Array.isArray(data?.results) ? data.results : [];
 }
 
 async function applyInvoiceStockDeduction(invoice) {
