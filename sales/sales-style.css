@@ -14,6 +14,7 @@ a{color:inherit}.sales-wrap{max-width:1280px;margin:0 auto;padding:18px}
 .pill.active,.primary,button.primary{background:var(--main);border-color:var(--main);color:#fff}
 button{border:none;border-radius:14px;background:var(--main);color:#fff;font-weight:900;cursor:pointer;min-height:48px;padding:10px 16px}
 button:hover{background:var(--main-dark)}button.secondary{background:#dcebe1;color:var(--main-dark);border:1px solid #b7d7c4}button.secondary:hover{background:#c6dfcf}button.danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}button.danger:hover{background:#fecaca}
+button.next-step-button{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd}button.next-step-button:hover{background:#bfdbfe;color:#1e40af}
 .card{background:#fff;border:1px solid #dcebe1;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 6px 22px rgba(27,67,50,.05);overflow:hidden}
 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}.menu-card{min-height:170px;text-decoration:none;background:#fbfffc;padding:26px;box-shadow:0 10px 28px rgba(27,67,50,.04)}.menu-card h3{margin:0 0 14px;color:#073b2d;font-size:24px}.menu-card p{margin:0;color:#456b59;font-weight:800;line-height:1.6}.disabled{opacity:.58}
 h2{margin:0 0 14px;font-size:21px;color:var(--main-dark)}h3{color:var(--main-dark)}

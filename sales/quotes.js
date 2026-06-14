@@ -362,11 +362,14 @@ function applyCustomerToQuote(customer) {
   setFieldValue("salesCustomerCode", customer.customerCode);
   setFieldValue("salesSmaregiCustomerId", customer.smaregiMemberId);
   setFieldValue("salesSmaregiCustomerCode", customer.smaregiMemberCode);
-  setFieldValue("customerName", customer.customerName);
+  setFieldValue("customerName", customer.customerName || customer.name);
+  setFieldValue("quoteOrganizationName", customer.organizationName);
   setFieldValue("customerType", customer.customerType || "個人");
   setFieldValue("customerAddress", customer.address);
   setFieldValue("customerPhone", customer.phone);
   setFieldValue("customerEmail", customer.email);
+  const orgInput = document.getElementById("quoteOrganizationName");
+  if (orgInput) orgInput.value = customer.organizationName || "";
   const memo = document.getElementById("quoteMemo");
   if (memo && customer.memo && !memo.value) memo.value = customer.memo;
 }
@@ -457,7 +460,7 @@ function renderQuoteList() {
 
 function renderQuoteListRow(q) {
   const deleteButton = canDeleteQuote(q)
-    ? `<button type="button" class="danger" onclick="deleteQuote('${q.id}')">見積削除</button>`
+    ? `<button type="button" class="danger" onclick="deleteQuote('${q.id}')">&#21066;&#38500;</button>`
     : "";
   return `<tr>
     <td><span class="number-with-status">${escapeHtml(q.quoteNo)} ${quoteStatusBadge(q.status)}</span></td>
@@ -468,10 +471,10 @@ function renderQuoteListRow(q) {
     <td>${quoteStatusBadge(q.status)}</td>
     <td>${escapeHtml(q.staff || "")}</td>
     <td>
-      <button type="button" class="secondary" onclick="editQuote('${q.id}')">編集</button>
-      <button type="button" class="secondary" onclick="printQuoteById('${q.id}')">PDF出力</button>
-      <button type="button" class="secondary" onclick="duplicateQuote('${q.id}')">複製</button>
-      <button type="button" class="secondary" onclick="convertQuoteToInvoice('${q.id}')">請求書へ変換</button>
+      <button type="button" class="secondary" onclick="editQuote('${q.id}')">&#32232;&#38598;</button>
+      <button type="button" class="secondary" onclick="printQuoteById('${q.id}')">PDF&#20986;&#21147;</button>
+      <button type="button" class="secondary" onclick="duplicateQuote('${q.id}')">&#35079;&#35069;</button>
+      <button type="button" class="secondary next-step-button" onclick="convertQuoteToInvoice('${q.id}')">&#35531;&#27714;&#26360;&#12408;&#22793;&#25563;</button>
       ${deleteButton}
     </td>
   </tr>`;
@@ -514,6 +517,8 @@ function matchesDateRange(values, from, to) {
 
 function buildInvoiceFromQuote(quote, invoices) {
   const now = new Date().toISOString();
+  const lines = quote.lines || quote.items || [];
+  const customerName = quote.customerName || quote.name || "";
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     invoiceNo: nextInvoiceNo(invoices),
@@ -525,8 +530,9 @@ function buildInvoiceFromQuote(quote, invoices) {
     smaregiCustomerCode: quote.smaregiCustomerCode || "",
     createdAt: now,
     updatedAt: now,
-    status: "下書き",
-    customerName: quote.customerName || "",
+    status: "draft",
+    customerName,
+    organizationName: quote.organizationName || "",
     customerType: quote.customerType || "",
     address: quote.address || "",
     phone: quote.phone || "",
@@ -535,9 +541,11 @@ function buildInvoiceFromQuote(quote, invoices) {
     invoiceDate: today(),
     dueDate: today(),
     staff: quote.staff || "",
-    memo: quote.memo || "",
+    memo: quote.memo || quote.customerMemo || "",
+    customerMemo: quote.customerMemo || quote.memo || "",
     discountTemplate: quote.discountTemplate || "none",
-    lines: JSON.parse(JSON.stringify(quote.lines || []))
+    items: JSON.parse(JSON.stringify(lines)),
+    lines: JSON.parse(JSON.stringify(lines))
   };
 }
 
@@ -725,6 +733,7 @@ function collectQuote() {
     smaregiCustomerCode: document.getElementById("salesSmaregiCustomerCode")?.value || existing?.smaregiCustomerCode || "",
     status: existing?.status || "下書き",
     customerName: document.getElementById("customerName").value.trim(),
+    organizationName: document.getElementById("quoteOrganizationName")?.value?.trim() || "",
     customerType: document.getElementById("customerType").value,
     address: document.getElementById("customerAddress").value.trim(),
     phone: document.getElementById("customerPhone").value.trim(),
@@ -734,35 +743,40 @@ function collectQuote() {
     validUntil: document.getElementById("validUntil").value,
     staff: document.getElementById("quoteStaff").value,
     memo: document.getElementById("quoteMemo").value,
+    customerMemo: document.getElementById("quoteMemo").value,
     discountTemplate: document.getElementById("discountTemplate").value,
     lines: currentLines.map(({ stock, ...line }) => ({ ...line }))
   };
 }
 
 async function saveQuote() {
-  if (!document.getElementById("customerName").value.trim()) {
-    showSalesMessage("顧客名を入力してください。", "err");
+  if (!document.getElementById("salesCustomerId")?.value) {
+    showSalesMessage("\u9867\u5ba2\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044", "err");
+    showSalesPopup("\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093", "\u9867\u5ba2\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044", "warn");
     return;
   }
   if (!currentLines.length) {
-    showSalesMessage("見積商品を追加してください。", "err");
+    showSalesMessage("\u898b\u7a4d\u5546\u54c1\u3092\u8ffd\u52a0\u3057\u3066\u304f\u3060\u3055\u3044\u3002", "err");
     return;
   }
   try {
     await refreshQuoteLineStocks();
   } catch (_) {
-    showSalesMessage("最新在庫の再確認に失敗しました。見積は保存できますが、現在庫表示を確認してください。", "warn");
+    showSalesMessage("\u6700\u65b0\u5728\u5eab\u306e\u518d\u78ba\u8a8d\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\u898b\u7a4d\u306f\u4fdd\u5b58\u3067\u304d\u307e\u3059\u304c\u3001\u73fe\u5728\u5eab\u8868\u793a\u3092\u78ba\u8a8d\u3057\u3066\u304f\u3060\u3055\u3044\u3002", "warn");
   }
   const quote = collectQuote();
   const quotes = readQuotes();
   const index = quotes.findIndex(q => q.id === quote.id);
+  const isNewQuote = index < 0;
   if (index >= 0) quotes[index] = quote;
   else quotes.push(quote);
   writeQuotes(quotes);
   currentQuoteId = quote.id;
   renderQuoteList();
   updateQuoteDeleteButton(quote);
-  showSalesMessage("見積書を保存しました。", "ok");
+  const savedMessage = isNewQuote ? "\u898b\u7a4d\u66f8\u3092\u4fdd\u5b58\u3057\u307e\u3057\u305f" : "\u898b\u7a4d\u66f8\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f";
+  showSalesMessage(savedMessage, "ok");
+  showSalesPopup("\u4fdd\u5b58\u5b8c\u4e86", savedMessage, "ok");
 }
 
 function updateQuoteDeleteButton(quote) {
@@ -783,7 +797,8 @@ async function fillQuoteForm(quote) {
   setFieldValue("quoteCustomerSearchInput", "");
   const customerResults = document.getElementById("quoteCustomerSearchResults");
   if (customerResults) customerResults.innerHTML = "";
-  document.getElementById("customerName").value = quote.customerName || "";
+  document.getElementById("customerName").value = quote.customerName || quote.name || "";
+  setFieldValue("quoteOrganizationName", quote.organizationName || "");
   document.getElementById("customerType").value = quote.customerType || "個人";
   document.getElementById("customerAddress").value = quote.address || "";
   document.getElementById("customerPhone").value = quote.phone || "";

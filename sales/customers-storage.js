@@ -78,6 +78,7 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
       id: makeCustomerId(),
       customerCode: nextCustomerCode(customers),
       customerName: String(data.customerName || "").trim(),
+      organizationName: String(data.organizationName || "").trim(),
       kana: String(data.kana || "").trim(),
       customerType: normalizeCustomerType(data.customerType),
       staff: String(data.staff || "").trim(),
@@ -117,6 +118,7 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
       id: makeCustomerId(),
       customerCode,
       customerName: String(incoming.customerName || "").trim(),
+      organizationName: String(incoming.organizationName || "").trim(),
       kana: String(incoming.kana || "").trim(),
       customerType: "個人",
       staff: "",
@@ -141,6 +143,7 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
     return {
       ...existing,
       customerName: String(incoming.customerName || existing.customerName || "").trim(),
+      organizationName: String(incoming.organizationName || existing.organizationName || "").trim(),
       kana: String(incoming.kana || existing.kana || "").trim(),
       customerType: normalizeCustomerType(existing.customerType),
       postalCode: String(incoming.postalCode || existing.postalCode || "").trim() || inferPostalCodeFromAddress(incoming.address || existing.address).postalCode,

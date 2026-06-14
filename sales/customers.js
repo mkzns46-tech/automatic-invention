@@ -123,7 +123,7 @@ function renderCustomerList() {
     <td>${escapeHtml(customer.smaregiMemberCode)}</td>
     <td>${escapeHtml(customer.staff)}</td>
     <td>${escapeHtml(formatDate(customer.updatedAt))}</td>
-    <td><button type="button" class="secondary" onclick="editCustomer('${escapeHtml(customer.id)}');">編集</button></td>
+    <td><button type="button" class="secondary" onclick="editCustomer('${escapeHtml(customer.id)}');">&#32232;&#38598;</button> ${canDeleteCustomer(customer) ? `<button type="button" class="danger" onclick="deleteCustomer('${escapeHtml(customer.id)}');">&#21066;&#38500;</button>` : ""}</td>
   </tr>`).join("") : '<tr><td colspan="9">顧客データはありません。</td></tr>';
 }
 
@@ -140,6 +140,58 @@ function startNewCustomerRegistration() {
   document.getElementById("customerEditCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function readCustomerQuotes() {
+  try {
+    const rows = JSON.parse(localStorage.getItem("arico_sales_quotes_v1") || "[]");
+    return Array.isArray(rows) ? rows : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function readCustomerInvoices() {
+  try {
+    const rows = JSON.parse(localStorage.getItem("arico_sales_invoices_v1") || "[]");
+    return Array.isArray(rows) ? rows : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function customerUsageKeys(customer) {
+  return [
+    customer.id,
+    customer.customerCode,
+    customer.smaregiMemberId,
+    customer.smaregiMemberCode,
+    customer.smaregiCustomerId,
+    customer.smaregiCustomerCode
+  ].map(value => String(value || "").trim()).filter(Boolean);
+}
+
+function isCustomerUsed(customer) {
+  const keys = new Set(customerUsageKeys(customer));
+  const usedBy = row => [
+    row.customerId,
+    row.customerCode,
+    row.smaregiCustomerId,
+    row.smaregiCustomerCode
+  ].some(value => keys.has(String(value || "").trim()));
+  return readCustomerQuotes().some(usedBy) || readCustomerInvoices().some(usedBy);
+}
+
+function canDeleteCustomer(customer) {
+  return customer && !isCustomerUsed(customer);
+}
+
+function updateCustomerDeleteButton(customer) {
+  const button = document.getElementById("deleteCustomerButton");
+  if (!button) return;
+  const show = Boolean(customer?.id);
+  button.hidden = !show;
+  button.disabled = show && !canDeleteCustomer(customer);
+}
+
 function showCustomerDetail(id) {
   const customer = customerStorage().readCustomers().find(row => row.id === id);
   const card = document.getElementById("customerDetailCard");
@@ -149,6 +201,7 @@ function showCustomerDetail(id) {
     <div><span>&#39015;&#23458;&#12467;&#12540;&#12489;</span><strong>${escapeHtml(customer.customerCode)}</strong></div>
     <div><span>&#39015;&#23458;&#21517;</span><strong>${escapeHtml(customer.customerName)}</strong></div>
     <div><span>&#39015;&#23458;&#21306;&#20998;</span><strong>${escapeHtml(customer.customerType)}</strong></div>
+    <div><span>&#22243;&#20307;&#21517;</span><strong>${escapeHtml(customer.organizationName)}</strong></div>
     <div><span>&#21516;&#26399;&#29366;&#24907;</span><strong>${customerSyncBadge(customer)}</strong></div>
     <div><span>&#38651;&#35441;&#30058;&#21495;</span><strong>${escapeHtml(customer.phone)}</strong></div>
     <div><span>&#12513;&#12540;&#12523;&#12450;&#12489;&#12524;&#12473;</span><strong>${escapeHtml(customer.email)}</strong></div>
@@ -248,6 +301,7 @@ function editCustomer(id) {
   setValue("smaregiMemberId", customer.smaregiMemberId);
   setValue("smaregiMemberCode", customer.smaregiMemberCode);
   setValue("customerName", customer.customerName);
+  setValue("customerOrganizationName", customer.organizationName);
   setValue("customerKana", customer.kana);
   setValue("customerType", customerStorage().normalizeCustomerType(customer.customerType));
   setValue("customerStaff", customer.staff);
@@ -256,6 +310,7 @@ function editCustomer(id) {
   setValue("customerAddress", customer.address);
   setValue("customerEmail", customer.email);
   setValue("customerMemo", customer.memo);
+  updateCustomerDeleteButton(customer);
   document.getElementById("customerEditCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -266,6 +321,7 @@ function clearCustomerForm() {
     "smaregiMemberId",
     "smaregiMemberCode",
     "customerName",
+    "customerOrganizationName",
     "customerKana",
     "customerStaff",
     "customerPostalCode",
@@ -300,6 +356,7 @@ function saveCustomer() {
     smaregiCustomerId: getValue("smaregiMemberId"),
     smaregiCustomerCode: getValue("smaregiMemberCode"),
     customerName: getValue("customerName"),
+    organizationName: getValue("customerOrganizationName"),
     kana: getValue("customerKana"),
     customerType: customerStorage().normalizeCustomerType(getValue("customerType")),
     staff: getValue("customerStaff"),
@@ -321,9 +378,69 @@ function saveCustomer() {
   setValue("customerId", customer.id);
   setValue("customerCode", customer.customerCode);
   setCustomerFormMode("edit");
+  updateCustomerDeleteButton(customer);
   renderCustomerList();
   showCustomerMessage("顧客情報を保存しました。", "ok");
   showSalesPopup("保存完了", "顧客情報を保存しました。", "ok");
+}
+
+async function deleteCurrentCustomer() {
+  const id = getValue("customerId");
+  if (id) await deleteCustomer(id);
+}
+
+async function deleteCustomer(id) {
+  const customers = customerStorage().readCustomers();
+  const customer = customers.find(row => row.id === id);
+  if (!customer) return;
+  if (!canDeleteCustomer(customer)) {
+    showSalesPopup("\u524a\u9664\u3067\u304d\u307e\u305b\u3093", "\u898b\u7a4d\u66f8\u30fb\u8acb\u6c42\u66f8\u3067\u4f7f\u7528\u6e08\u307f\u306e\u9867\u5ba2\u306f\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002", "warn");
+    return;
+  }
+  const ok = await confirmCustomerPopup("\u9867\u5ba2\u524a\u9664", "\u3053\u306e\u9867\u5ba2\u3092\u524a\u9664\u3057\u307e\u3059\u304b\uff1f", "warn");
+  if (!ok) return;
+  customerStorage().writeCustomers(customers.filter(row => row.id !== id));
+  clearCustomerForm();
+  renderCustomerList();
+  showSalesPopup("\u524a\u9664\u5b8c\u4e86", "\u9867\u5ba2\u3092\u524a\u9664\u3057\u307e\u3057\u305f", "ok");
+}
+
+function confirmCustomerPopup(title, body, type = "warn") {
+  const popup = document.getElementById("salesPopup");
+  const titleEl = document.getElementById("salesPopupTitle");
+  const bodyEl = document.getElementById("salesPopupBody");
+  const okButton = popup?.querySelector("button");
+  if (!popup || !titleEl || !bodyEl || !okButton) {
+    return Promise.resolve(confirm(body || title || ""));
+  }
+  let cancelButton = document.getElementById("salesPopupCancel");
+  if (!cancelButton) {
+    cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.id = "salesPopupCancel";
+    cancelButton.className = "secondary";
+    okButton.insertAdjacentElement("afterend", cancelButton);
+  }
+  return new Promise(resolve => {
+    popup.dataset.type = type;
+    titleEl.textContent = title;
+    bodyEl.textContent = body;
+    popup.classList.remove("hidden");
+    okButton.textContent = "OK";
+    cancelButton.textContent = "\u30ad\u30e3\u30f3\u30bb\u30eb";
+    cancelButton.style.display = "";
+    const close = result => {
+      popup.classList.add("hidden");
+      cancelButton.style.display = "none";
+      okButton.textContent = "OK";
+      okButton.onclick = null;
+      cancelButton.onclick = null;
+      resolve(result);
+    };
+    okButton.onclick = () => close(true);
+    cancelButton.onclick = () => close(false);
+    playSalesNotifySound(type);
+  });
 }
 
 function makeCustomerId() {

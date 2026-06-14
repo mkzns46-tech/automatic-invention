@@ -98,27 +98,29 @@
     </div>
     <input id="customerId" type="hidden">
     <div class="row three">
-      <label>顧客コード<input id="customerCode" readonly></label>
-      <label>スマレジ会員ID<input id="smaregiMemberId" readonly></label>
-      <label>スマレジ会員コード<input id="smaregiMemberCode" readonly></label>
+      <label>&#39015;&#23458;&#12467;&#12540;&#12489;<input id="customerCode" readonly></label>
+      <label>&#12473;&#12510;&#12524;&#12472;&#20250;&#21729;ID<input id="smaregiMemberId" readonly></label>
+      <label>&#12473;&#12510;&#12524;&#12472;&#20250;&#21729;&#12467;&#12540;&#12489;<input id="smaregiMemberCode" readonly></label>
     </div>
     <div class="row three">
       <label>&#39015;&#23458;&#21517; <span class="required-badge">&#24517;&#38920;</span><input id="customerName"></label>
-      <label>カナ<input id="customerKana"></label>
-      <label>顧客区分<select id="customerType"></select></label>
+      <label>&#22243;&#20307;&#21517;<input id="customerOrganizationName"></label>
+      <label>&#12459;&#12490;<input id="customerKana"></label>
+      <label>&#39015;&#23458;&#21306;&#20998;<select id="customerType"></select></label>
     </div>
     <div class="row three">
-      <label>担当者<input id="customerStaff"></label>
-      <label>郵便番号<input id="customerPostalCode"></label>
-      <label>電話番号<input id="customerPhone"></label>
+      <label>&#25285;&#24403;&#32773;<input id="customerStaff"></label>
+      <label>&#37109;&#20415;&#30058;&#21495;<input id="customerPostalCode"></label>
+      <label>&#38651;&#35441;&#30058;&#21495;<input id="customerPhone"></label>
     </div>
     <div class="row two">
-      <label>住所<input id="customerAddress"></label>
-      <label>メールアドレス<input id="customerEmail" type="email"></label>
+      <label>&#20303;&#25152;<input id="customerAddress"></label>
+      <label>&#12513;&#12540;&#12523;&#12450;&#12489;&#12524;&#12473;<input id="customerEmail" type="email"></label>
     </div>
-    <label>備考<textarea id="customerMemo"></textarea></label>
+    <label>&#20633;&#32771;<textarea id="customerMemo"></textarea></label>
     <div class="sales-actions">
       <button type="button" id="customerSaveButton" onclick="saveCustomer();">&#20445;&#23384;</button>
+      <button type="button" class="danger" id="deleteCustomerButton" onclick="deleteCurrentCustomer();" hidden>&#21066;&#38500;</button>
     </div>
   </section>
 </main>

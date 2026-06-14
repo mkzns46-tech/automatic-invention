@@ -144,15 +144,18 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     createdAt: now,
     updatedAt: now,
     status: "draft",
-    customerName: invoice.customerName || "",
+    customerName: invoice.customerName || invoice.name || "",
+    organizationName: invoice.organizationName || "",
     customerType: invoice.customerType || "",
     address: invoice.address || "",
     phone: invoice.phone || "",
     email: invoice.email || "",
     subject: invoice.subject || "",
     staff: invoice.staff || "",
-    memo: invoice.memo || "",
-    lines: JSON.parse(JSON.stringify(invoice.lines || [])),
+    memo: invoice.memo || invoice.customerMemo || "",
+    customerMemo: invoice.customerMemo || invoice.memo || "",
+    items: JSON.parse(JSON.stringify(invoice.lines || invoice.items || [])),
+    lines: JSON.parse(JSON.stringify(invoice.lines || invoice.items || [])),
     subtotal: totals.subtotal,
     discount: totals.discount,
     total: totals.total,
@@ -410,7 +413,7 @@ function clearInvoiceEditor() {
 
 function fillInvoiceForm(invoice) {
   currentInvoiceId = invoice.id || null;
-  currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || []));
+  currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || invoice.items || []));
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
   document.getElementById("invoiceStatus").value = normalizeInvoiceStatus(invoice.status);
   document.getElementById("sourceQuoteNo").value = invoice.sourceQuoteNo || "";
@@ -419,7 +422,7 @@ function fillInvoiceForm(invoice) {
   setFieldValue("salesSmaregiCustomerId", invoice.smaregiCustomerId || "");
   setFieldValue("salesSmaregiCustomerCode", invoice.smaregiCustomerCode || "");
   document.getElementById("issuedAt").value = formatDateTime(invoice.issuedAt);
-  document.getElementById("customerName").value = invoice.customerName || "";
+  document.getElementById("customerName").value = invoice.customerName || invoice.name || "";
   document.getElementById("customerType").value = invoice.customerType || "";
   document.getElementById("invoiceStaff").value = invoice.staff || "";
   document.getElementById("customerAddress").value = invoice.address || "";
@@ -575,6 +578,7 @@ function collectInvoice() {
     updatedAt: new Date().toISOString(),
     status: normalizeInvoiceStatus(document.getElementById("invoiceStatus").value),
     customerName: document.getElementById("customerName").value.trim(),
+    organizationName: existing?.organizationName || "",
     customerType: document.getElementById("customerType").value.trim(),
     address: document.getElementById("customerAddress").value.trim(),
     phone: document.getElementById("customerPhone").value.trim(),
@@ -584,6 +588,8 @@ function collectInvoice() {
     dueDate: document.getElementById("dueDate").value,
     staff: document.getElementById("invoiceStaff").value.trim(),
     memo: document.getElementById("invoiceMemo").value,
+    customerMemo: existing?.customerMemo || document.getElementById("invoiceMemo").value,
+    items: currentInvoiceLines.map(line => ({ ...line })),
     lines: currentInvoiceLines.map(line => ({ ...line }))
   };
 }

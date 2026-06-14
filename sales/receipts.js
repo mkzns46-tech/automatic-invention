@@ -331,7 +331,7 @@ function createReceiptFromInvoice(invoiceId) {
 
 function clearReceiptDetail() {
   currentReceiptId = null;
-  ["receiptNo", "sourceInvoiceNo", "receiptStatus", "receiptCustomerName", "receiptSubject", "receiptStaff", "receiptPaymentDate", "receiptAmount", "receiptMethod", "receiptPayerName", "receiptMemo"].forEach(id => {
+  ["receiptNo", "sourceInvoiceNo", "receiptStatus", "receiptCustomerName", "receiptSubject", "receiptStaff", "receiptPaymentDate", "receiptAmount", "receiptMethod", "receiptMemo"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
@@ -353,7 +353,6 @@ function selectReceipt(id) {
   document.getElementById("receiptPaymentDate").value = receipt.paymentDate || "";
   document.getElementById("receiptAmount").value = money(receipt.amount);
   document.getElementById("receiptMethod").value = receipt.method || "振込";
-  document.getElementById("receiptPayerName").value = receipt.payerName || "";
   document.getElementById("receiptMemo").value = receipt.memo || "";
   history.replaceState(null, "", `receipts.html?id=${encodeURIComponent(receipt.id)}`);
   showSalesMessage(`${receipt.receiptNo || ""} を表示しています。`, "ok");

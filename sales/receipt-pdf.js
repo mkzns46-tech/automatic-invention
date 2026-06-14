@@ -19,7 +19,6 @@ function printReceiptPdf(receipt) {
     <table>
       <tr><th>入金日</th><td>${receipt.paymentDate || ""}</td></tr>
       <tr><th>入金方法</th><td>${receipt.method || "振込"}</td></tr>
-      <tr><th>振込名義</th><td>${receipt.payerName || ""}</td></tr>
       <tr><th>担当者</th><td>${receipt.staff || ""}</td></tr>
       <tr><th>備考</th><td>${receipt.memo || ""}</td></tr>
     </table>
