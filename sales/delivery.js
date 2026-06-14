@@ -71,9 +71,10 @@ function matchesDateRange(values, from, to) {
 function recalcDeliveryLine(line) {
   const qty = Number(line.qty || 0);
   const unitPrice = Number(line.unitPrice || 0);
-  const discountValue = Number(line.discountValue || 0);
+  const discountValue = Number(line.discountValue ?? line.discountRate ?? 0);
   const gross = Math.round(qty * unitPrice);
-  line.discountAmount = Math.round(gross * discountValue / 100);
+  const fixedDiscount = Math.max(0, Number(line.discountAmountInput || line.fixedDiscountAmount || line.manualDiscountAmount || 0));
+  line.discountAmount = Math.min(gross, fixedDiscount > 0 ? fixedDiscount : Math.round(gross * discountValue / 100));
   line.amount = Math.max(0, gross - line.discountAmount);
   return line;
 }

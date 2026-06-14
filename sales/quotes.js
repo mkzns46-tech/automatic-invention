@@ -116,6 +116,42 @@ function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
 
+function recalcSalesLine(line) {
+  const qty = Number(line?.qty || 0);
+  const unitPrice = Number(line?.unitPrice || 0);
+  const gross = Math.max(0, Math.round(qty * unitPrice));
+  const discountRate = Number(line?.discountRate ?? line?.discountValue ?? line?.discount ?? 0);
+  const fixedDiscount = Math.max(0, Number(line?.discountAmountInput || line?.fixedDiscountAmount || line?.manualDiscountAmount || 0));
+  const rateDiscount = Math.round(gross * discountRate / 100);
+  line.discountRate = discountRate;
+  line.discountValue = discountRate;
+  line.discountAmountInput = fixedDiscount;
+  line.discountAmount = Math.min(gross, fixedDiscount > 0 ? fixedDiscount : rateDiscount);
+  line.amount = Math.max(0, gross - line.discountAmount);
+  return line;
+}
+
+function calcQuoteTotals(quote) {
+  const lines = Array.isArray(quote?.lines) ? quote.lines : Array.isArray(quote?.items) ? quote.items : [];
+  let subtotal = 0;
+  let discount = 0;
+  let total = 0;
+  lines.forEach(line => {
+    recalcSalesLine(line);
+    const gross = Math.max(0, Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0)));
+    subtotal += gross;
+    discount += Number(line.discountAmount || 0);
+    total += Number(line.amount || 0);
+  });
+  total = Math.max(0, total);
+  return {
+    subtotal,
+    discount,
+    total,
+    tax: Math.floor(total * 10 / 110)
+  };
+}
+
 function normalizeQuoteStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (!value || value === "draft" || value === "下書き") return QUOTE_STATUS_DRAFT;
@@ -762,6 +798,8 @@ async function addProductLine(product) {
       unit,
       unitPrice: price.hasPrice ? price.value : 0,
       discountValue: 0,
+      discountRate: 0,
+      discountAmountInput: 0,
       discountAmount: 0,
       amount: 0,
       memo: ""
@@ -784,6 +822,8 @@ function renderLines() {
       <label>単位<select onchange="updateLine(${index}, 'unit', this.value)" ${disabled}>${UNIT_OPTIONS.map(unit => `<option value="${unit}" ${unit === line.unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label>
       <label>税込単価<input type="number" min="0" step="1" value="${line.unitPrice}" onchange="updateLine(${index}, 'unitPrice', this.value)" ${disabled}></label>
       <label>値引率%<input type="number" min="0" step="1" value="${line.discountValue}" onchange="updateLine(${index}, 'discountValue', this.value)" ${disabled}></label>
+      <label>値引額<input type="number" min="0" step="1" value="${Number(line.discountAmountInput || 0)}" onchange="updateLine(${index}, 'discountAmountInput', this.value)" ${disabled}></label>
+      <label>金額<div class="line-amount">${money(line.amount)}</div></label>
       <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateLine(${index}, 'memo', this.value)" ${disabled}></label>
       <button type="button" class="danger" onclick="removeLine(${index})" ${disabled}>削除</button>
     </div>`).join("") : '<div class="message">見積商品を追加してください。</div>';
@@ -798,7 +838,7 @@ function updateLine(index, key, value) {
   }
   const line = currentLines[index];
   if (!line) return;
-  if (["qty", "unitPrice", "discountValue"].includes(key)) line[key] = Number(value || 0);
+  if (["qty", "unitPrice", "discountValue", "discountRate", "discountAmountInput"].includes(key)) line[key] = Number(value || 0);
   else line[key] = value;
   if (key === "unit" && line.barcode) {
     const units = readUnits();
@@ -832,6 +872,7 @@ function applyDiscountTemplate(render = true) {
     if (template === "all10") line.discountValue = 10;
     if (template === "dealer10") line.discountValue = isDealerBrand(line.name) ? 10 : 0;
     if (template === "none") line.discountValue = 0;
+    line.discountRate = line.discountValue;
     recalcSalesLine(line);
   });
   if (render) renderLines();
@@ -879,6 +920,78 @@ function collectQuote() {
     discountTemplate: document.getElementById("discountTemplate").value,
     lines: currentLines.map(({ stock, ...line }) => ({ ...line }))
   };
+}
+
+function printQuotePdf(quote) {
+  const doc = JSON.parse(JSON.stringify(quote || {}));
+  const lines = (doc.lines || doc.items || []).map(recalcSalesLine);
+  const totals = calcQuoteTotals({ lines });
+  const rows = lines.map((line, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${escapeHtml(line.name || "")}</td>
+      <td class="num">${Number(line.qty || 0)}</td>
+      <td>${escapeHtml(line.unit || "")}</td>
+      <td class="num">${money(line.unitPrice)}</td>
+      <td class="num">${Number(line.discountAmountInput || 0) > 0 ? money(line.discountAmountInput) : `${Number(line.discountValue || 0)}%`}</td>
+      <td class="num">${money(line.amount)}</td>
+    </tr>
+  `).join("");
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(`<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(doc.quoteNo || "quote")}</title>
+<style>
+  @page{size:A4;margin:14mm}
+  body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827}
+  .top{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #1b4332;padding-bottom:14px}
+  h1{margin:0;font-size:30px;letter-spacing:.08em}
+  .brand{font-weight:900;color:#1b4332}
+  .meta{text-align:right;line-height:1.7;font-size:13px}
+  .customer{margin:22px 0;font-size:15px;line-height:1.8}
+  .total{display:inline-block;margin:12px 0 22px;padding:12px 22px;border:2px solid #1b4332;font-size:22px;font-weight:900}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#dcf5e2;color:#1b4332}
+  th,td{border:1px solid #cfe6d7;padding:8px;text-align:left}
+  .num{text-align:right}
+  .summary{width:320px;margin:18px 0 0 auto}
+  .summary div{display:flex;justify-content:space-between;border-bottom:1px solid #cfe6d7;padding:7px 0}
+  .note{margin-top:22px;white-space:pre-wrap;line-height:1.7}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div><div class="brand">ARICO ARCHERY</div><h1>見積書</h1></div>
+    <div class="meta">
+      <div>見積書番号: ${escapeHtml(doc.quoteNo || "")}</div>
+      <div>見積日: ${escapeHtml(doc.quoteDate || "")}</div>
+      <div>有効期限: ${escapeHtml(doc.validUntil || "")}</div>
+    </div>
+  </div>
+  <div class="customer">
+    <strong>${escapeHtml(doc.customerName || "")} 御中</strong><br>
+    ${escapeHtml(doc.address || "")}<br>
+    件名: ${escapeHtml(doc.subject || "")}
+  </div>
+  <div class="total">見積金額 ${money(totals.total)}</div>
+  <table>
+    <thead><tr><th>No.</th><th>商品名</th><th>数量</th><th>単位</th><th>税込単価</th><th>値引</th><th>金額</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7">明細なし</td></tr>'}</tbody>
+  </table>
+  <div class="summary">
+    <div><span>小計</span><strong>${money(totals.subtotal)}</strong></div>
+    <div><span>値引</span><strong>${money(totals.discount)}</strong></div>
+    <div><span>合計</span><strong>${money(totals.total)}</strong></div>
+    <div><span>内消費税 10%</span><strong>${money(totals.tax)}</strong></div>
+  </div>
+  <div class="note">${escapeHtml(doc.memo || "")}</div>
+  <script>window.onload = () => window.print();</script>
+</body>
+</html>`);
+  win.document.close();
 }
 
 async function saveQuote() {

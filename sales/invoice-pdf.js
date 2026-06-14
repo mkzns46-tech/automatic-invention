@@ -16,7 +16,7 @@ function invoicePdfRecalcLine(line) {
   const gross = Math.round(Number(line.qty || 0) * Number(line.unitPrice || 0));
   const rateDiscount = Math.round(gross * Number(line.discountValue || 0) / 100);
   const fixedDiscount = Math.max(0, Number(line.discountAmountInput || line.fixedDiscountAmount || line.manualDiscountAmount || 0));
-  line.discountAmount = Math.min(gross, Math.max(rateDiscount, fixedDiscount));
+  line.discountAmount = Math.min(gross, fixedDiscount > 0 ? fixedDiscount : rateDiscount);
   line.amount = Math.max(0, gross - line.discountAmount);
   return line;
 }

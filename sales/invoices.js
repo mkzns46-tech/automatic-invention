@@ -173,7 +173,7 @@ function recalcInvoiceLine(line) {
   const gross = Math.round(qty * unitPrice);
   const rateDiscount = Math.round(gross * discountValue / 100);
   const fixedDiscount = Math.max(0, Number(line.discountAmountInput || line.fixedDiscountAmount || line.manualDiscountAmount || 0));
-  line.discountAmount = Math.min(gross, Math.max(rateDiscount, fixedDiscount));
+  line.discountAmount = Math.min(gross, fixedDiscount > 0 ? fixedDiscount : rateDiscount);
   line.amount = Math.max(0, gross - line.discountAmount);
   return line;
 }
@@ -189,6 +189,7 @@ function normalizeInvoiceLine(line) {
     discountAmountInput: Number(line?.discountAmountInput ?? line?.fixedDiscountAmount ?? line?.manualDiscountAmount ?? 0),
     memo: line?.memo || line?.note || ""
   };
+  normalized.discountRate = normalized.discountValue;
   return recalcInvoiceLine(normalized);
 }
 
@@ -710,6 +711,7 @@ function updateInvoiceLine(index, key, value) {
   if (!line) return;
   if (["qty", "unitPrice", "discountValue", "discountAmountInput"].includes(key)) line[key] = Number(value || 0);
   else line[key] = value;
+  if (key === "discountValue") line.discountRate = Number(value || 0);
   recalcInvoiceLine(line);
   renderInvoiceLines();
 }
