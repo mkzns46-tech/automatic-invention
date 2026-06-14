@@ -152,8 +152,15 @@ function normalizeInvoiceStatus(status) {
 }
 
 function isInvoiceEditable(invoiceOrStatus) {
+  if (invoiceOrStatus && typeof invoiceOrStatus === "object" && !invoiceOrStatus.issuedAt) return true;
   const status = normalizeInvoiceStatus(typeof invoiceOrStatus === "string" ? invoiceOrStatus : invoiceOrStatus?.status);
   return status === INVOICE_STATUS_DRAFT;
+}
+
+function isCurrentInvoiceEditable() {
+  const invoice = currentInvoiceId ? readInvoices().find(row => row.id === currentInvoiceId) : null;
+  if (invoice) return isInvoiceEditable(invoice);
+  return isInvoiceEditable(document.getElementById("invoiceStatus")?.value);
 }
 
 function pickInvoiceCustomerFields(row) {
@@ -300,7 +307,7 @@ function canRetryStockDeduction(invoice) {
 
 function canOutputInvoicePdf(invoice) {
   if (!invoice) return false;
-  return normalizeInvoiceStatus(invoice.status) !== INVOICE_STATUS_DRAFT;
+  return Boolean(invoice.issuedAt) && normalizeInvoiceStatus(invoice.status) !== INVOICE_STATUS_DRAFT;
 }
 
 function recalcInvoiceLine(line) {
@@ -887,7 +894,7 @@ function renderInvoiceListRow(invoice) {
     <td>${escapeHtml(invoice.staff || "")}</td>
     <td>
       <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">${status === INVOICE_STATUS_DRAFT ? "&#32232;&#38598;" : "&#35443;&#32048;"}</button>
-      ${canOutputInvoicePdf(invoice) ? `<button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>` : `<button type="button" class="secondary" disabled title="請求書発行確定後にPDF出力できます">PDF&#20986;&#21147;</button>`}
+      ${canOutputInvoicePdf(invoice) ? `<button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>` : `<button type="button" class="secondary" disabled title="請求書確定後にPDF出力できます">PDF&#20986;&#21147;</button>`}
       ${canRetryStockDeduction(invoice) ? `<button type="button" class="secondary" onclick="retryInvoiceStockDeduction('${invoice.id}')">在庫減算再実行</button>` : ""}
     </td>
   </tr>`;
@@ -966,7 +973,7 @@ function fillInvoiceForm(invoice) {
   currentInvoiceId = invoice.id || null;
   currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || []));
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
-  document.getElementById("invoiceStatus").value = normalizeInvoiceStatus(invoice.status);
+  document.getElementById("invoiceStatus").value = invoice.issuedAt ? normalizeInvoiceStatus(invoice.status) : INVOICE_STATUS_DRAFT;
   setFieldValue("stockDeductionStatus", stockDeductionDisplay(invoice));
   document.getElementById("sourceQuoteNo").value = invoice.sourceQuoteNo || "";
   setFieldValue("salesCustomerId", invoice.customerId || "");
@@ -1014,8 +1021,9 @@ function scrollToInvoiceEditor() {
 
 function renderInvoiceLines() {
   const area = document.getElementById("invoiceLines");
-  const locked = !isInvoiceEditable(document.getElementById("invoiceStatus")?.value);
+  const locked = !isCurrentInvoiceEditable();
   const disabled = locked ? "disabled" : "";
+  const memoDisabled = "";
   area.innerHTML = currentInvoiceLines.length ? currentInvoiceLines.map((line, index) => {
     recalcInvoiceLine(line);
     return `<div class="invoice-line">
@@ -1026,7 +1034,7 @@ function renderInvoiceLines() {
       <label>値引率%<input type="number" min="0" max="100" step="1" value="${Number(line.discountValue || 0)}" onchange="updateInvoiceLine(${index}, 'discountValue', this.value)" ${disabled}></label>
       <label>値引額<input type="number" min="0" step="1" value="${Number(line.discountAmountInput || 0)}" onchange="updateInvoiceLine(${index}, 'discountAmountInput', this.value)" ${disabled}></label>
       <label>金額<div class="line-amount ${amountClass(line.amount, line.transactionType)}">${money(line.amount)} ${refundBadge(line.transactionType)}</div></label>
-      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateInvoiceLine(${index}, 'memo', this.value)" ${disabled}></label>
+      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateInvoiceLine(${index}, 'memo', this.value)" ${memoDisabled}></label>
       <button type="button" class="danger" onclick="removeInvoiceLine(${index})" ${disabled}>削除</button>
     </div>`;
   }).join("") : '<div class="message">請求商品がありません。</div>';
@@ -1034,7 +1042,8 @@ function renderInvoiceLines() {
 }
 
 function updateInvoiceLine(index, key, value) {
-  if (!isInvoiceEditable(document.getElementById("invoiceStatus")?.value)) {
+  const editable = isCurrentInvoiceEditable();
+  if (!editable && key !== "memo") {
     showSalesMessage("発行済みの請求書は商品明細を編集できません。", "warn");
     renderInvoiceLines();
     return;
@@ -1051,11 +1060,34 @@ function updateInvoiceLine(index, key, value) {
   else line[key] = value;
   if (key === "discountValue") line.discountRate = clampNumber(value, 0, 100);
   recalcInvoiceLine(line);
+  if (!editable && key === "memo") {
+    persistInvoiceLineMemos();
+    showSalesMessage("商品備考を保存しました。", "ok");
+  }
   renderInvoiceLines();
 }
 
+function persistInvoiceLineMemos() {
+  if (!currentInvoiceId) return;
+  const invoices = readInvoices();
+  const index = invoices.findIndex(row => row.id === currentInvoiceId);
+  if (index < 0) return;
+  const existing = invoices[index];
+  const lines = getInvoiceRawLines(existing).map((line, lineIndex) => ({
+    ...line,
+    memo: currentInvoiceLines[lineIndex]?.memo || ""
+  }));
+  invoices[index] = {
+    ...existing,
+    lines,
+    items: lines,
+    updatedAt: new Date().toISOString()
+  };
+  writeInvoices(invoices);
+}
+
 function removeInvoiceLine(index) {
-  if (!isInvoiceEditable(document.getElementById("invoiceStatus")?.value)) {
+  if (!isCurrentInvoiceEditable()) {
     showSalesMessage("発行済みの請求書は商品明細を編集できません。", "warn");
     return;
   }
@@ -1094,7 +1126,7 @@ function updateInvoiceLockState(invoice) {
     issueButton.hidden = !shouldShow;
     issueButton.style.display = shouldShow ? "" : "none";
     issueButton.disabled = !shouldShow;
-    issueButton.textContent = "発行確定";
+    issueButton.textContent = "請求書確定";
   }
   if (saveButton) {
     saveButton.hidden = !editable;
@@ -1104,7 +1136,7 @@ function updateInvoiceLockState(invoice) {
     const pdfAvailable = canOutputInvoicePdf(invoice);
     pdfButton.hidden = false;
     pdfButton.disabled = !pdfAvailable;
-    pdfButton.title = pdfAvailable ? "" : "請求書発行確定後にPDF出力できます";
+    pdfButton.title = pdfAvailable ? "" : "請求書確定後にPDF出力できます";
   }
   if (retryStockButton) {
     const shouldShowRetry = canRetryStockDeduction(invoice);
@@ -1125,7 +1157,7 @@ function updateInvoiceLockState(invoice) {
   });
   document.getElementById("invoiceEditorCard")?.classList.toggle("locked", !editable);
   showSalesMessage(
-    editable ? "請求書を編集できます。" : "発行済みのため請求情報・金額・商品明細は編集できません。PDF出力とキャンセル処理は可能です。",
+    editable ? "請求書を編集できます。" : "確定済みのため請求情報・金額・商品明細は編集できません。商品備考、PDF出力、キャンセル処理は可能です。",
     editable ? "" : "warn"
   );
   renderInvoiceLines();
@@ -1234,7 +1266,7 @@ async function issueInvoice() {
     showSalesMessage("先に請求書を保存してください。", "err");
     return;
   }
-  const confirmed = await confirmSalesPopup("発行確定", "この請求書を発行確定しますか？", "warn");
+  const confirmed = await confirmSalesPopup("請求書確定", "この請求書を確定しますか？", "warn");
   if (!confirmed) return;
   const invoices = readInvoices();
   const index = invoices.findIndex(row => row.id === currentInvoiceId);
@@ -1262,8 +1294,8 @@ async function issueInvoice() {
   renderInvoiceList();
   const statusLabel = normalizeInvoiceStatus(invoice.status);
   const stockMessage = stockDeductionDisplay(invoice);
-  showSalesMessage(`請求書を発行確定しました。ステータスを${statusLabel}に更新しました。在庫減算: ${stockMessage}`, invoice.stockDeductionStatus === STOCK_DEDUCTION_STATUS_FAILED ? "warn" : "ok");
-  showSalesPopup("発行確定", `請求書を発行確定しました\n在庫減算: ${stockMessage}${invoice.stockDeductionError ? `\n${invoice.stockDeductionError}` : ""}`, invoice.stockDeductionStatus === STOCK_DEDUCTION_STATUS_FAILED ? "warn" : "ok");
+  showSalesMessage(`請求書を確定しました。ステータスを${statusLabel}に更新しました。在庫減算: ${stockMessage}`, invoice.stockDeductionStatus === STOCK_DEDUCTION_STATUS_FAILED ? "warn" : "ok");
+  showSalesPopup("請求書確定", `請求書を確定しました\n在庫減算: ${stockMessage}${invoice.stockDeductionError ? `\n${invoice.stockDeductionError}` : ""}`, invoice.stockDeductionStatus === STOCK_DEDUCTION_STATUS_FAILED ? "warn" : "ok");
 }
 
 async function retryInvoiceStockDeduction(id) {
@@ -1329,7 +1361,7 @@ function cancelInvoice() {
 function outputCurrentInvoicePdf() {
   const invoice = currentInvoiceId ? readInvoices().find(row => row.id === currentInvoiceId) : null;
   if (!canOutputInvoicePdf(invoice)) {
-    showSalesPopup("PDF出力", "請求書発行確定後にPDF出力できます", "warn");
+    showSalesPopup("PDF出力", "請求書確定後にPDF出力できます", "warn");
     return;
   }
   try {
@@ -1343,7 +1375,7 @@ function printInvoiceById(id) {
   const invoice = readInvoices().find(row => row.id === id);
   if (!invoice) return;
   if (!canOutputInvoicePdf(invoice)) {
-    showSalesPopup("PDF出力", "請求書発行確定後にPDF出力できます", "warn");
+    showSalesPopup("PDF出力", "請求書確定後にPDF出力できます", "warn");
     return;
   }
   printInvoicePdf(normalizeInvoiceForView(invoice));

@@ -9,7 +9,7 @@
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="delivery-pdf.js?v=20260614-lists-hidden"></script>
-<script src="delivery.js?v=20260615-shipping-status" defer></script>
+<script src="delivery.js?v=20260615-line-memo" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -42,6 +42,8 @@
             <option value="未発行">未発行</option>
             <option value="納品書発行済">納品書発行済</option>
             <option value="発送済">発送済</option>
+            <option value="手渡し済">手渡し済</option>
+            <option value="担当者手持ち済">担当者手持ち済</option>
             <option value="完了済">完了済</option>
             <option value="キャンセル">キャンセル</option>
           </select>
@@ -95,9 +97,16 @@
   <section class="card" id="deliveryShippingCard">
     <h2>発送情報</h2>
     <div class="row">
-      <label>発送日<input id="shipmentDate" type="date"></label>
-      <label>配送会社<input id="shippingCarrier" placeholder="ヤマト"></label>
-      <label>送り状番号<input id="trackingNumber" placeholder="送り状番号"></label>
+      <label>発送方法
+        <select id="shippingMethod">
+          <option value="配送">配送</option>
+          <option value="手渡し">手渡し</option>
+          <option value="担当者手持ち">担当者手持ち</option>
+        </select>
+      </label>
+      <label><span id="shipmentDateLabelText">発送日</span><input id="shipmentDate" type="date"></label>
+      <label id="shippingCarrierLabel">配送会社<input id="shippingCarrier" placeholder="ヤマト"></label>
+      <label id="trackingNumberLabel">送り状番号<input id="trackingNumber" placeholder="送り状番号"></label>
       <label>担当者<input id="shippingStaff" placeholder="担当者"></label>
     </div>
     <label>備考<textarea id="shippingMemo" rows="3" placeholder="発送に関する備考"></textarea></label>

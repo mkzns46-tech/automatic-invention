@@ -2,7 +2,12 @@ const DELIVERIES_KEY = "arico_sales_deliveries_v1";
 const DELIVERY_STATUS_DRAFT = "未発行";
 const DELIVERY_STATUS_ISSUED = "納品書発行済";
 const DELIVERY_STATUS_SHIPPED = "発送済";
+const DELIVERY_STATUS_HAND_DELIVERED = "手渡し済";
+const DELIVERY_STATUS_STAFF_CARRY = "担当者手持ち済";
 const DELIVERY_STATUS_CANCELLED = "キャンセル";
+const SHIPPING_METHOD_DELIVERY = "配送";
+const SHIPPING_METHOD_HAND = "手渡し";
+const SHIPPING_METHOD_STAFF = "担当者手持ち";
 
 let currentDeliveryId = null;
 let deliverySearchText = "";
@@ -67,15 +72,21 @@ function normalizeDeliveryStatus(status) {
   if (!value || lower === "draft" || value === "未発行") return DELIVERY_STATUS_DRAFT;
   if (lower === "issued" || value === "発行済み" || value === "納品書発行済" || value === "発送準備中") return DELIVERY_STATUS_ISSUED;
   if (lower === "shipped" || value === "発送済" || value === "納品済み") return DELIVERY_STATUS_SHIPPED;
+  if (lower === "hand_delivered" || lower === "hand_delivery" || value === "手渡し済") return DELIVERY_STATUS_HAND_DELIVERED;
+  if (lower === "staff_carry" || lower === "staff_carried" || value === "担当者手持ち済") return DELIVERY_STATUS_STAFF_CARRY;
   if (lower === "cancel" || lower === "cancelled" || lower === "canceled" || value === "キャンセル") return DELIVERY_STATUS_CANCELLED;
   return value;
+}
+
+function isCompletedDeliveryStatus(status) {
+  return [DELIVERY_STATUS_SHIPPED, DELIVERY_STATUS_HAND_DELIVERED, DELIVERY_STATUS_STAFF_CARRY].includes(normalizeDeliveryStatus(status));
 }
 
 function statusBadge(status) {
   const value = normalizeDeliveryStatus(status);
   const type = value === DELIVERY_STATUS_CANCELLED
     ? "danger"
-    : value === DELIVERY_STATUS_SHIPPED
+    : isCompletedDeliveryStatus(value)
       ? "ok"
       : value === DELIVERY_STATUS_ISSUED
         ? "info"
@@ -99,6 +110,57 @@ function formatDateTime(value) {
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeShippingMethod(method) {
+  const value = String(method || "").trim();
+  if (value === SHIPPING_METHOD_HAND) return SHIPPING_METHOD_HAND;
+  if (value === SHIPPING_METHOD_STAFF) return SHIPPING_METHOD_STAFF;
+  return SHIPPING_METHOD_DELIVERY;
+}
+
+function shippingMethodForDelivery(delivery = {}) {
+  if (delivery.shippingMethod) return normalizeShippingMethod(delivery.shippingMethod);
+  const status = normalizeDeliveryStatus(delivery.status);
+  if (status === DELIVERY_STATUS_HAND_DELIVERED) return SHIPPING_METHOD_HAND;
+  if (status === DELIVERY_STATUS_STAFF_CARRY) return SHIPPING_METHOD_STAFF;
+  return SHIPPING_METHOD_DELIVERY;
+}
+
+function deliveryStatusForShippingMethod(method) {
+  const value = normalizeShippingMethod(method);
+  if (value === SHIPPING_METHOD_HAND) return DELIVERY_STATUS_HAND_DELIVERED;
+  if (value === SHIPPING_METHOD_STAFF) return DELIVERY_STATUS_STAFF_CARRY;
+  return DELIVERY_STATUS_SHIPPED;
+}
+
+function updateShippingMethodUi() {
+  const methodEl = document.getElementById("shippingMethod");
+  const method = normalizeShippingMethod(methodEl?.value);
+  if (methodEl) methodEl.value = method;
+  const dateLabel = document.getElementById("shipmentDateLabelText");
+  if (dateLabel) {
+    dateLabel.textContent = method === SHIPPING_METHOD_HAND
+      ? "受け渡し日"
+      : method === SHIPPING_METHOD_STAFF
+        ? "持ち出し日"
+        : "発送日";
+  }
+  const needsDeliveryInfo = method === SHIPPING_METHOD_DELIVERY;
+  const carrier = document.getElementById("shippingCarrier");
+  const tracking = document.getElementById("trackingNumber");
+  const carrierLabel = document.getElementById("shippingCarrierLabel");
+  const trackingLabel = document.getElementById("trackingNumberLabel");
+  if (carrier) {
+    carrier.disabled = !needsDeliveryInfo;
+    if (!needsDeliveryInfo) carrier.value = "";
+  }
+  if (tracking) {
+    tracking.disabled = !needsDeliveryInfo;
+    if (!needsDeliveryInfo) tracking.value = "";
+  }
+  if (carrierLabel) carrierLabel.hidden = !needsDeliveryInfo;
+  if (trackingLabel) trackingLabel.hidden = !needsDeliveryInfo;
 }
 
 function matchesDateRange(values, from, to) {
@@ -193,6 +255,8 @@ function bindDeliveryListControls() {
     deliveryDateTo = event.target.value;
     renderDeliveryList();
   });
+  document.getElementById("shippingMethod")?.addEventListener("change", updateShippingMethodUi);
+  updateShippingMethodUi();
   setDeliveryListCollapsed(false);
 }
 
@@ -213,11 +277,11 @@ function renderDeliveryList() {
   const deliveries = allDeliveries.filter(matchesDeliveryFilters);
   const activeDeliveries = deliveries.filter(delivery => {
     const status = normalizeDeliveryStatus(delivery.status);
-    return status !== DELIVERY_STATUS_SHIPPED && status !== DELIVERY_STATUS_CANCELLED;
+    return !isCompletedDeliveryStatus(status) && status !== DELIVERY_STATUS_CANCELLED;
   });
   const completedDeliveries = deliveries.filter(delivery => {
     const status = normalizeDeliveryStatus(delivery.status);
-    return status === DELIVERY_STATUS_SHIPPED || status === DELIVERY_STATUS_CANCELLED;
+    return isCompletedDeliveryStatus(status) || status === DELIVERY_STATUS_CANCELLED;
   });
   const count = document.getElementById("deliveryListCount");
   if (count) count.textContent = deliverySearchText || deliveryStatusFilter || deliveryDateFrom || deliveryDateTo
@@ -236,7 +300,7 @@ function renderDeliveryRow(delivery) {
   const displayNumber = delivery.originNumber || delivery.masterNumber || delivery.quoteNumber || delivery.deliveryNo || "";
   return `<tr>
     <td><span class="number-with-status">${escapeHtml(displayNumber)} ${statusBadge(status)}</span></td>
-    <td>${escapeHtml(normalizeDateOnly(delivery.shipmentDate) || normalizeDateOnly(delivery.issuedAt) || delivery.deliveryDate || delivery.invoiceDate || "")}</td>
+    <td>${escapeHtml(normalizeDateOnly(delivery.shipmentDate) || normalizeDateOnly(delivery.handoverDate) || normalizeDateOnly(delivery.carryOutDate) || normalizeDateOnly(delivery.issuedAt) || delivery.deliveryDate || delivery.invoiceDate || "")}</td>
     <td>${escapeHtml(delivery.organizationName || delivery.organization || delivery.companyName || "")}</td>
     <td>${escapeHtml(delivery.customerName || delivery.name || delivery.customer || "")}</td>
     <td class="${amountClass(delivery.total, delivery)}">${money(delivery.total)}</td>
@@ -245,7 +309,7 @@ function renderDeliveryRow(delivery) {
     <td>
       <button type="button" class="secondary" onclick="selectDelivery('${delivery.id}')">詳細</button>
       <button type="button" class="secondary" onclick="printDeliveryById('${delivery.id}')">PDF出力</button>
-      ${status !== DELIVERY_STATUS_SHIPPED && status !== DELIVERY_STATUS_CANCELLED ? `<button type="button" class="invoice-issue-button" onclick="quickShipDelivery('${delivery.id}')">発送済</button>` : ""}
+      ${!isCompletedDeliveryStatus(status) && status !== DELIVERY_STATUS_CANCELLED ? `<button type="button" class="invoice-issue-button" onclick="quickShipDelivery('${delivery.id}')">発送済</button>` : ""}
     </td>
   </tr>`;
 }
@@ -253,13 +317,13 @@ function renderDeliveryRow(delivery) {
 function matchesDeliveryFilters(delivery) {
   const status = normalizeDeliveryStatus(delivery.status);
   if (deliveryStatusFilter === "未発送") {
-    if (status === DELIVERY_STATUS_SHIPPED || status === DELIVERY_STATUS_CANCELLED) return false;
+    if (isCompletedDeliveryStatus(status) || status === DELIVERY_STATUS_CANCELLED) return false;
   } else if (deliveryStatusFilter === "完了済") {
-    if (status !== DELIVERY_STATUS_SHIPPED) return false;
+    if (!isCompletedDeliveryStatus(status)) return false;
   } else if (deliveryStatusFilter && status !== deliveryStatusFilter) {
     return false;
   }
-  if (!matchesDateRange([delivery.createdAt, delivery.invoiceDate, delivery.issuedAt, delivery.shipmentDate, delivery.updatedAt], deliveryDateFrom, deliveryDateTo)) return false;
+  if (!matchesDateRange([delivery.createdAt, delivery.invoiceDate, delivery.issuedAt, delivery.shipmentDate, delivery.handoverDate, delivery.carryOutDate, delivery.updatedAt], deliveryDateFrom, deliveryDateTo)) return false;
   if (!deliverySearchText) return true;
   const text = [
     delivery.originNumber,
@@ -270,8 +334,11 @@ function matchesDeliveryFilters(delivery) {
     delivery.organizationName,
     delivery.customerName,
     delivery.shippingCarrier,
+    delivery.shippingMethod,
     delivery.trackingNumber,
     delivery.shippingStaff,
+    delivery.handoverDate,
+    delivery.carryOutDate,
     delivery.staff,
     delivery.subject,
     status,
@@ -300,12 +367,15 @@ function clearDeliveryDetail() {
     "deliverySubject",
     "deliveryInvoiceDate",
     "deliveryIssuedAt",
+    "shippingMethod",
     "shipmentDate",
     "shippingCarrier",
     "trackingNumber",
     "shippingStaff",
     "shippingMemo"
   ].forEach(id => setFieldValue(id, ""));
+  setFieldValue("shippingMethod", SHIPPING_METHOD_DELIVERY);
+  updateShippingMethodUi();
   document.getElementById("deliveryLines").innerHTML = '<div class="message">納品書を選択してください。</div>';
   updateTotals({});
 }
@@ -329,11 +399,13 @@ function selectDelivery(id) {
   setFieldValue("deliverySubject", delivery.subject || "");
   setFieldValue("deliveryInvoiceDate", delivery.invoiceDate || "");
   setFieldValue("deliveryIssuedAt", formatDateTime(delivery.issuedAt));
-  setFieldValue("shipmentDate", normalizeDateOnly(delivery.shipmentDate));
+  setFieldValue("shippingMethod", shippingMethodForDelivery(delivery));
+  setFieldValue("shipmentDate", normalizeDateOnly(delivery.shipmentDate) || normalizeDateOnly(delivery.handoverDate) || normalizeDateOnly(delivery.carryOutDate));
   setFieldValue("shippingCarrier", delivery.shippingCarrier || "");
   setFieldValue("trackingNumber", delivery.trackingNumber || "");
   setFieldValue("shippingStaff", delivery.shippingStaff || delivery.staff || "");
   setFieldValue("shippingMemo", delivery.shippingMemo || "");
+  updateShippingMethodUi();
   renderDeliveryLines(delivery);
   updateTotals(delivery);
   history.replaceState(null, "", `delivery.html?id=${encodeURIComponent(delivery.id)}`);
@@ -343,7 +415,7 @@ function selectDelivery(id) {
 function renderDeliveryLines(delivery) {
   const area = document.getElementById("deliveryLines");
   const lines = delivery.lines || [];
-  area.innerHTML = lines.length ? lines.map(line => {
+  area.innerHTML = lines.length ? lines.map((line, index) => {
     line.transactionType = line.transactionType || delivery.transactionType || "";
     recalcDeliveryLine(line);
     return `<div class="invoice-line">
@@ -353,9 +425,24 @@ function renderDeliveryLines(delivery) {
       <label>税込単価<input value="${Number(line.unitPrice || 0)}" readonly></label>
       <label>値引率%<input value="${Number(line.discountValue ?? line.discountRate ?? 0)}" readonly></label>
       <label>金額<div class="line-amount ${amountClass(line.amount, line.transactionType)}">${money(line.amount)}</div></label>
-      <label>備考<input value="${escapeHtml(line.memo || "")}" readonly></label>
+      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateDeliveryLineMemo(${index}, this.value)"></label>
     </div>`;
   }).join("") : '<div class="message">納品商品がありません。</div>';
+}
+
+function updateDeliveryLineMemo(index, value) {
+  if (!currentDeliveryId) return;
+  const updated = updateDelivery(currentDeliveryId, current => {
+    const lines = Array.isArray(current.lines) ? current.lines.slice() : [];
+    if (!lines[index]) return current;
+    lines[index] = { ...lines[index], memo: value };
+    current.lines = lines;
+    current.items = lines;
+    return current;
+  });
+  if (!updated) return;
+  renderDeliveryLines(updated);
+  showSalesMessage("納品商品の備考を保存しました。", "ok");
 }
 
 function updateTotals(delivery) {
@@ -383,7 +470,7 @@ function updateDelivery(id, updater) {
 function markDeliveryIssuedById(id) {
   return updateDelivery(id, current => {
     const status = normalizeDeliveryStatus(current.status);
-    if (status === DELIVERY_STATUS_CANCELLED || status === DELIVERY_STATUS_SHIPPED) return current;
+    if (status === DELIVERY_STATUS_CANCELLED || isCompletedDeliveryStatus(status)) return current;
     if (!current.issuedAt) current.issuedAt = new Date().toISOString();
     current.status = DELIVERY_STATUS_ISSUED;
     return current;
@@ -396,7 +483,8 @@ function markCurrentDeliveryIssued() {
     return;
   }
   const delivery = updateDelivery(currentDeliveryId, current => {
-    if (normalizeDeliveryStatus(current.status) === DELIVERY_STATUS_CANCELLED) return current;
+    const status = normalizeDeliveryStatus(current.status);
+    if (status === DELIVERY_STATUS_CANCELLED || isCompletedDeliveryStatus(status)) return current;
     if (!current.issuedAt) current.issuedAt = new Date().toISOString();
     current.status = DELIVERY_STATUS_ISSUED;
     return current;
@@ -408,10 +496,16 @@ function markCurrentDeliveryIssued() {
 }
 
 function collectShipmentFields(base = {}) {
+  const method = normalizeShippingMethod(document.getElementById("shippingMethod")?.value || shippingMethodForDelivery(base));
+  const date = document.getElementById("shipmentDate")?.value || base.shipmentDate || base.handoverDate || base.carryOutDate || today();
+  const isDelivery = method === SHIPPING_METHOD_DELIVERY;
   return {
-    shipmentDate: document.getElementById("shipmentDate")?.value || base.shipmentDate || today(),
-    shippingCarrier: document.getElementById("shippingCarrier")?.value || base.shippingCarrier || "",
-    trackingNumber: document.getElementById("trackingNumber")?.value || base.trackingNumber || "",
+    shippingMethod: method,
+    shipmentDate: date,
+    handoverDate: method === SHIPPING_METHOD_HAND ? date : "",
+    carryOutDate: method === SHIPPING_METHOD_STAFF ? date : "",
+    shippingCarrier: isDelivery ? (document.getElementById("shippingCarrier")?.value || base.shippingCarrier || "") : "",
+    trackingNumber: isDelivery ? (document.getElementById("trackingNumber")?.value || base.trackingNumber || "") : "",
     shippingStaff: document.getElementById("shippingStaff")?.value || base.shippingStaff || base.staff || "",
     shippingMemo: document.getElementById("shippingMemo")?.value || base.shippingMemo || ""
   };
@@ -425,19 +519,23 @@ function markCurrentDeliveryShipped() {
   const delivery = updateDelivery(currentDeliveryId, current => {
     const shipment = collectShipmentFields(current);
     if (!current.issuedAt) current.issuedAt = new Date().toISOString();
-    current.status = DELIVERY_STATUS_SHIPPED;
+    current.status = deliveryStatusForShippingMethod(shipment.shippingMethod);
+    current.shippingMethod = shipment.shippingMethod;
     current.shipmentDate = shipment.shipmentDate;
+    current.handoverDate = shipment.handoverDate;
+    current.carryOutDate = shipment.carryOutDate;
     current.shippingCarrier = shipment.shippingCarrier;
     current.trackingNumber = shipment.trackingNumber;
     current.shippingStaff = shipment.shippingStaff;
     current.shippingMemo = shipment.shippingMemo;
-    current.shippedAt = current.shippedAt || new Date().toISOString();
+    current.completedAt = current.completedAt || new Date().toISOString();
+    if (current.status === DELIVERY_STATUS_SHIPPED) current.shippedAt = current.shippedAt || current.completedAt;
     return current;
   });
   if (!delivery) return;
   selectDelivery(delivery.id);
   renderDeliveryList();
-  showSalesPopup("発送済登録", "発送済として登録しました。", "ok");
+  showSalesPopup("完了登録", `${normalizeDeliveryStatus(delivery.status)}として登録しました。`, "ok");
 }
 
 function quickShipDelivery(id) {
@@ -449,11 +547,15 @@ function quickShipDelivery(id) {
   const updated = updateDelivery(id, current => {
     if (!current.issuedAt) current.issuedAt = new Date().toISOString();
     current.status = DELIVERY_STATUS_SHIPPED;
+    current.shippingMethod = SHIPPING_METHOD_DELIVERY;
     current.shipmentDate = current.shipmentDate || today();
+    current.handoverDate = "";
+    current.carryOutDate = "";
     current.shippingCarrier = current.shippingCarrier || "";
     current.trackingNumber = current.trackingNumber || "";
     current.shippingStaff = current.shippingStaff || current.staff || "";
-    current.shippedAt = current.shippedAt || new Date().toISOString();
+    current.completedAt = current.completedAt || new Date().toISOString();
+    current.shippedAt = current.shippedAt || current.completedAt;
     return current;
   });
   if (!updated) return;

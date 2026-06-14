@@ -10,7 +10,7 @@
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="customers-storage.js?v=20260614-html-repair"></script>
 <script src="invoice-pdf.js?v=20260614-exchange-pdf-restore"></script>
-<script src="invoices.js?v=20260614-progress-sort" defer></script>
+<script src="invoices.js?v=20260615-confirm-pdf-memo" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -18,7 +18,7 @@
     <div>
       <div class="brand">ARICO ARCHERY</div>
       <h1>請求書</h1>
-      <p class="lead">見積書から変換した請求書の一覧・編集・PDF出力を行います。発行確定時に在庫減算を実行し、スマレジ売上登録はまだ行いません。</p>
+      <p class="lead">見積書から変換した請求書の一覧・編集・PDF出力を行います。請求書確定時に在庫減算を実行し、スマレジ売上登録はまだ行いません。</p>
     </div>
     <div class="sales-actions">
       <a class="pill" href="quotes.html">見積書</a>
@@ -129,9 +129,9 @@
     </div>
     <div class="sales-actions" style="margin-top:14px">
       <button type="button" class="primary" id="saveInvoiceBtn" onclick="saveInvoice();">保存</button>
-      <button type="button" class="primary invoice-issue-button" id="issueInvoiceBtn" onclick="issueInvoice();">発行確定</button>
+      <button type="button" class="primary invoice-issue-button" id="issueInvoiceBtn" onclick="issueInvoice();">請求書確定</button>
       <button type="button" class="secondary" id="retryStockDeductionBtn" onclick="retryCurrentInvoiceStockDeduction();" hidden>在庫減算再実行</button>
-      <button type="button" class="secondary" id="invoicePdfBtn" onclick="outputCurrentInvoicePdf();" disabled title="請求書発行確定後にPDF出力できます">PDF出力</button>
+      <button type="button" class="secondary" id="invoicePdfBtn" onclick="outputCurrentInvoicePdf();" disabled title="請求書確定後にPDF出力できます">PDF出力</button>
       <button type="button" class="danger" id="cancelInvoiceBtn" onclick="cancelInvoice();">キャンセル</button>
     </div>
   </section>
