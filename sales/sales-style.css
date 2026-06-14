@@ -79,3 +79,5 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 
 .saved-row-highlight{animation:savedRowFlash 2.4s ease-out;background:#e0f2fe!important}
 @keyframes savedRowFlash{0%{background:#bae6fd}70%{background:#e0f2fe}100%{background:transparent}}
+.section-focus-highlight{animation:savedSectionFlash 1.8s ease-out}
+@keyframes savedSectionFlash{0%{box-shadow:0 0 0 4px rgba(34,197,94,.28),0 8px 28px rgba(0,0,0,.05)}100%{box-shadow:0 8px 28px rgba(0,0,0,.05)}}

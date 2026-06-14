@@ -765,6 +765,15 @@ function editInvoice(id) {
   }
   fillInvoiceForm(invoice);
   history.replaceState(null, "", `invoices.html?id=${encodeURIComponent(id)}`);
+  scrollToInvoiceEditor();
+}
+
+function scrollToInvoiceEditor() {
+  const target = document.getElementById("invoiceEditorCard");
+  if (!target) return;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  target.classList.add("section-focus-highlight");
+  window.setTimeout(() => target.classList.remove("section-focus-highlight"), 1800);
 }
 
 function renderInvoiceLines() {
