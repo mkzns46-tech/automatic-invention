@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 販売進捗確認</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-progress-unpaid">
+<link rel="stylesheet" href="sales-style.css?v=20260614-progress-sections">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
-<script src="progress.js?v=20260614-progress-unpaid" defer></script>
+<script src="progress.js?v=20260614-progress-sections" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -16,7 +16,7 @@
     <div>
       <div class="brand">ARICO ARCHERY</div>
       <h1>販売進捗確認</h1>
-      <p class="lead">見積から領収までの進捗を伝票番号単位で確認します。</p>
+      <p class="lead">売上・回収・納品・領収の確認を用途別に分けて表示します。</p>
     </div>
     <div class="sales-actions">
       <a class="pill" href="index.html">トップ</a>
@@ -27,24 +27,9 @@
   <div id="salesMessage" class="message">販売進捗を確認できます。</div>
 
   <section class="card">
-    <div class="section-title">
-      <div>
-        <h2>進捗一覧</h2>
-        <p class="section-note">未完了を上に表示します。各ボタンから該当画面へ移動できます。</p>
-      </div>
-      <span class="badge muted" id="progressCount">0件</span>
-    </div>
-
     <div class="list-filter-row progress-filter-row">
       <label>検索
         <input id="progressSearch" placeholder="伝票番号・団体名・顧客名・担当者・取引区分・ステータス">
-      </label>
-      <label>進捗
-        <select id="progressCompletionFilter">
-          <option value="incomplete">未完了のみ</option>
-          <option value="complete">完了済み</option>
-          <option value="all">キャンセル含む全て</option>
-        </select>
       </label>
       <label>取引区分
         <select id="progressTransactionFilter">
@@ -57,27 +42,68 @@
         </select>
       </label>
     </div>
+  </section>
 
+  <section class="card progress-section-card">
+    <div class="section-title">
+      <div>
+        <h2>売上確認一覧</h2>
+        <p class="section-note">請求書ベースで売上金額を確認します。</p>
+      </div>
+      <span class="badge muted" id="salesProgressCount">0件</span>
+    </div>
     <div class="table-wrap list-scroll progress-scroll">
-      <table class="progress-table">
-        <thead>
-          <tr>
-            <th>伝票番号</th>
-            <th>取引区分</th>
-            <th>団体名</th>
-            <th>顧客名</th>
-            <th>見積</th>
-            <th>請求</th>
-            <th>入金</th>
-            <th>納品</th>
-            <th>領収</th>
-            <th>合計金額</th>
-            <th>担当者</th>
-            <th>最終更新日</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody id="progressListBody"></tbody>
+      <table class="progress-sales-table">
+        <thead><tr><th>伝票番号</th><th>請求日</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+        <tbody id="salesProgressBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card progress-section-card">
+    <div class="section-title">
+      <div>
+        <h2>未入金一覧</h2>
+        <p class="section-note">入金確認・回収確認が必要な請求書を表示します。</p>
+      </div>
+      <span class="badge muted" id="unpaidProgressCount">0件</span>
+    </div>
+    <div class="table-wrap list-scroll progress-scroll">
+      <table class="progress-unpaid-table">
+        <thead><tr><th>伝票番号</th><th>請求日</th><th>支払期限</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>入金額</th><th>未入金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+        <tbody id="unpaidProgressBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card progress-section-card">
+    <div class="section-title">
+      <div>
+        <h2>未納品一覧</h2>
+        <p class="section-note">納品・発送確認が必要な伝票を表示します。</p>
+      </div>
+      <span class="badge muted" id="undeliveredProgressCount">0件</span>
+    </div>
+    <div class="table-wrap list-scroll progress-scroll">
+      <table class="progress-delivery-table">
+        <thead><tr><th>伝票番号</th><th>納品日</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>納品ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+        <tbody id="undeliveredProgressBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card progress-section-card">
+    <div class="section-title">
+      <div>
+        <h2>領収書確認一覧</h2>
+        <p class="section-note">入金済み伝票の領収書発行状況を確認します。</p>
+      </div>
+      <span class="badge muted" id="receiptProgressCount">0件</span>
+    </div>
+    <div class="table-wrap list-scroll progress-scroll">
+      <table class="progress-receipt-table">
+        <thead><tr><th>伝票番号</th><th>入金日</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>領収書ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+        <tbody id="receiptProgressBody"></tbody>
       </table>
     </div>
   </section>

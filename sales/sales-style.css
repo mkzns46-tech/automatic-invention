@@ -87,6 +87,45 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 .progress-table th:nth-child(13),.progress-table td:nth-child(13){width:260px}
 .progress-actions{display:flex;gap:6px;flex-wrap:wrap}
 .progress-action-link{min-height:34px;padding:6px 9px;border-radius:9px;font-size:12px}
+.progress-section-card .table-wrap{max-height:360px}
+.progress-sales-table{min-width:1060px}
+.progress-unpaid-table{min-width:1360px}
+.progress-delivery-table,.progress-receipt-table{min-width:1060px}
+.progress-sales-table th:nth-child(1),.progress-sales-table td:nth-child(1),
+.progress-delivery-table th:nth-child(1),.progress-delivery-table td:nth-child(1),
+.progress-receipt-table th:nth-child(1),.progress-receipt-table td:nth-child(1){width:150px}
+.progress-sales-table th:nth-child(2),.progress-sales-table td:nth-child(2),
+.progress-delivery-table th:nth-child(2),.progress-delivery-table td:nth-child(2),
+.progress-receipt-table th:nth-child(2),.progress-receipt-table td:nth-child(2){width:120px}
+.progress-sales-table th:nth-child(3),.progress-sales-table td:nth-child(3),
+.progress-sales-table th:nth-child(4),.progress-sales-table td:nth-child(4),
+.progress-delivery-table th:nth-child(3),.progress-delivery-table td:nth-child(3),
+.progress-delivery-table th:nth-child(4),.progress-delivery-table td:nth-child(4),
+.progress-receipt-table th:nth-child(3),.progress-receipt-table td:nth-child(3),
+.progress-receipt-table th:nth-child(4),.progress-receipt-table td:nth-child(4){width:160px}
+.progress-sales-table th:nth-child(5),.progress-sales-table td:nth-child(5),
+.progress-delivery-table th:nth-child(5),.progress-delivery-table td:nth-child(5),
+.progress-receipt-table th:nth-child(5),.progress-receipt-table td:nth-child(5){width:120px}
+.progress-sales-table th:nth-child(6),.progress-sales-table td:nth-child(6),
+.progress-delivery-table th:nth-child(6),.progress-delivery-table td:nth-child(6),
+.progress-receipt-table th:nth-child(6),.progress-receipt-table td:nth-child(6){width:130px}
+.progress-sales-table th:nth-child(7),.progress-sales-table td:nth-child(7),
+.progress-delivery-table th:nth-child(7),.progress-delivery-table td:nth-child(7),
+.progress-receipt-table th:nth-child(7),.progress-receipt-table td:nth-child(7){width:120px}
+.progress-sales-table th:nth-child(8),.progress-sales-table td:nth-child(8),
+.progress-delivery-table th:nth-child(8),.progress-delivery-table td:nth-child(8),
+.progress-receipt-table th:nth-child(8),.progress-receipt-table td:nth-child(8){width:140px}
+.progress-unpaid-table th:nth-child(1),.progress-unpaid-table td:nth-child(1){width:150px}
+.progress-unpaid-table th:nth-child(2),.progress-unpaid-table td:nth-child(2),
+.progress-unpaid-table th:nth-child(3),.progress-unpaid-table td:nth-child(3){width:120px}
+.progress-unpaid-table th:nth-child(4),.progress-unpaid-table td:nth-child(4),
+.progress-unpaid-table th:nth-child(5),.progress-unpaid-table td:nth-child(5){width:150px}
+.progress-unpaid-table th:nth-child(6),.progress-unpaid-table td:nth-child(6),
+.progress-unpaid-table th:nth-child(7),.progress-unpaid-table td:nth-child(7),
+.progress-unpaid-table th:nth-child(8),.progress-unpaid-table td:nth-child(8){width:120px}
+.progress-unpaid-table th:nth-child(9),.progress-unpaid-table td:nth-child(9){width:130px}
+.progress-unpaid-table th:nth-child(10),.progress-unpaid-table td:nth-child(10){width:120px}
+.progress-unpaid-table th:nth-child(11),.progress-unpaid-table td:nth-child(11){width:140px}
 .unpaid-list-table{min-width:1120px}
 .unpaid-list-table th:nth-child(1),.unpaid-list-table td:nth-child(1){width:150px}
 .unpaid-list-table th:nth-child(2),.unpaid-list-table td:nth-child(2){width:120px}
