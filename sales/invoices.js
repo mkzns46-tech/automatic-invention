@@ -14,6 +14,10 @@ const STOCK_DEDUCTION_STATUS_PENDING = "pending";
 const STOCK_DEDUCTION_STATUS_SUCCESS = "success";
 const STOCK_DEDUCTION_STATUS_FAILED = "failed";
 const STOCK_DEDUCTION_STATUS_SKIPPED = "skipped";
+const SMAREGI_SALE_STATUS_PENDING = "pending";
+const SMAREGI_SALE_STATUS_SUCCESS = "success";
+const SMAREGI_SALE_STATUS_FAILED = "failed";
+const SMAREGI_SALE_STATUS_SKIPPED = "skipped";
 
 let currentInvoiceId = null;
 let currentInvoiceLines = [];
@@ -279,6 +283,37 @@ function stockDeductionDisplay(invoiceOrStatus) {
   return stockDeductionLabel(invoiceOrStatus);
 }
 
+function normalizeSmaregiSaleStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === SMAREGI_SALE_STATUS_PENDING || value === "登録中") return SMAREGI_SALE_STATUS_PENDING;
+  if (value === SMAREGI_SALE_STATUS_SUCCESS || value === "登録済み") return SMAREGI_SALE_STATUS_SUCCESS;
+  if (value === SMAREGI_SALE_STATUS_FAILED || value === "登録失敗") return SMAREGI_SALE_STATUS_FAILED;
+  if (value === SMAREGI_SALE_STATUS_SKIPPED || value === "対象外") return SMAREGI_SALE_STATUS_SKIPPED;
+  return "";
+}
+
+function smaregiSaleLabel(status) {
+  const value = normalizeSmaregiSaleStatus(status);
+  if (value === SMAREGI_SALE_STATUS_PENDING) return "スマレジ売上登録中";
+  if (value === SMAREGI_SALE_STATUS_SUCCESS) return "スマレジ売上登録済み";
+  if (value === SMAREGI_SALE_STATUS_FAILED) return "スマレジ売上登録失敗";
+  if (value === SMAREGI_SALE_STATUS_SKIPPED) return "スマレジ売上登録対象外";
+  return "未登録";
+}
+
+function smaregiSaleDisplay(invoiceOrStatus) {
+  if (invoiceOrStatus && typeof invoiceOrStatus === "object") {
+    if (
+      normalizeSmaregiSaleStatus(invoiceOrStatus.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS &&
+      invoiceOrStatus.stockBaseStockSyncStatus === "failed"
+    ) {
+      return "スマレジ売上登録済み / 在庫同期失敗";
+    }
+    return smaregiSaleLabel(invoiceOrStatus.smaregiSaleStatus);
+  }
+  return smaregiSaleLabel(invoiceOrStatus);
+}
+
 function stockDeductionBadge(invoice) {
   if (invoice?.stockBaseStockSyncStatus === "failed") {
     return '<span class="status-badge danger">在庫同期失敗</span>';
@@ -300,9 +335,13 @@ function isStockDeductionTarget(invoice) {
   return type !== "返金";
 }
 
+function isSmaregiSaleTarget(invoice) {
+  return isStockDeductionTarget(invoice);
+}
+
 function canRetryStockDeduction(invoice) {
-  const status = normalizeStockDeductionStatus(invoice?.stockDeductionStatus);
-  return Boolean(invoice?.id && isStockDeductionTarget(invoice) && (status === STOCK_DEDUCTION_STATUS_FAILED || invoice.stockBaseStockSyncStatus === "failed"));
+  const status = normalizeSmaregiSaleStatus(invoice?.smaregiSaleStatus);
+  return Boolean(invoice?.id && isSmaregiSaleTarget(invoice) && (status === SMAREGI_SALE_STATUS_FAILED || invoice.stockBaseStockSyncStatus === "failed"));
 }
 
 function canOutputInvoicePdf(invoice) {
@@ -517,41 +556,51 @@ async function syncProductsBaseStock(lines) {
 
 async function applyInvoiceStockDeduction(invoice) {
   const next = { ...invoice };
-  if (normalizeStockDeductionStatus(next.stockDeductionStatus) === STOCK_DEDUCTION_STATUS_SUCCESS) return next;
-  if (!isStockDeductionTarget(next)) {
-    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_SKIPPED;
-    next.stockDeductionError = "";
-    next.stockDeductionLines = [];
-    next.stockDeductedAt = "";
+  if (normalizeSmaregiSaleStatus(next.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS) return next;
+  if (!isSmaregiSaleTarget(next)) {
+    next.smaregiSaleStatus = SMAREGI_SALE_STATUS_SKIPPED;
+    next.smaregiSaleError = "";
+    next.smaregiSaleLines = [];
+    next.smaregiSaleRegisteredAt = "";
     return next;
   }
   const lines = buildStockDeductionLines(next);
   if (!lines.length) {
-    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_SKIPPED;
-    next.stockDeductionError = "在庫減算対象の商品明細がありません。";
-    next.stockDeductionLines = [];
-    next.stockDeductedAt = "";
+    next.smaregiSaleStatus = SMAREGI_SALE_STATUS_SKIPPED;
+    next.smaregiSaleError = "スマレジ売上登録対象の商品明細がありません。";
+    next.smaregiSaleLines = [];
+    next.smaregiSaleRegisteredAt = "";
     return next;
   }
-  next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_PENDING;
-  next.stockDeductionError = "";
-  next.stockDeductionLines = lines;
+  next.smaregiSaleStatus = SMAREGI_SALE_STATUS_PENDING;
+  next.smaregiSaleError = "";
+  next.smaregiSaleLines = lines;
   try {
-    console.log("[Sales stock deduction request]", {
+    const totals = calcInvoiceTotals(next);
+    console.log("[Sales Smaregi sale request]", {
       invoiceId: next.id,
       invoiceNo: next.invoiceNo,
       originNumber: next.originNumber || next.masterNumber || next.sourceQuoteNo || "",
       transactionType: next.transactionType,
+      total: totals.total,
       lines
     });
-    const response = await fetch("/api/smaregi-stock-decrement", {
+    const response = await fetch("/api/smaregi-sales-register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         invoiceId: next.id,
         invoiceNo: next.invoiceNo,
+        invoiceDate: next.invoiceDate,
+        issuedAt: next.issuedAt,
+        updatedAt: next.updatedAt,
         originNumber: next.originNumber || next.masterNumber || next.sourceQuoteNo || "",
-        idempotencyKey: `${next.id || next.invoiceNo}:stock-deduction`,
+        transactionType: next.transactionType,
+        total: totals.total,
+        tax: totals.tax,
+        smaregiCustomerId: next.smaregiCustomerId || "",
+        smaregiCustomerCode: next.smaregiCustomerCode || "",
+        idempotencyKey: `${next.id || next.invoiceNo}:smaregi-sale`,
         lines
       })
     });
@@ -564,18 +613,18 @@ async function applyInvoiceStockDeduction(invoice) {
       next.stockBaseStockSyncStatus = "failed";
       next.stockBaseStockSyncError = syncError.message || String(syncError);
     }
-    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_SUCCESS;
-    next.stockDeductedAt = new Date().toISOString();
-    next.stockDeductionError = next.stockBaseStockSyncStatus === "failed" ? `products.base_stock同期失敗: ${next.stockBaseStockSyncError || "一部商品未同期"}` : "";
-    next.smaregiStockMovementId = data.smaregiStockMovementId || "";
-    next.stockDeductionLines = lines.map(line => ({ ...line }));
+    next.smaregiSaleStatus = SMAREGI_SALE_STATUS_SUCCESS;
+    next.smaregiSaleRegisteredAt = new Date().toISOString();
+    next.smaregiSaleError = next.stockBaseStockSyncStatus === "failed" ? `products.base_stock同期失敗: ${next.stockBaseStockSyncError || "一部商品未同期"}` : "";
+    next.smaregiTransactionId = data.smaregiTransactionId || "";
+    next.smaregiSaleLines = lines.map(line => ({ ...line }));
     next.stockBaseStockSyncLines = baseStockSync;
   } catch (error) {
-    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_FAILED;
-    next.stockDeductedAt = "";
-    next.stockDeductionError = error.message || String(error);
-    next.smaregiStockMovementId = "";
-    next.stockDeductionLines = lines.map(line => ({ ...line }));
+    next.smaregiSaleStatus = SMAREGI_SALE_STATUS_FAILED;
+    next.smaregiSaleRegisteredAt = "";
+    next.smaregiSaleError = error.message || String(error);
+    next.smaregiTransactionId = "";
+    next.smaregiSaleLines = lines.map(line => ({ ...line }));
   }
   return next;
 }
@@ -895,7 +944,7 @@ function renderInvoiceListRow(invoice) {
     <td>
       <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">${status === INVOICE_STATUS_DRAFT ? "&#32232;&#38598;" : "&#35443;&#32048;"}</button>
       ${canOutputInvoicePdf(invoice) ? `<button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>` : `<button type="button" class="secondary" disabled title="請求書確定後にPDF出力できます">PDF&#20986;&#21147;</button>`}
-      ${canRetryStockDeduction(invoice) ? `<button type="button" class="secondary" onclick="retryInvoiceStockDeduction('${invoice.id}')">在庫減算再実行</button>` : ""}
+      ${canRetryStockDeduction(invoice) ? `<button type="button" class="secondary" onclick="retryInvoiceStockDeduction('${invoice.id}')">売上登録再実行</button>` : ""}
     </td>
   </tr>`;
 }
@@ -974,7 +1023,7 @@ function fillInvoiceForm(invoice) {
   currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || []));
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
   document.getElementById("invoiceStatus").value = invoice.issuedAt ? normalizeInvoiceStatus(invoice.status) : INVOICE_STATUS_DRAFT;
-  setFieldValue("stockDeductionStatus", stockDeductionDisplay(invoice));
+  setFieldValue("stockDeductionStatus", smaregiSaleDisplay(invoice));
   document.getElementById("sourceQuoteNo").value = invoice.sourceQuoteNo || "";
   setFieldValue("salesCustomerId", invoice.customerId || "");
   setFieldValue("salesCustomerCode", invoice.customerCode || "");
@@ -1293,9 +1342,9 @@ async function issueInvoice() {
   fillInvoiceForm(invoice);
   renderInvoiceList();
   const statusLabel = normalizeInvoiceStatus(invoice.status);
-  const stockMessage = stockDeductionDisplay(invoice);
-  showSalesMessage(`請求書を確定しました。ステータスを${statusLabel}に更新しました。在庫減算: ${stockMessage}`, invoice.stockDeductionStatus === STOCK_DEDUCTION_STATUS_FAILED ? "warn" : "ok");
-  showSalesPopup("請求書確定", `請求書を確定しました\n在庫減算: ${stockMessage}${invoice.stockDeductionError ? `\n${invoice.stockDeductionError}` : ""}`, invoice.stockDeductionStatus === STOCK_DEDUCTION_STATUS_FAILED ? "warn" : "ok");
+  const saleMessage = smaregiSaleDisplay(invoice);
+  showSalesMessage(`請求書を確定しました。ステータスを${statusLabel}に更新しました。スマレジ売上登録: ${saleMessage}`, invoice.smaregiSaleStatus === SMAREGI_SALE_STATUS_FAILED ? "warn" : "ok");
+  showSalesPopup("請求書確定", `請求書を確定しました\nスマレジ売上登録: ${saleMessage}${invoice.smaregiSaleError ? `\n${invoice.smaregiSaleError}` : ""}`, invoice.smaregiSaleStatus === SMAREGI_SALE_STATUS_FAILED ? "warn" : "ok");
 }
 
 async function retryInvoiceStockDeduction(id) {
@@ -1307,29 +1356,29 @@ async function retryInvoiceStockDeduction(id) {
   }
   const original = normalizeInvoiceForView(invoices[index]);
   if (!canRetryStockDeduction(original)) {
-    showSalesMessage("在庫減算の再実行対象ではありません。", "warn");
+    showSalesMessage("スマレジ売上登録の再実行対象ではありません。", "warn");
     return;
   }
-  showSalesMessage("在庫減算を再実行しています。", "warn");
+  showSalesMessage("スマレジ売上登録を再実行しています。", "warn");
   let updated = null;
   if (
-    normalizeStockDeductionStatus(original.stockDeductionStatus) === STOCK_DEDUCTION_STATUS_SUCCESS &&
+    normalizeSmaregiSaleStatus(original.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS &&
     original.stockBaseStockSyncStatus === "failed"
   ) {
     updated = { ...original };
     try {
-      const lines = Array.isArray(updated.stockDeductionLines) && updated.stockDeductionLines.length
-        ? updated.stockDeductionLines
+      const lines = Array.isArray(updated.smaregiSaleLines) && updated.smaregiSaleLines.length
+        ? updated.smaregiSaleLines
         : buildStockDeductionLines(updated);
       const baseStockSync = await syncProductsBaseStock(lines);
       updated.stockBaseStockSyncStatus = baseStockSync.every(row => row.ok) ? "success" : "failed";
       updated.stockBaseStockSyncError = updated.stockBaseStockSyncStatus === "failed" ? "一部商品のproducts.base_stock同期に失敗しました。" : "";
-      updated.stockDeductionError = updated.stockBaseStockSyncStatus === "failed" ? updated.stockBaseStockSyncError : "";
+      updated.smaregiSaleError = updated.stockBaseStockSyncStatus === "failed" ? updated.stockBaseStockSyncError : "";
       updated.stockBaseStockSyncLines = baseStockSync;
     } catch (error) {
       updated.stockBaseStockSyncStatus = "failed";
       updated.stockBaseStockSyncError = error.message || String(error);
-      updated.stockDeductionError = `products.base_stock同期失敗: ${updated.stockBaseStockSyncError}`;
+      updated.smaregiSaleError = `products.base_stock同期失敗: ${updated.stockBaseStockSyncError}`;
     }
   } else {
     updated = await applyInvoiceStockDeduction(original);
@@ -1339,9 +1388,9 @@ async function retryInvoiceStockDeduction(id) {
   writeInvoices(invoices);
   if (currentInvoiceId === updated.id) fillInvoiceForm(updated);
   renderInvoiceList();
-  const type = updated.stockDeductionStatus === STOCK_DEDUCTION_STATUS_SUCCESS ? "ok" : "warn";
-  showSalesMessage(`在庫減算再実行: ${stockDeductionDisplay(updated)}`, type);
-  showSalesPopup("在庫減算再実行", `${stockDeductionDisplay(updated)}${updated.stockDeductionError ? `\n${updated.stockDeductionError}` : ""}`, type);
+  const type = updated.smaregiSaleStatus === SMAREGI_SALE_STATUS_SUCCESS ? "ok" : "warn";
+  showSalesMessage(`スマレジ売上登録再実行: ${smaregiSaleDisplay(updated)}`, type);
+  showSalesPopup("スマレジ売上登録再実行", `${smaregiSaleDisplay(updated)}${updated.smaregiSaleError ? `\n${updated.smaregiSaleError}` : ""}`, type);
 }
 
 function retryCurrentInvoiceStockDeduction() {
