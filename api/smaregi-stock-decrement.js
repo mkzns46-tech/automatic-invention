@@ -1,4 +1,5 @@
-const DEFAULT_STOCK_SCOPE = "pos.stocks:write";
+const DEFAULT_STOCK_SCOPE = "pos.stock:write";
+const DEFAULT_STOCK_PATH = "/stock/{product_id}/add";
 
 function sendJson(res, status, payload) {
   try {
@@ -26,48 +27,35 @@ function parseBody(req) {
 }
 
 function resolveSmaregiContext() {
-  const clientId = env("SMAREGI_NEW_CLIENT_ID", "NEW_SMAREGI_CLIENT_ID", "SMAREGI_CLIENT_ID");
-  const clientSecret = env("SMAREGI_NEW_CLIENT_SECRET", "NEW_SMAREGI_CLIENT_SECRET", "SMAREGI_CLIENT_SECRET");
+  const clientId = env("SMAREGI_NEW_CLIENT_ID", "NEW_SMAREGI_CLIENT_ID");
+  const clientSecret = env("SMAREGI_NEW_CLIENT_SECRET", "NEW_SMAREGI_CLIENT_SECRET");
   const contractId = env(
     "SMAREGI_NEW_CONTRACT_ID",
     "SMAREGI_NEW_CONTRACTID",
     "NEW_SMAREGI_CONTRACT_ID",
-    "NEW_SMAREGI_CONTRACTID",
-    "SMAREGI_CONTRACT_ID",
-    "SMAREGI_CONTRACTID"
+    "NEW_SMAREGI_CONTRACTID"
   );
-  const apiBase = env("SMAREGI_NEW_POS_API_BASE_URL", "NEW_SMAREGI_POS_API_BASE_URL", "SMAREGI_POS_API_BASE_URL");
+  const apiBase = env("SMAREGI_NEW_POS_API_BASE_URL", "NEW_SMAREGI_POS_API_BASE_URL");
   const storeId = env(
     "SMAREGI_NEW_TOKYO_STORE_ID",
     "NEW_SMAREGI_TOKYO_STORE_ID",
-    "SMAREGI_TOKYO_STORE_ID",
-    "SMAREGI_NEW_STORE_ID",
-    "NEW_SMAREGI_STORE_ID",
-    "SMAREGI_STORE_ID"
+    "SMAREGI_TOKYO_STORE_ID"
   );
   const stockPath = env(
     "SMAREGI_NEW_TOKYO_STOCK_DECREMENT_PATH",
-    "NEW_SMAREGI_TOKYO_STOCK_DECREMENT_PATH",
-    "SMAREGI_STOCK_DECREMENT_PATH",
-    "SMAREGI_NEW_STOCK_DECREMENT_PATH"
+    "NEW_SMAREGI_TOKYO_STOCK_DECREMENT_PATH"
   );
   const stockUrl = env(
     "SMAREGI_NEW_TOKYO_STOCK_DECREMENT_URL",
-    "NEW_SMAREGI_TOKYO_STOCK_DECREMENT_URL",
-    "SMAREGI_STOCK_DECREMENT_URL",
-    "SMAREGI_NEW_STOCK_DECREMENT_URL"
+    "NEW_SMAREGI_TOKYO_STOCK_DECREMENT_URL"
   );
   const stockMethod = env(
     "SMAREGI_NEW_TOKYO_STOCK_DECREMENT_METHOD",
-    "NEW_SMAREGI_TOKYO_STOCK_DECREMENT_METHOD",
-    "SMAREGI_STOCK_DECREMENT_METHOD",
-    "SMAREGI_NEW_STOCK_DECREMENT_METHOD"
+    "NEW_SMAREGI_TOKYO_STOCK_DECREMENT_METHOD"
   ) || "POST";
   const stockScope = env(
     "SMAREGI_NEW_TOKYO_STOCK_SCOPE",
-    "NEW_SMAREGI_TOKYO_STOCK_SCOPE",
-    "SMAREGI_STOCK_SCOPE",
-    "SMAREGI_NEW_STOCK_SCOPE"
+    "NEW_SMAREGI_TOKYO_STOCK_SCOPE"
   ) || DEFAULT_STOCK_SCOPE;
   return {
     accountKey: "new",
@@ -87,21 +75,23 @@ function resolveSmaregiContext() {
 }
 
 function resolveStockPath(path, context) {
-  if (!path) {
-    throw new Error("SMAREGI_STOCK_DECREMENT_PATH is not configured for new Smaregi Tokyo store");
-  }
-  return path
+  return (path || DEFAULT_STOCK_PATH)
     .replaceAll("{store_id}", encodeURIComponent(context.storeId || ""))
     .replaceAll("{storeId}", encodeURIComponent(context.storeId || ""));
 }
 
-function resolveStockUrl(context, apiBase) {
+function resolveStockUrl(context, apiBase, line) {
+  const productId = encodeURIComponent(line.productId || line.smaregiProductId || "");
   if (context.stockUrl) {
     return context.stockUrl
       .replaceAll("{store_id}", encodeURIComponent(context.storeId || ""))
-      .replaceAll("{storeId}", encodeURIComponent(context.storeId || ""));
+      .replaceAll("{storeId}", encodeURIComponent(context.storeId || ""))
+      .replaceAll("{product_id}", productId)
+      .replaceAll("{productId}", productId);
   }
-  return apiBase + resolveStockPath(context.stockPath, context);
+  return apiBase + resolveStockPath(context.stockPath, context)
+    .replaceAll("{product_id}", productId)
+    .replaceAll("{productId}", productId);
 }
 
 async function getAccessToken(context) {
@@ -150,9 +140,56 @@ function normalizeLines(lines) {
   }).filter(line => line.quantity > 0 && (line.productId || line.productCode || line.barcode));
 }
 
+function groupLinesByProduct(lines) {
+  const grouped = new Map();
+  for (const line of lines) {
+    if (!line.productId) {
+      throw new Error(
+        `Missing smaregi_product_id for stock decrement: ${line.name || line.barcode || line.productCode || "unknown"}`
+      );
+    }
+    const key = line.productId;
+    const current = grouped.get(key) || {
+      productId: line.productId,
+      productCode: line.productCode,
+      barcode: line.barcode,
+      name: line.name,
+      quantity: 0,
+      changeQuantity: 0
+    };
+    current.quantity += Number(line.quantity || 0);
+    current.changeQuantity = -Math.abs(current.quantity);
+    grouped.set(key, current);
+  }
+  return Array.from(grouped.values())
+    .map(line => ({
+      ...line,
+      quantity: Math.abs(Number(line.quantity || 0)),
+      changeQuantity: -Math.abs(Number(line.quantity || 0))
+    }))
+    .filter(line => line.quantity > 0);
+}
+
+function buildStockPayload(context, line, body) {
+  const memoBase = [
+    "ARICO sales",
+    body.invoiceNo || "",
+    body.originNumber || ""
+  ].filter(Boolean).join(" ");
+  return {
+    storeId: String(context.storeId || ""),
+    stockAmount: String(-Math.abs(Number(line.quantity || 0))),
+    stockHistory: {
+      memo: memoBase.slice(0, 100)
+    }
+  };
+}
+
 function findMovementId(body) {
   if (!body || typeof body !== "object") return "";
   return String(
+    body.stockHistory?.id ||
+    body.stock_history?.id ||
     body.stockMovementId ||
     body.stock_movement_id ||
     body.movementId ||
@@ -195,61 +232,74 @@ module.exports = async function handler(req, res) {
     if (!context.storeId) {
       throw new Error("New Smaregi Tokyo store ID is not configured. Set SMAREGI_NEW_TOKYO_STORE_ID.");
     }
-    const stockUrl = resolveStockUrl(context, apiBase);
+    const stockLines = groupLinesByProduct(lines);
     step = "oauth_token";
     const token = await getAccessToken(context);
     step = "stock_decrement";
-    const payload = {
-      storeId: context.storeId || body.storeId || "",
-      reason: "sales_invoice_issue",
+    console.log("[smaregi-stock-decrement] request", {
       invoiceNo: body.invoiceNo || "",
       originNumber: body.originNumber || "",
-      idempotencyKey: body.idempotencyKey || body.invoiceId || body.invoiceNo || "",
-      lines
-    };
-    console.log("[smaregi-stock-decrement] request", {
-      invoiceNo: payload.invoiceNo,
-      originNumber: payload.originNumber,
       storeName: context.storeName,
       storeId: context.storeId,
       stockMethod: context.stockMethod,
-      stockUrl,
-      lineCount: lines.length
+      stockPath: context.stockPath || DEFAULT_STOCK_PATH,
+      lineCount: stockLines.length
     });
-    const response = await fetch(stockUrl, {
-      method: context.stockMethod,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-    const responseText = await response.text().catch(() => "");
-    let responseBody = null;
-    try {
-      responseBody = responseText ? JSON.parse(responseText) : null;
-    } catch (_) {
-      throw new Error(`Smaregi stock decrement JSON parse failed ${response.status}: ${responseText.slice(0, 500)}`);
-    }
-    if (!response.ok) {
-      throw new Error(`Smaregi stock decrement error ${response.status}: ${JSON.stringify(responseBody)}`);
+
+    const results = [];
+    for (const line of stockLines) {
+      const stockUrl = resolveStockUrl(context, apiBase, line);
+      const payload = buildStockPayload(context, line, body);
+      const response = await fetch(stockUrl, {
+        method: context.stockMethod,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      const responseText = await response.text().catch(() => "");
+      let responseBody = null;
+      try {
+        responseBody = responseText ? JSON.parse(responseText) : null;
+      } catch (_) {
+        throw new Error(
+          `Smaregi stock decrement JSON parse failed ${response.status} productId=${line.productId}: ${responseText.slice(0, 500)}`
+        );
+      }
+      if (!response.ok) {
+        throw new Error(
+          `Smaregi stock decrement error ${response.status} productId=${line.productId}: ${JSON.stringify(responseBody)}`
+        );
+      }
+      results.push({
+        productId: line.productId,
+        productCode: line.productCode,
+        barcode: line.barcode,
+        name: line.name,
+        quantity: line.quantity,
+        changeQuantity: line.changeQuantity,
+        stockUrl,
+        response: responseBody,
+        smaregiStockMovementId: findMovementId(responseBody)
+      });
     }
     return sendJson(res, 200, {
       ok: true,
       step,
       status: 200,
-      smaregiStockMovementId: findMovementId(responseBody),
-      lines,
-      response: responseBody,
+      smaregiStockMovementId: results.map(result => result.smaregiStockMovementId).filter(Boolean).join(","),
+      lines: stockLines,
+      results,
       context: {
         accountKey: context.accountKey,
         accountName: context.accountName,
         storeCode: context.storeCode,
         storeName: context.storeName,
         storeId: context.storeId || null,
-        stockPath: context.stockPath || null,
-        stockUrl,
+        stockPath: context.stockPath || DEFAULT_STOCK_PATH,
+        stockUrl: context.stockUrl || null,
         stockMethod: context.stockMethod,
         stockScope: context.stockScope
       }
