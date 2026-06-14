@@ -362,7 +362,7 @@ function selectQuoteCustomer(customerId) {
   setFieldValue("quoteCustomerSearchInput", "");
   const results = document.getElementById("quoteCustomerSearchResults");
   if (results) results.innerHTML = "";
-  showSalesPopup("顧客選択", "顧客情報を反映しました", "ok");
+  showSalesPopup("完了", "顧客情報を反映しました", "ok");
 }
 
 function applyCustomerToQuote(customer) {

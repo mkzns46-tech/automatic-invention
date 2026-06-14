@@ -1,67 +1,67 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARICO ARCHERY 隲区ｱよ嶌</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-table-invoice-payment-fix">
+<title>ARICO ARCHERY 請求書</title>
+<link rel="stylesheet" href="sales-style.css?v=20260614-html-repair">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-lists-hidden" defer></script>
-<script src="customers-storage.js?v=20260614-origin-customer-master"></script>
+<script src="customers-storage.js?v=20260614-html-repair"></script>
 <script src="invoice-pdf.js?v=20260614-lists-hidden"></script>
-<script src="invoices.js?v=20260614-table-invoice-payment-fix" defer></script>
+<script src="invoices.js?v=20260614-html-repair" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
   <header class="sales-header">
     <div>
       <div class="brand">ARICO ARCHERY</div>
-      <h1>隲区ｱよ嶌</h1>
-      <p class="lead">隕狗ｩ肴嶌縺九ｉ螟画鋤縺励◆隲区ｱよ嶌縺ｮ荳隕ｧ繝ｻ邱ｨ髮・・PDF蜃ｺ蜉帙ｒ陦後＞縺ｾ縺吶ょ惠蠎ｫ縺ｨ繧ｹ繝槭Ξ繧ｸ螢ｲ荳翫・螟画峩縺励∪縺帙ｓ縲・/p>
+      <h1>請求書</h1>
+      <p class="lead">見積書から変換した請求書の一覧・編集・PDF出力を行います。在庫とスマレジ売上は変更しません。</p>
     </div>
     <div class="sales-actions">
-      <a class="pill" href="quotes.html">隕狗ｩ肴嶌</a>
-      <button type="button" class="secondary" onclick="logoutSales();">繝ｭ繧ｰ繧､繝ｳ逕ｻ髱｢縺ｫ謌ｻ繧・/button>
+      <a class="pill" href="quotes.html">見積書</a>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
     </div>
   </header>
 
-  <div id="salesMessage" class="message">隲区ｱよ嶌繧堤｢ｺ隱阪〒縺阪∪縺吶・/div>
+  <div id="salesMessage" class="message">請求書を確認できます。</div>
 
   <section class="card collapsible-list-card" id="invoiceListCard">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleInvoiceList();">隲区ｱよ嶌荳隕ｧ <span class="status-badge muted" id="invoiceListCount">0莉ｶ</span></h2>
-      <button type="button" class="secondary list-toggle-button" id="invoiceListToggle" onclick="toggleInvoiceList();">荳隕ｧ繧帝哩縺倥ｋ</button>
-      <button type="button" class="secondary" onclick="clearInvoiceEditor();">譁ｰ隕丞・蜉帙ｒ繧ｯ繝ｪ繧｢</button>
+      <h2 class="list-heading" onclick="toggleInvoiceList();">請求書一覧 <span class="status-badge muted" id="invoiceListCount">0件</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="invoiceListToggle" onclick="toggleInvoiceList();">一覧を閉じる</button>
+      <button type="button" class="secondary" onclick="clearInvoiceEditor();">新規入力をクリア</button>
     </div>
     <div class="list-panel" id="invoiceListPanel">
       <div class="list-filter-row">
-        <label>荳隕ｧ讀懃ｴ｢<input id="invoiceListSearch" placeholder="鬘ｧ螳｢蜷阪・諡・ｽ楢・・莉ｶ蜷阪・隲区ｱよ嶌逡ｪ蜿ｷ繝ｻ繧ｹ繝・・繧ｿ繧ｹ"></label>
-        <label>繧ｹ繝・・繧ｿ繧ｹ
-          <select id="invoiceStatusFilter">
-            <option value="">蜈ｨ縺ｦ</option>
-            <option value="荳区嶌縺・>荳区嶌縺・/option>
-            <option value="逋ｺ陦梧ｸ医∩">逋ｺ陦梧ｸ医∩</option>
-            <option value="蜈･驥大ｾ・■">蜈･驥大ｾ・■</option>
-            <option value="蜈･驥第ｸ医∩">蜈･驥第ｸ医∩</option>
-            <option value="繧ｭ繝｣繝ｳ繧ｻ繝ｫ">繧ｭ繝｣繝ｳ繧ｻ繝ｫ</option>
+        <label>一覧検索<input id="invoiceListSearch" placeholder="顧客名・担当者・件名・請求書番号・ステータス"></label>
+        <label>ステータス
+          <select id="invoiceListStatusFilter">
+            <option value="">全て</option>
+            <option value="下書き">下書き</option>
+            <option value="発行済み">発行済み</option>
+            <option value="入金待ち">入金待ち</option>
+            <option value="入金済み">入金済み</option>
+            <option value="キャンセル">キャンセル</option>
           </select>
         </label>
-        <label>髢句ｧ区律<input id="invoiceDateFromFilter" type="date"></label>
-        <label>邨ゆｺ・律<input id="invoiceDateToFilter" type="date"></label>
+        <label>開始日<input id="invoiceDateFromFilter" type="date"></label>
+        <label>終了日<input id="invoiceDateToFilter" type="date"></label>
       </div>
-      <div class="list-subheading">蟇ｾ蠢懊′蠢・ｦ√↑隲区ｱよ嶌</div>
+      <div class="list-subheading">対応が必要な請求書</div>
       <div class="table-wrap list-scroll">
-      <table>
-        <thead><tr><th>&#20253;&#31080;&#30058;&#21495;</th><th>&#26085;&#20184;</th><th>&#22243;&#20307;&#21517;</th><th>&#39015;&#23458;&#21517;</th><th>&#21512;&#35336;&#37329;&#38989;</th><th>&#12473;&#12486;&#12540;&#12479;&#12473;</th><th>&#25285;&#24403;&#32773;</th><th>&#25805;&#20316;</th></tr></thead>
-        <tbody id="invoiceListBody"></tbody>
-      </table>
+        <table>
+          <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <tbody id="invoiceListBody"></tbody>
+        </table>
       </div>
       <div class="list-panel completed-list-panel" id="invoiceCompletedListPanel" hidden>
-        <div class="list-subheading">螳御ｺ・ｸ医∩繝ｻ繧ｭ繝｣繝ｳ繧ｻ繝ｫ貂医∩</div>
+        <div class="list-subheading">完了済み・キャンセル済み</div>
         <div class="table-wrap list-scroll">
           <table>
-            <thead><tr><th>&#20253;&#31080;&#30058;&#21495;</th><th>&#26085;&#20184;</th><th>&#22243;&#20307;&#21517;</th><th>&#39015;&#23458;&#21517;</th><th>&#21512;&#35336;&#37329;&#38989;</th><th>&#12473;&#12486;&#12540;&#12479;&#12473;</th><th>&#25285;&#24403;&#32773;</th><th>&#25805;&#20316;</th></tr></thead>
+            <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
             <tbody id="invoiceCompletedListBody"></tbody>
           </table>
         </div>
@@ -70,59 +70,59 @@
   </section>
 
   <section class="card" id="invoiceEditorCard">
-    <h2>&#35531;&#27714;&#24773;&#22577;</h2>
+    <h2>請求情報</h2>
     <input id="salesCustomerId" type="hidden">
     <input id="salesCustomerCode" type="hidden">
     <input id="salesSmaregiCustomerId" type="hidden">
     <input id="salesSmaregiCustomerCode" type="hidden">
     <div class="row">
-      <label>&#35531;&#27714;&#26360;&#30058;&#21495;<input id="invoiceNo" readonly></label>
-      <label>&#12473;&#12486;&#12540;&#12479;&#12473;<select id="invoiceStatus"></select></label>
-      <label>&#20803;&#35211;&#31309;&#30058;&#21495;<input id="sourceQuoteNo" readonly></label>
-      <label>&#30330;&#34892;&#26085;&#26178;<input id="issuedAt"></label>
+      <label>請求書番号<input id="invoiceNo" readonly></label>
+      <label>ステータス<select id="invoiceStatus"></select></label>
+      <label>元見積番号<input id="sourceQuoteNo" readonly></label>
+      <label>発行日時<input id="issuedAt"></label>
     </div>
-    <p class="section-note customer-readonly-note">&#39015;&#23458;&#24773;&#22577;&#12399;&#35211;&#31309;&#26360;&#12363;&#12425;&#24341;&#12365;&#32153;&#12366;&#12414;&#12377;</p>
+    <p class="section-note customer-readonly-note">顧客情報は見積書から引き継ぎます</p>
     <div class="row three">
-      <label>&#39015;&#23458;&#21517;<input class="customer-readonly-input" id="customerName" readonly></label>
-      <label>&#22243;&#20307;&#21517;<input class="customer-readonly-input" id="invoiceOrganizationName" readonly></label>
-      <label>&#39015;&#23458;&#21306;&#20998;<input class="customer-readonly-input" id="customerType" readonly></label>
-    </div>
-    <div class="row three">
-      <label>&#20303;&#25152;<input class="customer-readonly-input" id="customerAddress" readonly></label>
-      <label>&#38651;&#35441;&#30058;&#21495;<input class="customer-readonly-input" id="customerPhone" readonly></label>
-      <label>&#12513;&#12540;&#12523;&#12450;&#12489;&#12524;&#12473;<input class="customer-readonly-input" id="customerEmail" readonly></label>
+      <label>顧客名<input class="customer-readonly-input" id="customerName" readonly></label>
+      <label>団体名<input class="customer-readonly-input" id="invoiceOrganizationName" readonly></label>
+      <label>顧客区分<input class="customer-readonly-input" id="customerType" readonly></label>
     </div>
     <div class="row three">
-      <label>&#25285;&#24403;&#32773;<input id="invoiceStaff"></label>
-      <label>&#20214;&#21517;<input id="invoiceSubject"></label>
-      <label>&#35531;&#27714;&#26085;<input id="invoiceDate" type="date"></label>
+      <label>住所<input class="customer-readonly-input" id="customerAddress" readonly></label>
+      <label>電話番号<input class="customer-readonly-input" id="customerPhone" readonly></label>
+      <label>メールアドレス<input class="customer-readonly-input" id="customerEmail" readonly></label>
     </div>
     <div class="row three">
-      <label>&#25903;&#25173;&#26399;&#38480;<input id="dueDate" type="date"></label>
+      <label>担当者<input id="invoiceStaff"></label>
+      <label>件名<input id="invoiceSubject"></label>
+      <label>請求日<input id="invoiceDate" type="date"></label>
     </div>
-    <label>&#20633;&#32771;<textarea id="invoiceMemo"></textarea></label>
+    <div class="row three">
+      <label>支払期限<input id="dueDate" type="date"></label>
+    </div>
+    <label>備考<textarea id="invoiceMemo"></textarea></label>
   </section>
 
   <section class="card">
-    <h2>隲区ｱょ膚蜩・/h2>
+    <h2>請求商品</h2>
     <div id="invoiceLines" class="invoice-lines"></div>
     <div class="summary">
-      <div>蟆剰ｨ・strong id="subtotalText">0蜀・/strong></div>
-      <div>蛟､蠑輔″ <strong id="discountText">0蜀・/strong></div>
-      <div>蜷郁ｨ・strong id="totalText">0蜀・/strong></div>
-      <div>蜀・ｶ郁ｲｻ遞・strong id="taxText">0蜀・/strong></div>
+      <div>小計<strong id="subtotalText">0円</strong></div>
+      <div>値引き <strong id="discountText">0円</strong></div>
+      <div>合計<strong id="totalText">0円</strong></div>
+      <div>内消費税<strong id="taxText">0円</strong></div>
     </div>
     <div class="sales-actions" style="margin-top:14px">
-      <button type="button" class="primary" id="saveInvoiceBtn" onclick="saveInvoice();">菫晏ｭ・/button>
-      <button type="button" class="primary invoice-issue-button" id="issueInvoiceBtn" onclick="issueInvoice();">逋ｺ陦檎｢ｺ螳・/button>
-      <button type="button" class="secondary" id="invoicePdfBtn" onclick="outputCurrentInvoicePdf();">PDF蜃ｺ蜉・/button>
-      <button type="button" class="danger" id="cancelInvoiceBtn" onclick="cancelInvoice();">繧ｭ繝｣繝ｳ繧ｻ繝ｫ</button>
+      <button type="button" class="primary" id="saveInvoiceBtn" onclick="saveInvoice();">保存</button>
+      <button type="button" class="primary invoice-issue-button" id="issueInvoiceBtn" onclick="issueInvoice();">発行確定</button>
+      <button type="button" class="secondary" id="invoicePdfBtn" onclick="outputCurrentInvoicePdf();">PDF出力</button>
+      <button type="button" class="danger" id="cancelInvoiceBtn" onclick="cancelInvoice();">キャンセル</button>
     </div>
   </section>
 </main>
 <div id="salesPopup" class="app-popup" style="display:none;">
   <div class="app-popup-card">
-    <div id="salesPopupTitle" class="app-popup-title">螳御ｺ・/div>
+    <div id="salesPopupTitle" class="app-popup-title">完了</div>
     <div id="salesPopupBody" class="app-popup-body"></div>
     <button type="button" id="salesPopupClose">OK</button>
   </div>
