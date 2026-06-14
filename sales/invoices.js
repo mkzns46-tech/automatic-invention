@@ -412,6 +412,10 @@ function clearInvoiceEditor() {
 }
 
 function fillInvoiceForm(invoice) {
+  invoice.customerName = invoice.customerName || invoice.name || "";
+  invoice.organizationName = invoice.organizationName || invoice.organization || invoice.companyName || "";
+  invoice.items = invoice.items || invoice.lines || [];
+  invoice.lines = invoice.lines || invoice.items || [];
   currentInvoiceId = invoice.id || null;
   currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || invoice.items || []));
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
@@ -422,7 +426,7 @@ function fillInvoiceForm(invoice) {
   setFieldValue("salesSmaregiCustomerId", invoice.smaregiCustomerId || "");
   setFieldValue("salesSmaregiCustomerCode", invoice.smaregiCustomerCode || "");
   document.getElementById("issuedAt").value = formatDateTime(invoice.issuedAt);
-  document.getElementById("customerName").value = invoice.customerName || invoice.name || "";
+  document.getElementById("customerName").value = invoice.customerName || "";
   document.getElementById("customerType").value = invoice.customerType || "";
   document.getElementById("invoiceStaff").value = invoice.staff || "";
   document.getElementById("customerAddress").value = invoice.address || "";
@@ -501,6 +505,7 @@ function updateInvoiceLockState(invoice) {
     "customerPhone",
     "customerEmail",
     "invoiceSubject",
+    "issuedAt",
     "invoiceDate",
     "dueDate",
     "invoiceMemo"
@@ -573,12 +578,12 @@ function collectInvoice() {
     customerCode: document.getElementById("salesCustomerCode")?.value || existing?.customerCode || "",
     smaregiCustomerId: document.getElementById("salesSmaregiCustomerId")?.value || existing?.smaregiCustomerId || "",
     smaregiCustomerCode: document.getElementById("salesSmaregiCustomerCode")?.value || existing?.smaregiCustomerCode || "",
-    issuedAt: existing?.issuedAt || "",
+    issuedAt: document.getElementById("issuedAt")?.value || existing?.issuedAt || "",
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     status: normalizeInvoiceStatus(document.getElementById("invoiceStatus").value),
     customerName: document.getElementById("customerName").value.trim(),
-    organizationName: existing?.organizationName || "",
+    organizationName: existing?.organizationName || existing?.organization || existing?.companyName || "",
     customerType: document.getElementById("customerType").value.trim(),
     address: document.getElementById("customerAddress").value.trim(),
     phone: document.getElementById("customerPhone").value.trim(),
@@ -634,8 +639,9 @@ async function issueInvoice() {
     return;
   }
   invoice.status = "waiting_payment";
-  invoice.issuedAt = new Date().toISOString();
-  invoice.updatedAt = invoice.issuedAt;
+  const issuedAtInput = document.getElementById("issuedAt")?.value;
+  invoice.issuedAt = issuedAtInput || new Date().toISOString();
+  invoice.updatedAt = new Date().toISOString();
   ensureDeliveryForInvoice(invoice);
   invoices[index] = invoice;
   writeInvoices(invoices);

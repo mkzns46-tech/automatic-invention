@@ -66,26 +66,28 @@
   </section>
 
   <section class="card" id="receiptDetailCard">
-    <h2>領収書詳細</h2>
+    <h2>&#38936;&#21454;&#26360;&#35443;&#32048;</h2>
     <div class="row three">
-      <label>領収書番号<input id="receiptNo" readonly></label>
-      <label>請求書番号<input id="sourceInvoiceNo" readonly></label>
-      <label>ステータス<input id="receiptStatus" readonly></label>
+      <label>&#38936;&#21454;&#26360;&#30058;&#21495;<input id="receiptNo" readonly></label>
+      <label>&#35531;&#27714;&#26360;&#30058;&#21495;<input id="sourceInvoiceNo" readonly></label>
+      <label>&#12473;&#12486;&#12540;&#12479;&#12473;<input id="receiptStatus" readonly></label>
     </div>
     <div class="row three">
-      <label>顧客名<input id="receiptCustomerName" readonly></label>
-      <label>件名<input id="receiptSubject" readonly></label>
-      <label>担当者<input id="receiptStaff" readonly></label>
+      <label>&#39015;&#23458;&#21517;<input id="receiptCustomerName"></label>
+      <label>&#20214;&#21517;<input id="receiptSubject"></label>
+      <label>&#25285;&#24403;&#32773;<input id="receiptStaff" readonly></label>
     </div>
     <div class="row three">
-      <label>入金日<input id="receiptPaymentDate" readonly></label>
-      <label>入金額<input id="receiptAmount" readonly></label>
-      <label>入金方法<input id="receiptMethod" readonly></label>
+      <label>&#20837;&#37329;&#26085;<input id="receiptPaymentDate" type="date"></label>
+      <label>&#20837;&#37329;&#38989;<input id="receiptAmount" readonly></label>
+      <label>&#20837;&#37329;&#26041;&#27861;<input id="receiptMethod" readonly></label>
     </div>
-    <div class="row two">      <label>備考<textarea id="receiptMemo" readonly></textarea></label>
+    <div class="row two">
+      <label>&#20633;&#32771;<textarea id="receiptMemo" readonly></textarea></label>
     </div>
     <div class="sales-actions" style="margin-top:14px">
-      <button type="button" class="secondary" onclick="outputCurrentReceiptPdf();">PDF出力</button>
+      <button type="button" onclick="saveCurrentReceipt();">&#20445;&#23384;</button>
+      <button type="button" class="secondary" onclick="outputCurrentReceiptPdf();">PDF&#20986;&#21147;</button>
     </div>
   </section>
 </main>

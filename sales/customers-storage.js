@@ -41,6 +41,7 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
     return readCustomers().filter(customer => {
       const haystack = [
         customer.customerName,
+        customer.organizationName,
         customer.kana,
         customer.phone,
         customer.email,

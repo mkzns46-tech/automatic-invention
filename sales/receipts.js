@@ -358,7 +358,47 @@ function selectReceipt(id) {
   showSalesMessage(`${receipt.receiptNo || ""} を表示しています。`, "ok");
 }
 
+function saveReceiptEditsSilently() {
+  if (!currentReceiptId) return;
+  const receipts = readReceipts();
+  const index = receipts.findIndex(row => row.id === currentReceiptId);
+  if (index < 0) return;
+  const receipt = receipts[index];
+  receipt.customerName = document.getElementById("receiptCustomerName")?.value.trim() || receipt.customerName || "";
+  receipt.subject = document.getElementById("receiptSubject")?.value.trim() || receipt.subject || "";
+  receipt.paymentDate = document.getElementById("receiptPaymentDate")?.value || receipt.paymentDate || "";
+  receipt.memo = document.getElementById("receiptMemo")?.value || receipt.memo || "";
+  receipt.updatedAt = new Date().toISOString();
+  receipts[index] = receipt;
+  writeReceipts(receipts);
+}
+
+function saveCurrentReceipt() {
+  if (!currentReceiptId) {
+    showSalesPopup("\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093", "\u9818\u53ce\u66f8\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044\u3002", "warn");
+    return;
+  }
+  const receipts = readReceipts();
+  const index = receipts.findIndex(row => row.id === currentReceiptId);
+  if (index < 0) {
+    showSalesPopup("\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093", "\u9818\u53ce\u66f8\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3002", "err");
+    return;
+  }
+  const receipt = receipts[index];
+  receipt.customerName = document.getElementById("receiptCustomerName")?.value.trim() || "";
+  receipt.subject = document.getElementById("receiptSubject")?.value.trim() || "";
+  receipt.paymentDate = document.getElementById("receiptPaymentDate")?.value || receipt.paymentDate || "";
+  receipt.memo = document.getElementById("receiptMemo")?.value || "";
+  receipt.updatedAt = new Date().toISOString();
+  receipts[index] = receipt;
+  writeReceipts(receipts);
+  renderReceiptLists();
+  selectReceipt(receipt.id);
+  showSalesPopup("\u4fdd\u5b58\u5b8c\u4e86", "\u9818\u53ce\u66f8\u3092\u4fdd\u5b58\u3057\u307e\u3057\u305f\u3002", "ok");
+}
+
 function outputCurrentReceiptPdf() {
+  saveReceiptEditsSilently();
   const receipt = markReceiptIssued(currentReceiptId);
   if (receipt) printReceiptPdf(receipt);
 }

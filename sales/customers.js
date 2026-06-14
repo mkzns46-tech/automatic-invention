@@ -113,10 +113,11 @@ function renderCustomerList() {
   const customers = allCustomers.filter(matchesCustomerFilters)
     .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
   const count = document.getElementById("customerListCount");
-  if (count) count.textContent = `${customers.length}件`;
+  if (count) count.textContent = `${customers.length}\u4ef6`;
   body.innerHTML = customers.length ? customers.map(customer => `<tr>
     <td>${escapeHtml(customer.customerCode)}</td>
     <td><button type="button" class="link-button" onclick="showCustomerDetail('${escapeHtml(customer.id)}');">${escapeHtml(customer.customerName)}</button> ${customerSyncBadge(customer)}</td>
+    <td>${escapeHtml(customer.organizationName || "")}</td>
     <td>${escapeHtml(customer.customerType)}</td>
     <td>${escapeHtml(customer.phone)}</td>
     <td>${escapeHtml(customer.email)}</td>
@@ -124,7 +125,7 @@ function renderCustomerList() {
     <td>${escapeHtml(customer.staff)}</td>
     <td>${escapeHtml(formatDate(customer.updatedAt))}</td>
     <td><button type="button" class="secondary" onclick="editCustomer('${escapeHtml(customer.id)}');">&#32232;&#38598;</button> ${canDeleteCustomer(customer) ? `<button type="button" class="danger" onclick="deleteCustomer('${escapeHtml(customer.id)}');">&#21066;&#38500;</button>` : ""}</td>
-  </tr>`).join("") : '<tr><td colspan="9">顧客データはありません。</td></tr>';
+  </tr>`).join("") : '<tr><td colspan="10">&#39015;&#23458;&#12487;&#12540;&#12479;&#12399;&#12354;&#12426;&#12414;&#12379;&#12435;&#12290;</td></tr>';
 }
 
 function customerSyncBadge(customer) {
@@ -225,6 +226,7 @@ function matchesCustomerFilters(customer) {
   if (!customerSearchText) return true;
   const text = [
     customer.customerName,
+    customer.organizationName,
     customer.kana,
     customer.customerType,
     customer.phone,
@@ -331,7 +333,10 @@ function clearCustomerForm() {
     "customerMemo"
   ];
   fields.forEach(id => setValue(id, ""));
-  setValue("customerType", "個人");
+  setValue("customerCode", customerStorage().nextCustomerCode(customerStorage().readCustomers()));
+  setValue("customerType", "\u500b\u4eba");
+  setCustomerFormMode("new");
+  updateCustomerDeleteButton(null);
 }
 
 function setCustomerFormMode(mode) {
@@ -400,9 +405,12 @@ async function deleteCustomer(id) {
   const ok = await confirmCustomerPopup("\u9867\u5ba2\u524a\u9664", "\u3053\u306e\u9867\u5ba2\u3092\u524a\u9664\u3057\u307e\u3059\u304b\uff1f", "warn");
   if (!ok) return;
   customerStorage().writeCustomers(customers.filter(row => row.id !== id));
-  clearCustomerForm();
-  renderCustomerList();
+  const selectedId = getValue("customerId");
+  if (selectedId === id) clearCustomerForm();
+  else updateCustomerDeleteButton(null);
   showSalesPopup("\u524a\u9664\u5b8c\u4e86", "\u9867\u5ba2\u3092\u524a\u9664\u3057\u307e\u3057\u305f", "ok");
+  const popup = document.getElementById("salesPopup");
+  if (popup) popup.dataset.afterClose = "renderCustomerList";
 }
 
 function confirmCustomerPopup(title, body, type = "warn") {
@@ -433,7 +441,7 @@ function confirmCustomerPopup(title, body, type = "warn") {
       popup.classList.add("hidden");
       cancelButton.style.display = "none";
       okButton.textContent = "OK";
-      okButton.onclick = null;
+      okButton.onclick = closeSalesPopup;
       cancelButton.onclick = null;
       resolve(result);
     };
@@ -492,6 +500,10 @@ function showSalesPopup(title, body, type = "ok") {
     alert(body || title);
     return;
   }
+  const okButton = popup.querySelector("button");
+  const cancelButton = document.getElementById("salesPopupCancel");
+  if (okButton) okButton.onclick = closeSalesPopup;
+  if (cancelButton) cancelButton.style.display = "none";
   popup.dataset.type = type;
   popupTitle.textContent = title;
   popupBody.textContent = body;
@@ -500,5 +512,9 @@ function showSalesPopup(title, body, type = "ok") {
 }
 
 function closeSalesPopup() {
-  document.getElementById("salesPopup")?.classList.add("hidden");
+  const popup = document.getElementById("salesPopup");
+  const afterClose = popup?.dataset.afterClose || "";
+  popup?.classList.add("hidden");
+  if (popup) delete popup.dataset.afterClose;
+  if (afterClose === "renderCustomerList") renderCustomerList();
 }

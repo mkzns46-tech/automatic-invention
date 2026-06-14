@@ -519,6 +519,7 @@ function buildInvoiceFromQuote(quote, invoices) {
   const now = new Date().toISOString();
   const lines = quote.lines || quote.items || [];
   const customerName = quote.customerName || quote.name || "";
+  const organizationName = quote.organizationName || quote.organization || quote.companyName || "";
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     invoiceNo: nextInvoiceNo(invoices),
@@ -532,7 +533,7 @@ function buildInvoiceFromQuote(quote, invoices) {
     updatedAt: now,
     status: "draft",
     customerName,
-    organizationName: quote.organizationName || "",
+    organizationName,
     customerType: quote.customerType || "",
     address: quote.address || "",
     phone: quote.phone || "",
