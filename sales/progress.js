@@ -7,7 +7,7 @@ const PROGRESS_KEYS = {
 };
 
 const TRANSACTION_OPTIONS = ["", "通常販売", "交換", "返金", "無償提供", "その他"];
-const STATUS_OPTIONS = ["", "下書き", "請求書変換済み", "請求書発行済", "未発行", "納品書発行済", "発送済", "発行済み", "入金待ち", "一部入金", "入金済み", "入金不要", "支払期限超過", "納品待ち", "発送待ち", "未納品", "納品済み"];
+const STATUS_OPTIONS = ["", "下書き", "請求書変換済み", "請求書発行済", "未発行", "納品書発行済", "発送済", "手渡し済", "担当者手持ち済", "発行済み", "入金待ち", "一部入金", "入金済み", "入金不要", "支払期限超過", "納品待ち", "発送待ち", "未納品", "納品済み", "在庫減算済", "在庫減算失敗", "在庫同期失敗", "在庫減算対象外"];
 
 function emptyFilters() {
   return {
@@ -96,6 +96,8 @@ function statusLabel(status, kind = "") {
   if (lower === "issued") return kind === "delivery" ? "納品書発行済" : "発行済み";
   if (value === "発行済み") return kind === "delivery" ? "納品書発行済" : "発行済み";
   if (lower === "shipped" || value === "発送済") return "発送済";
+  if (lower === "hand_delivered" || lower === "hand_delivery" || value === "手渡し済") return "手渡し済";
+  if (lower === "staff_carry" || lower === "staff_carried" || value === "担当者手持ち済") return "担当者手持ち済";
   if (value === "納品書発行済" || value === "発送準備中") return "納品書発行済";
   if (lower === "waiting_payment" || lower === "payment_waiting" || value === "入金待ち") return "入金待ち";
   if (lower === "partial_payment" || lower === "partially_paid" || value === "一部入金") return "一部入金";
@@ -111,10 +113,27 @@ function statusLabel(status, kind = "") {
 function statusBadge(status, kind = "") {
   const label = statusLabel(status, kind);
   let type = "muted";
-  if (["発行済み", "請求書発行済", "入金済み", "納品済み", "発送済"].includes(label)) type = "ok";
+  if (["発行済み", "請求書発行済", "入金済み", "納品済み", "発送済", "手渡し済", "担当者手持ち済"].includes(label)) type = "ok";
   if (["入金待ち", "一部入金", "支払期限超過", "下書き", "未発行", "納品書発行済", "請求書変換済み", "納品待ち", "発送待ち", "未納品"].includes(label)) type = "warn";
   if (label === "入金不要") type = "info";
   if (label === "キャンセル") type = "danger";
+  return `<span class="status-badge ${type}">${escapeHtml(label)}</span>`;
+}
+
+function stockStatusLabel(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === "success" || status === "在庫減算済") return "在庫減算済";
+  if (value === "failed" || status === "在庫減算失敗") return "在庫減算失敗";
+  if (status === "在庫同期失敗") return "在庫同期失敗";
+  if (value === "skipped" || status === "在庫減算対象外") return "在庫減算対象外";
+  if (value === "pending" || status === "在庫減算中") return "在庫減算中";
+  return "";
+}
+
+function stockStatusBadge(status) {
+  const label = stockStatusLabel(status);
+  if (!label) return "";
+  const type = label === "在庫減算済" ? "ok" : label === "在庫減算失敗" || label === "在庫同期失敗" ? "danger" : label === "在庫減算対象外" ? "muted" : "warn";
   return `<span class="status-badge ${type}">${escapeHtml(label)}</span>`;
 }
 
@@ -285,6 +304,7 @@ function makeProgressRow(group) {
     unpaid: invoice ? unpaidAmount(invoice) : 0,
     quoteStatus: quote ? statusLabel(quote.status, "quote") : "未作成",
     invoiceStatus: invoice ? statusLabel(invoice.status, "invoice") : "未作成",
+    stockDeductionStatus: invoice?.stockBaseStockSyncStatus === "failed" ? "在庫同期失敗" : invoice ? stockStatusLabel(invoice.stockDeductionStatus) : "",
     paymentStatus: paymentStatus(invoice),
     deliveryStatus: delivery ? statusLabel(delivery.status, "delivery") : "未発行",
     staff: invoice?.staff || quote?.staff || delivery?.staff || receipt?.staff || "",
@@ -321,7 +341,7 @@ function rowDateValues(row, section) {
     return [row.invoice?.invoiceDate, row.invoice?.dueDate, row.invoice?.issuedAt, row.invoice?.updatedAt, row.invoice?.createdAt];
   }
   if (section === "delivery") {
-    return [row.delivery?.deliveryDate, row.delivery?.issuedAt, row.delivery?.updatedAt, row.delivery?.createdAt, row.invoice?.invoiceDate];
+    return [row.delivery?.deliveryDate, row.delivery?.issuedAt, row.delivery?.shipmentDate, row.delivery?.handoverDate, row.delivery?.carryOutDate, row.delivery?.updatedAt, row.delivery?.createdAt, row.invoice?.invoiceDate];
   }
   return [
     row.quote?.quoteDate,
@@ -451,7 +471,7 @@ function renderUnpaidRows(allRows) {
 
 function renderUndeliveredRows(allRows) {
   const rows = allRows
-    .filter(row => !["発送済", "納品済み", "キャンセル"].includes(row.deliveryStatus))
+    .filter(row => !["発送済", "手渡し済", "担当者手持ち済", "納品済み", "キャンセル"].includes(row.deliveryStatus))
     .filter(row => !isCancelledRow(row))
     .filter(row => matchesFilters(row, "delivery"))
     .sort(sortNewest);

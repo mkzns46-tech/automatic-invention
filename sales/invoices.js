@@ -1,6 +1,8 @@
 const INVOICES_KEY = "arico_sales_invoices_v1";
 const DELIVERIES_KEY = "arico_sales_deliveries_v1";
 const QUOTES_KEY = "arico_sales_quotes_v1";
+const ARICO_SUPABASE_URL = "https://ciciykfuwxawszujdohq.supabase.co";
+const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 const INVOICE_STATUS_OPTIONS = ["下書き", "発行済み", "入金待ち", "入金済み", "入金不要", "キャンセル"];
 const INVOICE_STATUS_DRAFT = "下書き";
 const INVOICE_STATUS_ISSUED = "発行済み";
@@ -8,6 +10,10 @@ const INVOICE_STATUS_WAITING_PAYMENT = "入金待ち";
 const INVOICE_STATUS_PAID = "入金済み";
 const INVOICE_STATUS_NO_PAYMENT_REQUIRED = "入金不要";
 const INVOICE_STATUS_CANCELLED = "キャンセル";
+const STOCK_DEDUCTION_STATUS_PENDING = "pending";
+const STOCK_DEDUCTION_STATUS_SUCCESS = "success";
+const STOCK_DEDUCTION_STATUS_FAILED = "failed";
+const STOCK_DEDUCTION_STATUS_SKIPPED = "skipped";
 
 let currentInvoiceId = null;
 let currentInvoiceLines = [];
@@ -44,6 +50,23 @@ function readLinkedQuotes() {
 
 function writeLinkedQuotes(quotes) {
   localStorage.setItem(QUOTES_KEY, JSON.stringify(quotes));
+}
+
+async function salesRestFetch(path, options = {}) {
+  const response = await fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: ARICO_SUPABASE_API_KEY,
+      Authorization: `Bearer ${ARICO_SUPABASE_API_KEY}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+  const text = await response.text().catch(() => "");
+  if (!response.ok) {
+    throw new Error(`Supabase API ${response.status}: ${text.slice(0, 500)}`);
+  }
+  return text ? JSON.parse(text) : null;
 }
 
 function today() {
@@ -218,6 +241,68 @@ function statusBadge(status) {
   return `<span class="status-badge ${type}">${escapeHtml(value)}</span>`;
 }
 
+function normalizeStockDeductionStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === STOCK_DEDUCTION_STATUS_PENDING || value === "減算中") return STOCK_DEDUCTION_STATUS_PENDING;
+  if (value === STOCK_DEDUCTION_STATUS_SUCCESS || value === "在庫減算済") return STOCK_DEDUCTION_STATUS_SUCCESS;
+  if (value === STOCK_DEDUCTION_STATUS_FAILED || value === "在庫減算失敗") return STOCK_DEDUCTION_STATUS_FAILED;
+  if (value === STOCK_DEDUCTION_STATUS_SKIPPED || value === "対象外") return STOCK_DEDUCTION_STATUS_SKIPPED;
+  return "";
+}
+
+function stockDeductionLabel(status) {
+  const value = normalizeStockDeductionStatus(status);
+  if (value === STOCK_DEDUCTION_STATUS_PENDING) return "在庫減算中";
+  if (value === STOCK_DEDUCTION_STATUS_SUCCESS) return "在庫減算済";
+  if (value === STOCK_DEDUCTION_STATUS_FAILED) return "在庫減算失敗";
+  if (value === STOCK_DEDUCTION_STATUS_SKIPPED) return "在庫減算対象外";
+  return "未実行";
+}
+
+function stockDeductionDisplay(invoiceOrStatus) {
+  if (invoiceOrStatus && typeof invoiceOrStatus === "object") {
+    if (
+      normalizeStockDeductionStatus(invoiceOrStatus.stockDeductionStatus) === STOCK_DEDUCTION_STATUS_SUCCESS &&
+      invoiceOrStatus.stockBaseStockSyncStatus === "failed"
+    ) {
+      return "在庫同期失敗";
+    }
+    return stockDeductionLabel(invoiceOrStatus.stockDeductionStatus);
+  }
+  return stockDeductionLabel(invoiceOrStatus);
+}
+
+function stockDeductionBadge(invoice) {
+  if (invoice?.stockBaseStockSyncStatus === "failed") {
+    return '<span class="status-badge danger">在庫同期失敗</span>';
+  }
+  const value = normalizeStockDeductionStatus(invoice?.stockDeductionStatus);
+  if (!value) return "";
+  const type = value === STOCK_DEDUCTION_STATUS_SUCCESS
+    ? "ok"
+    : value === STOCK_DEDUCTION_STATUS_FAILED
+      ? "danger"
+      : value === STOCK_DEDUCTION_STATUS_SKIPPED
+        ? "muted"
+        : "warn";
+  return `<span class="status-badge ${type}">${escapeHtml(stockDeductionLabel(value))}</span>`;
+}
+
+function isStockDeductionTarget(invoice) {
+  const type = normalizeTransactionType(invoice?.transactionType);
+  return type !== "返金";
+}
+
+function canRetryStockDeduction(invoice) {
+  const status = normalizeStockDeductionStatus(invoice?.stockDeductionStatus);
+  return Boolean(invoice?.id && isStockDeductionTarget(invoice) && (status === STOCK_DEDUCTION_STATUS_FAILED || invoice.stockBaseStockSyncStatus === "failed"));
+}
+
+function canOutputInvoicePdf(invoice) {
+  if (!invoice) return false;
+  return normalizeInvoiceStatus(invoice.status) !== INVOICE_STATUS_DRAFT;
+}
+
 function recalcInvoiceLine(line) {
   const transactionType = normalizeTransactionType(line.transactionType || getCurrentTransactionType());
   const qty = Number(line.qty || 0);
@@ -351,6 +436,141 @@ function calcInvoiceTotals(invoice) {
     total,
     tax: Math.floor(total * 10 / 110)
   };
+}
+
+function buildStockDeductionLines(invoice) {
+  return getInvoiceRawLines(invoice).map(line => {
+    const qty = Math.abs(Number(line.qty || line.quantity || 0));
+    const productId = String(line.smaregiProductId || line.smaregi_product_id || line.productId || "").trim();
+    const barcode = String(line.barcode || line.productCode || "").trim();
+    return {
+      productId,
+      smaregiProductId: productId,
+      productCode: barcode,
+      barcode,
+      name: String(line.name || "").trim(),
+      quantity: qty
+    };
+  }).filter(line => line.quantity > 0 && (line.productId || line.barcode || line.productCode));
+}
+
+async function readStockApiJson(response) {
+  const text = await response.text().catch(() => "");
+  console.log("[Sales stock decrement API response]", {
+    ok: response.ok,
+    status: response.status,
+    body: text
+  });
+  if (!text) {
+    throw new Error(`在庫減算API応答が空です。HTTP ${response.status}`);
+  }
+  let data = null;
+  try {
+    data = JSON.parse(text);
+  } catch (_) {
+    throw new Error(`在庫減算APIのJSON解析に失敗しました。HTTP ${response.status}: ${text.slice(0, 500)}`);
+  }
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || `在庫減算APIエラー HTTP ${response.status}`);
+  }
+  return data;
+}
+
+async function findProductForStockLine(line) {
+  if (line.barcode) {
+    const rows = await salesRestFetch(`products?select=barcode,base_stock,smaregi_product_id&barcode=eq.${encodeURIComponent(line.barcode)}&limit=1`);
+    if (Array.isArray(rows) && rows[0]) return { row: rows[0], filter: `barcode=eq.${encodeURIComponent(line.barcode)}` };
+  }
+  if (line.productId) {
+    const rows = await salesRestFetch(`products?select=barcode,base_stock,smaregi_product_id&smaregi_product_id=eq.${encodeURIComponent(line.productId)}&limit=1`);
+    if (Array.isArray(rows) && rows[0]) return { row: rows[0], filter: `smaregi_product_id=eq.${encodeURIComponent(line.productId)}` };
+  }
+  return null;
+}
+
+async function syncProductsBaseStock(lines) {
+  const results = [];
+  for (const line of lines) {
+    const found = await findProductForStockLine(line);
+    if (!found) {
+      results.push({ ...line, ok: false, error: "products row not found" });
+      continue;
+    }
+    const before = Number(found.row.base_stock || 0);
+    const after = Math.max(0, before - Number(line.quantity || 0));
+    await salesRestFetch(`products?${found.filter}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ base_stock: after })
+    });
+    results.push({ ...line, ok: true, before, after });
+  }
+  return results;
+}
+
+async function applyInvoiceStockDeduction(invoice) {
+  const next = { ...invoice };
+  if (normalizeStockDeductionStatus(next.stockDeductionStatus) === STOCK_DEDUCTION_STATUS_SUCCESS) return next;
+  if (!isStockDeductionTarget(next)) {
+    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_SKIPPED;
+    next.stockDeductionError = "";
+    next.stockDeductionLines = [];
+    next.stockDeductedAt = "";
+    return next;
+  }
+  const lines = buildStockDeductionLines(next);
+  if (!lines.length) {
+    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_SKIPPED;
+    next.stockDeductionError = "在庫減算対象の商品明細がありません。";
+    next.stockDeductionLines = [];
+    next.stockDeductedAt = "";
+    return next;
+  }
+  next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_PENDING;
+  next.stockDeductionError = "";
+  next.stockDeductionLines = lines;
+  try {
+    console.log("[Sales stock deduction request]", {
+      invoiceId: next.id,
+      invoiceNo: next.invoiceNo,
+      originNumber: next.originNumber || next.masterNumber || next.sourceQuoteNo || "",
+      transactionType: next.transactionType,
+      lines
+    });
+    const response = await fetch("/api/smaregi-stock-decrement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        invoiceId: next.id,
+        invoiceNo: next.invoiceNo,
+        originNumber: next.originNumber || next.masterNumber || next.sourceQuoteNo || "",
+        idempotencyKey: `${next.id || next.invoiceNo}:stock-deduction`,
+        lines
+      })
+    });
+    const data = await readStockApiJson(response);
+    let baseStockSync = [];
+    try {
+      baseStockSync = await syncProductsBaseStock(lines);
+      next.stockBaseStockSyncStatus = baseStockSync.every(row => row.ok) ? "success" : "failed";
+    } catch (syncError) {
+      next.stockBaseStockSyncStatus = "failed";
+      next.stockBaseStockSyncError = syncError.message || String(syncError);
+    }
+    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_SUCCESS;
+    next.stockDeductedAt = new Date().toISOString();
+    next.stockDeductionError = next.stockBaseStockSyncStatus === "failed" ? `products.base_stock同期失敗: ${next.stockBaseStockSyncError || "一部商品未同期"}` : "";
+    next.smaregiStockMovementId = data.smaregiStockMovementId || "";
+    next.stockDeductionLines = lines.map(line => ({ ...line }));
+    next.stockBaseStockSyncLines = baseStockSync;
+  } catch (error) {
+    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_FAILED;
+    next.stockDeductedAt = "";
+    next.stockDeductionError = error.message || String(error);
+    next.smaregiStockMovementId = "";
+    next.stockDeductionLines = lines.map(line => ({ ...line }));
+  }
+  return next;
 }
 
 function deliveryNo(n) {
@@ -667,7 +887,8 @@ function renderInvoiceListRow(invoice) {
     <td>${escapeHtml(invoice.staff || "")}</td>
     <td>
       <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">${status === INVOICE_STATUS_DRAFT ? "&#32232;&#38598;" : "&#35443;&#32048;"}</button>
-      <button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>
+      ${canOutputInvoicePdf(invoice) ? `<button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>` : `<button type="button" class="secondary" disabled title="請求書発行確定後にPDF出力できます">PDF&#20986;&#21147;</button>`}
+      ${canRetryStockDeduction(invoice) ? `<button type="button" class="secondary" onclick="retryInvoiceStockDeduction('${invoice.id}')">在庫減算再実行</button>` : ""}
     </td>
   </tr>`;
 }
@@ -713,7 +934,7 @@ function matchesDateRange(values, from, to) {
 function clearInvoiceEditor() {
   currentInvoiceId = null;
   currentInvoiceLines = [];
-  ["invoiceNo", "sourceQuoteNo", "customerName", "invoiceOrganizationName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo", "originalSlipNumber", "reasonMemo"].forEach(id => {
+  ["invoiceNo", "sourceQuoteNo", "customerName", "invoiceOrganizationName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo", "originalSlipNumber", "reasonMemo", "stockDeductionStatus"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
@@ -746,6 +967,7 @@ function fillInvoiceForm(invoice) {
   currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || []));
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
   document.getElementById("invoiceStatus").value = normalizeInvoiceStatus(invoice.status);
+  setFieldValue("stockDeductionStatus", stockDeductionDisplay(invoice));
   document.getElementById("sourceQuoteNo").value = invoice.sourceQuoteNo || "";
   setFieldValue("salesCustomerId", invoice.customerId || "");
   setFieldValue("salesCustomerCode", invoice.customerCode || "");
@@ -845,6 +1067,8 @@ function updateInvoiceLockState(invoice) {
   const editable = isInvoiceEditable(invoice);
   const issueButton = ensureIssueInvoiceButton();
   const saveButton = document.getElementById("saveInvoiceBtn");
+  const pdfButton = document.getElementById("invoicePdfBtn");
+  const retryStockButton = document.getElementById("retryStockDeductionBtn");
   const alwaysReadonlyCustomerTargets = [
     "customerName",
     "invoiceOrganizationName",
@@ -875,6 +1099,17 @@ function updateInvoiceLockState(invoice) {
   if (saveButton) {
     saveButton.hidden = !editable;
     saveButton.disabled = !editable;
+  }
+  if (pdfButton) {
+    const pdfAvailable = canOutputInvoicePdf(invoice);
+    pdfButton.hidden = false;
+    pdfButton.disabled = !pdfAvailable;
+    pdfButton.title = pdfAvailable ? "" : "請求書発行確定後にPDF出力できます";
+  }
+  if (retryStockButton) {
+    const shouldShowRetry = canRetryStockDeduction(invoice);
+    retryStockButton.hidden = !shouldShowRetry;
+    retryStockButton.disabled = !shouldShowRetry;
   }
   alwaysReadonlyCustomerTargets.forEach(id => {
     const element = document.getElementById(id);
@@ -1007,7 +1242,7 @@ async function issueInvoice() {
     showSalesMessage("請求書が見つかりません。", "err");
     return;
   }
-  const invoice = collectInvoice();
+  let invoice = collectInvoice();
   if (!isInvoiceEditable(invoice.status)) {
     showSalesMessage("この請求書は発行確定済みです。", "warn");
     return;
@@ -1017,6 +1252,7 @@ async function issueInvoice() {
   const issuedAtInput = document.getElementById("issuedAt")?.value;
   invoice.issuedAt = issuedAtInput || new Date().toISOString();
   invoice.updatedAt = new Date().toISOString();
+  invoice = await applyInvoiceStockDeduction(invoice);
   ensureDeliveryForInvoice(invoice);
   markSourceQuoteIssued(invoice);
   invoices[index] = invoice;
@@ -1025,8 +1261,63 @@ async function issueInvoice() {
   fillInvoiceForm(invoice);
   renderInvoiceList();
   const statusLabel = normalizeInvoiceStatus(invoice.status);
-  showSalesMessage(`請求書を発行確定しました。ステータスを${statusLabel}に更新しました。`, "ok");
-  showSalesPopup("発行確定", "請求書を発行確定しました", "ok");
+  const stockMessage = stockDeductionDisplay(invoice);
+  showSalesMessage(`請求書を発行確定しました。ステータスを${statusLabel}に更新しました。在庫減算: ${stockMessage}`, invoice.stockDeductionStatus === STOCK_DEDUCTION_STATUS_FAILED ? "warn" : "ok");
+  showSalesPopup("発行確定", `請求書を発行確定しました\n在庫減算: ${stockMessage}${invoice.stockDeductionError ? `\n${invoice.stockDeductionError}` : ""}`, invoice.stockDeductionStatus === STOCK_DEDUCTION_STATUS_FAILED ? "warn" : "ok");
+}
+
+async function retryInvoiceStockDeduction(id) {
+  const invoices = readInvoices();
+  const index = invoices.findIndex(row => row.id === id);
+  if (index < 0) {
+    showSalesMessage("請求書が見つかりません。", "err");
+    return;
+  }
+  const original = normalizeInvoiceForView(invoices[index]);
+  if (!canRetryStockDeduction(original)) {
+    showSalesMessage("在庫減算の再実行対象ではありません。", "warn");
+    return;
+  }
+  showSalesMessage("在庫減算を再実行しています。", "warn");
+  let updated = null;
+  if (
+    normalizeStockDeductionStatus(original.stockDeductionStatus) === STOCK_DEDUCTION_STATUS_SUCCESS &&
+    original.stockBaseStockSyncStatus === "failed"
+  ) {
+    updated = { ...original };
+    try {
+      const lines = Array.isArray(updated.stockDeductionLines) && updated.stockDeductionLines.length
+        ? updated.stockDeductionLines
+        : buildStockDeductionLines(updated);
+      const baseStockSync = await syncProductsBaseStock(lines);
+      updated.stockBaseStockSyncStatus = baseStockSync.every(row => row.ok) ? "success" : "failed";
+      updated.stockBaseStockSyncError = updated.stockBaseStockSyncStatus === "failed" ? "一部商品のproducts.base_stock同期に失敗しました。" : "";
+      updated.stockDeductionError = updated.stockBaseStockSyncStatus === "failed" ? updated.stockBaseStockSyncError : "";
+      updated.stockBaseStockSyncLines = baseStockSync;
+    } catch (error) {
+      updated.stockBaseStockSyncStatus = "failed";
+      updated.stockBaseStockSyncError = error.message || String(error);
+      updated.stockDeductionError = `products.base_stock同期失敗: ${updated.stockBaseStockSyncError}`;
+    }
+  } else {
+    updated = await applyInvoiceStockDeduction(original);
+  }
+  updated.updatedAt = new Date().toISOString();
+  invoices[index] = updated;
+  writeInvoices(invoices);
+  if (currentInvoiceId === updated.id) fillInvoiceForm(updated);
+  renderInvoiceList();
+  const type = updated.stockDeductionStatus === STOCK_DEDUCTION_STATUS_SUCCESS ? "ok" : "warn";
+  showSalesMessage(`在庫減算再実行: ${stockDeductionDisplay(updated)}`, type);
+  showSalesPopup("在庫減算再実行", `${stockDeductionDisplay(updated)}${updated.stockDeductionError ? `\n${updated.stockDeductionError}` : ""}`, type);
+}
+
+function retryCurrentInvoiceStockDeduction() {
+  if (!currentInvoiceId) {
+    showSalesMessage("請求書を選択してください。", "warn");
+    return;
+  }
+  retryInvoiceStockDeduction(currentInvoiceId);
 }
 
 function cancelInvoice() {
@@ -1036,8 +1327,13 @@ function cancelInvoice() {
 }
 
 function outputCurrentInvoicePdf() {
+  const invoice = currentInvoiceId ? readInvoices().find(row => row.id === currentInvoiceId) : null;
+  if (!canOutputInvoicePdf(invoice)) {
+    showSalesPopup("PDF出力", "請求書発行確定後にPDF出力できます", "warn");
+    return;
+  }
   try {
-    printInvoicePdf(normalizeInvoiceForView(collectInvoice()));
+    printInvoicePdf(normalizeInvoiceForView(invoice));
   } finally {
     restoreInvoiceEditorAfterPdf();
   }
@@ -1045,7 +1341,12 @@ function outputCurrentInvoicePdf() {
 
 function printInvoiceById(id) {
   const invoice = readInvoices().find(row => row.id === id);
-  if (invoice) printInvoicePdf(normalizeInvoiceForView(invoice));
+  if (!invoice) return;
+  if (!canOutputInvoicePdf(invoice)) {
+    showSalesPopup("PDF出力", "請求書発行確定後にPDF出力できます", "warn");
+    return;
+  }
+  printInvoicePdf(normalizeInvoiceForView(invoice));
 }
 
 function restoreInvoiceEditorAfterPdf() {
