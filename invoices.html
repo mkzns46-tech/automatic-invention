@@ -3,39 +3,145 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARICO ARCHERY 販売管理</title>
-<link rel="stylesheet" href="sales-style.css?v=20260613-vtest">
+<title>ARICO ARCHERY 請求書</title>
+<link rel="stylesheet" href="sales-style.css?v=20260614-refund-memo-scroll">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-nav.js?v=20260613-vtest" defer></script>
-<script src="sales.js?v=20260613-vtest" defer></script>
+<script src="sales-nav.js?v=20260614-progress" defer></script>
+<script src="customers-storage.js?v=20260614-html-repair"></script>
+<script src="invoice-pdf.js?v=20260614-exchange-pdf-restore"></script>
+<script src="invoices.js?v=20260614-progress-sort" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
   <header class="sales-header">
     <div>
       <div class="brand">ARICO ARCHERY</div>
-      <h1>販売管理</h1>
-      <p class="lead">見積・請求・入金確認などの販売業務入口です。</p>
+      <h1>請求書</h1>
+      <p class="lead">見積書から変換した請求書の一覧・編集・PDF出力を行います。発行確定時に在庫減算を実行し、スマレジ売上登録はまだ行いません。</p>
     </div>
     <div class="sales-actions">
-      <a class="pill" href="../portal/portal.html">システム入口に戻る</a>
+      <a class="pill" href="quotes.html">見積書</a>
       <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
     </div>
   </header>
 
-  <div id="salesMessage" class="message">販売管理トップです。左メニューから機能を選択できます。</div>
+  <div id="salesMessage" class="message">請求書を確認できます。</div>
 
-  <section class="card sales-overview-card">
-    <div class="section-title">
-      <div>
-        <h2>販売管理メニュー</h2>
-        <p class="section-note">見積書を中心に、販売フローごとの画面へ移動します。</p>
-      </div>
-      <div class="badge muted">v1</div>
+  <section class="card collapsible-list-card" id="invoiceListCard">
+    <div class="sales-actions section-heading-row">
+      <h2 class="list-heading" onclick="toggleInvoiceList();">請求書一覧 <span class="status-badge muted" id="invoiceListCount">0件</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="invoiceListToggle" onclick="toggleInvoiceList();">一覧を閉じる</button>
+      <button type="button" class="secondary" onclick="clearInvoiceEditor();">新規入力をクリア</button>
     </div>
-    <section id="salesMenuGrid" class="grid"></section>
+    <div class="list-panel" id="invoiceListPanel">
+      <div class="list-filter-row">
+        <label>一覧検索<input id="invoiceListSearch" placeholder="顧客名・担当者・件名・請求書番号・ステータス"></label>
+        <label>ステータス
+          <select id="invoiceListStatusFilter">
+            <option value="">全て</option>
+            <option value="下書き">下書き</option>
+            <option value="発行済み">発行済み</option>
+            <option value="入金待ち">入金待ち</option>
+            <option value="入金済み">入金済み</option>
+            <option value="入金不要">入金不要</option>
+            <option value="キャンセル">キャンセル</option>
+          </select>
+        </label>
+        <label>開始日<input id="invoiceDateFromFilter" type="date"></label>
+        <label>終了日<input id="invoiceDateToFilter" type="date"></label>
+      </div>
+      <div class="list-subheading">対応が必要な請求書</div>
+      <div class="table-wrap list-scroll">
+        <table>
+          <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <tbody id="invoiceListBody"></tbody>
+        </table>
+      </div>
+      <div class="list-panel completed-list-panel" id="invoiceCompletedListPanel" hidden>
+        <div class="list-subheading">完了済み・キャンセル済み</div>
+        <div class="table-wrap list-scroll">
+          <table>
+            <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+            <tbody id="invoiceCompletedListBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="invoiceEditorCard">
+    <h2>請求情報</h2>
+    <input id="salesCustomerId" type="hidden">
+    <input id="salesCustomerCode" type="hidden">
+    <input id="salesSmaregiCustomerId" type="hidden">
+    <input id="salesSmaregiCustomerCode" type="hidden">
+    <div class="row">
+      <label>請求書番号<input id="invoiceNo" readonly></label>
+      <label>ステータス<select id="invoiceStatus"></select></label>
+      <label>元見積番号<input id="sourceQuoteNo" readonly></label>
+      <label>発行日時<input id="issuedAt"></label>
+      <label>在庫減算<input id="stockDeductionStatus" readonly></label>
+    </div>
+    <p class="section-note customer-readonly-note">顧客情報は見積書から引き継ぎます</p>
+    <div class="row three">
+      <label>顧客名<input class="customer-readonly-input" id="customerName" readonly></label>
+      <label>団体名<input class="customer-readonly-input" id="invoiceOrganizationName" readonly></label>
+      <label>顧客区分<input class="customer-readonly-input" id="customerType" readonly></label>
+    </div>
+    <div class="row three">
+      <label>住所<input class="customer-readonly-input" id="customerAddress" readonly></label>
+      <label>電話番号<input class="customer-readonly-input" id="customerPhone" readonly></label>
+      <label>メールアドレス<input class="customer-readonly-input" id="customerEmail" readonly></label>
+    </div>
+    <div class="row three">
+      <label>担当者<input id="invoiceStaff"></label>
+      <label>件名<input id="invoiceSubject"></label>
+      <label>請求日<input id="invoiceDate" type="date"></label>
+    </div>
+    <div class="row three">
+      <label>支払期限<input id="dueDate" type="date"></label>
+    </div>
+    <div class="row three">
+      <label>取引区分
+        <select id="transactionType">
+          <option value="通常販売">通常販売</option>
+          <option value="交換">交換</option>
+          <option value="返金">返金</option>
+          <option value="無償提供">無償提供</option>
+          <option value="その他">その他</option>
+        </select>
+      </label>
+      <label>元伝票番号<input id="originalSlipNumber" placeholder="交換・返金時に入力"></label>
+      <label>理由メモ<input id="reasonMemo" placeholder="交換理由・返金理由など"></label>
+    </div>
+    <label>備考<textarea id="invoiceMemo"></textarea></label>
+  </section>
+
+  <section class="card">
+    <h2>請求商品</h2>
+    <div id="invoiceLines" class="invoice-lines"></div>
+    <div class="summary">
+      <div>小計<strong id="subtotalText">0円</strong></div>
+      <div>値引き <strong id="discountText">0円</strong></div>
+      <div>合計<strong id="totalText">0円</strong></div>
+      <div>内消費税<strong id="taxText">0円</strong></div>
+    </div>
+    <div class="sales-actions" style="margin-top:14px">
+      <button type="button" class="primary" id="saveInvoiceBtn" onclick="saveInvoice();">保存</button>
+      <button type="button" class="primary invoice-issue-button" id="issueInvoiceBtn" onclick="issueInvoice();">発行確定</button>
+      <button type="button" class="secondary" id="retryStockDeductionBtn" onclick="retryCurrentInvoiceStockDeduction();" hidden>在庫減算再実行</button>
+      <button type="button" class="secondary" id="invoicePdfBtn" onclick="outputCurrentInvoicePdf();">PDF出力</button>
+      <button type="button" class="danger" id="cancelInvoiceBtn" onclick="cancelInvoice();">キャンセル</button>
+    </div>
   </section>
 </main>
+<div id="salesPopup" class="app-popup" style="display:none;">
+  <div class="app-popup-card">
+    <div id="salesPopupTitle" class="app-popup-title">完了</div>
+    <div id="salesPopupBody" class="app-popup-body"></div>
+    <button type="button" id="salesPopupClose">OK</button>
+  </div>
+</div>
 </body>
 </html>

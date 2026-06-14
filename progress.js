@@ -7,7 +7,7 @@ const PROGRESS_KEYS = {
 };
 
 const TRANSACTION_OPTIONS = ["", "通常販売", "交換", "返金", "無償提供", "その他"];
-const STATUS_OPTIONS = ["", "下書き", "請求書変換済み", "請求書発行済", "未発行", "納品書発行済", "発送済", "手渡し済", "担当者手持ち済", "発行済み", "入金待ち", "一部入金", "入金済み", "入金不要", "支払期限超過", "納品待ち", "発送待ち", "未納品", "納品済み"];
+const STATUS_OPTIONS = ["", "下書き", "請求書変換済み", "請求書発行済", "未発行", "納品書発行済", "発送済", "手渡し済", "担当者手持ち済", "発行済み", "入金待ち", "一部入金", "入金済み", "入金不要", "支払期限超過", "納品待ち", "発送待ち", "未納品", "納品済み", "在庫減算済", "在庫減算失敗", "在庫同期失敗", "在庫減算対象外"];
 
 function emptyFilters() {
   return {
@@ -117,6 +117,23 @@ function statusBadge(status, kind = "") {
   if (["入金待ち", "一部入金", "支払期限超過", "下書き", "未発行", "納品書発行済", "請求書変換済み", "納品待ち", "発送待ち", "未納品"].includes(label)) type = "warn";
   if (label === "入金不要") type = "info";
   if (label === "キャンセル") type = "danger";
+  return `<span class="status-badge ${type}">${escapeHtml(label)}</span>`;
+}
+
+function stockStatusLabel(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === "success" || status === "在庫減算済") return "在庫減算済";
+  if (value === "failed" || status === "在庫減算失敗") return "在庫減算失敗";
+  if (status === "在庫同期失敗") return "在庫同期失敗";
+  if (value === "skipped" || status === "在庫減算対象外") return "在庫減算対象外";
+  if (value === "pending" || status === "在庫減算中") return "在庫減算中";
+  return "";
+}
+
+function stockStatusBadge(status) {
+  const label = stockStatusLabel(status);
+  if (!label) return "";
+  const type = label === "在庫減算済" ? "ok" : label === "在庫減算失敗" || label === "在庫同期失敗" ? "danger" : label === "在庫減算対象外" ? "muted" : "warn";
   return `<span class="status-badge ${type}">${escapeHtml(label)}</span>`;
 }
 
@@ -287,6 +304,7 @@ function makeProgressRow(group) {
     unpaid: invoice ? unpaidAmount(invoice) : 0,
     quoteStatus: quote ? statusLabel(quote.status, "quote") : "未作成",
     invoiceStatus: invoice ? statusLabel(invoice.status, "invoice") : "未作成",
+    stockDeductionStatus: invoice?.stockBaseStockSyncStatus === "failed" ? "在庫同期失敗" : invoice ? stockStatusLabel(invoice.stockDeductionStatus) : "",
     paymentStatus: paymentStatus(invoice),
     deliveryStatus: delivery ? statusLabel(delivery.status, "delivery") : "未発行",
     staff: invoice?.staff || quote?.staff || delivery?.staff || receipt?.staff || "",
@@ -309,10 +327,10 @@ function isCancelledRow(row) {
 }
 
 function rowStatusValues(row, section) {
-  if (section === "sales") return [row.invoiceStatus];
+  if (section === "sales") return [row.invoiceStatus, row.stockDeductionStatus];
   if (section === "unpaid") return [isPaymentOverdue(row.invoice) ? "支払期限超過" : row.paymentStatus];
   if (section === "delivery") return [row.deliveryStatus];
-  return [row.quoteStatus, row.invoiceStatus, row.paymentStatus, row.deliveryStatus];
+  return [row.quoteStatus, row.invoiceStatus, row.stockDeductionStatus, row.paymentStatus, row.deliveryStatus];
 }
 
 function rowDateValues(row, section) {
@@ -401,7 +419,7 @@ function renderTicketRows(allRows) {
       <td>${escapeHtml(row.organizationName)}</td>
       <td>${escapeHtml(row.customerName)}</td>
       <td>${statusBadge(row.quoteStatus, "quote")}</td>
-      <td>${statusBadge(row.invoiceStatus, "invoice")}</td>
+      <td>${statusBadge(row.invoiceStatus, "invoice")} ${stockStatusBadge(row.stockDeductionStatus)}</td>
       <td>${statusBadge(row.paymentStatus, "payment")}</td>
       <td>${statusBadge(row.deliveryStatus, "delivery")}</td>
       <td class="${amountClass(row.total, row)}">${money(row.total)}</td>
@@ -420,7 +438,7 @@ function renderSalesRows(allRows) {
       <td>${escapeHtml(row.organizationName)}</td>
       <td>${escapeHtml(row.customerName)}</td>
       <td class="${amountClass(row.total, row)}">${money(row.total)}</td>
-      <td>${statusBadge(row.invoiceStatus, "invoice")}</td>
+      <td>${statusBadge(row.invoiceStatus, "invoice")} ${stockStatusBadge(row.stockDeductionStatus)}</td>
       <td>${escapeHtml(row.staff)}</td>
       <td>${actionLinks(row, ["invoice"])}</td>
     </tr>`, "請求書はありません。", 8);
