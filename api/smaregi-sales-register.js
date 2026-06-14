@@ -242,8 +242,6 @@ function buildTransactionPayload(context, body, paymentMethod) {
     total: String(total),
     taxInclude: String(taxInclude),
     taxExclude: "0",
-    deposit: String(total),
-    change: "0",
     storeId: String(context.storeId),
     terminalId: String(context.terminalId),
     terminalTranId,
@@ -256,8 +254,6 @@ function buildTransactionPayload(context, body, paymentMethod) {
       {
         paymentMethodId: paymentMethod.paymentMethodId,
         paymentMethodName: paymentMethod.paymentMethodName,
-        receivedAmount: total,
-        changeAmount: 0,
         paidAmount: total
       }
     ]
