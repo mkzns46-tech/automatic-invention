@@ -490,7 +490,7 @@
   function openPdfWindow(documents, action) {
     const { body, title } = buildDocuments(documents);
     const win = window.open("", "_blank");
-    if (!win) return;
+    if (!win) return false;
     const baseHref = location.href.replace(/[^/]*$/, "");
     const safeTitleLiteral = JSON.stringify(title).replace(/</g, "\\u003c");
     const autoScript = action === "print"
@@ -498,17 +498,57 @@
       : "";
     win.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><base href="${escapeHtml(baseHref)}"><title>${escapeHtml(title)}</title>${css()}</head><body>${body}${autoScript}</body></html>`);
     win.document.close();
+    return true;
   }
 
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  function documentListLabel(item, index) {
+    const info = documentPages(item.type, item.data);
+    const number = info.number || documentNumber(item.type, item.data) || `No.${index + 1}`;
+    return {
+      title: `${documentTitle(item.type)} ${number}`,
+      filename: info.filename
+    };
   }
 
-  async function openPdfWindowsIndividually(documents, action) {
-    for (const documentItem of documents) {
-      openPdfWindow([documentItem], action);
-      await sleep(450);
-    }
+  function showBulkPdfListPopup(documents) {
+    const popup = document.createElement("div");
+    popup.className = "app-popup";
+    popup.style.display = "flex";
+    const rows = documents.map((item, index) => {
+      const label = documentListLabel(item, index);
+      return `
+        <div class="pdf-bulk-list-row" data-index="${index}">
+          <div class="pdf-bulk-list-text">
+            <strong>${escapeHtml(label.title)}</strong>
+            <span>${escapeHtml(label.filename)}</span>
+          </div>
+          <button type="button" class="primary" data-open-index="${index}">PDFを開く</button>
+        </div>
+      `;
+    }).join("");
+    popup.innerHTML = `
+      <div class="app-popup-card pdf-bulk-list-card">
+        <div class="app-popup-title">選択済みPDF一覧</div>
+        <div class="app-popup-body">選択したPDFを1件ずつ開いてください。ブラウザのポップアップブロックを避けるため、各行のボタンから開きます。</div>
+        <div class="pdf-bulk-list">${rows}</div>
+        <div class="sales-actions" style="justify-content:center;margin-top:12px">
+          <button type="button" class="secondary" data-action="close">閉じる</button>
+        </div>
+      </div>
+    `;
+    popup.addEventListener("click", event => {
+      const openIndex = event.target?.dataset?.openIndex;
+      const action = event.target?.dataset?.action;
+      if (openIndex !== undefined) {
+        const documentItem = documents[Number(openIndex)];
+        if (!documentItem) return;
+        const opened = openPdfWindow([documentItem], "save");
+        if (!opened) alert("PDFを開けませんでした。ブラウザのポップアップ許可を確認してください。");
+        return;
+      }
+      if (action === "close" || event.target === popup) popup.remove();
+    });
+    document.body.appendChild(popup);
   }
 
   async function printSalesDocument(type, data) {
@@ -521,13 +561,13 @@
   async function printSalesDocuments(documents) {
     const safeDocuments = (documents || []).filter(item => item && item.type && item.data);
     if (!safeDocuments.length) return;
+    if (safeDocuments.length > 1) {
+      showBulkPdfListPopup(safeDocuments);
+      return;
+    }
     const first = documentPages(safeDocuments[0].type, safeDocuments[0].data);
     const action = await showPdfActionPopup(first.filename, safeDocuments.length);
     if (action === "cancel") return;
-    if (action === "save") {
-      await openPdfWindowsIndividually(safeDocuments, "save");
-      return;
-    }
     openPdfWindow(safeDocuments, action);
   }
 
