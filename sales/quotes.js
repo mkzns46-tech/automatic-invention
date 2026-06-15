@@ -171,7 +171,7 @@ function recalcSalesLine(line) {
   const gross = Math.max(0, Math.round(Math.abs(qty) * Math.abs(unitPrice)));
   const discountRate = isFreeTransaction(transactionType)
     ? 100
-    : clampNumber(line?.discountRate ?? line?.discountValue ?? line?.discount ?? 0, 0, 100);
+    : clampNumber(line?.discountValue ?? line?.discountRate ?? line?.discount ?? 0, 0, 100);
   const fixedDiscount = Math.max(0, Number(line?.discountAmountInput || line?.fixedDiscountAmount || line?.manualDiscountAmount || 0));
   const rateDiscount = Math.round(gross * discountRate / 100);
   line.transactionType = transactionType;
@@ -970,7 +970,9 @@ function updateLine(index, key, value) {
   const line = currentLines[index];
   if (!line) return;
   if (key === "discountValue" || key === "discountRate") {
-    line[key] = clampNumber(value, 0, 100);
+    const discountRate = clampNumber(value, 0, 100);
+    line.discountValue = discountRate;
+    line.discountRate = discountRate;
     line.autoTransactionDiscount = false;
   } else if (key === "discountAmountInput") {
     line[key] = Math.max(0, Number(value || 0));
