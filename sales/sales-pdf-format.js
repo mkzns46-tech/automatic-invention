@@ -567,6 +567,17 @@
     }
   }
 
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function downloadPdfFiles(documents) {
+    for (const documentItem of documents) {
+      await downloadPdf([documentItem]);
+      await sleep(450);
+    }
+  }
+
   async function printSalesDocument(type, data) {
     const info = documentPages(type, data);
     const action = await showPdfActionPopup(info.filename, 1);
@@ -590,7 +601,7 @@
     if (action === "cancel") return;
     if (action === "save") {
       try {
-        await downloadPdf(safeDocuments);
+        await downloadPdfFiles(safeDocuments);
       } catch (error) {
         alert(`PDF保存に失敗しました。\n${error?.message || error}`);
       }
