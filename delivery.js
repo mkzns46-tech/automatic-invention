@@ -188,6 +188,17 @@ function recalcDeliveryLine(line) {
   return line;
 }
 
+function formatDeliveryStock(line) {
+  if (line.manualProduct || (!line.barcode && !line.productCode && !line.smaregiProductId && !line.smaregi_product_id && !line.productId)) return "手入力";
+  const value = Number(line.stock ?? line.base_stock ?? 0);
+  return value > 0 ? `現在庫 ${value}` : "取寄せ";
+}
+
+function deliveryStockClass(line) {
+  if (line.manualProduct || (!line.barcode && !line.productCode && !line.smaregiProductId && !line.smaregi_product_id && !line.productId)) return "line-stock muted";
+  return Number(line.stock ?? line.base_stock ?? 0) > 0 ? "" : "line-stock warn";
+}
+
 function showSalesMessage(text, type) {
   const box = document.getElementById("salesMessage");
   if (!box) return;
@@ -231,12 +242,58 @@ function showSalesPopup(title, body, type = "ok") {
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
+  arrangeDeliveryDetailLayout();
+  arrangeDeliveryShippingLayout();
   bindDeliveryListControls();
   renderDeliveryList();
   const id = new URLSearchParams(location.search).get("id");
   if (id) selectDelivery(id);
   else clearDeliveryDetail();
 });
+
+function arrangeDeliveryDetailLayout() {
+  const card = document.getElementById("deliveryDetailCard");
+  if (!card) return;
+  const groups = [
+    ["deliveryNo", "deliveryStatus", "deliveryIssuedAt"],
+    ["deliveryCustomerName", "deliveryCustomerType", "deliveryStaff"],
+    ["deliveryAddress", "deliveryPhone", "deliveryEmail"],
+    ["deliverySubject", "deliveryInvoiceDate"],
+    ["deliverySlipMemo"]
+  ];
+  groups.forEach((ids, index) => {
+    let row = document.getElementById(`deliveryDetailRow${index + 1}`);
+    if (!row) {
+      row = document.createElement("div");
+      row.id = `deliveryDetailRow${index + 1}`;
+      row.className = ids.length === 3 ? "row three delivery-detail-row" : ids.length === 2 ? "row two delivery-detail-row" : "delivery-memo-row";
+      card.appendChild(row);
+    }
+    ids.forEach(id => {
+      const label = document.getElementById(id)?.closest("label");
+      if (label) row.appendChild(label);
+    });
+  });
+}
+
+function arrangeDeliveryShippingLayout() {
+  const card = document.getElementById("deliveryShippingCard");
+  if (!card) return;
+  const ids = ["shippingMethod", "shipmentDate", "trackingNumber", "shippingStaff"];
+  let row = document.getElementById("deliveryShippingMainRow");
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "deliveryShippingMainRow";
+    row.className = "row delivery-shipping-main-row";
+    card.querySelector(".sales-actions")?.insertAdjacentElement("beforebegin", row);
+  }
+  ids.forEach(id => {
+    const label = document.getElementById(id)?.closest("label");
+    if (label) row.appendChild(label);
+  });
+  const memoLabel = document.getElementById("shippingMemo")?.closest("label");
+  if (memoLabel) row.insertAdjacentElement("afterend", memoLabel);
+}
 
 function bindDeliveryListControls() {
   document.getElementById("deliverySearch")?.addEventListener("input", event => {
@@ -367,6 +424,7 @@ function clearDeliveryDetail() {
     "deliverySubject",
     "deliveryInvoiceDate",
     "deliveryIssuedAt",
+    "deliverySlipMemo",
     "shippingMethod",
     "shipmentDate",
     "shippingCarrier",
@@ -399,6 +457,7 @@ function selectDelivery(id) {
   setFieldValue("deliverySubject", delivery.subject || "");
   setFieldValue("deliveryInvoiceDate", delivery.invoiceDate || "");
   setFieldValue("deliveryIssuedAt", formatDateTime(delivery.issuedAt));
+  setFieldValue("deliverySlipMemo", delivery.slipMemo || delivery.memo || "");
   setFieldValue("shippingMethod", shippingMethodForDelivery(delivery));
   setFieldValue("shipmentDate", normalizeDateOnly(delivery.shipmentDate) || normalizeDateOnly(delivery.handoverDate) || normalizeDateOnly(delivery.carryOutDate));
   setFieldValue("shippingCarrier", delivery.shippingCarrier || "");
@@ -415,19 +474,46 @@ function selectDelivery(id) {
 function renderDeliveryLines(delivery) {
   const area = document.getElementById("deliveryLines");
   const lines = delivery.lines || [];
-  area.innerHTML = lines.length ? lines.map(line => {
+  area.innerHTML = lines.length ? lines.map((line, index) => {
     line.transactionType = line.transactionType || delivery.transactionType || "";
     recalcDeliveryLine(line);
     return `<div class="invoice-line">
       <label>商品名<input value="${escapeHtml(line.name || "")}" readonly></label>
+      <label>在庫<div class="${deliveryStockClass(line)}">${formatDeliveryStock(line)}</div></label>
       <label>数量<input value="${Number(line.qty || 0)}" readonly></label>
       <label>単位<input value="${escapeHtml(line.unit || "")}" readonly></label>
       <label>税込単価<input value="${Number(line.unitPrice || 0)}" readonly></label>
       <label>値引率%<input value="${Number(line.discountValue ?? line.discountRate ?? 0)}" readonly></label>
       <label>金額<div class="line-amount ${amountClass(line.amount, line.transactionType)}">${money(line.amount)}</div></label>
-      <label>備考<input value="${escapeHtml(line.memo || "")}" readonly></label>
+      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateDeliveryLineMemo(${index}, this.value)"></label>
     </div>`;
   }).join("") : '<div class="message">納品商品がありません。</div>';
+}
+
+function updateDeliveryLineMemo(index, value) {
+  if (!currentDeliveryId) return;
+  const updated = updateDelivery(currentDeliveryId, current => {
+    const lines = Array.isArray(current.lines) ? current.lines.slice() : [];
+    if (!lines[index]) return current;
+    lines[index] = { ...lines[index], memo: value };
+    current.lines = lines;
+    current.items = lines;
+    return current;
+  });
+  if (!updated) return;
+  renderDeliveryLines(updated);
+  showSalesMessage("納品商品の備考を保存しました。", "ok");
+}
+
+function updateCurrentDeliverySlipMemo(value) {
+  if (!currentDeliveryId) return;
+  const updated = updateDelivery(currentDeliveryId, current => {
+    current.slipMemo = value;
+    current.memo = value;
+    return current;
+  });
+  if (!updated) return;
+  showSalesMessage("伝票備考を保存しました。", "ok");
 }
 
 function updateTotals(delivery) {
