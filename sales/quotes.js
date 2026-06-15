@@ -1447,3 +1447,11 @@ function restoreQuoteEditorAfterPdf() {
     window.focus();
   }, 300);
 }
+
+function printQuotePdf(quote) {
+  if (window.SalesPdfFormat?.printSalesDocument) {
+    window.SalesPdfFormat.printSalesDocument("quote", quote);
+    return;
+  }
+  showSalesPopup("PDF出力失敗", "PDFフォーマットを読み込めませんでした。", "err");
+}

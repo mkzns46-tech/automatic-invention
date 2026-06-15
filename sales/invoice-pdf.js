@@ -2,6 +2,14 @@ function invoicePdfMoney(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
 
+function printInvoicePdf(invoice) {
+  if (window.SalesPdfFormat?.printSalesDocument) {
+    window.SalesPdfFormat.printSalesDocument("invoice", invoice);
+    return;
+  }
+  alert("PDFフォーマットを読み込めませんでした。");
+}
+
 function invoicePdfAmountClass(value, transactionType = "") {
   return Number(value || 0) < 0 || invoicePdfIsRefundTransaction(transactionType) ? "amount-negative refund-amount" : "";
 }
@@ -163,4 +171,12 @@ function printInvoicePdf(invoice) {
 </body>
 </html>`);
   win.document.close();
+}
+
+function printInvoicePdf(invoice) {
+  if (window.SalesPdfFormat?.printSalesDocument) {
+    window.SalesPdfFormat.printSalesDocument("invoice", invoice);
+    return;
+  }
+  alert("PDFフォーマットを読み込めませんでした。");
 }

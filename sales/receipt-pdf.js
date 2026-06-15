@@ -30,3 +30,11 @@ function printReceiptPdf(receipt) {
   win.focus();
   win.print();
 }
+
+function printReceiptPdf(receipt) {
+  if (window.SalesPdfFormat?.printSalesDocument) {
+    window.SalesPdfFormat.printSalesDocument("receipt", receipt);
+    return;
+  }
+  alert("PDFフォーマットを読み込めませんでした。");
+}

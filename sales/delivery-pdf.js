@@ -46,3 +46,11 @@ function printDeliveryPdf(delivery) {
   win.focus();
   win.print();
 }
+
+function printDeliveryPdf(delivery) {
+  if (window.SalesPdfFormat?.printSalesDocument) {
+    window.SalesPdfFormat.printSalesDocument("delivery", delivery);
+    return;
+  }
+  alert("PDFフォーマットを読み込めませんでした。");
+}
