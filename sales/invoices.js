@@ -1345,7 +1345,7 @@ function fillInvoiceForm(invoice) {
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
   document.getElementById("invoiceStatus").value = invoice.issuedAt ? normalizeInvoiceStatus(invoice.status) : INVOICE_STATUS_DRAFT;
   setFieldValue("stockDeductionStatus", smaregiSaleDisplay(invoice));
-  document.getElementById("sourceQuoteNo").value = invoice.sourceQuoteNo || "";
+  setFieldValue("sourceQuoteNo", invoice.sourceQuoteNo || "");
   setFieldValue("salesCustomerId", invoice.customerId || "");
   setFieldValue("salesCustomerCode", invoice.customerCode || "");
   setFieldValue("salesSmaregiCustomerId", invoice.smaregiCustomerId || "");
