@@ -293,10 +293,10 @@ function renderReceiptLists() {
   if (count) count.textContent = `未発行 ${activeRows.length}件`;
   document.getElementById("receiptTargetListBody").innerHTML = activeRows.length
     ? activeRows.map(renderReceiptTargetRow).join("")
-    : '<tr><td colspan="8">領収書発行対象はありません。</td></tr>';
+    : '<tr><td colspan="9">領収書発行対象はありません。</td></tr>';
   document.getElementById("issuedReceiptListBody").innerHTML = completedRows.length
     ? completedRows.map(renderReceiptTargetRow).join("")
-    : '<tr><td colspan="8">発行済み・キャンセル済みの領収書はありません。</td></tr>';
+    : '<tr><td colspan="9">発行済み・キャンセル済みの領収書はありません。</td></tr>';
 }
 
 function sortReceiptRows(a, b) {
@@ -315,6 +315,7 @@ function renderReceiptTargetRow(row) {
     const invoice = row.invoice;
     const payment = getLatestActivePayment(invoice) || {};
     return `<tr>
+      <td></td>
       <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo || "")} <span class="status-badge muted">&#26410;&#20316;&#25104;</span></span></td>
       <td>${escapeHtml(normalizeDateOnly(invoice.issuedAt) || payment.paymentDate || "")}</td>
       <td>${escapeHtml(invoice.organizationName || invoice.organization || invoice.companyName || "")}</td>
@@ -327,6 +328,7 @@ function renderReceiptTargetRow(row) {
   }
   const receipt = row.receipt;
   return `<tr>
+    <td><input type="checkbox" class="receipt-pdf-check" value="${escapeHtml(receipt.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(receipt.receiptNo || "")} ${statusBadge(receipt.status)}</span></td>
     <td>${escapeHtml(normalizeDateOnly(receipt.issuedAt) || receipt.paymentDate || "")}</td>
     <td>${escapeHtml(receipt.organizationName || receipt.organization || receipt.companyName || "")}</td>
@@ -339,6 +341,20 @@ function renderReceiptTargetRow(row) {
       <button type="button" class="secondary" onclick="printReceiptById('${receipt.id}')">PDF&#20986;&#21147;</button>
     </td>
   </tr>`;
+}
+
+function printSelectedReceipts() {
+  const ids = Array.from(document.querySelectorAll(".receipt-pdf-check:checked")).map(input => input.value);
+  const receipts = readReceipts().filter(receipt => ids.includes(String(receipt.id)));
+  if (!receipts.length) {
+    showSalesPopup("PDF出力", "印刷する領収書を選択してください。", "warn");
+    return;
+  }
+  if (!window.SalesPdfFormat?.printSalesDocuments) {
+    showSalesPopup("PDF出力失敗", "PDFフォーマットを読み込めませんでした。", "err");
+    return;
+  }
+  window.SalesPdfFormat.printSalesDocuments(receipts.map(receipt => ({ type: "receipt", data: receipt })));
 }
 
 function matchesReceiptTargetFilters(row) {

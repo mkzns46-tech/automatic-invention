@@ -394,7 +394,8 @@ function pageLink(page, id, label) {
 
 function pdfButton(type, id) {
   if (!id) return "";
-  return `<button type="button" class="secondary progress-action-link" onclick="printProgressPdf('${type}', '${escapeHtml(id)}')">PDF</button>`;
+  const label = { quote: "見積PDF", invoice: "請求PDF", delivery: "納品PDF", receipt: "領収PDF" }[type] || "PDF";
+  return `<button type="button" class="secondary progress-action-link" onclick="printProgressPdf('${type}', '${escapeHtml(id)}')">${label}</button>`;
 }
 
 function printProgressPdf(type, id) {
@@ -425,6 +426,31 @@ function actionLinks(row, kinds) {
   return `<div class="progress-actions">${links.join("")}</div>`;
 }
 
+function printSelectedProgressTickets() {
+  const origins = Array.from(document.querySelectorAll(".progress-ticket-pdf-check:checked")).map(input => input.value);
+  if (!origins.length) {
+    alert("印刷する伝票を選択してください。");
+    return;
+  }
+  const rows = buildProgressRows().filter(row => origins.includes(String(row.origin)));
+  const documents = [];
+  rows.forEach(row => {
+    if (row.quote) documents.push({ type: "quote", data: row.quote });
+    if (row.invoice) documents.push({ type: "invoice", data: row.invoice });
+    if (row.delivery) documents.push({ type: "delivery", data: row.delivery });
+    if (row.receipt) documents.push({ type: "receipt", data: row.receipt });
+  });
+  if (!documents.length) {
+    alert("PDF出力対象の伝票が見つかりません。");
+    return;
+  }
+  if (!window.SalesPdfFormat?.printSalesDocuments) {
+    alert("PDF出力機能を読み込めませんでした。");
+    return;
+  }
+  window.SalesPdfFormat.printSalesDocuments(documents);
+}
+
 function renderRows(bodyId, countId, rows, renderer, emptyMessage, colspan) {
   const body = document.getElementById(bodyId);
   const count = document.getElementById(countId);
@@ -438,6 +464,7 @@ function renderTicketRows(allRows) {
   const rows = allRows.filter(row => !isCancelledRow(row)).filter(row => matchesFilters(row, "ticket")).sort(sortNewest);
   renderRows("ticketProgressBody", "ticketProgressCount", rows, row => `
     <tr>
+      <td><input type="checkbox" class="progress-ticket-pdf-check" value="${escapeHtml(row.origin)}"></td>
       <td>${escapeHtml(row.origin)}</td>
       <td>${escapeHtml(row.transactionType)}</td>
       <td>${escapeHtml(row.organizationName)}</td>
@@ -450,7 +477,7 @@ function renderTicketRows(allRows) {
       <td>${escapeHtml(row.staff)}</td>
       <td>${escapeHtml(normalizeDateTime(row.updatedAt))}</td>
       <td>${actionLinks(row, ["quote", "invoice", "payment", "delivery"])}</td>
-    </tr>`, "伝票ごとの進捗はありません。", 12);
+    </tr>`, "伝票ごとの進捗はありません。", 13);
 }
 
 function renderSalesRows(allRows) {

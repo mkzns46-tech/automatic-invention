@@ -100,6 +100,9 @@ label:has(#smaregiMemberCode){display:none!important}
 .progress-table th:nth-child(13),.progress-table td:nth-child(13){width:260px}
 .progress-actions{display:flex;gap:6px;flex-wrap:wrap}
 .progress-action-link{min-height:34px;padding:6px 9px;border-radius:9px;font-size:12px}
+.table-wrap th:first-child:empty,.table-wrap td:first-child:empty,.table-wrap td:has(input[type="checkbox"]){width:48px!important;min-width:48px;text-align:center}
+.progress-actions{gap:8px;align-items:center}
+.progress-action-link{white-space:nowrap}
 .progress-list-filter{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px;margin:4px 0 12px;align-items:end}
 .progress-list-filter label{margin:0}
 .progress-list-filter input,.progress-list-filter select{min-height:42px;font-size:14px;padding:9px 10px}

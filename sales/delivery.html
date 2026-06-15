@@ -32,6 +32,7 @@
     <div class="sales-actions section-heading-row">
       <h2 class="list-heading" onclick="toggleDeliveryList();">納品書一覧 <span class="status-badge muted" id="deliveryListCount">0件</span></h2>
       <button type="button" class="secondary list-toggle-button" id="deliveryListToggle" onclick="toggleDeliveryList();">一覧を閉じる</button>
+      <button type="button" class="secondary" onclick="printSelectedDeliveries();">選択PDF印刷</button>
     </div>
     <div class="list-panel" id="deliveryListPanel">
       <div class="list-filter-row">
@@ -55,7 +56,7 @@
       <div class="list-subheading">対応が必要な納品書</div>
       <div class="table-wrap list-scroll">
         <table>
-          <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <thead><tr><th></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
           <tbody id="deliveryListBody"></tbody>
         </table>
       </div>
@@ -63,7 +64,7 @@
         <div class="list-subheading">発送済・完了済一覧</div>
         <div class="table-wrap list-scroll">
           <table>
-            <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+            <thead><tr><th></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
             <tbody id="deliveryCompletedListBody"></tbody>
           </table>
         </div>

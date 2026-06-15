@@ -31,6 +31,7 @@
     <div class="sales-actions section-heading-row">
       <h2 class="list-heading" onclick="toggleProgressSection('ticket')">伝票一覧 <span class="status-badge muted" id="ticketProgressCount">0件 / 合計 0円</span></h2>
       <button type="button" class="secondary list-toggle-button" id="ticketProgressToggle" onclick="toggleProgressSection('ticket')">一覧を閉じる</button>
+      <button type="button" class="secondary" onclick="printSelectedProgressTickets();">選択PDF印刷</button>
     </div>
     <div class="list-panel" id="ticketProgressPanel">
       <div class="progress-list-filter">
@@ -45,7 +46,7 @@
       </div>
       <div class="table-wrap list-scroll progress-scroll">
         <table class="progress-table">
-          <thead><tr><th>伝票番号</th><th>取引区分</th><th>団体名</th><th>顧客名</th><th>見積</th><th>請求</th><th>入金</th><th>納品</th><th>合計金額</th><th>担当者</th><th>最終更新日</th><th>操作</th></tr></thead>
+          <thead><tr><th></th><th>伝票番号</th><th>取引区分</th><th>団体名</th><th>顧客名</th><th>見積</th><th>請求</th><th>入金</th><th>納品</th><th>合計金額</th><th>担当者</th><th>最終更新日</th><th>操作</th></tr></thead>
           <tbody id="ticketProgressBody"></tbody>
         </table>
       </div>

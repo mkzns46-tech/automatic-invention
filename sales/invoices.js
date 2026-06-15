@@ -1347,9 +1347,9 @@ function renderInvoiceList() {
   if (count) count.textContent = invoiceListSearchText || invoiceListStatusFilter || invoiceListDateFrom || invoiceListDateTo
     ? `入金待ち ${activeInvoices.length}件 / 全${invoices.length}件`
     : `入金待ち ${activeInvoices.length}件`;
-  body.innerHTML = activeInvoices.length ? activeInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="8">対応が必要な請求書はありません。</td></tr>';
+  body.innerHTML = activeInvoices.length ? activeInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="9">対応が必要な請求書はありません。</td></tr>';
   if (completedBody) {
-    completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="8">完了済み・キャンセル済みの請求書はありません。</td></tr>';
+    completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="9">完了済み・キャンセル済みの請求書はありません。</td></tr>';
   }
 }
 
@@ -1359,6 +1359,7 @@ function renderInvoiceListRow(invoice) {
   const status = normalizeInvoiceStatus(invoice.status);
   const customerView = getInvoiceCustomerView(invoice);
   return `<tr>
+    <td><input type="checkbox" class="invoice-pdf-check" value="${escapeHtml(invoice.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo)} ${statusBadge(status)}</span></td>
     <td>${escapeHtml(invoice.invoiceDate || "")}</td>
     <td>${escapeHtml(customerView.organizationName)}</td>
@@ -1372,6 +1373,20 @@ function renderInvoiceListRow(invoice) {
       ${canRetryStockDeduction(invoice) ? `<button type="button" class="secondary" onclick="retryInvoiceStockDeduction('${invoice.id}')">売上登録再実行</button>` : ""}
     </td>
   </tr>`;
+}
+
+function printSelectedInvoices() {
+  const ids = Array.from(document.querySelectorAll(".invoice-pdf-check:checked")).map(input => input.value);
+  const invoices = readInvoices().filter(invoice => ids.includes(String(invoice.id)) && canOutputInvoicePdf(invoice));
+  if (!invoices.length) {
+    showSalesPopup("PDF出力", "印刷できる請求書を選択してください。", "warn");
+    return;
+  }
+  if (!window.SalesPdfFormat?.printSalesDocuments) {
+    showSalesPopup("PDF出力失敗", "PDFフォーマットを読み込めませんでした。", "err");
+    return;
+  }
+  window.SalesPdfFormat.printSalesDocuments(invoices.map(invoice => ({ type: "invoice", data: normalizeInvoiceForView(invoice) })));
 }
 
 function matchesInvoiceListFilters(invoice) {

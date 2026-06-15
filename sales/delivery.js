@@ -346,16 +346,17 @@ function renderDeliveryList() {
     : `対応 ${activeDeliveries.length}件`;
   document.getElementById("deliveryListBody").innerHTML = activeDeliveries.length
     ? activeDeliveries.map(renderDeliveryRow).join("")
-    : '<tr><td colspan="8">対応が必要な納品書はありません。</td></tr>';
+    : '<tr><td colspan="9">対応が必要な納品書はありません。</td></tr>';
   document.getElementById("deliveryCompletedListBody").innerHTML = completedDeliveries.length
     ? completedDeliveries.map(renderDeliveryRow).join("")
-    : '<tr><td colspan="8">完了済み・キャンセル済みの納品書はありません。</td></tr>';
+    : '<tr><td colspan="9">完了済み・キャンセル済みの納品書はありません。</td></tr>';
 }
 
 function renderDeliveryRow(delivery) {
   const status = normalizeDeliveryStatus(delivery.status);
   const displayNumber = delivery.originNumber || delivery.masterNumber || delivery.quoteNumber || delivery.deliveryNo || "";
   return `<tr>
+    <td><input type="checkbox" class="delivery-pdf-check" value="${escapeHtml(delivery.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(displayNumber)} ${statusBadge(status)}</span></td>
     <td>${escapeHtml(normalizeDateOnly(delivery.shipmentDate) || normalizeDateOnly(delivery.handoverDate) || normalizeDateOnly(delivery.carryOutDate) || normalizeDateOnly(delivery.issuedAt) || delivery.deliveryDate || delivery.invoiceDate || "")}</td>
     <td>${escapeHtml(delivery.organizationName || delivery.organization || delivery.companyName || "")}</td>
@@ -369,6 +370,20 @@ function renderDeliveryRow(delivery) {
       ${!isCompletedDeliveryStatus(status) && status !== DELIVERY_STATUS_CANCELLED ? `<button type="button" class="invoice-issue-button" onclick="quickShipDelivery('${delivery.id}')">発送済</button>` : ""}
     </td>
   </tr>`;
+}
+
+function printSelectedDeliveries() {
+  const ids = Array.from(document.querySelectorAll(".delivery-pdf-check:checked")).map(input => input.value);
+  const deliveries = readDeliveries().filter(delivery => ids.includes(String(delivery.id)));
+  if (!deliveries.length) {
+    showSalesPopup("PDF出力", "印刷する納品書を選択してください。", "warn");
+    return;
+  }
+  if (!window.SalesPdfFormat?.printSalesDocuments) {
+    showSalesPopup("PDF出力失敗", "PDFフォーマットを読み込めませんでした。", "err");
+    return;
+  }
+  window.SalesPdfFormat.printSalesDocuments(deliveries.map(delivery => ({ type: "delivery", data: delivery })));
 }
 
 function matchesDeliveryFilters(delivery) {

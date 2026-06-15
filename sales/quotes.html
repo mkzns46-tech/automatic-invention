@@ -33,6 +33,7 @@
     <div class="sales-actions section-heading-row">
       <h2 class="list-heading" onclick="toggleQuoteList();">見積書一覧 <span class="status-badge muted" id="quoteListCount">0件</span></h2>
       <button type="button" class="secondary list-toggle-button" id="quoteListToggle" onclick="toggleQuoteList();">一覧を閉じる</button>
+      <button type="button" class="secondary" onclick="printSelectedQuotes();">選択PDF印刷</button>
       <button type="button" class="primary" onclick="newQuote(true);">新規見積</button>
     </div>
     <div class="list-panel" id="quoteListPanel">
@@ -52,7 +53,7 @@
       <div class="list-subheading">対応が必要な見積書</div>
       <div class="table-wrap list-scroll">
         <table>
-          <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <thead><tr><th></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
           <tbody id="quoteListBody"></tbody>
         </table>
       </div>
@@ -60,7 +61,7 @@
         <div class="list-subheading">完了済み・キャンセル済み</div>
         <div class="table-wrap list-scroll">
           <table>
-            <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+            <thead><tr><th></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
             <tbody id="quoteCompletedListBody"></tbody>
           </table>
         </div>

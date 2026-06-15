@@ -32,6 +32,7 @@
     <div class="sales-actions section-heading-row">
       <h2 class="list-heading" onclick="toggleReceiptList();">領収書一覧 <span class="status-badge muted" id="receiptListCount">0件</span></h2>
       <button type="button" class="secondary list-toggle-button" id="receiptListToggle" onclick="toggleReceiptList();">一覧を開く</button>
+      <button type="button" class="secondary" onclick="printSelectedReceipts();">選択PDF印刷</button>
     </div>
     <div class="list-panel" id="receiptListPanel" hidden>
       <div class="list-filter-row">
@@ -50,7 +51,7 @@
       <div class="list-subheading">未発行の領収書</div>
       <div class="table-wrap list-scroll">
         <table>
-          <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <thead><tr><th></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
           <tbody id="receiptTargetListBody"></tbody>
         </table>
       </div>
@@ -58,7 +59,7 @@
         <div class="list-subheading">発行済み・キャンセル済み</div>
         <div class="table-wrap list-scroll">
           <table>
-            <thead><tr><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+            <thead><tr><th></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
             <tbody id="issuedReceiptListBody"></tbody>
           </table>
         </div>

@@ -81,6 +81,42 @@
     }[type] || "帳票";
   }
 
+  function documentFileLabel(type) {
+    return {
+      quote: "見積書",
+      invoice: "請求書",
+      delivery: "納品書",
+      receipt: "領収書"
+    }[type] || "伝票";
+  }
+
+  function documentMessage(type) {
+    return {
+      quote: "下記のとおり、御見積申し上げます。",
+      invoice: "下記のとおり、ご請求申し上げます。",
+      delivery: "下記のとおり、納品いたしました。",
+      receipt: "下記の通り、正に領収いたしました。"
+    }[type] || "";
+  }
+
+  function sanitizeFilePart(value) {
+    return String(value || "")
+      .replace(/[\\/:*?"<>|]/g, "")
+      .replace(/\s+/g, "")
+      .slice(0, 48) || "顧客";
+  }
+
+  function filenameDate(doc) {
+    const raw = doc.invoiceDate || doc.quoteDate || doc.deliveryDate || doc.paymentDate || doc.issuedAt || doc.createdAt || new Date();
+    const formatted = formatDate(raw).replaceAll("/", "");
+    return /^\d{8}$/.test(formatted) ? formatted : formatDate(new Date()).replaceAll("/", "");
+  }
+
+  function pdfFilename(type, doc) {
+    const customer = sanitizeFilePart(doc.customerName || doc.name || doc.customer || doc.organizationName || "顧客");
+    return `${filenameDate(doc)}【${customer}】様-${documentFileLabel(type)}.pdf`;
+  }
+
   function documentNumber(type, doc) {
     return doc.quoteNo || doc.invoiceNo || doc.deliveryNo || doc.receiptNo || doc.originNumber || "";
   }
@@ -230,17 +266,32 @@
     return rows + blanks;
   }
 
-  function summaryHtml(totals) {
+  function bankInfoHtml(type) {
+    if (type !== "invoice") return "";
+    return `
+      <div class="bank-info">
+        <div class="bank-title">振込先</div>
+        <div>GMOあおぞらネット銀行 法人営業部</div>
+        <div>普通 1890583</div>
+        <div>株式会社ARICO ARCHERY</div>
+      </div>
+    `;
+  }
+
+  function summaryHtml(type, totals) {
     const discountRow = totals.discount > 0
       ? `<tr><th>値引き</th><td>-${numberOnly(totals.discount)}</td></tr>`
       : "";
     return `
       <div class="summary-note">※ は軽減税率対象商品<br>（10%対象 税込金額 ${numberOnly(totals.total)} 円 内税 ${numberOnly(totals.tax)}円）</div>
-      <table class="summary-table">
-        ${discountRow}
-        <tr><th>合計</th><td class="${totals.total < 0 ? "negative" : ""}">${numberOnly(totals.total)}</td></tr>
-        <tr><th>内消費税</th><td>(${numberOnly(totals.tax)})</td></tr>
-      </table>
+      <div>
+        <table class="summary-table">
+          ${discountRow}
+          <tr><th>合計</th><td class="${totals.total < 0 ? "negative" : ""}">${numberOnly(totals.total)}</td></tr>
+          <tr><th>内消費税</th><td>(${numberOnly(totals.tax)})</td></tr>
+        </table>
+        ${bankInfoHtml(type)}
+      </div>
     `;
   }
 
@@ -254,7 +305,7 @@
         <thead><tr><th>摘要</th><th>数量</th><th>単位</th><th>税込単価</th><th>税込金額</th></tr></thead>
         <tbody>${itemRows(pageLines, Math.max(3, blankTarget - pageLines.length))}</tbody>
       </table>
-      ${isLast ? `<div class="summary-area">${summaryHtml(totals)}</div><div class="note-title">備考</div><div class="note-box">${escapeHtml(note)}</div>` : ""}
+      ${isLast ? `<div class="summary-area">${summaryHtml(type, totals)}</div><div class="note-title">備考</div><div class="note-box">${escapeHtml(note)}</div>` : ""}
       <div class="footer">${pageIndex + 1}/${pageTotal}<br>（ ${escapeHtml(number)} ）</div>
     </div>`;
   }
@@ -267,7 +318,7 @@
       <div>
         <div class="customer-name">${escapeHtml(customerName || organizationName)} 様</div>
         <div class="customer-address">${organizationName && organizationName !== customerName ? escapeHtml(organizationName) + "<br>" : ""}${escapeHtml(address)}<br>TEL：${escapeHtml(doc.phone || "")}<br>FAX：</div>
-        <div class="message">${type === "receipt" ? "下記の通り、正に領収いたしました。" : "下記のとおり、御見積申し上げます。"}</div>
+        <div class="message">${escapeHtml(documentMessage(type))}</div>
         <div class="info-list">
           ${infoRows(type, doc).map(([label, value]) => `<div class="info-row"><div class="info-label">${escapeHtml(label)}</div><div class="info-value">${escapeHtml(value)}</div></div>`).join("")}
           <div class="info-row total-row"><div class="info-label">${type === "receipt" ? "領収金額" : "合計金額"}</div><div class="info-value ${totals.total < 0 ? "negative" : ""}">${money(totals.total)} <small>（税込）</small></div></div>
@@ -335,7 +386,7 @@
       .items td{border-bottom:1px solid #bdbdbd;border-left:1px solid #e5e5e5;border-right:1px solid #e5e5e5;padding:4px 8px;height:24px;vertical-align:top}
       .items .desc{width:50%}
       .items th:nth-child(2),.items td:nth-child(2){width:10%}
-      .items th:nth-child(3),.items td:nth-child(3){width:10%}
+      .items th:nth-child(3),.items td:nth-child(3){width:10%;text-align:right}
       .items th:nth-child(4),.items td:nth-child(4){width:15%}
       .items th:nth-child(5),.items td:nth-child(5){width:15%}
       .num{text-align:right}
@@ -347,6 +398,11 @@
       .summary-table{width:225px;border-collapse:collapse}
       .summary-table th{width:105px;background:#2f744f;color:#fff;padding:7px 8px;text-align:right;border:1px solid #2f744f}
       .summary-table td{padding:7px 10px;text-align:right;border:1px solid #ddd}
+      .bank-info{margin-top:10px;border:1px solid #d7dfd9;padding:8px 10px;font-size:12px;line-height:1.55}
+      .bank-title{font-weight:700;color:#2f744f;margin-bottom:2px}
+      .pdf-toolbar{position:sticky;top:0;z-index:10;display:flex;gap:8px;justify-content:flex-end;padding:8px 12px;background:#f7faf8;border-bottom:1px solid #d7dfd9}
+      .pdf-toolbar button{border:1px solid #2f744f;background:#2f744f;color:#fff;border-radius:6px;padding:7px 14px;font-weight:700;cursor:pointer}
+      .pdf-toolbar button.secondary{background:#fff;color:#2f744f}
       .note-title{background:#2f744f;color:#fff;font-weight:700;margin-top:16px;padding:6px 12px}
       .note-box{min-height:78px;border-bottom:1px solid #999;white-space:pre-wrap;padding:8px 4px}
       .footer{position:absolute;right:0;bottom:0;font-size:12px;text-align:right}
@@ -359,11 +415,11 @@
       .receipt-breakdown th{background:#2f744f;color:#fff;border:1px solid #2f744f;padding:8px}
       .receipt-breakdown td{border:1px solid #ddd;padding:8px}
       .receipt-breakdown td:last-child{text-align:right}
-      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.pdf-toolbar{display:none}}
     </style>`;
   }
 
-  function printSalesDocument(type, data) {
+  function documentPages(type, data) {
     const doc = JSON.parse(JSON.stringify(data || {}));
     if (type === "receipt" && !(doc.slipMemo || doc.memo)) {
       doc.slipMemo = "アーチェリー用品代として";
@@ -390,12 +446,31 @@
         isLast: index === linePages.length - 1,
         note
       })).join("");
+    return { pages, title, number, filename: pdfFilename(type, doc) };
+  }
+
+  function openPdfWindow(documents) {
+    const built = documents.map(({ type, data }) => documentPages(type, data));
+    const first = built[0] || { title: "伝票", number: "", filename: "伝票.pdf", pages: "" };
     const win = window.open("", "_blank");
     if (!win) return;
     const baseHref = location.href.replace(/[^/]*$/, "");
-    win.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><base href="${escapeHtml(baseHref)}"><title>${escapeHtml(title)} ${escapeHtml(number)}</title>${css()}</head><body>${pages}<script>window.onload = () => { window.print(); setTimeout(() => { if (window.opener) window.opener.focus(); }, 300); };</script></body></html>`);
+    const body = built.map(item => item.pages).join("");
+    const title = documents.length === 1 ? first.filename : `販売管理PDF-${formatDate(new Date()).replaceAll("/", "")}.pdf`;
+    const safeTitleLiteral = JSON.stringify(title).replace(/</g, "\\u003c");
+    win.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><base href="${escapeHtml(baseHref)}"><title>${escapeHtml(title)}</title>${css()}</head><body><div class="pdf-toolbar"><button type="button" onclick="window.print()">印刷</button><button type="button" class="secondary" onclick="document.title=${safeTitleLiteral}; window.print()">保存(PDF)</button></div>${body}</body></html>`);
     win.document.close();
   }
 
-  window.SalesPdfFormat = { printSalesDocument };
+  function printSalesDocument(type, data) {
+    openPdfWindow([{ type, data }]);
+  }
+
+  function printSalesDocuments(documents) {
+    const safeDocuments = (documents || []).filter(item => item && item.type && item.data);
+    if (!safeDocuments.length) return;
+    openPdfWindow(safeDocuments);
+  }
+
+  window.SalesPdfFormat = { printSalesDocument, printSalesDocuments };
 })();

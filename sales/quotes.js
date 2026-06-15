@@ -707,9 +707,9 @@ function renderQuoteList() {
   if (count) count.textContent = quoteListSearchText || quoteListStatusFilter || quoteListDateFrom || quoteListDateTo
     ? `下書き ${activeQuotes.length}件 / 全${quotes.length}件`
     : `下書き ${activeQuotes.length}件`;
-  body.innerHTML = activeQuotes.length ? activeQuotes.map(renderQuoteListRow).join("") : '<tr><td colspan="8">対応が必要な見積書はありません。</td></tr>';
+  body.innerHTML = activeQuotes.length ? activeQuotes.map(renderQuoteListRow).join("") : '<tr><td colspan="9">対応が必要な見積書はありません。</td></tr>';
   if (completedBody) {
-    completedBody.innerHTML = completedQuotes.length ? completedQuotes.map(renderQuoteListRow).join("") : '<tr><td colspan="8">完了済み・キャンセル済みの見積書はありません。</td></tr>';
+    completedBody.innerHTML = completedQuotes.length ? completedQuotes.map(renderQuoteListRow).join("") : '<tr><td colspan="9">完了済み・キャンセル済みの見積書はありません。</td></tr>';
   }
 }
 
@@ -722,6 +722,7 @@ function renderQuoteListRow(q) {
     ? `<button type="button" class="secondary next-step-button" onclick="convertQuoteToInvoice('${q.id}')">&#35531;&#27714;&#26360;&#12408;&#22793;&#25563;</button>`
     : "";
   return `<tr data-quote-id="${escapeHtml(q.id || "")}">
+    <td><input type="checkbox" class="quote-pdf-check" value="${escapeHtml(q.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(q.quoteNo)} ${quoteStatusBadge(q.status)}</span></td>
     <td>${escapeHtml(normalizeDateOnly(q.createdAt) || q.quoteDate || "")}</td>
     <td>${escapeHtml(q.organizationName || q.organization || q.companyName || "")}</td>
@@ -737,6 +738,20 @@ function renderQuoteListRow(q) {
       ${deleteButton}
     </td>
   </tr>`;
+}
+
+function printSelectedQuotes() {
+  const ids = Array.from(document.querySelectorAll(".quote-pdf-check:checked")).map(input => input.value);
+  const quotes = readQuotes().filter(quote => ids.includes(String(quote.id)));
+  if (!quotes.length) {
+    showSalesPopup("PDF出力", "印刷する見積書を選択してください。", "warn");
+    return;
+  }
+  if (!window.SalesPdfFormat?.printSalesDocuments) {
+    showSalesPopup("PDF出力失敗", "PDFフォーマットを読み込めませんでした。", "err");
+    return;
+  }
+  window.SalesPdfFormat.printSalesDocuments(quotes.map(quote => ({ type: "quote", data: quote })));
 }
 
 function scrollToSavedQuote(quoteId) {
