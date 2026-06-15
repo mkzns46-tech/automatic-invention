@@ -11,7 +11,6 @@
   const STAMP_FALLBACK_SRC = "assets/arico-stamp.png";
   const LOGO_STORAGE_KEYS = ["arico_sales_pdf_logo", "aricoSalesPdfLogo", "salesPdfLogo"];
   const STAMP_STORAGE_KEYS = ["arico_sales_pdf_stamp", "aricoSalesPdfStamp", "salesPdfStamp"];
-  const HTML2PDF_SRC = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -480,23 +479,6 @@
     });
   }
 
-  function loadHtml2Pdf() {
-    if (window.html2pdf) return Promise.resolve(window.html2pdf);
-    return new Promise((resolve, reject) => {
-      const existing = document.querySelector(`script[src="${HTML2PDF_SRC}"]`);
-      if (existing) {
-        existing.addEventListener("load", () => resolve(window.html2pdf));
-        existing.addEventListener("error", reject);
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = HTML2PDF_SRC;
-      script.onload = () => window.html2pdf ? resolve(window.html2pdf) : reject(new Error("html2pdf load failed"));
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  }
-
   function buildDocuments(documents) {
     const built = documents.map(({ type, data }) => documentPages(type, data));
     const first = built[0] || { title: "伝票", number: "", filename: "伝票.pdf", pages: "" };
@@ -518,81 +500,13 @@
     win.document.close();
   }
 
-  function waitForImages(container) {
-    const images = Array.from(container.querySelectorAll("img"));
-    if (!images.length) return Promise.resolve();
-    return Promise.all(images.map(img => {
-      if (img.complete) return Promise.resolve();
-      return new Promise(resolve => {
-        const done = () => resolve();
-        img.addEventListener("load", done, { once: true });
-        img.addEventListener("error", done, { once: true });
-        setTimeout(done, 1200);
-      });
-    }));
-  }
-
-  function waitForPaint() {
-    return new Promise(resolve => {
-      requestAnimationFrame(() => requestAnimationFrame(resolve));
-    });
-  }
-
-  async function downloadPdf(documents) {
-    const { body, title, built } = buildDocuments(documents);
-    const html2pdf = await loadHtml2Pdf();
-    const firstDoc = documents[0]?.data || {};
-    const firstBuilt = built[0] || {};
-    const firstLines = normalizeLines(firstDoc);
-    console.log("sales pdf save", {
-      type: documents[0]?.type || "",
-      number: firstBuilt.number || documentNumber(documents[0]?.type, firstDoc),
-      customerName: firstDoc.customerName || firstDoc.name || firstDoc.customer || "",
-      itemCount: firstLines.length,
-      htmlLength: body.length
-    });
-    if (!body || body.length < 100 || !body.includes("sheet")) {
-      throw new Error("PDF HTML is empty");
-    }
-    const style = document.createElement("style");
-    style.dataset.salesPdfDownload = "true";
-    style.textContent = `${cssText()}
-      .pdf-download-root{position:fixed;left:0;top:0;width:210mm;background:#fff;z-index:2147483647;pointer-events:none}
-      .pdf-download-root .sheet{width:210mm;min-height:277mm;background:#fff;margin:0 auto}
-    `;
-    const container = document.createElement("div");
-    container.className = "pdf-download-root";
-    container.innerHTML = body;
-    document.head.appendChild(style);
-    document.body.appendChild(container);
-    try {
-      await waitForImages(container);
-      await waitForPaint();
-      const target = container.querySelector(".sheet") ? container : container.firstElementChild;
-      await html2pdf()
-        .set({
-          margin: 0,
-          filename: title,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff" },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["css", "legacy"], after: ".sheet" }
-        })
-        .from(target)
-        .save();
-    } finally {
-      container.remove();
-      style.remove();
-    }
-  }
-
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async function downloadPdfFiles(documents) {
+  async function openPdfWindowsIndividually(documents, action) {
     for (const documentItem of documents) {
-      await downloadPdf([documentItem]);
+      openPdfWindow([documentItem], action);
       await sleep(450);
     }
   }
@@ -601,14 +515,6 @@
     const info = documentPages(type, data);
     const action = await showPdfActionPopup(info.filename, 1);
     if (action === "cancel") return;
-    if (action === "save") {
-      try {
-        await downloadPdf([{ type, data }]);
-      } catch (error) {
-        alert(`PDF保存に失敗しました。\n${error?.message || error}`);
-      }
-      return;
-    }
     openPdfWindow([{ type, data }], action);
   }
 
@@ -619,11 +525,7 @@
     const action = await showPdfActionPopup(first.filename, safeDocuments.length);
     if (action === "cancel") return;
     if (action === "save") {
-      try {
-        await downloadPdfFiles(safeDocuments);
-      } catch (error) {
-        alert(`PDF保存に失敗しました。\n${error?.message || error}`);
-      }
+      await openPdfWindowsIndividually(safeDocuments, "save");
       return;
     }
     openPdfWindow(safeDocuments, action);
