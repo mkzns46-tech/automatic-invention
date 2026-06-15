@@ -417,13 +417,39 @@ function printProgressPdf(type, id) {
   window.SalesPdfFormat.printSalesDocument(type, doc);
 }
 
+function progressRowDocuments(row) {
+  const documents = [];
+  if (row?.quote) documents.push({ type: "quote", data: row.quote });
+  if (row?.invoice) documents.push({ type: "invoice", data: row.invoice });
+  if (row?.delivery) documents.push({ type: "delivery", data: row.delivery });
+  if (row?.receipt) documents.push({ type: "receipt", data: row.receipt });
+  return documents;
+}
+
+function printProgressRowPdfs(origin) {
+  const row = buildProgressRows().find(item => String(item.origin) === String(origin));
+  const documents = progressRowDocuments(row);
+  if (!documents.length) {
+    alert("PDF出力対象の伝票が見つかりません。");
+    return;
+  }
+  if (!window.SalesPdfFormat?.printSalesDocuments) {
+    alert("PDF出力機能を読み込めませんでした。");
+    return;
+  }
+  window.SalesPdfFormat.printSalesDocuments(documents);
+}
+
 function actionLinks(row, kinds) {
   const links = [];
-  if (kinds.includes("quote")) links.push(pageLink("quotes.html", row.quote?.id, "見積"), pdfButton("quote", row.quote?.id));
-  if (kinds.includes("invoice")) links.push(pageLink("invoices.html", row.invoice?.id, "請求"), pdfButton("invoice", row.invoice?.id));
-  if (kinds.includes("payment")) links.push(pageLink("payments.html", row.invoice?.id, "入金"), pdfButton("invoice", row.invoice?.id));
-  if (kinds.includes("delivery")) links.push(pageLink("delivery.html", row.delivery?.id, "納品"), pdfButton("delivery", row.delivery?.id));
-  return `<div class="progress-actions">${links.join("")}</div>`;
+  if (kinds.includes("quote")) links.push(pageLink("quotes.html", row.quote?.id, "見積"));
+  if (kinds.includes("invoice")) links.push(pageLink("invoices.html", row.invoice?.id, "請求"));
+  if (kinds.includes("payment")) links.push(pageLink("payments.html", row.invoice?.id, "入金"));
+  if (kinds.includes("delivery")) links.push(pageLink("delivery.html", row.delivery?.id, "納品"));
+  const pdf = progressRowDocuments(row).length
+    ? `<button type="button" class="secondary progress-action-link progress-pdf-button" onclick="printProgressRowPdfs('${escapeHtml(row.origin)}')">PDF出力</button>`
+    : "";
+  return `<div class="progress-actions"><div class="progress-detail-actions">${links.join("")}</div>${pdf}</div>`;
 }
 
 function printSelectedProgressTickets() {
@@ -435,10 +461,7 @@ function printSelectedProgressTickets() {
   const rows = buildProgressRows().filter(row => origins.includes(String(row.origin)));
   const documents = [];
   rows.forEach(row => {
-    if (row.quote) documents.push({ type: "quote", data: row.quote });
-    if (row.invoice) documents.push({ type: "invoice", data: row.invoice });
-    if (row.delivery) documents.push({ type: "delivery", data: row.delivery });
-    if (row.receipt) documents.push({ type: "receipt", data: row.receipt });
+    documents.push(...progressRowDocuments(row));
   });
   if (!documents.length) {
     alert("PDF出力対象の伝票が見つかりません。");

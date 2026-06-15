@@ -102,11 +102,13 @@ label:has(#smaregiMemberCode){display:none!important}
 .progress-table th:nth-child(11),.progress-table td:nth-child(11){width:120px}
 .progress-table th:nth-child(12),.progress-table td:nth-child(12){width:160px}
 .progress-table th:nth-child(13),.progress-table td:nth-child(13){width:260px}
-.progress-actions{display:flex;gap:6px;flex-wrap:wrap}
+.progress-actions{display:grid;gap:6px;justify-items:start}
 .progress-action-link{min-height:34px;padding:6px 9px;border-radius:9px;font-size:12px}
 .table-wrap th:first-child:empty,.table-wrap td:first-child:empty,.table-wrap td:has(input[type="checkbox"]){width:42px!important;min-width:42px;text-align:center}
 .table-wrap input[type="checkbox"],.pdf-select-checkbox{width:16px!important;height:16px!important;min-width:16px!important;min-height:0!important;padding:0!important;margin:0!important;accent-color:var(--main-dark)}
-.progress-actions{gap:8px;align-items:center}
+.progress-actions{gap:7px;align-items:center}
+.progress-detail-actions{display:flex;gap:6px;flex-wrap:wrap}
+.progress-pdf-button{background:#f8fcf9;color:var(--main-dark);border-color:#b8d8c4}
 .progress-action-link{white-space:nowrap}
 .progress-list-filter{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px;margin:4px 0 12px;align-items:end}
 .progress-list-filter label{margin:0}

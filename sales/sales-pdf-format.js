@@ -11,6 +11,7 @@
   const STAMP_FALLBACK_SRC = "assets/arico-stamp.png";
   const LOGO_STORAGE_KEYS = ["arico_sales_pdf_logo", "aricoSalesPdfLogo", "salesPdfLogo"];
   const STAMP_STORAGE_KEYS = ["arico_sales_pdf_stamp", "aricoSalesPdfStamp", "salesPdfStamp"];
+  const HTML2PDF_SRC = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -475,26 +476,84 @@
     });
   }
 
-  function openPdfWindow(documents, action) {
+  function loadHtml2Pdf() {
+    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[src="${HTML2PDF_SRC}"]`);
+      if (existing) {
+        existing.addEventListener("load", () => resolve(window.html2pdf));
+        existing.addEventListener("error", reject);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = HTML2PDF_SRC;
+      script.onload = () => window.html2pdf ? resolve(window.html2pdf) : reject(new Error("html2pdf load failed"));
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  function buildDocuments(documents) {
     const built = documents.map(({ type, data }) => documentPages(type, data));
     const first = built[0] || { title: "伝票", number: "", filename: "伝票.pdf", pages: "" };
+    const body = built.map(item => item.pages).join("");
+    const title = documents.length === 1 ? first.filename : `販売管理PDF-${formatDate(new Date()).replaceAll("/", "")}.pdf`;
+    return { built, first, body, title };
+  }
+
+  function openPdfWindow(documents, action) {
+    const { body, title } = buildDocuments(documents);
+    const built = documents.map(({ type, data }) => documentPages(type, data));
     const win = window.open("", "_blank");
     if (!win) return;
     const baseHref = location.href.replace(/[^/]*$/, "");
-    const body = built.map(item => item.pages).join("");
-    const title = documents.length === 1 ? first.filename : `販売管理PDF-${formatDate(new Date()).replaceAll("/", "")}.pdf`;
     const safeTitleLiteral = JSON.stringify(title).replace(/</g, "\\u003c");
-    const autoScript = action === "print" || action === "save"
+    const autoScript = action === "print"
       ? `<script>window.onload = () => { document.title=${safeTitleLiteral}; setTimeout(() => window.print(), 120); };</script>`
       : "";
     win.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><base href="${escapeHtml(baseHref)}"><title>${escapeHtml(title)}</title>${css()}</head><body>${body}${autoScript}</body></html>`);
     win.document.close();
   }
 
+  async function downloadPdf(documents) {
+    const { body, title } = buildDocuments(documents);
+    const html2pdf = await loadHtml2Pdf();
+    const container = document.createElement("div");
+    container.style.position = "fixed";
+    container.style.left = "-10000px";
+    container.style.top = "0";
+    container.style.width = "210mm";
+    container.innerHTML = `${css()}${body}`;
+    document.body.appendChild(container);
+    try {
+      await html2pdf()
+        .set({
+          margin: 0,
+          filename: title,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff" },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"], after: ".sheet" }
+        })
+        .from(container)
+        .save();
+    } finally {
+      container.remove();
+    }
+  }
+
   async function printSalesDocument(type, data) {
     const info = documentPages(type, data);
     const action = await showPdfActionPopup(info.filename, 1);
     if (action === "cancel") return;
+    if (action === "save") {
+      try {
+        await downloadPdf([{ type, data }]);
+      } catch (error) {
+        alert(`PDF保存に失敗しました。\n${error?.message || error}`);
+      }
+      return;
+    }
     openPdfWindow([{ type, data }], action);
   }
 
@@ -504,6 +563,14 @@
     const first = documentPages(safeDocuments[0].type, safeDocuments[0].data);
     const action = await showPdfActionPopup(first.filename, safeDocuments.length);
     if (action === "cancel") return;
+    if (action === "save") {
+      try {
+        await downloadPdf(safeDocuments);
+      } catch (error) {
+        alert(`PDF保存に失敗しました。\n${error?.message || error}`);
+      }
+      return;
+    }
     openPdfWindow(safeDocuments, action);
   }
 
