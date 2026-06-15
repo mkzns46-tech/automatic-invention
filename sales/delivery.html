@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARICO ARCHERY 納品書</title>
+<title>ARICO ARCHERY 邏榊刀譖ｸ</title>
 <link rel="stylesheet" href="sales-style.css?v=20260615-pdf-button-ui">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
@@ -17,56 +17,56 @@
   <header class="sales-header">
     <div>
       <div class="brand">ARICO ARCHERY</div>
-      <h1>納品書</h1>
-      <p class="lead">請求書の発行確定時に作成された納品書を確認し、PDF出力と発送済処理を行います。</p>
+      <h1>邏榊刀譖ｸ</h1>
+      <p class="lead">隲区ｱよ嶌縺ｮ逋ｺ陦檎｢ｺ螳壽凾縺ｫ菴懈・縺輔ｌ縺溽ｴ榊刀譖ｸ繧堤｢ｺ隱阪＠縲￣DF蜃ｺ蜉帙→逋ｺ騾∵ｸ亥・逅・ｒ陦後＞縺ｾ縺吶・/p>
     </div>
     <div class="sales-actions">
-      <a class="pill" href="invoices.html">請求書</a>
-      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+      <a class="pill" href="invoices.html">隲区ｱよ嶌</a>
+      <button type="button" class="secondary" onclick="logoutSales();">繝ｭ繧ｰ繧､繝ｳ逕ｻ髱｢縺ｫ謌ｻ繧・/button>
     </div>
   </header>
 
-  <div id="salesMessage" class="message">納品書を確認できます。</div>
+  <div id="salesMessage" class="message">邏榊刀譖ｸ繧堤｢ｺ隱阪〒縺阪∪縺吶・/div>
 
   <section class="card collapsible-list-card" id="deliveryListCard">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleDeliveryList();">納品書一覧 <span class="status-badge muted" id="deliveryListCount">0件</span></h2>
+      <h2 class="list-heading" onclick="toggleDeliveryList();">邏榊刀譖ｸ荳隕ｧ <span class="status-badge muted" id="deliveryListCount">0莉ｶ</span></h2>
       <div class="list-header-actions">
-        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedDeliveries();">PDF一括印刷</button>
-        <button type="button" class="secondary list-toggle-button" id="deliveryListToggle" onclick="toggleDeliveryList();">一覧を閉じる</button>
+        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedDeliveries();">PDF荳諡ｬ蜊ｰ蛻ｷ</button>
+        <button type="button" class="secondary list-toggle-button" id="deliveryListToggle" onclick="toggleDeliveryList();">荳隕ｧ繧帝哩縺倥ｋ</button>
       </div>
     </div>
     <div class="list-panel" id="deliveryListPanel">
       <div class="list-filter-row">
-        <label>一覧検索<input id="deliverySearch" placeholder="顧客名・担当者・件名・納品書番号・ステータス"></label>
-        <label>ステータス
+        <label>荳隕ｧ讀懃ｴ｢<input id="deliverySearch" placeholder="鬘ｧ螳｢蜷阪・諡・ｽ楢・・莉ｶ蜷阪・邏榊刀譖ｸ逡ｪ蜿ｷ繝ｻ繧ｹ繝・・繧ｿ繧ｹ"></label>
+        <label>繧ｹ繝・・繧ｿ繧ｹ
           <select id="deliveryStatusFilter">
-            <option value="">全て</option>
-            <option value="未発送">未発送</option>
-            <option value="未発行">未発行</option>
-            <option value="納品書発行済">納品書発行済</option>
-            <option value="発送済">発送済</option>
-            <option value="手渡し済">手渡し済</option>
-            <option value="担当者手持ち済">担当者手持ち済</option>
-            <option value="完了済">完了済</option>
-            <option value="キャンセル">キャンセル</option>
+            <option value="">蜈ｨ縺ｦ</option>
+            <option value="譛ｪ逋ｺ騾・>譛ｪ逋ｺ騾・/option>
+            <option value="譛ｪ逋ｺ陦・>譛ｪ逋ｺ陦・/option>
+            <option value="邏榊刀譖ｸ逋ｺ陦梧ｸ・>邏榊刀譖ｸ逋ｺ陦梧ｸ・/option>
+            <option value="逋ｺ騾∵ｸ・>逋ｺ騾∵ｸ・/option>
+            <option value="謇区ｸ｡縺玲ｸ・>謇区ｸ｡縺玲ｸ・/option>
+            <option value="諡・ｽ楢・焔謖√■貂・>諡・ｽ楢・焔謖√■貂・/option>
+            <option value="螳御ｺ・ｸ・>螳御ｺ・ｸ・/option>
+            <option value="繧ｭ繝｣繝ｳ繧ｻ繝ｫ">繧ｭ繝｣繝ｳ繧ｻ繝ｫ</option>
           </select>
         </label>
-        <label>開始日<input id="deliveryDateFromFilter" type="date"></label>
-        <label>終了日<input id="deliveryDateToFilter" type="date"></label>
+        <label>髢句ｧ区律<input id="deliveryDateFromFilter" type="date"></label>
+        <label>邨ゆｺ・律<input id="deliveryDateToFilter" type="date"></label>
       </div>
-      <div class="list-subheading">対応が必要な納品書</div>
+      <div class="list-subheading">蟇ｾ蠢懊′蠢・ｦ√↑邏榊刀譖ｸ</div>
       <div class="table-wrap list-scroll">
         <table>
-          <thead><tr><th></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('delivery-pdf-check', this.checked, this)"></th><th>莨晉･ｨ逡ｪ蜿ｷ</th><th>譌･莉・/th><th>蝗｣菴灘錐</th><th>鬘ｧ螳｢蜷・/th><th>蜷郁ｨ磯≡鬘・/th><th>繧ｹ繝・・繧ｿ繧ｹ</th><th>諡・ｽ楢・/th><th>謫堺ｽ・/th></tr></thead>
           <tbody id="deliveryListBody"></tbody>
         </table>
       </div>
       <div class="list-panel completed-list-panel" id="deliveryCompletedListPanel">
-        <div class="list-subheading">発送済・完了済一覧</div>
+        <div class="list-subheading">逋ｺ騾∵ｸ医・螳御ｺ・ｸ井ｸ隕ｧ</div>
         <div class="table-wrap list-scroll">
           <table>
-            <thead><tr><th></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+            <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('delivery-pdf-check', this.checked, this)"></th><th>莨晉･ｨ逡ｪ蜿ｷ</th><th>譌･莉・/th><th>蝗｣菴灘錐</th><th>鬘ｧ螳｢蜷・/th><th>蜷郁ｨ磯≡鬘・/th><th>繧ｹ繝・・繧ｿ繧ｹ</th><th>諡・ｽ楢・/th><th>謫堺ｽ・/th></tr></thead>
             <tbody id="deliveryCompletedListBody"></tbody>
           </table>
         </div>
@@ -76,76 +76,76 @@
 
   <section class="card" id="deliveryDetailCard">
     <div class="sales-actions section-heading-row">
-      <h2>納品情報</h2>
-      <button type="button" class="secondary" onclick="clearDeliveryDetail();">入力をクリア</button>
+      <h2>邏榊刀諠・ｱ</h2>
+      <button type="button" class="secondary" onclick="clearDeliveryDetail();">蜈･蜉帙ｒ繧ｯ繝ｪ繧｢</button>
     </div>
     <div class="row">
-      <label>納品書番号<input id="deliveryNo" readonly></label>
-      <label>元請求書番号<input id="sourceInvoiceNo" readonly></label>
-      <label>ステータス<input id="deliveryStatus" readonly></label>
-      <label>発行日<input id="deliveryIssuedAt" readonly></label>
+      <label>邏榊刀譖ｸ逡ｪ蜿ｷ<input id="deliveryNo" readonly></label>
+      <label>蜈・ｫ区ｱよ嶌逡ｪ蜿ｷ<input id="sourceInvoiceNo" readonly></label>
+      <label>繧ｹ繝・・繧ｿ繧ｹ<input id="deliveryStatus" readonly></label>
+      <label>逋ｺ陦梧律<input id="deliveryIssuedAt" readonly></label>
     </div>
     <div class="row three">
-      <label>顧客名<input id="deliveryCustomerName" readonly></label>
-      <label>顧客区分<input id="deliveryCustomerType" readonly></label>
-      <label>担当者<input id="deliveryStaff" readonly></label>
+      <label>鬘ｧ螳｢蜷・input id="deliveryCustomerName" readonly></label>
+      <label>鬘ｧ螳｢蛹ｺ蛻・input id="deliveryCustomerType" readonly></label>
+      <label>諡・ｽ楢・input id="deliveryStaff" readonly></label>
     </div>
     <div class="row three">
-      <label>住所<input id="deliveryAddress" readonly></label>
-      <label>電話番号<input id="deliveryPhone" readonly></label>
-      <label>メールアドレス<input id="deliveryEmail" readonly></label>
+      <label>菴乗園<input id="deliveryAddress" readonly></label>
+      <label>髮ｻ隧ｱ逡ｪ蜿ｷ<input id="deliveryPhone" readonly></label>
+      <label>繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ<input id="deliveryEmail" readonly></label>
     </div>
     <div class="row two">
-      <label>件名<input id="deliverySubject" readonly></label>
-      <label>請求日<input id="deliveryInvoiceDate" readonly></label>
+      <label>莉ｶ蜷・input id="deliverySubject" readonly></label>
+      <label>隲区ｱよ律<input id="deliveryInvoiceDate" readonly></label>
     </div>
-    <label>伝票備考<textarea id="deliverySlipMemo" rows="3" onchange="updateCurrentDeliverySlipMemo(this.value)"></textarea></label>
+    <label>莨晉･ｨ蛯呵・textarea id="deliverySlipMemo" rows="3" onchange="updateCurrentDeliverySlipMemo(this.value)"></textarea></label>
   </section>
 
   <section class="card" id="deliveryShippingCard">
-    <h2>発送情報</h2>
+    <h2>逋ｺ騾∵ュ蝣ｱ</h2>
     <div class="row">
-      <label>発送方法
-        <select id="shippingMethod">
-          <option value="配送">配送</option>
-          <option value="手渡し">手渡し</option>
-          <option value="担当者手持ち">担当者手持ち</option>
+      <label>逋ｺ騾∵婿豕・        <select id="shippingMethod">
+          <option value="驟埼・>驟埼・/option>
+          <option value="謇区ｸ｡縺・>謇区ｸ｡縺・/option>
+          <option value="諡・ｽ楢・焔謖√■">諡・ｽ楢・焔謖√■</option>
         </select>
       </label>
-      <label><span id="shipmentDateLabelText">発送日</span><input id="shipmentDate" type="date"></label>
-      <label id="shippingCarrierLabel">配送会社<input id="shippingCarrier" placeholder="ヤマト"></label>
-      <label id="trackingNumberLabel">送り状番号<input id="trackingNumber" placeholder="送り状番号"></label>
-      <label>担当者<input id="shippingStaff" placeholder="担当者"></label>
+      <label><span id="shipmentDateLabelText">逋ｺ騾∵律</span><input id="shipmentDate" type="date"></label>
+      <label id="shippingCarrierLabel">驟埼∽ｼ夂､ｾ<input id="shippingCarrier" placeholder="繝､繝槭ヨ"></label>
+      <label id="trackingNumberLabel">騾√ｊ迥ｶ逡ｪ蜿ｷ<input id="trackingNumber" placeholder="騾√ｊ迥ｶ逡ｪ蜿ｷ"></label>
+      <label>諡・ｽ楢・input id="shippingStaff" placeholder="諡・ｽ楢・></label>
     </div>
-    <label>備考<textarea id="shippingMemo" rows="3" placeholder="発送に関する備考"></textarea></label>
+    <label>蛯呵・textarea id="shippingMemo" rows="3" placeholder="逋ｺ騾√↓髢｢縺吶ｋ蛯呵・></textarea></label>
     <div class="sales-actions" style="margin-top:14px">
-      <button type="button" class="secondary" onclick="markCurrentDeliveryIssued();">納品書発行済にする</button>
-      <button type="button" class="invoice-issue-button" onclick="markCurrentDeliveryShipped();">発送済登録</button>
+      <button type="button" class="secondary" onclick="markCurrentDeliveryIssued();">邏榊刀譖ｸ逋ｺ陦梧ｸ医↓縺吶ｋ</button>
+      <button type="button" class="invoice-issue-button" onclick="markCurrentDeliveryShipped();">逋ｺ騾∵ｸ育匳骭ｲ</button>
     </div>
   </section>
 
   <section class="card">
-    <h2>納品商品</h2>
+    <h2>邏榊刀蝠・刀</h2>
     <div id="deliveryLines" class="invoice-lines">
-      <div class="message">納品書を選択してください。</div>
+      <div class="message">邏榊刀譖ｸ繧帝∈謚槭＠縺ｦ縺上□縺輔＞縲・/div>
     </div>
     <div class="summary">
-      <div>小計 <strong id="deliverySubtotalText">0円</strong></div>
-      <div>値引き <strong id="deliveryDiscountText">0円</strong></div>
-      <div>合計 <strong id="deliveryTotalText">0円</strong></div>
-      <div>内消費税 <strong id="deliveryTaxText">0円</strong></div>
+      <div>蟆剰ｨ・<strong id="deliverySubtotalText">0蜀・/strong></div>
+      <div>蛟､蠑輔″ <strong id="deliveryDiscountText">0蜀・/strong></div>
+      <div>蜷郁ｨ・<strong id="deliveryTotalText">0蜀・/strong></div>
+      <div>蜀・ｶ郁ｲｻ遞・<strong id="deliveryTaxText">0蜀・/strong></div>
     </div>
     <div class="sales-actions" style="margin-top:14px">
-      <button type="button" class="secondary" onclick="outputCurrentDeliveryPdf();">PDF出力</button>
+      <button type="button" class="secondary" onclick="outputCurrentDeliveryPdf();">PDF蜃ｺ蜉・/button>
     </div>
   </section>
 </main>
 <div id="salesPopup" class="app-popup" style="display:none;">
   <div class="app-popup-card">
-    <div id="salesPopupTitle" class="app-popup-title">完了</div>
+    <div id="salesPopupTitle" class="app-popup-title">螳御ｺ・/div>
     <div id="salesPopupBody" class="app-popup-body"></div>
     <button type="button" id="salesPopupClose">OK</button>
   </div>
 </div>
 </body>
 </html>
+

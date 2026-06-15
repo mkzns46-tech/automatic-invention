@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARICO ARCHERY 見積書</title>
+<title>ARICO ARCHERY 隕狗ｩ肴嶌</title>
 <link rel="stylesheet" href="sales-style.css?v=20260615-pdf-button-ui">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
@@ -18,51 +18,51 @@
   <header class="sales-header">
     <div>
       <div class="brand">ARICO ARCHERY</div>
-      <h1>見積書</h1>
-      <p class="lead">見積作成・一覧・PDF出力を行います。在庫とスマレジ売上は変更しません。</p>
+      <h1>隕狗ｩ肴嶌</h1>
+      <p class="lead">隕狗ｩ堺ｽ懈・繝ｻ荳隕ｧ繝ｻPDF蜃ｺ蜉帙ｒ陦後＞縺ｾ縺吶ょ惠蠎ｫ縺ｨ繧ｹ繝槭Ξ繧ｸ螢ｲ荳翫・螟画峩縺励∪縺帙ｓ縲・/p>
     </div>
     <div class="sales-actions">
-      <a class="pill" href="index.html">販売管理トップ</a>
-      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+      <a class="pill" href="index.html">雋ｩ螢ｲ邂｡逅・ヨ繝・・</a>
+      <button type="button" class="secondary" onclick="logoutSales();">繝ｭ繧ｰ繧､繝ｳ逕ｻ髱｢縺ｫ謌ｻ繧・/button>
     </div>
   </header>
 
-  <div id="salesMessage" class="message">見積書を作成できます。</div>
+  <div id="salesMessage" class="message">隕狗ｩ肴嶌繧剃ｽ懈・縺ｧ縺阪∪縺吶・/div>
 
   <section class="card collapsible-list-card" id="quoteListCard">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleQuoteList();">見積書一覧 <span class="status-badge muted" id="quoteListCount">0件</span></h2>
+      <h2 class="list-heading" onclick="toggleQuoteList();">隕狗ｩ肴嶌荳隕ｧ <span class="status-badge muted" id="quoteListCount">0莉ｶ</span></h2>
       <div class="list-header-actions">
-        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedQuotes();">PDF一括印刷</button>
-        <button type="button" class="secondary list-toggle-button" id="quoteListToggle" onclick="toggleQuoteList();">一覧を閉じる</button>
+        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedQuotes();">PDF荳諡ｬ蜊ｰ蛻ｷ</button>
+        <button type="button" class="secondary list-toggle-button" id="quoteListToggle" onclick="toggleQuoteList();">荳隕ｧ繧帝哩縺倥ｋ</button>
       </div>
     </div>
     <div class="list-panel" id="quoteListPanel">
       <div class="list-filter-row">
-        <label>一覧検索<input id="quoteListSearch" placeholder="顧客名・担当者・件名・見積番号・ステータス"></label>
-        <label>ステータス
+        <label>荳隕ｧ讀懃ｴ｢<input id="quoteListSearch" placeholder="鬘ｧ螳｢蜷阪・諡・ｽ楢・・莉ｶ蜷阪・隕狗ｩ咲分蜿ｷ繝ｻ繧ｹ繝・・繧ｿ繧ｹ"></label>
+        <label>繧ｹ繝・・繧ｿ繧ｹ
           <select id="quoteListStatusFilter">
-            <option value="">全て</option>
-            <option value="下書き">下書き</option>
-            <option value="請求書変換済み">請求書変換済み</option>
-            <option value="キャンセル">キャンセル</option>
+            <option value="">蜈ｨ縺ｦ</option>
+            <option value="荳区嶌縺・>荳区嶌縺・/option>
+            <option value="隲区ｱよ嶌螟画鋤貂医∩">隲区ｱよ嶌螟画鋤貂医∩</option>
+            <option value="繧ｭ繝｣繝ｳ繧ｻ繝ｫ">繧ｭ繝｣繝ｳ繧ｻ繝ｫ</option>
           </select>
         </label>
-        <label>開始日<input id="quoteDateFromFilter" type="date"></label>
-        <label>終了日<input id="quoteDateToFilter" type="date"></label>
+        <label>髢句ｧ区律<input id="quoteDateFromFilter" type="date"></label>
+        <label>邨ゆｺ・律<input id="quoteDateToFilter" type="date"></label>
       </div>
-      <div class="list-subheading">対応が必要な見積書</div>
+      <div class="list-subheading">蟇ｾ蠢懊′蠢・ｦ√↑隕狗ｩ肴嶌</div>
       <div class="table-wrap list-scroll">
         <table>
-          <thead><tr><th></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('quote-pdf-check', this.checked, this)"></th><th>莨晉･ｨ逡ｪ蜿ｷ</th><th>譌･莉・/th><th>蝗｣菴灘錐</th><th>鬘ｧ螳｢蜷・/th><th>蜷郁ｨ磯≡鬘・/th><th>繧ｹ繝・・繧ｿ繧ｹ</th><th>諡・ｽ楢・/th><th>謫堺ｽ・/th></tr></thead>
           <tbody id="quoteListBody"></tbody>
         </table>
       </div>
       <div class="list-panel completed-list-panel" id="quoteCompletedListPanel" hidden>
-        <div class="list-subheading">完了済み・キャンセル済み</div>
+        <div class="list-subheading">螳御ｺ・ｸ医∩繝ｻ繧ｭ繝｣繝ｳ繧ｻ繝ｫ貂医∩</div>
         <div class="table-wrap list-scroll">
           <table>
-            <thead><tr><th></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+            <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('quote-pdf-check', this.checked, this)"></th><th>莨晉･ｨ逡ｪ蜿ｷ</th><th>譌･莉・/th><th>蝗｣菴灘錐</th><th>鬘ｧ螳｢蜷・/th><th>蜷郁ｨ磯≡鬘・/th><th>繧ｹ繝・・繧ｿ繧ｹ</th><th>諡・ｽ楢・/th><th>謫堺ｽ・/th></tr></thead>
             <tbody id="quoteCompletedListBody"></tbody>
           </table>
         </div>
@@ -72,115 +72,114 @@
 
   <section class="card" id="quoteEditorCard">
     <div class="sales-actions section-heading-row">
-      <h2>顧客情報</h2>
-      <button type="button" class="secondary" onclick="newQuote(true);">入力をクリア</button>
+      <h2>鬘ｧ螳｢諠・ｱ</h2>
+      <button type="button" class="secondary" onclick="newQuote(true);">蜈･蜉帙ｒ繧ｯ繝ｪ繧｢</button>
     </div>
     <input id="salesCustomerId" type="hidden">
     <input id="salesCustomerCode" type="hidden">
     <input id="salesSmaregiCustomerId" type="hidden">
     <input id="salesSmaregiCustomerCode" type="hidden">
     <div class="customer-search-box">
-      <label>顧客検索<input id="quoteCustomerSearchInput" placeholder="顧客名・電話番号・メール・スマレジ会員コード"></label>
+      <label>鬘ｧ螳｢讀懃ｴ｢<input id="quoteCustomerSearchInput" placeholder="鬘ｧ螳｢蜷阪・髮ｻ隧ｱ逡ｪ蜿ｷ繝ｻ繝｡繝ｼ繝ｫ繝ｻ繧ｹ繝槭Ξ繧ｸ莨壼藤繧ｳ繝ｼ繝・></label>
       <div id="quoteCustomerSearchResults" class="customer-search-results"></div>
     </div>
-    <p class="section-note customer-readonly-note">顧客情報は顧客管理から選択してください</p>
+    <p class="section-note customer-readonly-note">鬘ｧ螳｢諠・ｱ縺ｯ鬘ｧ螳｢邂｡逅・°繧蛾∈謚槭＠縺ｦ縺上□縺輔＞</p>
     <div class="row three">
-      <label>顧客名<input class="customer-readonly-input" id="customerName" readonly></label>
-      <label>団体名<input class="customer-readonly-input" id="quoteOrganizationName" readonly></label>
-      <label>顧客区分<select id="customerType"></select></label>
-      <label>担当者<select id="quoteStaff"></select></label>
+      <label>鬘ｧ螳｢蜷・input class="customer-readonly-input" id="customerName" readonly></label>
+      <label>蝗｣菴灘錐<input class="customer-readonly-input" id="quoteOrganizationName" readonly></label>
+      <label>鬘ｧ螳｢蛹ｺ蛻・select id="customerType"></select></label>
+      <label>諡・ｽ楢・select id="quoteStaff"></select></label>
     </div>
     <div class="row three">
-      <label>住所<input class="customer-readonly-input" id="customerAddress" readonly></label>
-      <label>電話番号<input class="customer-readonly-input" id="customerPhone" readonly></label>
-      <label>メールアドレス<input class="customer-readonly-input" id="customerEmail" readonly></label>
+      <label>菴乗園<input class="customer-readonly-input" id="customerAddress" readonly></label>
+      <label>髮ｻ隧ｱ逡ｪ蜿ｷ<input class="customer-readonly-input" id="customerPhone" readonly></label>
+      <label>繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ<input class="customer-readonly-input" id="customerEmail" readonly></label>
     </div>
     <div class="row three">
-      <label>件名<input id="quoteSubject"></label>
-      <label>見積日<input id="quoteDate" type="date"></label>
-      <label>有効期限<input id="validUntil" type="date"></label>
+      <label>莉ｶ蜷・input id="quoteSubject"></label>
+      <label>隕狗ｩ肴律<input id="quoteDate" type="date"></label>
+      <label>譛牙柑譛滄剞<input id="validUntil" type="date"></label>
     </div>
     <div class="row three">
-      <label>取引区分
-        <select id="transactionType">
-          <option value="通常販売">通常販売</option>
-          <option value="交換">交換</option>
-          <option value="返金">返金</option>
-          <option value="無償提供">無償提供</option>
-          <option value="その他">その他</option>
+      <label>蜿門ｼ募玄蛻・        <select id="transactionType">
+          <option value="騾壼ｸｸ雋ｩ螢ｲ">騾壼ｸｸ雋ｩ螢ｲ</option>
+          <option value="莠､謠・>莠､謠・/option>
+          <option value="霑秘≡">霑秘≡</option>
+          <option value="辟｡蜆滓署萓・>辟｡蜆滓署萓・/option>
+          <option value="縺昴・莉・>縺昴・莉・/option>
         </select>
       </label>
-      <label>元伝票番号<input id="originalSlipNumber" placeholder="交換・返金時に入力"></label>
-      <label>理由メモ<input id="reasonMemo" placeholder="交換理由・返金理由など"></label>
+      <label>蜈・ｼ晉･ｨ逡ｪ蜿ｷ<input id="originalSlipNumber" placeholder="莠､謠帙・霑秘≡譎ゅ↓蜈･蜉・></label>
+      <label>逅・罰繝｡繝｢<input id="reasonMemo" placeholder="莠､謠帷炊逕ｱ繝ｻ霑秘≡逅・罰縺ｪ縺ｩ"></label>
     </div>
     <div class="row two">
-      <label>値引きテンプレート
-        <select id="discountTemplate" onchange="applyDiscountTemplate();">
-          <option value="none">なし</option>
-          <option value="dealer10">代理店10%</option>
-          <option value="all10">全品10%</option>
-          <option value="custom">カスタム</option>
+      <label>蛟､蠑輔″繝・Φ繝励Ξ繝ｼ繝・        <select id="discountTemplate" onchange="applyDiscountTemplate();">
+          <option value="none">縺ｪ縺・/option>
+          <option value="dealer10">莉｣逅・ｺ・0%</option>
+          <option value="all10">蜈ｨ蜩・0%</option>
+          <option value="custom">繧ｫ繧ｹ繧ｿ繝</option>
         </select>
       </label>
     </div>
   </section>
 
   <section class="card">
-    <h2>見積商品</h2>
+    <h2>隕狗ｩ榊膚蜩・/h2>
     <div class="product-search-row">
-      <label>商品検索<input id="productSearchInput" placeholder="商品名・バーコード・商品コード"></label>
-      <button type="button" class="secondary" onclick="addManualProductLine();">手入力商品を追加</button>
+      <label>蝠・刀讀懃ｴ｢<input id="productSearchInput" placeholder="蝠・刀蜷阪・繝舌・繧ｳ繝ｼ繝峨・蝠・刀繧ｳ繝ｼ繝・></label>
+      <button type="button" class="secondary" onclick="addManualProductLine();">謇句・蜉帛膚蜩√ｒ霑ｽ蜉</button>
     </div>
     <div id="productSearchResults"></div>
     <div id="quoteLines" class="quote-lines"></div>
     <div class="row two">
-      <label>全体値引き額<input id="overallDiscountAmount" type="number" min="0" step="1" value="0" onchange="recalcTotals();"></label>
-      <label>伝票備考<textarea id="quoteMemo"></textarea></label>
+      <label>蜈ｨ菴灘､蠑輔″鬘・input id="overallDiscountAmount" type="number" min="0" step="1" value="0" onchange="recalcTotals();"></label>
+      <label>莨晉･ｨ蛯呵・textarea id="quoteMemo"></textarea></label>
     </div>
     <div class="summary">
-      <div>小計<strong id="subtotalText">0円</strong></div>
-      <div>値引き <strong id="discountText">0円</strong></div>
-      <div>合計<strong id="totalText">0円</strong></div>
-      <div>内消費税<strong id="taxText">0円</strong></div>
+      <div>蟆剰ｨ・strong id="subtotalText">0蜀・/strong></div>
+      <div>蛟､蠑輔″ <strong id="discountText">0蜀・/strong></div>
+      <div>蜷郁ｨ・strong id="totalText">0蜀・/strong></div>
+      <div>蜀・ｶ郁ｲｻ遞・strong id="taxText">0蜀・/strong></div>
     </div>
     <div class="sales-actions" style="margin-top:14px">
-      <button type="button" class="primary" onclick="saveQuote();">保存</button>
-      <button type="button" class="secondary" onclick="outputCurrentQuotePdf();">PDF出力</button>
-      <button type="button" class="danger" id="deleteQuoteBtn" onclick="deleteCurrentQuote();" hidden>見積削除</button>
+      <button type="button" class="primary" onclick="saveQuote();">菫晏ｭ・/button>
+      <button type="button" class="secondary" onclick="outputCurrentQuotePdf();">PDF蜃ｺ蜉・/button>
+      <button type="button" class="danger" id="deleteQuoteBtn" onclick="deleteCurrentQuote();" hidden>隕狗ｩ榊炎髯､</button>
     </div>
   </section>
 </main>
 
 <div id="quoteCustomerCreateModal" class="app-popup" style="display:none;">
   <div class="app-popup-card customer-create-modal-card">
-    <div class="app-popup-title">新規顧客登録</div>
+    <div class="app-popup-title">譁ｰ隕城｡ｧ螳｢逋ｻ骭ｲ</div>
     <div class="row two">
-      <label>顧客名<input id="quoteNewCustomerName"></label>
-      <label>顧客区分<select id="quoteNewCustomerType"></select></label>
+      <label>鬘ｧ螳｢蜷・input id="quoteNewCustomerName"></label>
+      <label>鬘ｧ螳｢蛹ｺ蛻・select id="quoteNewCustomerType"></select></label>
     </div>
     <div class="row two">
-      <label>担当者<input id="quoteNewCustomerStaff"></label>
-      <label>郵便番号<input id="quoteNewCustomerPostalCode"></label>
+      <label>諡・ｽ楢・input id="quoteNewCustomerStaff"></label>
+      <label>驛ｵ萓ｿ逡ｪ蜿ｷ<input id="quoteNewCustomerPostalCode"></label>
     </div>
-    <label>住所<input id="quoteNewCustomerAddress"></label>
+    <label>菴乗園<input id="quoteNewCustomerAddress"></label>
     <div class="row two">
-      <label>電話番号<input id="quoteNewCustomerPhone"></label>
-      <label>メールアドレス<input id="quoteNewCustomerEmail" type="email"></label>
+      <label>髮ｻ隧ｱ逡ｪ蜿ｷ<input id="quoteNewCustomerPhone"></label>
+      <label>繝｡繝ｼ繝ｫ繧｢繝峨Ξ繧ｹ<input id="quoteNewCustomerEmail" type="email"></label>
     </div>
-    <label>備考<textarea id="quoteNewCustomerMemo"></textarea></label>
+    <label>蛯呵・textarea id="quoteNewCustomerMemo"></textarea></label>
     <div class="sales-actions">
-      <button type="button" onclick="saveQuoteNewCustomer();">保存して選択</button>
-      <button type="button" class="secondary" onclick="closeQuoteNewCustomerModal();">キャンセル</button>
+      <button type="button" onclick="saveQuoteNewCustomer();">菫晏ｭ倥＠縺ｦ驕ｸ謚・/button>
+      <button type="button" class="secondary" onclick="closeQuoteNewCustomerModal();">繧ｭ繝｣繝ｳ繧ｻ繝ｫ</button>
     </div>
   </div>
 </div>
 
 <div id="salesPopup" class="app-popup" style="display:none;">
   <div class="app-popup-card">
-    <div id="salesPopupTitle" class="app-popup-title">完了</div>
+    <div id="salesPopupTitle" class="app-popup-title">螳御ｺ・/div>
     <div id="salesPopupBody" class="app-popup-body"></div>
     <button type="button" id="salesPopupClose">OK</button>
   </div>
 </div>
 </body>
 </html>
+

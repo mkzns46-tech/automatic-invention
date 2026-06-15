@@ -551,6 +551,20 @@
     document.body.appendChild(popup);
   }
 
+  function isVisibleElement(element) {
+    return !!(element && (element.offsetWidth || element.offsetHeight || element.getClientRects().length));
+  }
+
+  function toggleVisiblePdfChecks(checkClass, checked, source) {
+    const selector = `.${String(checkClass || "").replace(/[^a-zA-Z0-9_-]/g, "")}`;
+    if (selector === ".") return;
+    document.querySelectorAll(selector).forEach(input => {
+      if (input === source || input.disabled || !isVisibleElement(input)) return;
+      input.checked = checked;
+    });
+    if (source) source.indeterminate = false;
+  }
+
   async function printSalesDocument(type, data) {
     const info = documentPages(type, data);
     const action = await showPdfActionPopup(info.filename, 1);
@@ -571,5 +585,5 @@
     openPdfWindow(safeDocuments, action);
   }
 
-  window.SalesPdfFormat = { printSalesDocument, printSalesDocuments };
+  window.SalesPdfFormat = { printSalesDocument, printSalesDocuments, toggleVisiblePdfChecks };
 })();
