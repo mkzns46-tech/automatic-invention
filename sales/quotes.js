@@ -321,11 +321,13 @@ function getProductPriceInfo(product) {
 }
 
 function formatStock(stock) {
+  if (stock === "manual") return "手入力";
   const value = Number(stock || 0);
-  return value > 0 ? `現在庫 ${value}` : "現在庫 0 / 取寄せ";
+  return value > 0 ? `現在庫 ${value}` : "取寄せ";
 }
 
 function stockClass(stock) {
+  if (stock === "manual") return "line-stock muted";
   return Number(stock || 0) > 0 ? "" : "line-stock warn";
 }
 
@@ -856,13 +858,12 @@ async function searchProducts() {
   try {
     const filter = encodeURIComponent(`*${query}*`);
     const rows = await salesFetch(`products?select=barcode,name,base_stock,price,smaregi_product_id&or=(name.ilike.${filter},barcode.ilike.${filter},smaregi_product_id.ilike.${filter})&limit=20`);
-    results.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>商品名</th><th>バーコード</th><th>現在庫</th><th>販売価格</th><th>操作</th></tr></thead><tbody>${rows.map(raw => {
+    results.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>商品名</th><th>バーコード</th><th>販売価格</th><th>操作</th></tr></thead><tbody>${rows.map(raw => {
       const row = sanitizeProductRow(raw);
       const price = getProductPriceInfo(row);
       return `<tr>
         <td>${escapeHtml(row.name || "")}</td>
         <td>${escapeHtml(row.barcode || "")}</td>
-        <td><span class="${stockClass(row.base_stock)}">${formatStock(row.base_stock)}</span></td>
         <td>${price.hasPrice ? money(price.value) : '<span class="line-stock warn">価格未登録</span>'}</td>
         <td><button type="button" class="secondary" onclick='addProductLine(${JSON.stringify(row).replaceAll("'", "&#39;")})'>追加</button></td>
       </tr>`;
@@ -870,6 +871,30 @@ async function searchProducts() {
   } catch (e) {
     results.innerHTML = '<div class="message err">商品検索に失敗しました。</div>';
   }
+}
+
+function addManualProductLine() {
+  currentLines.push({
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+    barcode: "",
+    smaregiProductId: "",
+    manualProduct: true,
+    name: "",
+    stock: "manual",
+    qty: 1,
+    unit: "個",
+    unitPrice: 0,
+    transactionType: normalizeTransactionType(getCurrentTransactionType()),
+    discountValue: isFreeTransaction(getCurrentTransactionType()) ? 100 : 0,
+    discountRate: isFreeTransaction(getCurrentTransactionType()) ? 100 : 0,
+    discountAmountInput: 0,
+    autoTransactionDiscount: isFreeTransaction(getCurrentTransactionType()),
+    discountAmount: 0,
+    amount: 0,
+    memo: ""
+  });
+  renderLines();
+  showSalesPopup("追加完了", "手入力商品を追加しました", "ok");
 }
 
 async function addProductLine(product) {

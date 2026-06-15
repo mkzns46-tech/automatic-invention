@@ -374,6 +374,17 @@ function recalcInvoiceLine(line) {
   return line;
 }
 
+function formatInvoiceStock(line) {
+  if (line.manualProduct || (!line.barcode && !line.smaregiProductId && !line.productId)) return "手入力";
+  const value = Number(line.stock ?? line.base_stock ?? 0);
+  return value > 0 ? `現在庫 ${value}` : "取寄せ";
+}
+
+function invoiceStockClass(line) {
+  if (line.manualProduct || (!line.barcode && !line.smaregiProductId && !line.productId)) return "line-stock muted";
+  return Number(line.stock ?? line.base_stock ?? 0) > 0 ? "" : "line-stock warn";
+}
+
 function normalizeInvoiceLine(line) {
   const normalized = {
     ...line,
@@ -413,6 +424,33 @@ function getInvoiceRawLines(invoice) {
     invoice?.orderItems
   );
   return rows.map(normalizeInvoiceLine);
+}
+
+async function refreshInvoiceLineStocks() {
+  const targets = currentInvoiceLines
+    .map(line => ({
+      barcode: String(line.barcode || line.productCode || "").trim(),
+      productId: String(line.smaregiProductId || line.smaregi_product_id || line.productId || "").trim()
+    }))
+    .filter(target => target.barcode || target.productId);
+  const unique = new Map(targets.map(target => [`${target.barcode}|${target.productId}`, target]));
+  for (const target of unique.values()) {
+    let rows = [];
+    if (target.barcode) {
+      rows = await salesRestFetch(`products?select=barcode,base_stock,smaregi_product_id&barcode=eq.${encodeURIComponent(target.barcode)}&limit=1`).catch(() => []);
+    }
+    if ((!Array.isArray(rows) || !rows[0]) && target.productId) {
+      rows = await salesRestFetch(`products?select=barcode,base_stock,smaregi_product_id&smaregi_product_id=eq.${encodeURIComponent(target.productId)}&limit=1`).catch(() => []);
+    }
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) continue;
+    currentInvoiceLines.forEach(line => {
+      const sameBarcode = target.barcode && String(line.barcode || line.productCode || "") === target.barcode;
+      const sameProduct = target.productId && String(line.smaregiProductId || line.smaregi_product_id || line.productId || "") === target.productId;
+      if (sameBarcode || sameProduct) line.stock = Number(row.base_stock || 0);
+    });
+  }
+  renderInvoiceLines();
 }
 
 function normalizeInvoiceForView(invoice) {
@@ -1161,6 +1199,9 @@ function fillInvoiceForm(invoice) {
   applyInvoiceTransactionTypeToLines();
   renderInvoiceLines();
   updateInvoiceLockState(invoice);
+  refreshInvoiceLineStocks().catch(error => {
+    console.warn("invoice stock refresh failed", error);
+  });
 }
 
 function editInvoice(id) {
@@ -1190,6 +1231,7 @@ function renderInvoiceLines() {
   area.innerHTML = currentInvoiceLines.length ? currentInvoiceLines.map((line, index) => {
     recalcInvoiceLine(line);
     return `<div class="invoice-line">
+      <label>現在庫<div class="${invoiceStockClass(line)}">${formatInvoiceStock(line)}</div></label>
       <label>商品名<input value="${escapeHtml(line.name || "")}" onchange="updateInvoiceLine(${index}, 'name', this.value)" ${disabled}></label>
       <label>数量<input type="number" min="0" step="1" value="${Number(line.qty || 0)}" onchange="updateInvoiceLine(${index}, 'qty', this.value)" ${disabled}></label>
       <label>単位<input value="${escapeHtml(line.unit || "")}" onchange="updateInvoiceLine(${index}, 'unit', this.value)" ${disabled}></label>

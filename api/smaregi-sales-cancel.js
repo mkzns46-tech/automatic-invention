@@ -145,7 +145,7 @@ function normalizeLines(lines) {
     const amount = Math.abs(toInt(line.amount));
     return {
       transactionDetailId: String(index + 1),
-      transactionDetailDivision: "1",
+      transactionDetailDivision: "2",
       productId: firstString(line.smaregiProductId, line.smaregi_product_id, line.productId),
       productCode: firstString(line.productCode, line.barcode),
       productName: firstString(line.name, line.productName, line.itemName),
@@ -176,8 +176,8 @@ function buildCancelPayload(context, body) {
   const taxInclude = toInt(body.tax ?? Math.floor(total * 10 / 110));
   const terminalTranIdSource = `${body.invoiceNo || ""}${Date.now()}`.replace(/\D/g, "");
   return {
-    transactionHeadDivision: "1",
-    cancelDivision: "1",
+    transactionHeadDivision: "2",
+    cancelDivision: "0",
     subtotal: String(total),
     total: String(total),
     taxInclude: String(taxInclude),
