@@ -392,12 +392,36 @@ function pageLink(page, id, label) {
   return `<a class="secondary progress-action-link" href="${href}">${escapeHtml(label)}</a>`;
 }
 
+function pdfButton(type, id) {
+  if (!id) return "";
+  return `<button type="button" class="secondary progress-action-link" onclick="printProgressPdf('${type}', '${escapeHtml(id)}')">PDF</button>`;
+}
+
+function printProgressPdf(type, id) {
+  const sources = {
+    quote: readQuotes(),
+    invoice: readInvoices(),
+    delivery: readDeliveries(),
+    receipt: readReceipts()
+  };
+  const doc = (sources[type] || []).find(row => row.id === id);
+  if (!doc) {
+    alert("PDF出力対象の伝票が見つかりません。");
+    return;
+  }
+  if (!window.SalesPdfFormat?.printSalesDocument) {
+    alert("PDF出力機能を読み込めませんでした。");
+    return;
+  }
+  window.SalesPdfFormat.printSalesDocument(type, doc);
+}
+
 function actionLinks(row, kinds) {
   const links = [];
-  if (kinds.includes("quote")) links.push(pageLink("quotes.html", row.quote?.id, "見積"));
-  if (kinds.includes("invoice")) links.push(pageLink("invoices.html", row.invoice?.id, "請求"));
-  if (kinds.includes("payment")) links.push(pageLink("payments.html", row.invoice?.id, "入金"));
-  if (kinds.includes("delivery")) links.push(pageLink("delivery.html", row.delivery?.id, "納品"));
+  if (kinds.includes("quote")) links.push(pageLink("quotes.html", row.quote?.id, "見積"), pdfButton("quote", row.quote?.id));
+  if (kinds.includes("invoice")) links.push(pageLink("invoices.html", row.invoice?.id, "請求"), pdfButton("invoice", row.invoice?.id));
+  if (kinds.includes("payment")) links.push(pageLink("payments.html", row.invoice?.id, "入金"), pdfButton("invoice", row.invoice?.id));
+  if (kinds.includes("delivery")) links.push(pageLink("delivery.html", row.delivery?.id, "納品"), pdfButton("delivery", row.delivery?.id));
   return `<div class="progress-actions">${links.join("")}</div>`;
 }
 

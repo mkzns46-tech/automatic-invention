@@ -259,6 +259,19 @@ function confirmSalesPopup(title, body, type = "warn") {
   });
 }
 
+function printPaymentInvoicePdf(id) {
+  const invoice = readPaymentInvoices().find(row => row.id === id);
+  if (!invoice) {
+    showSalesPopup("PDF出力失敗", "請求書が見つかりません。", "err");
+    return;
+  }
+  if (!window.SalesPdfFormat?.printSalesDocument) {
+    showSalesPopup("PDF出力失敗", "PDF出力機能を読み込めませんでした。", "err");
+    return;
+  }
+  window.SalesPdfFormat.printSalesDocument("invoice", invoice);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   bindPaymentListControls();
@@ -362,7 +375,7 @@ function renderPaymentInvoiceRow(invoice) {
     <td>${money(total)}</td>
     <td>${statusBadge(status)}</td>
     <td>${escapeHtml(invoice.staff || "")}</td>
-    <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">&#36984;&#25246;</button>${cancelButton}</td>
+    <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">&#36984;&#25246;</button><button type="button" class="secondary" onclick="printPaymentInvoicePdf('${invoice.id}')">PDF出力</button>${cancelButton}</td>
   </tr>`;
 }
 

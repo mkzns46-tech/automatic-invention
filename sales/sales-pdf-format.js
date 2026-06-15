@@ -237,7 +237,6 @@
     return `
       <div class="summary-note">※ は軽減税率対象商品<br>（10%対象 税込金額 ${numberOnly(totals.total)} 円 内税 ${numberOnly(totals.tax)}円）</div>
       <table class="summary-table">
-        <tr><th>小計</th><td>${numberOnly(totals.subtotal)}</td></tr>
         ${discountRow}
         <tr><th>合計</th><td class="${totals.total < 0 ? "negative" : ""}">${numberOnly(totals.total)}</td></tr>
         <tr><th>内消費税</th><td>(${numberOnly(totals.tax)})</td></tr>
@@ -292,7 +291,6 @@
           <div class="revenue-stamp-box">収入印紙</div>
           <table class="receipt-breakdown">
             <tr><th>内訳</th><th>金額</th></tr>
-            <tr><td>税抜金額</td><td>${numberOnly(Math.abs(totals.total) - totals.tax)} 円</td></tr>
             <tr><td>消費税額等</td><td>${numberOnly(totals.tax)} 円</td></tr>
             <tr><td>合計</td><td>${numberOnly(totals.total)} 円</td></tr>
           </table>
@@ -327,8 +325,8 @@
       .staff-line{display:inline-block;padding-right:62px}
       .stamp-img{position:absolute;right:8px;top:126px;width:56px;height:56px;object-fit:contain}
       .message{margin:10px 0 7px}
-      .info-list{width:360px;margin:7px 0 15px}
-      .info-row{display:grid;grid-template-columns:105px 1fr;min-height:31px;align-items:center;margin-bottom:5px}
+      .info-list{width:315px;margin:7px 0 15px}
+      .info-row{display:grid;grid-template-columns:105px 210px;min-height:31px;align-items:center;margin-bottom:5px}
       .info-label{background:#2f744f;color:#fff;text-align:center;padding:7px 6px;font-weight:700}
       .info-value{padding:6px 9px;border-bottom:1px solid #ddd}
       .total-row .info-value{border:0;border-bottom:1px solid #ddd;font-size:20px;font-weight:700;background:#fff}
