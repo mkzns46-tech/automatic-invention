@@ -503,7 +503,6 @@
 
   function openPdfWindow(documents, action) {
     const { body, title } = buildDocuments(documents);
-    const built = documents.map(({ type, data }) => documentPages(type, data));
     const win = window.open("", "_blank");
     if (!win) return;
     const baseHref = location.href.replace(/[^/]*$/, "");
@@ -515,17 +514,43 @@
     win.document.close();
   }
 
+  function waitForImages(container) {
+    const images = Array.from(container.querySelectorAll("img"));
+    if (!images.length) return Promise.resolve();
+    return Promise.all(images.map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise(resolve => {
+        const done = () => resolve();
+        img.addEventListener("load", done, { once: true });
+        img.addEventListener("error", done, { once: true });
+        setTimeout(done, 1200);
+      });
+    }));
+  }
+
+  function waitForPaint() {
+    return new Promise(resolve => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  }
+
   async function downloadPdf(documents) {
     const { body, title } = buildDocuments(documents);
     const html2pdf = await loadHtml2Pdf();
     const container = document.createElement("div");
-    container.style.position = "fixed";
-    container.style.left = "-10000px";
-    container.style.top = "0";
+    container.className = "pdf-download-root";
+    container.style.position = "absolute";
+    container.style.left = "0";
+    container.style.top = `${window.scrollY}px`;
     container.style.width = "210mm";
-    container.innerHTML = `${css()}${body}`;
+    container.style.background = "#ffffff";
+    container.style.zIndex = "2147483647";
+    container.style.pointerEvents = "none";
+    container.innerHTML = `${css()}<style>.pdf-download-root .sheet{width:210mm;min-height:277mm;background:#fff;margin:0 auto;}</style>${body}`;
     document.body.appendChild(container);
     try {
+      await waitForImages(container);
+      await waitForPaint();
       await html2pdf()
         .set({
           margin: 0,
