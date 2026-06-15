@@ -520,7 +520,7 @@ function getLinkedDeliveriesForInvoice(invoice) {
 function invoiceHasBlockedDelivery(invoice) {
   return getLinkedDeliveriesForInvoice(invoice).some(delivery => {
     const status = normalizeDeliveryStatusForInvoice(delivery.status);
-    return status !== "cancelled" && (status === "issued" || status === "shipped" || Boolean(delivery.issuedAt || delivery.shippedAt || delivery.completedAt));
+    return status !== "cancelled" && (status === "issued" || status === "shipped" || Boolean(delivery.shippedAt || delivery.completedAt));
   });
 }
 
@@ -546,6 +546,7 @@ function canCancelInvoice(invoice) {
   if (!invoice) return false;
   const status = normalizeInvoiceStatus(invoice.status);
   if (status === INVOICE_STATUS_CANCELLED || status === INVOICE_STATUS_DRAFT || status === INVOICE_STATUS_PAID || status === INVOICE_STATUS_NO_PAYMENT_REQUIRED) return false;
+  if (normalizeSmaregiSaleStatus(invoice.smaregiSaleStatus) !== SMAREGI_SALE_STATUS_SUCCESS) return false;
   if (invoiceHasPaidRecord(invoice)) return false;
   if (invoiceHasBlockedDelivery(invoice)) return false;
   if (invoiceHasIssuedReceipt(invoice)) return false;
