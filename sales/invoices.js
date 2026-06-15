@@ -151,8 +151,7 @@ function markInvoiceRequiredLabels() {
     "invoiceDate",
     "dueDate",
     "invoiceStaff",
-    "transactionType",
-    "overallDiscountAmount"
+    "transactionType"
   ];
   requiredIds.forEach(id => applyRequiredLabel(document.getElementById(id)?.closest("label")));
 }

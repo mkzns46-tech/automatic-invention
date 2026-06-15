@@ -398,7 +398,7 @@ function clearPaymentForm() {
   });
   document.getElementById("paymentDate").value = today();
   document.getElementById("paymentAmount").value = "";
-  document.getElementById("paymentMethod").value = "振込";
+  document.getElementById("paymentMethod").value = "現金";
   document.getElementById("paymentPayerName").value = "";
   document.getElementById("paymentStaff").value = "";
   document.getElementById("paymentCurrentStatus").value = "";
@@ -431,7 +431,7 @@ function selectPaymentInvoice(id) {
   document.getElementById("paymentInvoiceTotal").value = `${money(total)}（入金済 ${money(paid)}）`;
   document.getElementById("paymentDate").value = today();
   document.getElementById("paymentAmount").value = Math.max(0, total - paid);
-  document.getElementById("paymentMethod").value = "振込";
+  document.getElementById("paymentMethod").value = "現金";
   document.getElementById("paymentPayerName").value = customerView.customerName || "";
   document.getElementById("paymentStaff").value = invoice.staff || "";
   document.getElementById("paymentCurrentStatus").value = normalizePaymentStatus(invoice.status);
@@ -473,7 +473,7 @@ function savePayment() {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     paymentDate: document.getElementById("paymentDate").value || today(),
     amount,
-    method: "振込",
+    method: "現金",
     payerName: document.getElementById("paymentPayerName").value.trim(),
     staff: document.getElementById("paymentStaff").value.trim(),
     memo: document.getElementById("paymentMemo").value,

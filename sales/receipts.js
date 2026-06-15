@@ -7,6 +7,7 @@ const RECEIPT_STATUS_CANCELLED = "キャンセル";
 let currentReceiptId = null;
 let receiptSearchText = "";
 let receiptStatusFilter = "";
+let receiptTransactionTypeFilter = "";
 let receiptDateFrom = "";
 let receiptDateTo = "";
 let receiptListCollapsed = true;
@@ -172,12 +173,56 @@ function showSalesPopup(title, body, type = "ok") {
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
+  arrangeReceiptDetailLayout();
+  ensureReceiptTransactionFilter();
   bindReceiptControls();
   renderReceiptLists();
   const id = new URLSearchParams(location.search).get("id");
   if (id) selectReceipt(id);
   else clearReceiptDetail();
 });
+
+function arrangeReceiptDetailLayout() {
+  const card = document.getElementById("receiptDetailCard");
+  if (!card) return;
+  const groups = [
+    ["receiptNo", "receiptStatus"],
+    ["receiptCustomerName", "receiptSubject", "receiptStaff"],
+    ["receiptPaymentDate", "receiptAmount"],
+    ["receiptMemo"]
+  ];
+  groups.forEach((ids, index) => {
+    let row = document.getElementById(`receiptDetailRow${index + 1}`);
+    if (!row) {
+      row = document.createElement("div");
+      row.id = `receiptDetailRow${index + 1}`;
+      row.className = ids.length === 3 ? "row three" : ids.length === 2 ? "row two" : "receipt-memo-row";
+      card.querySelector(".sales-actions")?.insertAdjacentElement("beforebegin", row);
+    }
+    ids.forEach(id => {
+      const label = document.getElementById(id)?.closest("label");
+      if (label) row.appendChild(label);
+    });
+  });
+}
+
+function ensureReceiptTransactionFilter() {
+  if (document.getElementById("receiptTransactionTypeFilter")) return;
+  const statusLabel = document.getElementById("receiptStatusFilter")?.closest("label");
+  if (!statusLabel) return;
+  const label = document.createElement("label");
+  label.textContent = "取引区分";
+  const select = document.createElement("select");
+  select.id = "receiptTransactionTypeFilter";
+  ["", "通常販売", "交換", "返金", "無償提供", "その他"].forEach(value => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value || "全て";
+    select.appendChild(option);
+  });
+  label.appendChild(select);
+  statusLabel.insertAdjacentElement("afterend", label);
+}
 
 function bindReceiptControls() {
   document.getElementById("receiptSearch")?.addEventListener("input", event => {
@@ -186,6 +231,10 @@ function bindReceiptControls() {
   });
   document.getElementById("receiptStatusFilter")?.addEventListener("change", event => {
     receiptStatusFilter = event.target.value;
+    renderReceiptLists();
+  });
+  document.getElementById("receiptTransactionTypeFilter")?.addEventListener("change", event => {
+    receiptTransactionTypeFilter = event.target.value;
     renderReceiptLists();
   });
   document.getElementById("receiptDateFromFilter")?.addEventListener("input", event => {
@@ -203,11 +252,15 @@ function toggleIssuedReceiptList() {
   setReceiptListCollapsed(!receiptListCollapsed);
 }
 
+function toggleReceiptList() {
+  setReceiptListCollapsed(!receiptListCollapsed);
+}
+
 function setReceiptListCollapsed(collapsed) {
   receiptListCollapsed = collapsed;
   const listPanel = document.getElementById("receiptListPanel");
   const panel = document.getElementById("issuedReceiptListPanel");
-  const button = document.getElementById("receiptIssuedToggle");
+  const button = document.getElementById("receiptListToggle") || document.getElementById("receiptIssuedToggle");
   if (listPanel) listPanel.hidden = receiptListCollapsed;
   if (panel) panel.hidden = receiptListCollapsed;
   if (button) button.textContent = receiptListCollapsed ? "一覧を開く" : "一覧を閉じる";
@@ -235,6 +288,9 @@ function renderReceiptLists() {
   const issuedReceipts = receipts.filter(row => normalizeReceiptStatus(row.receipt.status) !== RECEIPT_STATUS_DRAFT);
   const activeRows = [...targets, ...draftReceipts].sort(sortReceiptRows);
   const completedRows = issuedReceipts.sort(sortReceiptRows);
+  const displayedRows = [...activeRows, ...completedRows];
+  const listCount = document.getElementById("receiptListCount");
+  if (listCount) listCount.textContent = `${displayedRows.length}件 / 合計 ${money(displayedRows.reduce((sum, row) => sum + getReceiptRowAmount(row), 0))}`;
   const count = document.getElementById("receiptTargetCount");
   if (count) count.textContent = `未発行 ${activeRows.length}件`;
   document.getElementById("receiptTargetListBody").innerHTML = activeRows.length
@@ -249,6 +305,11 @@ function sortReceiptRows(a, b) {
   const aDate = a.type === "invoice" ? getLatestActivePayment(a.invoice)?.paymentDate : a.receipt.paymentDate;
   const bDate = b.type === "invoice" ? getLatestActivePayment(b.invoice)?.paymentDate : b.receipt.paymentDate;
   return String(bDate || "").localeCompare(String(aDate || ""));
+}
+
+function getReceiptRowAmount(row) {
+  if (row.type === "invoice") return getReceiptDisplayAmount(row.invoice);
+  return Number(row.receipt?.amount || 0);
 }
 
 function renderReceiptTargetRow(row) {
@@ -287,18 +348,28 @@ function matchesReceiptTargetFilters(row) {
   const receipt = row.receipt;
   const status = receipt ? normalizeReceiptStatus(receipt.status) : RECEIPT_STATUS_DRAFT;
   if (receiptStatusFilter && status !== receiptStatusFilter) return false;
+  const transactionType = receipt?.transactionType || invoice?.transactionType || "";
+  if (receiptTransactionTypeFilter && transactionType !== receiptTransactionTypeFilter) return false;
   const paymentDate = receipt ? receipt.paymentDate : getLatestActivePayment(invoice)?.paymentDate;
   if (!matchesDateRange([paymentDate, receipt?.createdAt, invoice?.invoiceDate], receiptDateFrom, receiptDateTo)) return false;
   if (!receiptSearchText) return true;
   const text = [
     receipt?.receiptNo,
     receipt?.sourceInvoiceNo,
+    receipt?.originNumber,
+    receipt?.transactionType,
     receipt?.customerName,
+    receipt?.organizationName,
     receipt?.subject,
     receipt?.payerName,
+    receipt?.amount,
     invoice?.invoiceNo,
+    invoice?.originNumber,
+    invoice?.transactionType,
+    invoice?.organizationName,
     invoice?.customerName,
     invoice?.subject,
+    getReceiptDisplayAmount(invoice),
     status
   ].map(value => String(value || "").toLowerCase()).join(" ");
   return text.includes(receiptSearchText);

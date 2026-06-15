@@ -177,8 +177,17 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 
 label:has(#sourceQuoteNo),
 label:has(#originalSlipNumber),
-label:has(#reasonMemo){display:none!important}
+label:has(#reasonMemo),
+label:has(#stockDeductionStatus),
+label:has(#paymentMethod),
+label:has(#sourceInvoiceNo),
+label:has(#receiptMethod),
+#retryStockDeductionBtn{display:none!important}
 .subject-date-row,
 .staff-transaction-row,
 .invoice-subject-date-row{align-items:end}
 .required-mark{color:#b45309;font-weight:900}
+.row.two label:has(#overallDiscountAmount) input{min-height:88px}
+.row.two label:has(#quoteMemo) textarea,
+.row.two label:has(#invoiceMemo) textarea{min-height:88px}
+.receipt-memo-row label{margin-top:10px}

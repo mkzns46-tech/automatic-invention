@@ -213,8 +213,7 @@ function markQuoteRequiredLabels() {
     "validUntil",
     "quoteStaff",
     "transactionType",
-    "discountTemplate",
-    "overallDiscountAmount"
+    "discountTemplate"
   ];
   requiredIds.forEach(id => applyRequiredLabel(document.getElementById(id)?.closest("label")));
 }
