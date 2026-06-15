@@ -298,11 +298,10 @@
           </table>
         </div>
         <div class="company">
-          <table class="doc-meta">${metaRows("receipt", doc, number).map(([label, value]) => `<tr><th>${escapeHtml(label)}：</th><td>${escapeHtml(value)}</td></tr>`).join("")}</table>
           ${companyBlock(doc.staff)}
         </div>
       </div>
-      <div class="footer">1/1<br>（ ${escapeHtml(number)} ）</div>
+      <div class="footer">1/1</div>
     </div>`;
   }
 
@@ -319,20 +318,20 @@
       .top{display:grid;grid-template-columns:1.08fr .92fr;gap:24px;align-items:start}
       .customer-name{display:inline-block;min-width:150px;border-bottom:1px solid #999;font-size:16px;margin:0 0 8px;padding:0 6px 2px}
       .customer-address{min-height:54px;white-space:pre-wrap}
-      .company{position:relative;padding-left:4px}
-      .doc-meta{margin:0 0 6px auto;border-collapse:collapse;font-size:13px}
+      .company{position:relative;width:260px;margin-left:auto;padding-left:0}
+      .doc-meta{width:260px;margin:0 0 6px 0;border-collapse:collapse;font-size:13px}
       .doc-meta th{font-weight:400;text-align:right;padding:0 4px 2px 0;white-space:nowrap}
       .doc-meta td{text-align:left;padding:0 0 2px 0;min-width:125px}
-      .company-logo-img{display:block;width:205px;max-height:64px;object-fit:contain;margin:4px 0 4px}
-      .company-info{font-size:12.5px;line-height:1.38}
+      .company-logo-img{display:block;width:220px;max-height:64px;object-fit:contain;margin:4px 0 4px}
+      .company-info{width:230px;font-size:12.5px;line-height:1.38}
       .staff-line{display:inline-block;padding-right:62px}
-      .stamp-img{position:absolute;right:30px;top:126px;width:56px;height:56px;object-fit:contain}
+      .stamp-img{position:absolute;right:8px;top:126px;width:56px;height:56px;object-fit:contain}
       .message{margin:10px 0 7px}
       .info-list{width:360px;margin:7px 0 15px}
       .info-row{display:grid;grid-template-columns:105px 1fr;min-height:31px;align-items:center;margin-bottom:5px}
       .info-label{background:#2f744f;color:#fff;text-align:center;padding:7px 6px;font-weight:700}
       .info-value{padding:6px 9px;border-bottom:1px solid #ddd}
-      .total-row .info-value{border:1px solid #d9d9d9;font-size:22px;font-weight:700;background:#fff}
+      .total-row .info-value{border:0;border-bottom:1px solid #ddd;font-size:20px;font-weight:700;background:#fff}
       .items{width:100%;border-collapse:collapse;margin-top:7px;table-layout:fixed}
       .items th{background:#2f744f;color:#fff;font-weight:700;padding:6px 8px;border:1px solid #2f744f}
       .items td{border-bottom:1px solid #bdbdbd;border-left:1px solid #e5e5e5;border-right:1px solid #e5e5e5;padding:4px 8px;height:24px;vertical-align:top}
@@ -354,7 +353,7 @@
       .note-box{min-height:78px;border-bottom:1px solid #999;white-space:pre-wrap;padding:8px 4px}
       .footer{position:absolute;right:0;bottom:0;font-size:12px;text-align:right}
       .continuation{margin:8px 0 10px;text-align:right}
-      .receipt-top{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;margin-top:24px}
+      .receipt-top{display:grid;grid-template-columns:1fr 260px;gap:32px;margin-top:24px}
       .receipt-amount{font-size:28px;font-weight:900;border-bottom:3px double #111;padding:14px 0;margin:24px 0 18px}
       .receipt-message{font-size:16px;line-height:1.8;margin:16px 0 28px}
       .revenue-stamp-box{width:110px;height:86px;border:1px solid #999;display:flex;align-items:center;justify-content:center;margin:18px 0;color:#555}

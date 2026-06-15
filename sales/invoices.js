@@ -1682,8 +1682,10 @@ async function issueInvoice() {
   invoices[index] = invoice;
   writeInvoices(invoices);
   currentInvoiceId = invoice.id;
-  fillInvoiceForm(invoice);
+  const refreshedInvoice = readInvoices().find(row => row.id === invoice.id) || invoice;
+  fillInvoiceForm(refreshedInvoice);
   renderInvoiceList();
+  updateInvoiceLockState(refreshedInvoice);
   const statusLabel = normalizeInvoiceStatus(invoice.status);
   const saleMessage = smaregiSaleDisplay(invoice);
   showSalesMessage(`請求書を確定しました。ステータスを${statusLabel}に更新しました。スマレジ売上登録: ${saleMessage}`, invoice.smaregiSaleStatus === SMAREGI_SALE_STATUS_FAILED ? "warn" : "ok");
