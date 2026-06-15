@@ -82,7 +82,7 @@ async function syncLine(line) {
   const before = Number(found.row.base_stock || 0);
   const mode = String(line.mode || "").trim() === "restore" ? "restore" : "decrement";
   const quantity = Number(line.quantity || 0);
-  const after = mode === "restore" ? before + quantity : Math.max(0, before - quantity);
+  const after = mode === "restore" ? before + quantity : before - quantity;
   await supabaseFetch(`products?${found.filter}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
@@ -96,7 +96,7 @@ async function syncLine(line) {
     quantity,
     mode,
     matchedBy: found.filter.startsWith("barcode=") ? "barcode" : "smaregi_product_id",
-    note: mode === "decrement" && before <= 0 ? "base_stock was already 0; kept at 0" : ""
+    note: mode === "decrement" && after < 0 ? "base_stock is negative; display should show 取寄せ" : ""
   };
 }
 
