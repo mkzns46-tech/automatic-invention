@@ -192,7 +192,7 @@ function buildCancelPayload(context, body) {
   const total = lines.reduce((sum, line) => sum + toInt(line.aricoAmount), 0);
   const taxInclude = toInt(body.tax ?? Math.floor(total * 10 / 110));
   const terminalTranIdSource = `${body.invoiceNo || ""}${Date.now()}`.replace(/\D/g, "");
-  return {
+  const payload = {
     transactionHeadDivision: "2",
     cancelDivision: "0",
     subtotal: String(total),
@@ -210,16 +210,9 @@ function buildCancelPayload(context, body) {
       `理由:${firstString(body.cancelReason) || "-"}`
     ].join(" ").slice(0, 100),
     sellDivision: "0",
-    taxRate: "10",
-    details: lines.map(({ aricoAmount, aricoQuantity, aricoManualProduct, aricoOverallDiscountLine, ...line }) => line),
-    payments: [
-      {
-        paymentMethodId: context.paymentMethodId,
-        paymentMethodName: context.paymentMethodName,
-        paidAmount: total
-      }
-    ]
+    taxRate: "10"
   };
+  return payload;
 }
 
 module.exports = async function handler(req, res) {
