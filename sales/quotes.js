@@ -1459,6 +1459,24 @@ function archiveQuote(id, archived = true) {
   showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
 }
 
+function archiveSelectedQuotes(archived = true) {
+  const ids = Array.from(document.querySelectorAll(".quote-pdf-check:checked")).map(input => input.value);
+  if (!ids.length) {
+    showSalesPopup("対象未選択", "非表示にする見積書を選択してください。", "warn");
+    return;
+  }
+  const quotes = readQuotes();
+  let count = 0;
+  quotes.forEach(quote => {
+    if (!ids.includes(String(quote.id))) return;
+    window.SalesArchive?.markArchived?.(quote, archived);
+    count += 1;
+  });
+  writeQuotes(quotes);
+  renderQuoteList();
+  showSalesPopup(archived ? "一括非表示にしました" : "一括再表示しました", `${count}件を更新しました。履歴は削除していません。`, "ok");
+}
+
 function outputCurrentQuotePdf() {
   try {
     printQuotePdf(collectQuote());

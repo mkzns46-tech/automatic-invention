@@ -387,6 +387,24 @@ function archiveDelivery(id, archived = true) {
   showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
 }
 
+function archiveSelectedDeliveries(archived = true) {
+  const ids = Array.from(document.querySelectorAll(".delivery-pdf-check:checked")).map(input => input.value);
+  if (!ids.length) {
+    showSalesPopup("対象未選択", "非表示にする納品書を選択してください。", "warn");
+    return;
+  }
+  const deliveries = readDeliveries();
+  let count = 0;
+  deliveries.forEach(delivery => {
+    if (!ids.includes(String(delivery.id))) return;
+    window.SalesArchive?.markArchived?.(delivery, archived);
+    count += 1;
+  });
+  writeDeliveries(deliveries);
+  renderDeliveryList();
+  showSalesPopup(archived ? "一括非表示にしました" : "一括再表示しました", `${count}件を更新しました。履歴は削除していません。`, "ok");
+}
+
 function printSelectedDeliveries() {
   const ids = Array.from(document.querySelectorAll(".delivery-pdf-check:checked")).map(input => input.value);
   const deliveries = readDeliveries().filter(delivery => ids.includes(String(delivery.id)));

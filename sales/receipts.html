@@ -35,6 +35,8 @@
       <h2 class="list-heading" onclick="toggleReceiptList();">領収書一覧 <span class="status-badge muted" id="receiptListCount">0件</span></h2>
       <div class="list-header-actions">
         <button type="button" class="primary pdf-bulk-button" onclick="printSelectedReceipts();">PDF一括印刷</button>
+        <button type="button" class="secondary" onclick="archiveSelectedReceipts(true);">&#36984;&#25246;&#12434;&#38750;&#34920;&#31034;</button>
+        <button type="button" class="secondary" onclick="archiveSelectedReceipts(false);">&#36984;&#25246;&#12434;&#20877;&#34920;&#31034;</button>
         <button type="button" class="secondary list-toggle-button" id="receiptListToggle" onclick="toggleReceiptList();">一覧を開く</button>
       </div>
     </div>

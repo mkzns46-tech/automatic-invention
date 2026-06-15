@@ -371,6 +371,7 @@ function renderPaymentInvoiceRow(invoice) {
     ? `<button type="button" class="secondary" onclick="archivePaymentInvoice('${invoice.id}', false)">再表示</button>`
     : `<button type="button" class="secondary" onclick="archivePaymentInvoice('${invoice.id}', true)">非表示</button>`;
   return `<tr>
+    <td><input type="checkbox" class="payment-archive-check pdf-select-checkbox" value="${escapeHtml(invoice.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo || "")} ${statusBadge(status)}</span></td>
     <td>${escapeHtml(invoice.invoiceDate || "")}</td>
     <td>${escapeHtml(paymentDate || "")}</td>
@@ -391,6 +392,24 @@ function archivePaymentInvoice(id, archived = true) {
   writePaymentInvoices(invoices);
   renderPaymentInvoiceList();
   showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
+}
+
+function archiveSelectedPaymentInvoices(archived = true) {
+  const ids = Array.from(document.querySelectorAll(".payment-archive-check:checked")).map(input => input.value);
+  if (!ids.length) {
+    showSalesPopup("対象未選択", "非表示にする入金確認対象を選択してください。", "warn");
+    return;
+  }
+  const invoices = readPaymentInvoices();
+  let count = 0;
+  invoices.forEach(invoice => {
+    if (!ids.includes(String(invoice.id))) return;
+    window.SalesArchive?.markArchived?.(invoice, archived);
+    count += 1;
+  });
+  writePaymentInvoices(invoices);
+  renderPaymentInvoiceList();
+  showSalesPopup(archived ? "一括非表示にしました" : "一括再表示しました", `${count}件を更新しました。履歴は削除していません。`, "ok");
 }
 
 function matchesPaymentInvoiceFilters(invoice) {

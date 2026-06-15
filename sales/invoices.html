@@ -36,6 +36,8 @@
       <h2 class="list-heading" onclick="toggleInvoiceList();">請求書一覧 <span class="status-badge muted" id="invoiceListCount">0件</span></h2>
       <div class="list-header-actions">
         <button type="button" class="primary pdf-bulk-button" onclick="printSelectedInvoices();">PDF一括印刷</button>
+        <button type="button" class="secondary" onclick="archiveSelectedInvoices(true);">選択を非表示</button>
+        <button type="button" class="secondary" onclick="archiveSelectedInvoices(false);">選択を再表示</button>
         <button type="button" class="secondary list-toggle-button" id="invoiceListToggle" onclick="toggleInvoiceList();">一覧を閉じる</button>
       </div>
     </div>

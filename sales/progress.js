@@ -38,6 +38,10 @@ function readJson(key) {
   }
 }
 
+function writeJson(key, rows) {
+  localStorage.setItem(key, JSON.stringify(rows || []));
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
     "&": "&amp;",
@@ -472,6 +476,34 @@ function printSelectedProgressTickets() {
     return;
   }
   window.SalesPdfFormat.printSalesDocuments(documents);
+}
+
+function archiveSelectedProgressTickets(archived = true) {
+  const origins = Array.from(document.querySelectorAll(".progress-ticket-pdf-check:checked")).map(input => input.value);
+  if (!origins.length) {
+    alert("非表示にする伝票を選択してください。");
+    return;
+  }
+  const originSet = new Set(origins.map(String));
+  const datasets = [
+    [PROGRESS_KEYS.quotes, readQuotes()],
+    [PROGRESS_KEYS.invoices, readInvoices()],
+    [PROGRESS_KEYS.deliveries, readDeliveries()],
+    [PROGRESS_KEYS.receipts, readReceipts()]
+  ];
+  let count = 0;
+  datasets.forEach(([, rows]) => {
+    rows.forEach(row => {
+      const origin = getOriginNumber(row, row.invoiceNo || row.deliveryNo || row.receiptNo || "");
+      const invoiceOrigin = row.invoiceNo ? getInvoiceOrigin(row) : origin;
+      if (!originSet.has(String(origin)) && !originSet.has(String(invoiceOrigin))) return;
+      window.SalesArchive?.markArchived?.(row, archived);
+      count += 1;
+    });
+  });
+  datasets.forEach(([key, rows]) => writeJson(key, rows));
+  renderProgressSections();
+  alert(`${count}件を${archived ? "非表示" : "再表示"}にしました。履歴は削除していません。`);
 }
 
 function renderRows(bodyId, countId, rows, renderer, emptyMessage, colspan) {

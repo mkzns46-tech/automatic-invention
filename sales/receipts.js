@@ -360,6 +360,24 @@ function archiveReceipt(id, archived = true) {
   showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
 }
 
+function archiveSelectedReceipts(archived = true) {
+  const ids = Array.from(document.querySelectorAll(".receipt-pdf-check:checked")).map(input => input.value);
+  if (!ids.length) {
+    showSalesPopup("対象未選択", "非表示にする領収書を選択してください。", "warn");
+    return;
+  }
+  const receipts = readReceipts();
+  let count = 0;
+  receipts.forEach(receipt => {
+    if (!ids.includes(String(receipt.id))) return;
+    window.SalesArchive?.markArchived?.(receipt, archived);
+    count += 1;
+  });
+  writeReceipts(receipts);
+  renderReceiptLists();
+  showSalesPopup(archived ? "一括非表示にしました" : "一括再表示しました", `${count}件を更新しました。履歴は削除していません。`, "ok");
+}
+
 function printSelectedReceipts() {
   const ids = Array.from(document.querySelectorAll(".receipt-pdf-check:checked")).map(input => input.value);
   const receipts = readReceipts().filter(receipt => ids.includes(String(receipt.id)));
