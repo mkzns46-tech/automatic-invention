@@ -152,6 +152,21 @@ function defaultTradeSubject(dateValue = new Date()) {
   return `${safe.getFullYear()}年${pad(safe.getMonth() + 1)}月${pad(safe.getDate())}日取引分`;
 }
 
+function datePlusDays(value, days) {
+  const date = value ? new Date(value) : new Date();
+  const safe = Number.isNaN(date.getTime()) ? new Date() : date;
+  safe.setDate(safe.getDate() + Number(days || 0));
+  return safe.toISOString().slice(0, 10);
+}
+
+function removeUnusedQuoteFields() {
+  ["originalSlipNumber", "reasonMemo"].forEach(id => {
+    const input = document.getElementById(id);
+    const label = input?.closest("label");
+    if (label) label.remove();
+  });
+}
+
 function getCurrentTransactionType() {
   return document.getElementById("transactionType")?.value || "通常販売";
 }
@@ -380,9 +395,10 @@ async function refreshQuoteLineStocks() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (!requireSalesAuth()) return;
+  removeUnusedQuoteFields();
   document.getElementById("customerType").innerHTML = ARICO_CUSTOMER_TYPES.map(type => `<option value="${type}">${type}</option>`).join("");
   document.getElementById("quoteDate").value = today();
-  document.getElementById("validUntil").value = today();
+  document.getElementById("validUntil").value = datePlusDays(today(), 14);
   bindProductAutoSearch();
   bindQuoteCustomerSearch();
   bindQuoteListControls();
@@ -771,14 +787,14 @@ function buildInvoiceFromQuote(quote, invoices) {
     email: quote.email || linkedCustomer.email || "",
     subject: quote.subject || "",
     invoiceDate: today(),
-    dueDate: today(),
+    dueDate: datePlusDays(today(), 14),
     staff: quote.staff || "",
     memo: quote.slipMemo || quote.memo || quote.customerMemo || linkedCustomer.memo || "",
     slipMemo: quote.slipMemo || quote.memo || quote.customerMemo || "",
     customerMemo: quote.customerMemo || quote.slipMemo || quote.memo || linkedCustomer.memo || "",
     transactionType: normalizeTransactionType(quote.transactionType),
-    originalSlipNumber: quote.originalSlipNumber || "",
-    reasonMemo: quote.reasonMemo || "",
+    originalSlipNumber: "",
+    reasonMemo: "",
     discountTemplate: quote.discountTemplate || "none",
     overallDiscountAmount: Math.max(0, Number(quote.overallDiscountAmount || 0)),
     overallDiscountReason: quote.overallDiscountReason || "",
@@ -851,7 +867,7 @@ function newQuote(shouldScroll = false) {
   setFieldValue("transactionType", "通常販売");
   document.getElementById("discountTemplate").value = "none";
   document.getElementById("quoteDate").value = today();
-  document.getElementById("validUntil").value = today();
+  document.getElementById("validUntil").value = datePlusDays(today(), 14);
   setFieldValue("quoteSubject", defaultTradeSubject());
   document.getElementById("productSearchResults").innerHTML = "";
   ["salesCustomerId", "salesCustomerCode", "salesSmaregiCustomerId", "salesSmaregiCustomerCode", "quoteCustomerSearchInput"].forEach(id => {
@@ -1085,8 +1101,8 @@ function collectQuote() {
     validUntil: document.getElementById("validUntil").value,
     staff: document.getElementById("quoteStaff").value,
     transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value || existing?.transactionType),
-    originalSlipNumber: document.getElementById("originalSlipNumber")?.value?.trim() || "",
-    reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
+    originalSlipNumber: "",
+    reasonMemo: "",
     memo: document.getElementById("quoteMemo").value,
     slipMemo: document.getElementById("quoteMemo").value,
     customerMemo: document.getElementById("quoteMemo").value,
@@ -1153,8 +1169,6 @@ function printQuotePdf(quote) {
     ${escapeHtml(doc.address || "")}<br>
     件名: ${escapeHtml(doc.subject || "")}
     <br>取引区分: ${escapeHtml(doc.transactionType || "通常販売")}
-    ${doc.originalSlipNumber ? `<br>元伝票番号: ${escapeHtml(doc.originalSlipNumber)}` : ""}
-    ${doc.reasonMemo ? `<br>理由メモ: ${escapeHtml(doc.reasonMemo)}` : ""}
   </div>
   <div class="total ${amountClass(totals.total, doc.transactionType)}">見積金額 ${money(totals.total)}</div>
   <table>
@@ -1238,11 +1252,11 @@ async function fillQuoteForm(quote) {
   document.getElementById("customerEmail").value = quote.email || "";
   document.getElementById("quoteSubject").value = quote.subject || defaultTradeSubject(quote.quoteDate || quote.createdAt);
   document.getElementById("quoteDate").value = quote.quoteDate || today();
-  document.getElementById("validUntil").value = quote.validUntil || today();
+  document.getElementById("validUntil").value = quote.validUntil || datePlusDays(quote.quoteDate || today(), 14);
   document.getElementById("quoteStaff").value = quote.staff || "";
   setFieldValue("transactionType", normalizeTransactionType(quote.transactionType));
-  setFieldValue("originalSlipNumber", quote.originalSlipNumber || "");
-  setFieldValue("reasonMemo", quote.reasonMemo || "");
+  setFieldValue("originalSlipNumber", "");
+  setFieldValue("reasonMemo", "");
   document.getElementById("quoteMemo").value = quote.slipMemo || quote.memo || "";
   document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
   setFieldValue("overallDiscountAmount", quote.overallDiscountAmount || 0);

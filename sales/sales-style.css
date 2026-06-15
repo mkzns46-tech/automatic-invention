@@ -174,3 +174,8 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 @keyframes savedRowFlash{0%{background:#bae6fd}70%{background:#e0f2fe}100%{background:transparent}}
 .section-focus-highlight{animation:savedSectionFlash 1.8s ease-out}
 @keyframes savedSectionFlash{0%{box-shadow:0 0 0 4px rgba(34,197,94,.28),0 8px 28px rgba(0,0,0,.05)}100%{box-shadow:0 8px 28px rgba(0,0,0,.05)}}
+
+label:has(#sourceQuoteNo),
+label:has(#originalSlipNumber),
+label:has(#reasonMemo){display:none!important}
+.invoice-subject-date-row{align-items:end}

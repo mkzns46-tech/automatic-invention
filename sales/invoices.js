@@ -90,6 +90,39 @@ function defaultTradeSubject(dateValue = new Date()) {
   return `${safe.getFullYear()}年${pad(safe.getMonth() + 1)}月${pad(safe.getDate())}日取引分`;
 }
 
+function datePlusDays(value, days) {
+  const date = value ? new Date(value) : new Date();
+  const safe = Number.isNaN(date.getTime()) ? new Date() : date;
+  safe.setDate(safe.getDate() + Number(days || 0));
+  return safe.toISOString().slice(0, 10);
+}
+
+function removeUnusedInvoiceFields() {
+  ["sourceQuoteNo", "originalSlipNumber", "reasonMemo"].forEach(id => {
+    const input = document.getElementById(id);
+    const label = input?.closest("label");
+    if (label) label.remove();
+  });
+}
+
+function arrangeInvoiceSubjectDateRow() {
+  const subjectLabel = document.getElementById("invoiceSubject")?.closest("label");
+  const dateLabel = document.getElementById("invoiceDate")?.closest("label");
+  const dueLabel = document.getElementById("dueDate")?.closest("label");
+  const sourceRow = subjectLabel?.parentElement;
+  if (!sourceRow || !subjectLabel || !dateLabel || !dueLabel) return;
+  let row = document.getElementById("invoiceSubjectDateRow");
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "invoiceSubjectDateRow";
+    row.className = "row three invoice-subject-date-row";
+    sourceRow.insertAdjacentElement("afterend", row);
+  }
+  row.appendChild(subjectLabel);
+  row.appendChild(dateLabel);
+  row.appendChild(dueLabel);
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
     "&": "&amp;",
@@ -878,8 +911,8 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     subject: invoice.subject || defaultTradeSubject(today()),
     staff: invoice.staff || "",
     transactionType: normalizeTransactionType(invoice.transactionType),
-    originalSlipNumber: invoice.originalSlipNumber || "",
-    reasonMemo: invoice.reasonMemo || "",
+    originalSlipNumber: "",
+    reasonMemo: "",
     overallDiscountAmount: Math.max(0, Number(invoice.overallDiscountAmount || 0)),
     overallDiscountReason: invoice.overallDiscountReason || "",
     memo: invoice.slipMemo || invoice.memo || invoice.customerMemo || "",
@@ -1020,6 +1053,8 @@ function confirmSalesPopup(title, body, type = "warn") {
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
+  removeUnusedInvoiceFields();
+  arrangeInvoiceSubjectDateRow();
   document.getElementById("invoiceStatus").innerHTML = INVOICE_STATUS_OPTIONS
     .map(status => `<option value="${status}">${status}</option>`)
     .join("");
@@ -1209,7 +1244,7 @@ function clearInvoiceEditor() {
   setFieldValue("transactionType", "通常販売");
   document.getElementById("issuedAt").value = "";
   document.getElementById("invoiceDate").value = today();
-  document.getElementById("dueDate").value = today();
+  document.getElementById("dueDate").value = datePlusDays(today(), 14);
   setFieldValue("invoiceSubject", defaultTradeSubject());
   renderInvoiceLines();
   updateInvoiceLockState({ status: INVOICE_STATUS_DRAFT });
@@ -1247,10 +1282,10 @@ function fillInvoiceForm(invoice) {
   document.getElementById("customerEmail").value = customerView.email;
   document.getElementById("invoiceSubject").value = invoice.subject || defaultTradeSubject(invoice.invoiceDate || invoice.createdAt);
   document.getElementById("invoiceDate").value = invoice.invoiceDate || today();
-  document.getElementById("dueDate").value = invoice.dueDate || today();
+  document.getElementById("dueDate").value = invoice.dueDate || datePlusDays(invoice.invoiceDate || today(), 14);
   setFieldValue("transactionType", normalizeTransactionType(invoice.transactionType));
-  setFieldValue("originalSlipNumber", invoice.originalSlipNumber || "");
-  setFieldValue("reasonMemo", invoice.reasonMemo || "");
+  setFieldValue("originalSlipNumber", "");
+  setFieldValue("reasonMemo", "");
   document.getElementById("invoiceMemo").value = invoice.slipMemo || invoice.memo || "";
   setFieldValue("overallDiscountAmount", invoice.overallDiscountAmount || 0);
   setFieldValue("overallDiscountReason", invoice.overallDiscountReason || "");
@@ -1480,7 +1515,7 @@ function collectInvoice() {
     masterNumber: originNumber,
     quoteNumber: existing?.quoteNumber || existing?.sourceQuoteNo || originNumber,
     sourceQuoteId: existing?.sourceQuoteId || "",
-    sourceQuoteNo: document.getElementById("sourceQuoteNo").value || existing?.sourceQuoteNo || "",
+    sourceQuoteNo: existing?.sourceQuoteNo || "",
     customerId: document.getElementById("salesCustomerId")?.value || existing?.customerId || "",
     customerCode: document.getElementById("salesCustomerCode")?.value || existing?.customerCode || "",
     smaregiCustomerId: document.getElementById("salesSmaregiCustomerId")?.value || existing?.smaregiCustomerId || "",
@@ -1500,8 +1535,8 @@ function collectInvoice() {
     dueDate: document.getElementById("dueDate").value,
     staff: document.getElementById("invoiceStaff").value.trim(),
     transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value || existing?.transactionType),
-    originalSlipNumber: document.getElementById("originalSlipNumber")?.value?.trim() || "",
-    reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
+    originalSlipNumber: "",
+    reasonMemo: "",
     memo: document.getElementById("invoiceMemo").value,
     slipMemo: document.getElementById("invoiceMemo").value,
     customerMemo: existing?.customerMemo || document.getElementById("invoiceMemo").value,

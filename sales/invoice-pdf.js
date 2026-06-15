@@ -137,7 +137,6 @@ function printInvoicePdf(invoice) {
       <div>請求書番号: ${invoicePdfEscape(doc.invoiceNo || "")}</div>
       <div>請求日: ${invoicePdfEscape(doc.invoiceDate || "")}</div>
       <div>支払期限: ${invoicePdfEscape(doc.dueDate || "")}</div>
-      <div>元見積: ${invoicePdfEscape(doc.sourceQuoteNo || "")}</div>
     </div>
   </div>
   <div class="customer">
@@ -145,8 +144,6 @@ function printInvoicePdf(invoice) {
     ${invoicePdfEscape(doc.address || "")}<br>
     件名: ${invoicePdfEscape(doc.subject || "")}
     <br>取引区分: ${invoicePdfEscape(doc.transactionType || "通常販売")}
-    ${doc.originalSlipNumber ? `<br>元伝票番号: ${invoicePdfEscape(doc.originalSlipNumber)}` : ""}
-    ${doc.reasonMemo ? `<br>理由メモ: ${invoicePdfEscape(doc.reasonMemo)}` : ""}
   </div>
   <div class="total ${invoicePdfAmountClass(totals.total, doc.transactionType)}">ご請求金額 ${invoicePdfMoney(totals.total)}</div>
   <table>
