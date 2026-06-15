@@ -1,5 +1,6 @@
 const INVOICES_KEY = "arico_sales_invoices_v1";
 const DELIVERIES_KEY = "arico_sales_deliveries_v1";
+const RECEIPTS_KEY = "arico_sales_receipts_v1";
 const QUOTES_KEY = "arico_sales_quotes_v1";
 const ARICO_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
 const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
@@ -37,6 +38,14 @@ function writeInvoices(invoices) {
 
 function readDeliveries() {
   return JSON.parse(localStorage.getItem(DELIVERIES_KEY) || "[]");
+}
+
+function readReceipts() {
+  try {
+    return JSON.parse(localStorage.getItem(RECEIPTS_KEY) || "[]");
+  } catch (_) {
+    return [];
+  }
 }
 
 function writeDeliveries(deliveries) {
@@ -463,6 +472,84 @@ function canRetryStockDeduction(invoice) {
 function canOutputInvoicePdf(invoice) {
   if (!invoice) return false;
   return Boolean(invoice.issuedAt) && normalizeInvoiceStatus(invoice.status) !== INVOICE_STATUS_DRAFT;
+}
+
+function normalizeDeliveryStatusForInvoice(status) {
+  const value = String(status || "").trim();
+  const lower = value.toLowerCase();
+  if (lower === "cancel" || lower === "cancelled" || lower === "canceled" || value === "キャンセル") return "cancelled";
+  if (lower === "issued" || value === "納品書発行済" || value === "発送準備中" || value === "発行済み") return "issued";
+  if (lower === "shipped" || lower === "delivered" || value === "発送済" || value === "納品済み") return "shipped";
+  if (lower === "hand_delivered" || lower === "hand_delivery" || value === "手渡し済") return "shipped";
+  if (lower === "staff_carry" || lower === "staff_carried" || value === "担当者手持ち済") return "shipped";
+  return value;
+}
+
+function normalizeReceiptStatusForInvoice(status) {
+  const value = String(status || "").trim();
+  const lower = value.toLowerCase();
+  if (lower === "issued" || value === "発行済み") return "issued";
+  if (lower === "cancel" || lower === "cancelled" || lower === "canceled" || value === "キャンセル") return "cancelled";
+  return value;
+}
+
+function invoiceHasPaidRecord(invoice) {
+  if (normalizeInvoiceStatus(invoice?.status) === INVOICE_STATUS_PAID) return true;
+  if (invoice?.paidAt) return true;
+  if (Number(invoice?.paidAmount || 0) > 0) return true;
+  const payments = Array.isArray(invoice?.payments) ? invoice.payments : [];
+  return payments.some(payment => payment?.status !== "canceled" && Number(payment?.amount || 0) > 0);
+}
+
+function getLinkedDeliveriesForInvoice(invoice) {
+  const invoiceNo = String(invoice?.invoiceNo || invoice?.invoiceNumber || "").trim();
+  const invoiceId = String(invoice?.id || "").trim();
+  if (!invoiceNo && !invoiceId) return [];
+  return readDeliveries().filter(delivery => {
+    const keys = [
+      delivery.sourceInvoiceNo,
+      delivery.invoiceNo,
+      delivery.invoiceNumber,
+      delivery.sourceInvoiceId,
+      delivery.invoiceId
+    ].map(value => String(value || "").trim()).filter(Boolean);
+    return keys.includes(invoiceNo) || keys.includes(invoiceId);
+  });
+}
+
+function invoiceHasBlockedDelivery(invoice) {
+  return getLinkedDeliveriesForInvoice(invoice).some(delivery => {
+    const status = normalizeDeliveryStatusForInvoice(delivery.status);
+    return status !== "cancelled" && (status === "issued" || status === "shipped" || Boolean(delivery.issuedAt || delivery.shippedAt || delivery.completedAt));
+  });
+}
+
+function invoiceHasIssuedReceipt(invoice) {
+  const invoiceNo = String(invoice?.invoiceNo || invoice?.invoiceNumber || "").trim();
+  const invoiceId = String(invoice?.id || "").trim();
+  if (!invoiceNo && !invoiceId) return false;
+  return readReceipts().some(receipt => {
+    const status = normalizeReceiptStatusForInvoice(receipt.status);
+    if (status === "cancelled") return false;
+    const linked = [
+      receipt.sourceInvoiceNo,
+      receipt.invoiceNo,
+      receipt.invoiceNumber,
+      receipt.sourceInvoiceId,
+      receipt.invoiceId
+    ].map(value => String(value || "").trim()).filter(Boolean);
+    return (linked.includes(invoiceNo) || linked.includes(invoiceId)) && (status === "issued" || Boolean(receipt.issuedAt));
+  });
+}
+
+function canCancelInvoice(invoice) {
+  if (!invoice) return false;
+  const status = normalizeInvoiceStatus(invoice.status);
+  if (status === INVOICE_STATUS_CANCELLED || status === INVOICE_STATUS_DRAFT || status === INVOICE_STATUS_PAID || status === INVOICE_STATUS_NO_PAYMENT_REQUIRED) return false;
+  if (invoiceHasPaidRecord(invoice)) return false;
+  if (invoiceHasBlockedDelivery(invoice)) return false;
+  if (invoiceHasIssuedReceipt(invoice)) return false;
+  return status === INVOICE_STATUS_ISSUED || status === INVOICE_STATUS_WAITING_PAYMENT;
 }
 
 function recalcInvoiceLine(line) {
@@ -1494,6 +1581,7 @@ function updateInvoiceLockState(invoice) {
   const saveButton = document.getElementById("saveInvoiceBtn");
   const pdfButton = document.getElementById("invoicePdfBtn");
   const retryStockButton = document.getElementById("retryStockDeductionBtn");
+  const cancelButton = document.getElementById("cancelInvoiceBtn");
   const alwaysReadonlyCustomerTargets = [
     "customerName",
     "invoiceOrganizationName",
@@ -1537,6 +1625,12 @@ function updateInvoiceLockState(invoice) {
     const shouldShowRetry = canRetryStockDeduction(invoice);
     retryStockButton.hidden = !shouldShowRetry;
     retryStockButton.disabled = !shouldShowRetry;
+  }
+  if (cancelButton) {
+    const shouldShowCancel = canCancelInvoice(invoice);
+    cancelButton.hidden = !shouldShowCancel;
+    cancelButton.style.display = shouldShowCancel ? "" : "none";
+    cancelButton.disabled = !shouldShowCancel;
   }
   alwaysReadonlyCustomerTargets.forEach(id => {
     const element = document.getElementById(id);
@@ -1760,9 +1854,6 @@ function retryCurrentInvoiceStockDeduction() {
 
 async function cancelInvoice() {
   if (!currentInvoiceId) return;
-  const confirmed = await confirmSalesPopup("請求書キャンセル", "この請求書をキャンセルしますか？", "warn");
-  if (!confirmed) return;
-  const reason = window.prompt("キャンセル理由を入力してください。\n例：注文キャンセル / 誤発行 / 商品変更 / 数量変更 / 返金対応 / その他", "") || "";
   const invoices = readInvoices();
   const index = invoices.findIndex(row => row.id === currentInvoiceId);
   if (index < 0) {
@@ -1770,6 +1861,14 @@ async function cancelInvoice() {
     return;
   }
   const invoice = normalizeInvoiceForView(invoices[index]);
+  if (!canCancelInvoice(invoice)) {
+    showSalesPopup("キャンセルできません", "入金済み、納品書発行済み、発送済み、領収書発行済み、キャンセル済みの請求書はこの画面からキャンセルできません。", "warn");
+    updateInvoiceLockState(invoice);
+    return;
+  }
+  const confirmed = await confirmSalesPopup("請求書キャンセル", "この請求書をキャンセルしますか？", "warn");
+  if (!confirmed) return;
+  const reason = window.prompt("キャンセル理由を入力してください。\n例：注文キャンセル / 誤発行 / 商品変更 / 数量変更 / 返金対応 / その他", "") || "";
   try {
     const updated = await applyInvoiceCancel(invoice, reason);
     invoices[index] = updated;
