@@ -417,6 +417,10 @@
     </style>`;
   }
 
+  function cssText() {
+    return css().replace(/^<style>/, "").replace(/<\/style>$/, "");
+  }
+
   function documentPages(type, data) {
     const doc = JSON.parse(JSON.stringify(data || {}));
     if (type === "receipt" && !(doc.slipMemo || doc.memo)) {
@@ -535,22 +539,36 @@
   }
 
   async function downloadPdf(documents) {
-    const { body, title } = buildDocuments(documents);
+    const { body, title, built } = buildDocuments(documents);
     const html2pdf = await loadHtml2Pdf();
+    const firstDoc = documents[0]?.data || {};
+    const firstBuilt = built[0] || {};
+    const firstLines = normalizeLines(firstDoc);
+    console.log("sales pdf save", {
+      type: documents[0]?.type || "",
+      number: firstBuilt.number || documentNumber(documents[0]?.type, firstDoc),
+      customerName: firstDoc.customerName || firstDoc.name || firstDoc.customer || "",
+      itemCount: firstLines.length,
+      htmlLength: body.length
+    });
+    if (!body || body.length < 100 || !body.includes("sheet")) {
+      throw new Error("PDF HTML is empty");
+    }
+    const style = document.createElement("style");
+    style.dataset.salesPdfDownload = "true";
+    style.textContent = `${cssText()}
+      .pdf-download-root{position:fixed;left:0;top:0;width:210mm;background:#fff;z-index:2147483647;pointer-events:none}
+      .pdf-download-root .sheet{width:210mm;min-height:277mm;background:#fff;margin:0 auto}
+    `;
     const container = document.createElement("div");
     container.className = "pdf-download-root";
-    container.style.position = "absolute";
-    container.style.left = "0";
-    container.style.top = `${window.scrollY}px`;
-    container.style.width = "210mm";
-    container.style.background = "#ffffff";
-    container.style.zIndex = "2147483647";
-    container.style.pointerEvents = "none";
-    container.innerHTML = `${css()}<style>.pdf-download-root .sheet{width:210mm;min-height:277mm;background:#fff;margin:0 auto;}</style>${body}`;
+    container.innerHTML = body;
+    document.head.appendChild(style);
     document.body.appendChild(container);
     try {
       await waitForImages(container);
       await waitForPaint();
+      const target = container.querySelector(".sheet") ? container : container.firstElementChild;
       await html2pdf()
         .set({
           margin: 0,
@@ -560,10 +578,11 @@
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
           pagebreak: { mode: ["css", "legacy"], after: ".sheet" }
         })
-        .from(container)
+        .from(target)
         .save();
     } finally {
       container.remove();
+      style.remove();
     }
   }
 
