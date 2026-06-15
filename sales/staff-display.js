@@ -8,6 +8,17 @@
     return String(value || "").trim();
   }
 
+  function staffKeyVariants(value) {
+    const text = normalize(value);
+    if (!text) return [];
+    const variants = new Set([text]);
+    variants.add(text.replace(/（/g, "(").replace(/）/g, ")"));
+    variants.add(text.replace(/\(/g, "（").replace(/\)/g, "）"));
+    variants.add(text.replace(/\s+\(/g, " (").replace(/\s+（/g, "（"));
+    variants.add(text.replace(/\s+\(/g, "(").replace(/\s+（/g, "（"));
+    return Array.from(variants).filter(Boolean);
+  }
+
   function internalName(row) {
     const name = normalize(row?.name);
     const store = normalize(row?.store_name);
@@ -62,9 +73,15 @@
     (rows || []).forEach(row => {
       const key = internalName(row);
       const shortKey = normalize(row?.name);
+      const halfWidthStoreKey = normalize(row?.store_name) && shortKey ? `${shortKey} (${normalize(row.store_name)})` : "";
       const label = overrides[key] || overrides[shortKey] || displayName(row);
-      if (key && label) map[key] = label;
-      if (shortKey && label) map[shortKey] = label;
+      if (label) {
+        [key, halfWidthStoreKey, shortKey].forEach(candidate => {
+          staffKeyVariants(candidate).forEach(variant => {
+            map[variant] = label;
+          });
+        });
+      }
     });
     writeMap(map);
     return map;
@@ -96,7 +113,11 @@
     const text = normalize(value);
     if (!text) return "";
     const map = readMap();
-    return map[text] || text;
+    const foundKey = staffKeyVariants(text).find(key => map[key]);
+    if (foundKey) return map[foundKey];
+    const overrides = readOverrides();
+    const overrideKey = staffKeyVariants(text).find(key => overrides[key]);
+    return overrideKey ? overrides[overrideKey] : text;
   }
 
   function storageStaffName(value) {
@@ -111,7 +132,8 @@
     const overrides = readOverrides();
     const key = typeof row === "string" ? normalize(row) : internalName(row);
     const shortKey = typeof row === "string" ? "" : normalize(row?.name);
-    if (key && Object.prototype.hasOwnProperty.call(overrides, key)) return overrides[key];
+    const foundKey = staffKeyVariants(key).find(candidate => Object.prototype.hasOwnProperty.call(overrides, candidate));
+    if (foundKey) return overrides[foundKey];
     if (shortKey && Object.prototype.hasOwnProperty.call(overrides, shortKey)) return overrides[shortKey];
     return undefined;
   }
@@ -124,10 +146,10 @@
       if (!key) return;
       const value = normalize(valuesByKey?.[key]);
       if (value) {
-        overrides[key] = value;
+        staffKeyVariants(key).forEach(variant => { overrides[variant] = value; });
         if (shortKey) overrides[shortKey] = value;
       } else {
-        delete overrides[key];
+        staffKeyVariants(key).forEach(variant => { delete overrides[variant]; });
         if (shortKey) delete overrides[shortKey];
       }
     });
@@ -141,10 +163,21 @@
   }
 
   function staffOptionLabel(row) {
-    return displayName(row) || internalName(row);
+    return getStaffDisplayOverride(row) || displayName(row) || internalName(row);
   }
 
   function refreshSalesStaffDisplays() {
+    [
+      "customerStaff",
+      "invoiceStaff",
+      "paymentStaff",
+      "deliveryStaff",
+      "shippingStaff",
+      "receiptStaff"
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.value) el.value = formatStaffName(el.value);
+    });
     [
       "renderQuoteList",
       "renderInvoiceList",
@@ -173,6 +206,7 @@
   };
 
   window.formatSalesStaffName = formatStaffName;
+  window.getSalesStaffDisplayName = formatStaffName;
   window.storageSalesStaffName = storageStaffName;
 
   document.addEventListener("DOMContentLoaded", () => {

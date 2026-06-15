@@ -10,7 +10,7 @@
 <script src="sales-storage.js"></script>
 <script src="customers-storage.js?v=20260614-settings-imports"></script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
-<script src="staff-display.js?v=20260616-staff-fullname"></script>
+<script src="staff-display.js?v=20260616-staff-display-map"></script>
 <script src="settings.js?v=20260616-settings-display" defer></script>
 <script src="sales-smaregi.js?v=20260614-settings-imports" defer></script>
 </head>
@@ -82,25 +82,25 @@
     </div>
   </section>
 
-    <section class="card sales-smaregi-card sales-settings-combined-card">
+  <section class="card sales-smaregi-card sales-settings-combined-card">
     <div class="section-title">
       <div>
-        <h2>??????</h2>
-        <p class="section-note">???????????????????????????????</p>
+        <h2>スマレジデータ取込</h2>
+        <p class="section-note">新スマレジの商品マスターと会員データを販売管理へ取り込みます。</p>
       </div>
-      <div class="badge muted">?????</div>
+      <div class="badge muted">新スマレジ</div>
     </div>
     <div class="settings-combined-grid">
       <div class="settings-import-panel">
-        <h3>????????</h3>
-        <p class="section-note">????????????????ID????????????</p>
-        <button type="button" id="salesSmaregiImportBtn" class="primary" onclick="importSalesSmaregiProducts();">????????</button>
+        <h3>スマレジ商品マスター取込</h3>
+        <p class="section-note">商品名・バーコード・スマレジ商品ID・販売価格を取得します。</p>
+        <button type="button" id="salesSmaregiImportBtn" class="primary" onclick="importSalesSmaregiProducts();">商品マスター取込</button>
       </div>
       <div class="settings-import-panel">
-        <h3>???????</h3>
-        <p class="section-note">?????????????????????????????</p>
-        <button type="button" id="customerSmaregiImportBtn" class="primary" onclick="importSettingsSmaregiCustomers();">???????</button>
-        <div id="customerImportResult" class="message">??????</div>
+        <h3>スマレジ会員データ取込</h3>
+        <p class="section-note">スマレジ会員データを販売管理の顧客マスターへ取り込みます。</p>
+        <button type="button" id="customerSmaregiImportBtn" class="primary" onclick="importSettingsSmaregiCustomers();">会員データ取込</button>
+        <div id="customerImportResult" class="message">未取込です。</div>
       </div>
     </div>
   </section>
