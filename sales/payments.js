@@ -374,7 +374,7 @@ function renderPaymentInvoiceRow(invoice) {
     <td>${escapeHtml(customerLabel || customerView.customerName)}</td>
     <td>${money(total)}</td>
     <td>${statusBadge(status)}</td>
-    <td>${escapeHtml(invoice.staff || "")}</td>
+    <td>${escapeHtml(getSalesStaffDisplayName(invoice.staff || ""))}</td>
     <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">&#36984;&#25246;</button><button type="button" class="secondary" onclick="printPaymentInvoicePdf('${invoice.id}')">PDF出力</button>${cancelButton}</td>
   </tr>`;
 }
@@ -390,6 +390,7 @@ function matchesPaymentInvoiceFilters(invoice) {
     customerView.customerName,
     customerView.organizationName,
     invoice.staff,
+    getSalesStaffDisplayName(invoice.staff),
     invoice.subject,
     status,
     invoice.status,
@@ -446,7 +447,7 @@ function selectPaymentInvoice(id) {
   document.getElementById("paymentAmount").value = Math.max(0, total - paid);
   document.getElementById("paymentMethod").value = "現金";
   document.getElementById("paymentPayerName").value = customerView.customerName || "";
-  document.getElementById("paymentStaff").value = invoice.staff || "";
+  document.getElementById("paymentStaff").value = getSalesStaffDisplayName(invoice.staff || "");
   document.getElementById("paymentCurrentStatus").value = normalizePaymentStatus(invoice.status);
   document.getElementById("paymentMemo").value = "";
   document.getElementById("paymentInvoiceLink").href = `invoices.html?id=${encodeURIComponent(invoice.id)}`;
@@ -488,7 +489,7 @@ function savePayment() {
     amount,
     method: "現金",
     payerName: document.getElementById("paymentPayerName").value.trim(),
-    staff: document.getElementById("paymentStaff").value.trim(),
+    staff: storageSalesStaffName(document.getElementById("paymentStaff").value.trim()),
     memo: document.getElementById("paymentMemo").value,
     status: "confirmed",
     previousStatus,
@@ -528,7 +529,7 @@ async function cancelPayment(id) {
   const now = new Date().toISOString();
   payment.status = "canceled";
   payment.canceledAt = now;
-  payment.canceledBy = document.getElementById("paymentStaff")?.value.trim() || payment.staff || "";
+  payment.canceledBy = storageSalesStaffName(document.getElementById("paymentStaff")?.value.trim()) || payment.staff || "";
   payment.cancelReason = "";
   const activePaidTotal = getPaidTotal(invoice);
   const invoiceTotal = calcInvoiceTotal(invoice);
@@ -573,7 +574,7 @@ function renderPaymentHistory(invoice) {
       <td>${escapeHtml(payment.paymentDate || "")}</td>
       <td>${money(payment.amount)}</td>
       <td>${escapeHtml(payment.payerName || "")}</td>
-      <td>${escapeHtml(payment.staff || "")}</td>
+      <td>${escapeHtml(getSalesStaffDisplayName(payment.staff || ""))}</td>
       <td>${payment.status === "canceled" ? '<span class="status-badge danger">取消済み</span>' : '<span class="status-badge ok">入金確認済み</span>'}</td>
       <td>${escapeHtml(payment.memo || "")}</td>
       <td>${escapeHtml(formatDateTime(payment.canceledAt))}</td>

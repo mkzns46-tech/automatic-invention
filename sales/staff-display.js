@@ -3,6 +3,7 @@
   const STAFF_OVERRIDE_KEY = "arico_sales_staff_display_overrides_v1";
   const SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
   const SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
+  let staffDisplayLoadPromise = null;
 
   function normalize(value) {
     return String(value || "").trim();
@@ -109,6 +110,20 @@
     }
   }
 
+  async function ensureStaffDisplaysLoaded(options = {}) {
+    const force = !!options.force;
+    if (!force && Object.keys(readMap()).length) return readMap();
+    if (!force && staffDisplayLoadPromise) {
+      await staffDisplayLoadPromise;
+      return readMap();
+    }
+    staffDisplayLoadPromise = loadStaffDisplays().finally(() => {
+      staffDisplayLoadPromise = null;
+    });
+    await staffDisplayLoadPromise;
+    return readMap();
+  }
+
   function formatStaffName(value) {
     const text = normalize(value);
     if (!text) return "";
@@ -125,7 +140,10 @@
     if (!text) return "";
     const map = readMap();
     const found = Object.entries(map).find(([, label]) => normalize(label) === text);
-    return found ? found[0] : text;
+    if (found) return found[0];
+    const overrides = readOverrides();
+    const overrideFound = Object.entries(overrides).find(([, label]) => normalize(label) === text);
+    return overrideFound ? overrideFound[0] : text;
   }
 
   function getStaffDisplayOverride(row) {
@@ -195,6 +213,7 @@
 
   window.SalesStaffDisplay = {
     loadStaffDisplays,
+    ensureStaffDisplaysLoaded,
     formatStaffName,
     staffOptionValue,
     staffOptionLabel,
@@ -210,6 +229,6 @@
   window.storageSalesStaffName = storageStaffName;
 
   document.addEventListener("DOMContentLoaded", () => {
-    loadStaffDisplays().then(refreshSalesStaffDisplays).catch(() => {});
+    ensureStaffDisplaysLoaded({ force: true }).then(refreshSalesStaffDisplays).catch(() => {});
   });
 })();

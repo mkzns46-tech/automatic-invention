@@ -23,7 +23,7 @@ function printDeliveryPdf(delivery) {
     ? `<br>配送会社：${delivery.shippingCarrier || ""}<br>送り状番号：${delivery.trackingNumber || ""}`
     : "";
   const shippingBox = shippingDate || delivery.shippingCarrier || delivery.trackingNumber || delivery.shippingMethod
-    ? `<div class="box">発送方法：${shippingMethod}<br>${shippingDateLabel}：${shippingDate || ""}${deliveryOnlyInfo}<br>担当者：${delivery.shippingStaff || ""}</div>`
+    ? `<div class="box">発送方法：${shippingMethod}<br>${shippingDateLabel}：${shippingDate || ""}${deliveryOnlyInfo}<br>担当者：${getSalesStaffDisplayName(delivery.shippingStaff || "")}</div>`
     : "";
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>納品書 ${delivery.deliveryNo || ""}</title>
   <style>

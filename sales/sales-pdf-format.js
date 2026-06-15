@@ -244,7 +244,7 @@
         <div>${COMPANY.address}</div>
         <div>TEL：${COMPANY.tel}</div>
         <div>代表者：${COMPANY.representative}</div>
-        <div class="staff-line">担当：${escapeHtml(staff || "")}</div>
+        <div class="staff-line">担当：${escapeHtml(getSalesStaffDisplayName(staff || ""))}</div>
       </div>
       <img class="stamp-img" src="${escapeHtml(stampSrc)}" alt="印影">
     `;
@@ -566,6 +566,7 @@
   }
 
   async function printSalesDocument(type, data) {
+    await window.SalesStaffDisplay?.ensureStaffDisplaysLoaded?.();
     const info = documentPages(type, data);
     const action = await showPdfActionPopup(info.filename, 1);
     if (action === "cancel") return;
@@ -573,6 +574,7 @@
   }
 
   async function printSalesDocuments(documents) {
+    await window.SalesStaffDisplay?.ensureStaffDisplaysLoaded?.();
     const safeDocuments = (documents || []).filter(item => item && item.type && item.data);
     if (!safeDocuments.length) return;
     if (safeDocuments.length > 1) {

@@ -363,7 +363,7 @@ function renderDeliveryRow(delivery) {
     <td>${escapeHtml(delivery.customerName || delivery.name || delivery.customer || "")}</td>
     <td class="${amountClass(delivery.total, delivery)}">${money(delivery.total)}</td>
     <td>${statusBadge(status)}</td>
-    <td>${escapeHtml(delivery.shippingStaff || delivery.staff || "")}</td>
+    <td>${escapeHtml(getSalesStaffDisplayName(delivery.shippingStaff || delivery.staff || ""))}</td>
     <td>
       <button type="button" class="secondary" onclick="selectDelivery('${delivery.id}')">詳細</button>
       <button type="button" class="secondary" onclick="printDeliveryById('${delivery.id}')">PDF出力</button>
@@ -409,6 +409,7 @@ function matchesDeliveryFilters(delivery) {
     delivery.shippingMethod,
     delivery.trackingNumber,
     delivery.shippingStaff,
+    getSalesStaffDisplayName(delivery.shippingStaff || delivery.staff),
     delivery.handoverDate,
     delivery.carryOutDate,
     delivery.staff,
@@ -465,7 +466,7 @@ function selectDelivery(id) {
   setFieldValue("deliveryStatus", normalizeDeliveryStatus(delivery.status));
   setFieldValue("deliveryCustomerName", delivery.customerName || "");
   setFieldValue("deliveryCustomerType", delivery.customerType || "");
-  setFieldValue("deliveryStaff", delivery.staff || "");
+  setFieldValue("deliveryStaff", getSalesStaffDisplayName(delivery.staff || ""));
   setFieldValue("deliveryAddress", delivery.address || "");
   setFieldValue("deliveryPhone", delivery.phone || "");
   setFieldValue("deliveryEmail", delivery.email || "");
@@ -477,7 +478,7 @@ function selectDelivery(id) {
   setFieldValue("shipmentDate", normalizeDateOnly(delivery.shipmentDate) || normalizeDateOnly(delivery.handoverDate) || normalizeDateOnly(delivery.carryOutDate));
   setFieldValue("shippingCarrier", delivery.shippingCarrier || "");
   setFieldValue("trackingNumber", delivery.trackingNumber || "");
-  setFieldValue("shippingStaff", delivery.shippingStaff || delivery.staff || "");
+  setFieldValue("shippingStaff", getSalesStaffDisplayName(delivery.shippingStaff || delivery.staff || ""));
   setFieldValue("shippingMemo", delivery.shippingMemo || "");
   updateShippingMethodUi();
   renderDeliveryLines(delivery);
@@ -592,7 +593,7 @@ function collectShipmentFields(base = {}) {
     carryOutDate: method === SHIPPING_METHOD_STAFF ? date : "",
     shippingCarrier: isDelivery ? (document.getElementById("shippingCarrier")?.value || base.shippingCarrier || "") : "",
     trackingNumber: isDelivery ? (document.getElementById("trackingNumber")?.value || base.trackingNumber || "") : "",
-    shippingStaff: document.getElementById("shippingStaff")?.value || base.shippingStaff || base.staff || "",
+    shippingStaff: storageSalesStaffName(document.getElementById("shippingStaff")?.value || "") || base.shippingStaff || base.staff || "",
     shippingMemo: document.getElementById("shippingMemo")?.value || base.shippingMemo || ""
   };
 }

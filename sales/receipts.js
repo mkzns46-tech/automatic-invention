@@ -322,7 +322,7 @@ function renderReceiptTargetRow(row) {
       <td>${escapeHtml(invoice.customerName || invoice.name || invoice.customer || "")}</td>
       <td class="${amountClass(getReceiptDisplayAmount(invoice), invoice)}">${money(getReceiptDisplayAmount(invoice))}</td>
       <td><span class="status-badge muted">&#26410;&#30330;&#34892;</span></td>
-      <td>${escapeHtml(payment.staff || invoice.staff || "")}</td>
+      <td>${escapeHtml(getSalesStaffDisplayName(payment.staff || invoice.staff || ""))}</td>
       <td><button type="button" class="primary" onclick="createReceiptFromInvoice('${invoice.id}')">&#38936;&#21454;&#26360;&#20316;&#25104;</button></td>
     </tr>`;
   }
@@ -335,7 +335,7 @@ function renderReceiptTargetRow(row) {
     <td>${escapeHtml(receipt.customerName || receipt.name || receipt.customer || "")}</td>
     <td class="${amountClass(receipt.amount, receipt)}">${money(receipt.amount)}</td>
     <td>${statusBadge(receipt.status)}</td>
-    <td>${escapeHtml(receipt.staff || "")}</td>
+    <td>${escapeHtml(getSalesStaffDisplayName(receipt.staff || ""))}</td>
     <td>
       <button type="button" class="secondary" onclick="selectReceipt('${receipt.id}')">&#35443;&#32048;</button>
       <button type="button" class="secondary" onclick="printReceiptById('${receipt.id}')">PDF&#20986;&#21147;</button>
@@ -383,6 +383,10 @@ function matchesReceiptTargetFilters(row) {
     invoice?.organizationName,
     invoice?.customerName,
     invoice?.subject,
+    payment?.staff,
+    invoice?.staff,
+    receipt?.staff,
+    getSalesStaffDisplayName(payment?.staff || invoice?.staff || receipt?.staff),
     getReceiptDisplayAmount(invoice),
     status
   ].map(value => String(value || "").toLowerCase()).join(" ");
@@ -464,7 +468,7 @@ function selectReceipt(id) {
   document.getElementById("receiptStatus").value = normalizeReceiptStatus(receipt.status);
   document.getElementById("receiptCustomerName").value = receipt.customerName || "";
   document.getElementById("receiptSubject").value = receipt.subject || "";
-  document.getElementById("receiptStaff").value = receipt.staff || "";
+  document.getElementById("receiptStaff").value = getSalesStaffDisplayName(receipt.staff || "");
   document.getElementById("receiptPaymentDate").value = receipt.paymentDate || "";
   document.getElementById("receiptAmount").value = money(receipt.amount);
   document.getElementById("receiptMethod").value = receipt.method || "振込";

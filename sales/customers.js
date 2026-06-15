@@ -323,6 +323,7 @@ function matchesCustomerFilters(customer) {
     customer.phone,
     customer.email,
     customer.staff,
+    getSalesStaffDisplayName(customer.staff),
     customer.smaregiMemberCode,
     customer.customerCode
   ].map(value => normalizeSearchText(value)).join(" ");
@@ -398,7 +399,7 @@ function editCustomer(id) {
   setValue("customerOrganizationName", customer.organizationName);
   setValue("customerKana", customer.kana);
   setValue("customerType", customerStorage().normalizeCustomerType(customer.customerType));
-  setValue("customerStaff", customer.staff);
+  setValue("customerStaff", getSalesStaffDisplayName(customer.staff));
   setValue("customerPostalCode", customer.postalCode);
   setValue("customerPhone", customer.phone);
   setValue("customerAddress", customer.address);
@@ -456,7 +457,7 @@ function saveCustomer() {
     organizationName: getValue("customerOrganizationName"),
     kana: getValue("customerKana"),
     customerType: customerStorage().normalizeCustomerType(getValue("customerType")),
-    staff: getValue("customerStaff"),
+    staff: storageSalesStaffName(getValue("customerStaff")),
     postalCode: getValue("customerPostalCode"),
     phone: getValue("customerPhone"),
     address: getValue("customerAddress"),

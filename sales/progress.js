@@ -372,7 +372,7 @@ function matchesFilters(row, section) {
   if (!textMatches(row.origin, filters.slip)) return false;
   if (!textMatches(row.organizationName, filters.organization)) return false;
   if (!textMatches(row.customerName, filters.customer)) return false;
-  if (!textMatches(row.staff, filters.staff)) return false;
+  if (!textMatches([row.staff, getSalesStaffDisplayName(row.staff)].join(" "), filters.staff)) return false;
   if (filters.transaction && normalizeTransactionType(row.transactionType) !== filters.transaction) return false;
   if (filters.status && !rowStatusValues(row, section).some(status => statusLabel(status) === filters.status)) return false;
   if (!matchesDateRange(row, section)) return false;
@@ -497,7 +497,7 @@ function renderTicketRows(allRows) {
       <td>${statusBadge(row.paymentStatus, "payment")}</td>
       <td>${statusBadge(row.deliveryStatus, "delivery")}</td>
       <td class="${amountClass(row.total, row)}">${money(row.total)}</td>
-      <td>${escapeHtml(row.staff)}</td>
+      <td>${escapeHtml(getSalesStaffDisplayName(row.staff))}</td>
       <td>${escapeHtml(normalizeDateTime(row.updatedAt))}</td>
       <td>${actionLinks(row, ["quote", "invoice", "payment", "delivery"])}</td>
     </tr>`, "伝票ごとの進捗はありません。", 13);
@@ -513,7 +513,7 @@ function renderSalesRows(allRows) {
       <td>${escapeHtml(row.customerName)}</td>
       <td class="${amountClass(row.total, row)}">${money(row.total)}</td>
       <td>${statusBadge(row.invoiceStatus, "invoice")}</td>
-      <td>${escapeHtml(row.staff)}</td>
+      <td>${escapeHtml(getSalesStaffDisplayName(row.staff))}</td>
       <td>${actionLinks(row, ["invoice"])}</td>
     </tr>`, "請求書はありません。", 8);
 }
@@ -537,7 +537,7 @@ function renderUnpaidRows(allRows) {
       <td>${money(row.paid)}</td>
       <td class="${overdue}">${money(row.unpaid)}</td>
       <td>${statusBadge(isPaymentOverdue(row.invoice) ? "支払期限超過" : row.paymentStatus, "payment")}</td>
-      <td>${escapeHtml(row.staff)}</td>
+      <td>${escapeHtml(getSalesStaffDisplayName(row.staff))}</td>
       <td>${actionLinks(row, ["payment"])}</td>
     </tr>`;
   }, "未入金の請求書はありません。", 11);
@@ -557,7 +557,7 @@ function renderUndeliveredRows(allRows) {
       <td>${escapeHtml(row.customerName)}</td>
       <td class="${amountClass(row.total, row)}">${money(row.total)}</td>
       <td>${statusBadge(row.deliveryStatus, "delivery")}</td>
-      <td>${escapeHtml(row.staff)}</td>
+      <td>${escapeHtml(getSalesStaffDisplayName(row.staff))}</td>
       <td>${actionLinks(row, ["delivery"])}</td>
     </tr>`, "未納品の伝票はありません。", 8);
 }

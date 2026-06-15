@@ -686,13 +686,14 @@ function setFieldValue(id, value) {
 async function loadStaffOptions() {
   const select = document.getElementById("quoteStaff");
   try {
-    const staff = await salesFetch("staff_members?select=name,store_name&order=name.asc");
-    select.innerHTML = '<option value="">担当者を選択</option>' + staff.map(row => {
-      const label = row.store_name ? `${row.name}（${row.store_name}）` : row.name;
-      return `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`;
+    const staff = await (window.SalesStaffDisplay?.loadStaffDisplays?.() || salesFetch("staff_members?select=name,store_name&order=name.asc"));
+    select.innerHTML = '<option value="">??????</option>' + staff.map(row => {
+      const value = window.SalesStaffDisplay?.staffOptionValue?.(row) || (row.store_name ? `${row.name} (${row.store_name})` : row.name);
+      const label = window.SalesStaffDisplay?.staffOptionLabel?.(row) || value;
+      return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
     }).join("");
   } catch (_) {
-    select.innerHTML = '<option value="">担当者を選択</option>';
+    select.innerHTML = '<option value="">??????</option>';
   }
 }
 
@@ -729,7 +730,7 @@ function renderQuoteListRow(q) {
     <td>${escapeHtml(q.customerName || q.name || q.customer || "")}</td>
     <td class="${amountClass(calcQuoteTotals(q).total, q.transactionType)}">${money(calcQuoteTotals(q).total)}</td>
     <td>${quoteStatusBadge(q.status)}</td>
-    <td>${escapeHtml(q.staff || "")}</td>
+    <td>${escapeHtml(getSalesStaffDisplayName(q.staff || ""))}</td>
     <td>
       <button type="button" class="secondary" onclick="editQuote('${q.id}')">${status === QUOTE_STATUS_INVOICE_ISSUED ? "詳細" : "&#32232;&#38598;"}</button>
       <button type="button" class="secondary" onclick="printQuoteById('${q.id}')">PDF&#20986;&#21147;</button>
@@ -779,6 +780,7 @@ function matchesQuoteListFilters(quote) {
     quote.quoteNo,
     quote.customerName,
     quote.staff,
+    getSalesStaffDisplayName(quote.staff),
     quote.subject,
     status,
     quote.status

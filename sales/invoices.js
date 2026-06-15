@@ -1366,7 +1366,7 @@ function renderInvoiceListRow(invoice) {
     <td>${escapeHtml(customerView.customerName)}</td>
     <td class="${amountClass(totals.total, invoice.transactionType)}">${money(totals.total)}</td>
     <td>${statusBadge(status)}</td>
-    <td>${escapeHtml(invoice.staff || "")}</td>
+    <td>${escapeHtml(getSalesStaffDisplayName(invoice.staff || ""))}</td>
     <td>
       <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">${status === INVOICE_STATUS_DRAFT ? "&#32232;&#38598;" : "&#35443;&#32048;"}</button>
       ${canOutputInvoicePdf(invoice) ? `<button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>` : `<button type="button" class="secondary" disabled title="請求書確定後にPDF出力できます">PDF&#20986;&#21147;</button>`}
@@ -1401,6 +1401,7 @@ function matchesInvoiceListFilters(invoice) {
     customerView.customerName,
     customerView.organizationName,
     invoice.staff,
+    getSalesStaffDisplayName(invoice.staff),
     invoice.subject,
     status,
     invoice.status
@@ -1475,7 +1476,7 @@ function fillInvoiceForm(invoice) {
   document.getElementById("customerName").value = customerView.customerName;
   setFieldValue("invoiceOrganizationName", customerView.organizationName);
   document.getElementById("customerType").value = customerView.customerType;
-  document.getElementById("invoiceStaff").value = invoice.staff || "";
+  document.getElementById("invoiceStaff").value = getSalesStaffDisplayName(invoice.staff || "");
   document.getElementById("customerAddress").value = customerView.address;
   document.getElementById("customerPhone").value = customerView.phone;
   document.getElementById("customerEmail").value = customerView.email;
@@ -1756,7 +1757,7 @@ function collectInvoice() {
     subject: document.getElementById("invoiceSubject").value.trim() || defaultTradeSubject(document.getElementById("invoiceDate").value || new Date()),
     invoiceDate: document.getElementById("invoiceDate").value,
     dueDate: document.getElementById("dueDate").value,
-    staff: document.getElementById("invoiceStaff").value.trim(),
+    staff: storageSalesStaffName(document.getElementById("invoiceStaff").value.trim()),
     transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value || existing?.transactionType),
     originalSlipNumber: "",
     reasonMemo: "",
