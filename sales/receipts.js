@@ -174,7 +174,6 @@ function showSalesPopup(title, body, type = "ok") {
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   arrangeReceiptDetailLayout();
-  ensureReceiptTransactionFilter();
   bindReceiptControls();
   renderReceiptLists();
   const id = new URLSearchParams(location.search).get("id");

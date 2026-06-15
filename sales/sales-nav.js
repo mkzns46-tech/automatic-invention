@@ -37,10 +37,9 @@ function renderSalesSidebar() {
     </div>
     <nav aria-label="${isKo ? "판매 관리 메뉴" : "販売管理メニュー"}">
       <a class="sales-menu-link ${current === "index.html" || current === "index_ko.html" ? "active" : ""}" href="${isKo ? "index_ko.html" : "index.html"}">${isKo ? "トップ" : "トップ"}</a>
-      ${menus.map(([title, href, desc]) => `
+      ${menus.map(([title, href]) => `
         <a class="sales-menu-link ${current === href ? "active" : ""}" href="${href}">
           <strong>${title}</strong>
-          <span>${desc}</span>
         </a>
       `).join("")}
     </nav>

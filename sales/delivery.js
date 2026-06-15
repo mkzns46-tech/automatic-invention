@@ -242,12 +242,56 @@ function showSalesPopup(title, body, type = "ok") {
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
+  arrangeDeliveryDetailLayout();
+  arrangeDeliveryShippingLayout();
   bindDeliveryListControls();
   renderDeliveryList();
   const id = new URLSearchParams(location.search).get("id");
   if (id) selectDelivery(id);
   else clearDeliveryDetail();
 });
+
+function arrangeDeliveryDetailLayout() {
+  const card = document.getElementById("deliveryDetailCard");
+  if (!card) return;
+  const groups = [
+    ["deliveryNo", "deliveryStatus", "deliveryIssuedAt"],
+    ["deliveryCustomerName", "deliveryCustomerType", "deliveryStaff"],
+    ["deliveryAddress", "deliveryPhone", "deliveryEmail"],
+    ["deliverySubject", "deliveryInvoiceDate"],
+    ["deliverySlipMemo"]
+  ];
+  groups.forEach((ids, index) => {
+    let row = document.getElementById(`deliveryDetailRow${index + 1}`);
+    if (!row) {
+      row = document.createElement("div");
+      row.id = `deliveryDetailRow${index + 1}`;
+      row.className = ids.length === 3 ? "row three delivery-detail-row" : ids.length === 2 ? "row two delivery-detail-row" : "delivery-memo-row";
+      card.appendChild(row);
+    }
+    ids.forEach(id => {
+      const label = document.getElementById(id)?.closest("label");
+      if (label) row.appendChild(label);
+    });
+  });
+}
+
+function arrangeDeliveryShippingLayout() {
+  const card = document.getElementById("deliveryShippingCard");
+  if (!card) return;
+  const ids = ["shippingMethod", "shipmentDate", "trackingNumber", "shippingStaff"];
+  let row = document.getElementById("deliveryShippingMainRow");
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "deliveryShippingMainRow";
+    row.className = "row delivery-shipping-main-row";
+    card.querySelector(".sales-actions")?.insertAdjacentElement("beforebegin", row);
+  }
+  ids.forEach(id => {
+    const label = document.getElementById(id)?.closest("label");
+    if (label) row.appendChild(label);
+  });
+}
 
 function bindDeliveryListControls() {
   document.getElementById("deliverySearch")?.addEventListener("input", event => {

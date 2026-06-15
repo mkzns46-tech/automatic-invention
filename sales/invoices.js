@@ -154,6 +154,14 @@ function arrangeInvoiceSubjectDateRow() {
   secondRow.appendChild(transactionLabel);
 }
 
+function moveInvoiceOverallDiscountToSummary() {
+  const label = document.getElementById("overallDiscountAmount")?.closest("label");
+  const discountBox = document.getElementById("discountText")?.closest("div");
+  if (!label || !discountBox || label.closest(".summary")) return;
+  label.classList.add("summary-input-box");
+  discountBox.insertAdjacentElement("afterend", label);
+}
+
 function markInvoiceRequiredLabels() {
   const requiredIds = [
     "invoiceNo",
@@ -1118,6 +1126,7 @@ document.addEventListener("DOMContentLoaded", () => {
   removeUnusedInvoiceFields();
   arrangeInvoiceHeaderRow();
   arrangeInvoiceSubjectDateRow();
+  moveInvoiceOverallDiscountToSummary();
   markInvoiceRequiredLabels();
   document.getElementById("invoiceStatus").innerHTML = INVOICE_STATUS_OPTIONS
     .map(status => `<option value="${status}">${status}</option>`)

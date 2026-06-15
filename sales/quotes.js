@@ -200,6 +200,14 @@ function arrangeQuoteSubjectBlock() {
   secondRow.appendChild(discountLabel);
 }
 
+function moveQuoteOverallDiscountToSummary() {
+  const label = document.getElementById("overallDiscountAmount")?.closest("label");
+  const discountBox = document.getElementById("discountText")?.closest("div");
+  if (!label || !discountBox || label.closest(".summary")) return;
+  label.classList.add("summary-input-box");
+  discountBox.insertAdjacentElement("afterend", label);
+}
+
 function markQuoteRequiredLabels() {
   const requiredIds = [
     "customerName",
@@ -459,6 +467,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!requireSalesAuth()) return;
   removeUnusedQuoteFields();
   arrangeQuoteSubjectBlock();
+  moveQuoteOverallDiscountToSummary();
   markQuoteRequiredLabels();
   document.getElementById("customerType").innerHTML = ARICO_CUSTOMER_TYPES.map(type => `<option value="${type}">${type}</option>`).join("");
   document.getElementById("quoteDate").value = today();
