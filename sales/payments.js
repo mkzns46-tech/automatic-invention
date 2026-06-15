@@ -275,6 +275,7 @@ function printPaymentInvoicePdf(id) {
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   bindPaymentListControls();
+  window.SalesArchive?.bindToggle?.(renderPaymentInvoiceList);
   clearPaymentForm();
   renderPaymentInvoiceList();
   const id = new URLSearchParams(location.search).get("id");
@@ -336,7 +337,7 @@ function getPaymentTargetInvoices() {
 function renderPaymentInvoiceList() {
   const body = document.getElementById("paymentInvoiceListBody");
   const completedBody = document.getElementById("paymentCompletedListBody");
-  const allInvoices = getPaymentTargetInvoices();
+  const allInvoices = getPaymentTargetInvoices().filter(invoice => window.SalesArchive?.shouldShow?.(invoice) ?? true);
   const invoices = allInvoices.filter(matchesPaymentInvoiceFilters);
   const activeInvoices = invoices.filter(invoice => {
     const status = normalizePaymentStatus(invoice.status);
@@ -366,6 +367,9 @@ function renderPaymentInvoiceRow(invoice) {
   const cancelButton = status === PAYMENT_STATUS_PAID
     ? `<button type="button" class="danger" onclick="cancelPayment('${invoice.id}')">&#20837;&#37329;&#21462;&#28040;</button>`
     : "";
+  const archiveButton = window.SalesArchive?.isArchived?.(invoice)
+    ? `<button type="button" class="secondary" onclick="archivePaymentInvoice('${invoice.id}', false)">再表示</button>`
+    : `<button type="button" class="secondary" onclick="archivePaymentInvoice('${invoice.id}', true)">非表示</button>`;
   return `<tr>
     <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo || "")} ${statusBadge(status)}</span></td>
     <td>${escapeHtml(invoice.invoiceDate || "")}</td>
@@ -375,8 +379,18 @@ function renderPaymentInvoiceRow(invoice) {
     <td>${money(total)}</td>
     <td>${statusBadge(status)}</td>
     <td>${escapeHtml(getSalesStaffDisplayName(invoice.staff || ""))}</td>
-    <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">&#36984;&#25246;</button><button type="button" class="secondary" onclick="printPaymentInvoicePdf('${invoice.id}')">PDF出力</button>${cancelButton}</td>
+    <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">&#36984;&#25246;</button><button type="button" class="secondary" onclick="printPaymentInvoicePdf('${invoice.id}')">PDF出力</button>${cancelButton}${archiveButton}</td>
   </tr>`;
+}
+
+function archivePaymentInvoice(id, archived = true) {
+  const invoices = readPaymentInvoices();
+  const invoice = invoices.find(row => row.id === id);
+  if (!invoice) return;
+  window.SalesArchive?.markArchived?.(invoice, archived);
+  writePaymentInvoices(invoices);
+  renderPaymentInvoiceList();
+  showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
 }
 
 function matchesPaymentInvoiceFilters(invoice) {

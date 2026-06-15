@@ -475,6 +475,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindProductAutoSearch();
   bindQuoteCustomerSearch();
   bindQuoteListControls();
+  window.SalesArchive?.bindToggle?.(renderQuoteList);
   bindTransactionTypeControls();
   await loadStaffOptions();
   renderQuoteList();
@@ -700,7 +701,7 @@ async function loadStaffOptions() {
 function renderQuoteList() {
   const body = document.getElementById("quoteListBody");
   const completedBody = document.getElementById("quoteCompletedListBody");
-  const allQuotes = readQuotes().sort(sortNewestFirst);
+  const allQuotes = readQuotes().filter(quote => window.SalesArchive?.shouldShow?.(quote) ?? true).sort(sortNewestFirst);
   const quotes = allQuotes.filter(matchesQuoteListFilters);
   const activeQuotes = quotes.filter(quote => normalizeQuoteStatus(quote.status) === QUOTE_STATUS_DRAFT);
   const completedQuotes = quotes.filter(quote => normalizeQuoteStatus(quote.status) !== QUOTE_STATUS_DRAFT);
@@ -716,6 +717,9 @@ function renderQuoteList() {
 
 function renderQuoteListRow(q) {
   const status = normalizeQuoteStatus(q.status);
+  const archiveButton = window.SalesArchive?.isArchived?.(q)
+    ? `<button type="button" class="secondary" onclick="archiveQuote('${q.id}', false)">再表示</button>`
+    : `<button type="button" class="secondary" onclick="archiveQuote('${q.id}', true)">非表示</button>`;
   const deleteButton = canDeleteQuote(q)
     ? `<button type="button" class="danger" onclick="deleteQuote('${q.id}')">&#21066;&#38500;</button>`
     : "";
@@ -735,6 +739,7 @@ function renderQuoteListRow(q) {
       <button type="button" class="secondary" onclick="editQuote('${q.id}')">${status === QUOTE_STATUS_INVOICE_ISSUED ? "詳細" : "&#32232;&#38598;"}</button>
       <button type="button" class="secondary" onclick="printQuoteById('${q.id}')">PDF&#20986;&#21147;</button>
       <button type="button" class="secondary" onclick="duplicateQuote('${q.id}')">&#35079;&#35069;</button>
+      ${archiveButton}
       ${convertButton}
       ${deleteButton}
     </td>
@@ -1442,6 +1447,16 @@ async function deleteQuote(id) {
   renderQuoteList();
   if (currentQuoteId === id) newQuote();
   showSalesPopup("削除完了", "見積書を削除しました", "ok");
+}
+
+function archiveQuote(id, archived = true) {
+  const quotes = readQuotes();
+  const quote = quotes.find(q => q.id === id);
+  if (!quote) return;
+  window.SalesArchive?.markArchived?.(quote, archived);
+  writeQuotes(quotes);
+  renderQuoteList();
+  showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
 }
 
 function outputCurrentQuotePdf() {

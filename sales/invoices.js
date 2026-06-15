@@ -1240,6 +1240,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("invoiceStatus").disabled = true;
   bindInvoiceTransactionTypeControls();
   bindInvoiceListControls();
+  window.SalesArchive?.bindToggle?.(renderInvoiceList);
   renderInvoiceList();
   const id = new URLSearchParams(location.search).get("id");
   if (id) editInvoice(id);
@@ -1328,7 +1329,7 @@ function setInvoiceListCollapsed(collapsed) {
 function renderInvoiceList() {
   const body = document.getElementById("invoiceListBody");
   const completedBody = document.getElementById("invoiceCompletedListBody");
-  const allInvoices = readInvoices().sort(sortNewestFirst);
+  const allInvoices = readInvoices().filter(invoice => window.SalesArchive?.shouldShow?.(invoice) ?? true).sort(sortNewestFirst);
   const invoices = allInvoices.filter(matchesInvoiceListFilters);
   const completedStatuses = new Set([INVOICE_STATUS_PAID, INVOICE_STATUS_NO_PAYMENT_REQUIRED, INVOICE_STATUS_CANCELLED]);
   const completedInvoices = invoices.filter(invoice => {
@@ -1358,6 +1359,9 @@ function renderInvoiceListRow(invoice) {
   const totals = calcInvoiceTotals(invoice);
   const status = normalizeInvoiceStatus(invoice.status);
   const customerView = getInvoiceCustomerView(invoice);
+  const archiveButton = window.SalesArchive?.isArchived?.(invoice)
+    ? `<button type="button" class="secondary" onclick="archiveInvoice('${invoice.id}', false)">再表示</button>`
+    : `<button type="button" class="secondary" onclick="archiveInvoice('${invoice.id}', true)">非表示</button>`;
   return `<tr>
     <td><input type="checkbox" class="invoice-pdf-check pdf-select-checkbox" value="${escapeHtml(invoice.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo)} ${statusBadge(status)}</span></td>
@@ -1371,6 +1375,7 @@ function renderInvoiceListRow(invoice) {
       <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">${status === INVOICE_STATUS_DRAFT ? "&#32232;&#38598;" : "&#35443;&#32048;"}</button>
       ${canOutputInvoicePdf(invoice) ? `<button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>` : `<button type="button" class="secondary" disabled title="請求書確定後にPDF出力できます">PDF&#20986;&#21147;</button>`}
       ${canRetryStockDeduction(invoice) ? `<button type="button" class="secondary" onclick="retryInvoiceStockDeduction('${invoice.id}')">売上登録再実行</button>` : ""}
+      ${archiveButton}
     </td>
   </tr>`;
 }
@@ -1945,6 +1950,16 @@ function printInvoiceById(id) {
     return;
   }
   printInvoicePdf(normalizeInvoiceForView(invoice));
+}
+
+function archiveInvoice(id, archived = true) {
+  const invoices = readInvoices();
+  const invoice = invoices.find(row => row.id === id);
+  if (!invoice) return;
+  window.SalesArchive?.markArchived?.(invoice, archived);
+  writeInvoices(invoices);
+  renderInvoiceList();
+  showSalesPopup(archived ? "????????" : "???????", "??????????????????????????", "ok");
 }
 
 function restoreInvoiceEditorAfterPdf() {

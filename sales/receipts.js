@@ -175,6 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   arrangeReceiptDetailLayout();
   bindReceiptControls();
+  window.SalesArchive?.bindToggle?.(renderReceiptLists);
   renderReceiptLists();
   const id = new URLSearchParams(location.search).get("id");
   if (id) selectReceipt(id);
@@ -265,8 +266,9 @@ function setReceiptListCollapsed(collapsed) {
 }
 
 function getPaidInvoiceTargets() {
-  const receipts = readReceipts();
+  const receipts = readReceipts().filter(receipt => window.SalesArchive?.shouldShow?.(receipt) ?? true);
   return readInvoices()
+    .filter(invoice => window.SalesArchive?.shouldShow?.(invoice) ?? true)
     .filter(invoice => ["入金済み", "入金不要"].includes(normalizeInvoiceStatus(invoice.status)))
     .filter(invoice => !receipts.some(receipt => receipt.sourceInvoiceNo === invoice.invoiceNo))
     .map(invoice => ({ type: "invoice", invoice }))
@@ -275,6 +277,7 @@ function getPaidInvoiceTargets() {
 
 function getReceiptRows() {
   return readReceipts()
+    .filter(receipt => window.SalesArchive?.shouldShow?.(receipt) ?? true)
     .map(receipt => ({ type: "receipt", receipt }))
     .filter(matchesReceiptTargetFilters);
 }
@@ -327,6 +330,9 @@ function renderReceiptTargetRow(row) {
     </tr>`;
   }
   const receipt = row.receipt;
+  const archiveButton = window.SalesArchive?.isArchived?.(receipt)
+    ? `<button type="button" class="secondary" onclick="archiveReceipt('${receipt.id}', false)">再表示</button>`
+    : `<button type="button" class="secondary" onclick="archiveReceipt('${receipt.id}', true)">非表示</button>`;
   return `<tr>
     <td><input type="checkbox" class="receipt-pdf-check pdf-select-checkbox" value="${escapeHtml(receipt.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(receipt.receiptNo || "")} ${statusBadge(receipt.status)}</span></td>
@@ -339,8 +345,19 @@ function renderReceiptTargetRow(row) {
     <td>
       <button type="button" class="secondary" onclick="selectReceipt('${receipt.id}')">&#35443;&#32048;</button>
       <button type="button" class="secondary" onclick="printReceiptById('${receipt.id}')">PDF&#20986;&#21147;</button>
+      ${archiveButton}
     </td>
   </tr>`;
+}
+
+function archiveReceipt(id, archived = true) {
+  const receipts = readReceipts();
+  const receipt = receipts.find(row => row.id === id);
+  if (!receipt) return;
+  window.SalesArchive?.markArchived?.(receipt, archived);
+  writeReceipts(receipts);
+  renderReceiptLists();
+  showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
 }
 
 function printSelectedReceipts() {

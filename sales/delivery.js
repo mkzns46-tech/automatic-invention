@@ -245,6 +245,7 @@ document.addEventListener("DOMContentLoaded", () => {
   arrangeDeliveryDetailLayout();
   arrangeDeliveryShippingLayout();
   bindDeliveryListControls();
+  window.SalesArchive?.bindToggle?.(renderDeliveryList);
   renderDeliveryList();
   const id = new URLSearchParams(location.search).get("id");
   if (id) selectDelivery(id);
@@ -330,7 +331,7 @@ function setDeliveryListCollapsed(collapsed) {
 }
 
 function renderDeliveryList() {
-  const allDeliveries = readDeliveries().sort(sortNewestFirst);
+  const allDeliveries = readDeliveries().filter(delivery => window.SalesArchive?.shouldShow?.(delivery) ?? true).sort(sortNewestFirst);
   const deliveries = allDeliveries.filter(matchesDeliveryFilters);
   const activeDeliveries = deliveries.filter(delivery => {
     const status = normalizeDeliveryStatus(delivery.status);
@@ -355,6 +356,9 @@ function renderDeliveryList() {
 function renderDeliveryRow(delivery) {
   const status = normalizeDeliveryStatus(delivery.status);
   const displayNumber = delivery.originNumber || delivery.masterNumber || delivery.quoteNumber || delivery.deliveryNo || "";
+  const archiveButton = window.SalesArchive?.isArchived?.(delivery)
+    ? `<button type="button" class="secondary" onclick="archiveDelivery('${delivery.id}', false)">再表示</button>`
+    : `<button type="button" class="secondary" onclick="archiveDelivery('${delivery.id}', true)">非表示</button>`;
   return `<tr>
     <td><input type="checkbox" class="delivery-pdf-check pdf-select-checkbox" value="${escapeHtml(delivery.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(displayNumber)} ${statusBadge(status)}</span></td>
@@ -368,8 +372,19 @@ function renderDeliveryRow(delivery) {
       <button type="button" class="secondary" onclick="selectDelivery('${delivery.id}')">詳細</button>
       <button type="button" class="secondary" onclick="printDeliveryById('${delivery.id}')">PDF出力</button>
       ${!isCompletedDeliveryStatus(status) && status !== DELIVERY_STATUS_CANCELLED ? `<button type="button" class="invoice-issue-button" onclick="quickShipDelivery('${delivery.id}')">発送済</button>` : ""}
+      ${archiveButton}
     </td>
   </tr>`;
+}
+
+function archiveDelivery(id, archived = true) {
+  const deliveries = readDeliveries();
+  const delivery = deliveries.find(row => row.id === id);
+  if (!delivery) return;
+  window.SalesArchive?.markArchived?.(delivery, archived);
+  writeDeliveries(deliveries);
+  renderDeliveryList();
+  showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
 }
 
 function printSelectedDeliveries() {
