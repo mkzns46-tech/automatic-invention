@@ -185,9 +185,13 @@ label:has(#receiptMethod),
 #retryStockDeductionBtn{display:none!important}
 .subject-date-row,
 .staff-transaction-row,
-.invoice-subject-date-row{align-items:end}
+.invoice-subject-date-row,
+.invoice-header-info-row{align-items:end}
 .required-mark{color:#b45309;font-weight:900}
-.row.two label:has(#overallDiscountAmount) input{min-height:88px}
+.row.two label:has(#overallDiscountAmount) input{min-height:48px}
 .row.two label:has(#quoteMemo) textarea,
-.row.two label:has(#invoiceMemo) textarea{min-height:88px}
+.row.two label:has(#invoiceMemo) textarea,
+label:has(#paymentMemo) textarea,
+label:has(#deliverySlipMemo) textarea,
+label:has(#receiptMemo) textarea{min-height:48px}
 .receipt-memo-row label{margin-top:10px}

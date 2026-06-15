@@ -105,6 +105,24 @@ function removeUnusedInvoiceFields() {
   });
 }
 
+function arrangeInvoiceHeaderRow() {
+  const invoiceNoLabel = document.getElementById("invoiceNo")?.closest("label");
+  const statusLabel = document.getElementById("invoiceStatus")?.closest("label");
+  const issuedAtLabel = document.getElementById("issuedAt")?.closest("label");
+  if (!invoiceNoLabel || !statusLabel || !issuedAtLabel) return;
+  const sourceRow = invoiceNoLabel.parentElement;
+  let row = document.getElementById("invoiceHeaderInfoRow");
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "invoiceHeaderInfoRow";
+    row.className = "row three invoice-header-info-row";
+    sourceRow.insertAdjacentElement("afterend", row);
+  }
+  row.appendChild(invoiceNoLabel);
+  row.appendChild(statusLabel);
+  row.appendChild(issuedAtLabel);
+}
+
 function arrangeInvoiceSubjectDateRow() {
   const subjectLabel = document.getElementById("invoiceSubject")?.closest("label");
   const dateLabel = document.getElementById("invoiceDate")?.closest("label");
@@ -1098,6 +1116,7 @@ function confirmSalesPopup(title, body, type = "warn") {
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   removeUnusedInvoiceFields();
+  arrangeInvoiceHeaderRow();
   arrangeInvoiceSubjectDateRow();
   markInvoiceRequiredLabels();
   document.getElementById("invoiceStatus").innerHTML = INVOICE_STATUS_OPTIONS
@@ -1644,11 +1663,10 @@ async function issueInvoice() {
   const totals = calcInvoiceTotals(invoice);
   const confirmedAt = new Date().toISOString();
   invoice.status = totals.total <= 0 ? "no_payment_required" : "waiting_payment";
-  const issuedAtInput = document.getElementById("issuedAt")?.value;
-  invoice.issuedAt = issuedAtInput || new Date().toISOString();
+  invoice.issuedAt = confirmedAt;
   invoice.confirmedAt = confirmedAt;
   invoice.invoiceConfirmedAt = confirmedAt;
-  invoice.updatedAt = new Date().toISOString();
+  invoice.updatedAt = confirmedAt;
   invoice = await applyInvoiceStockDeduction(invoice);
   ensureDeliveryForInvoice(invoice);
   markSourceQuoteIssued(invoice);
