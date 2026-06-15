@@ -29,6 +29,33 @@
 
   <div id="salesMessage" class="message">新スマレジの商品マスター・会員データを販売管理へ反映できます。</div>
 
+  <section class="card sales-pdf-assets-card">
+    <div class="section-title">
+      <div>
+        <h2>PDF画像設定</h2>
+        <p class="section-note">見積書・請求書・納品書・領収書PDFで使用するロゴ画像と印鑑画像を登録します。</p>
+      </div>
+      <div class="badge muted">PDF</div>
+    </div>
+    <div class="row two">
+      <label>ロゴ画像<input id="pdfLogoInput" type="file" accept="image/*"></label>
+      <label>印鑑画像<input id="pdfStampInput" type="file" accept="image/*"></label>
+    </div>
+    <div class="pdf-asset-preview-row">
+      <div class="pdf-asset-preview-box">
+        <span>ロゴ</span>
+        <img id="pdfLogoPreview" alt="PDFロゴプレビュー">
+      </div>
+      <div class="pdf-asset-preview-box">
+        <span>印鑑</span>
+        <img id="pdfStampPreview" alt="PDF印鑑プレビュー">
+      </div>
+    </div>
+    <div class="sales-actions">
+      <button type="button" class="secondary" onclick="clearPdfAssetSettings();">画像設定をクリア</button>
+    </div>
+  </section>
+
   <section class="card sales-smaregi-card">
     <div class="section-title">
       <div>

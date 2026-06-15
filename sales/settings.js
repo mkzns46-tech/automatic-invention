@@ -49,6 +49,53 @@ function settingsCustomerStorage() {
   };
 }
 
+const PDF_LOGO_KEY = "arico_sales_pdf_logo";
+const PDF_STAMP_KEY = "arico_sales_pdf_stamp";
+
+function bindPdfAssetSettings() {
+  bindPdfAssetInput("pdfLogoInput", "pdfLogoPreview", PDF_LOGO_KEY);
+  bindPdfAssetInput("pdfStampInput", "pdfStampPreview", PDF_STAMP_KEY);
+  updatePdfAssetPreview("pdfLogoPreview", PDF_LOGO_KEY);
+  updatePdfAssetPreview("pdfStampPreview", PDF_STAMP_KEY);
+}
+
+function bindPdfAssetInput(inputId, previewId, storageKey) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.addEventListener("change", () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        localStorage.setItem(storageKey, String(reader.result || ""));
+        updatePdfAssetPreview(previewId, storageKey);
+        showSalesMessage("PDF画像設定を保存しました。", "ok");
+        showSalesPopup("保存完了", "PDF画像設定を保存しました。", "ok");
+      } catch (error) {
+        showSalesPopup("保存失敗", error?.message || "PDF画像設定を保存できませんでした。", "err");
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function updatePdfAssetPreview(previewId, storageKey) {
+  const preview = document.getElementById(previewId);
+  if (!preview) return;
+  const value = localStorage.getItem(storageKey) || "";
+  preview.src = value;
+  preview.hidden = !value;
+}
+
+function clearPdfAssetSettings() {
+  localStorage.removeItem(PDF_LOGO_KEY);
+  localStorage.removeItem(PDF_STAMP_KEY);
+  updatePdfAssetPreview("pdfLogoPreview", PDF_LOGO_KEY);
+  updatePdfAssetPreview("pdfStampPreview", PDF_STAMP_KEY);
+  showSalesPopup("クリア完了", "PDF画像設定をクリアしました。", "ok");
+}
+
 async function importSettingsSmaregiCustomers() {
   const button = document.getElementById("customerSmaregiImportBtn");
   const resultBox = document.getElementById("customerImportResult");
@@ -111,4 +158,5 @@ async function importSettingsSmaregiCustomers() {
 
 document.addEventListener("DOMContentLoaded", () => {
   if (typeof requireSalesAuth === "function" && !requireSalesAuth()) return;
+  bindPdfAssetSettings();
 });

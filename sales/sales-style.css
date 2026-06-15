@@ -40,6 +40,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 .login-card{max-width:680px;margin:54px auto;border-top:6px solid var(--main);padding:24px}.login-topbar{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px}.login-topbar h1{margin:3px 0 0;color:var(--main-dark);font-size:28px}.login-topbar .brand{color:var(--main)}.login-actions{min-width:220px}.login-actions .pill{width:100%;min-height:40px}.hidden{display:none!important}
 .sales-smaregi-card .settings-action-cell{padding-top:22px}.sales-smaregi-card .settings-action-cell button{width:100%}
 .settings-import-panel{display:flex;align-items:center;gap:12px}.settings-import-panel button{min-width:260px}
+.pdf-asset-preview-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}.pdf-asset-preview-box{min-height:130px;border:1px solid #dcebe1;border-radius:14px;background:#f8fcf9;padding:12px;display:grid;gap:8px;align-items:center}.pdf-asset-preview-box span{color:var(--main-dark);font-weight:900}.pdf-asset-preview-box img{max-width:100%;max-height:120px;object-fit:contain;justify-self:start}
 .section-heading-row{justify-content:space-between}
 .product-search-row{display:flex;align-items:flex-end;gap:12px;margin-bottom:12px}
 .product-search-row label{flex:1;margin-bottom:0}

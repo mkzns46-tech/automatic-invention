@@ -7,8 +7,10 @@
     tel: "052-990-4188",
     representative: "尹恵善"
   };
-  const LOGO_SRC = "assets/arico-logo.png";
-  const STAMP_SRC = "assets/arico-stamp.png";
+  const LOGO_FALLBACK_SRC = "assets/arico-logo.png";
+  const STAMP_FALLBACK_SRC = "assets/arico-stamp.png";
+  const LOGO_STORAGE_KEYS = ["arico_sales_pdf_logo", "aricoSalesPdfLogo", "salesPdfLogo"];
+  const STAMP_STORAGE_KEYS = ["arico_sales_pdf_stamp", "aricoSalesPdfStamp", "salesPdfStamp"];
 
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -43,6 +45,16 @@
     const m = String(date.getMonth() + 1).padStart(2, "0");
     const d = String(date.getDate()).padStart(2, "0");
     return `${y}/${m}/${d}`;
+  }
+
+  function readStoredImage(keys, fallback) {
+    try {
+      for (const key of keys) {
+        const value = localStorage.getItem(key);
+        if (value) return value;
+      }
+    } catch (_) {}
+    return fallback;
   }
 
   function isRefund(type) {
@@ -152,7 +164,6 @@
     if (type === "quote") {
       return [
         ["件名", doc.subject || ""],
-        ["納期", doc.deliveryDate || ""],
         ["支払条件", doc.paymentTerms || "先払い"],
         ["見積期限", formatDate(doc.validUntil || "")]
       ];
@@ -160,18 +171,12 @@
     if (type === "invoice") {
       return [
         ["件名", doc.subject || ""],
-        ["請求日", formatDate(doc.invoiceDate || "")],
-        ["支払期限", formatDate(doc.dueDate || "")],
-        ["発行日", issueDate(type, doc)]
+        ["支払期限", formatDate(doc.dueDate || "")]
       ];
     }
     if (type === "delivery") {
-      const shippingDate = doc.shipmentDate || doc.handoverDate || doc.carryOutDate || "";
       return [
-        ["件名", doc.subject || ""],
-        ["納品日", documentDate(type, doc)],
-        ["発送方法", doc.shippingMethod || ""],
-        ["発送日", formatDate(shippingDate)]
+        ["件名", doc.subject || ""]
       ];
     }
     return [
@@ -192,8 +197,10 @@
   }
 
   function companyBlock(staff) {
+    const logoSrc = readStoredImage(LOGO_STORAGE_KEYS, LOGO_FALLBACK_SRC);
+    const stampSrc = readStoredImage(STAMP_STORAGE_KEYS, STAMP_FALLBACK_SRC);
     return `
-      <img class="company-logo-img" src="${LOGO_SRC}" alt="ARICO ARCHERY GROUP">
+      <img class="company-logo-img" src="${escapeHtml(logoSrc)}" alt="ARICO ARCHERY GROUP">
       <div class="company-info">
         <div>${COMPANY.name}</div>
         <div>登録番号：${COMPANY.invoiceNo}</div>
@@ -203,7 +210,7 @@
         <div>代表者：${COMPANY.representative}</div>
         <div class="staff-line">担当：${escapeHtml(staff || "")}</div>
       </div>
-      <img class="stamp-img" src="${STAMP_SRC}" alt="印影">
+      <img class="stamp-img" src="${escapeHtml(stampSrc)}" alt="印影">
     `;
   }
 
@@ -239,9 +246,9 @@
   }
 
   function tablePageHtml({ type, doc, title, number, pageLines, pageIndex, pageTotal, totals, isLast, note }) {
-    const blankTarget = pageIndex === 0 ? 18 : 27;
+    const blankTarget = pageIndex === 0 ? Math.min(18, Math.max(5, pageLines.length + 2)) : Math.min(27, Math.max(5, pageLines.length + 2));
     return `<div class="sheet">
-      <div class="page-count top-count">${pageIndex + 1}/${pageTotal}</div>
+      ${pageTotal > 1 ? `<div class="page-count top-count">${pageIndex + 1}/${pageTotal}</div>` : ""}
       <h1>${escapeHtml(title)}</h1>
       ${pageIndex === 0 ? headerHtml({ type, doc, number, totals }) : `<div class="continuation">No：${escapeHtml(number)}　${escapeHtml(title)} 続き</div>`}
       <table class="items">
@@ -276,17 +283,18 @@
 
   function receiptHtml({ doc, title, number, totals, note }) {
     return `<div class="sheet receipt-sheet">
-      <div class="page-count top-count">1/1</div>
       <h1>${escapeHtml(title)}</h1>
       <div class="receipt-top">
         <div>
           <div class="customer-name">${escapeHtml(doc.customerName || "")} 様</div>
           <div class="receipt-amount ${totals.total < 0 ? "negative" : ""}">金額 ${money(totals.total)}</div>
           <div class="receipt-message">但し、${escapeHtml(note || "アーチェリー用品代として")}<br>上記正に領収いたしました。</div>
-          <table class="receipt-info">
-            <tr><th>領収書番号</th><td>${escapeHtml(number)}</td></tr>
-            <tr><th>入金日</th><td>${formatDate(doc.paymentDate || "")}</td></tr>
-            <tr><th>担当</th><td>${escapeHtml(doc.staff || "")}</td></tr>
+          <div class="revenue-stamp-box">収入印紙</div>
+          <table class="receipt-breakdown">
+            <tr><th>内訳</th><th>金額</th></tr>
+            <tr><td>税抜金額</td><td>${numberOnly(Math.abs(totals.total) - totals.tax)} 円</td></tr>
+            <tr><td>消費税額等</td><td>${numberOnly(totals.tax)} 円</td></tr>
+            <tr><td>合計</td><td>${numberOnly(totals.total)} 円</td></tr>
           </table>
         </div>
         <div class="company">
@@ -303,7 +311,7 @@
       @page{size:A4;margin:10mm 14mm}
       *{box-sizing:border-box}
       body{margin:0;color:#111;font-family:"Yu Gothic","YuGothic","Meiryo",system-ui,sans-serif;font-size:12.5px;line-height:1.28}
-      .sheet{position:relative;min-height:277mm;padding:2mm 2mm 8mm;page-break-after:always}
+      .sheet{position:relative;min-height:auto;padding:2mm 2mm 8mm;page-break-after:always}
       .sheet:last-child{page-break-after:auto}
       h1{text-align:center;font-size:23px;letter-spacing:.08em;margin:6px 0 10px;font-weight:700}
       .page-count{font-size:13px;font-weight:700;color:#111}
@@ -349,9 +357,11 @@
       .receipt-top{display:grid;grid-template-columns:1.1fr .9fr;gap:28px;margin-top:24px}
       .receipt-amount{font-size:28px;font-weight:900;border-bottom:3px double #111;padding:14px 0;margin:24px 0 18px}
       .receipt-message{font-size:16px;line-height:1.8;margin:16px 0 28px}
-      .receipt-info{width:100%;border-collapse:collapse}
-      .receipt-info th{width:130px;background:#2f744f;color:#fff;border:1px solid #2f744f;padding:8px}
-      .receipt-info td{border:1px solid #ddd;padding:8px}
+      .revenue-stamp-box{width:110px;height:86px;border:1px solid #999;display:flex;align-items:center;justify-content:center;margin:18px 0;color:#555}
+      .receipt-breakdown{width:360px;border-collapse:collapse;margin-top:12px}
+      .receipt-breakdown th{background:#2f744f;color:#fff;border:1px solid #2f744f;padding:8px}
+      .receipt-breakdown td{border:1px solid #ddd;padding:8px}
+      .receipt-breakdown td:last-child{text-align:right}
       @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
     </style>`;
   }
