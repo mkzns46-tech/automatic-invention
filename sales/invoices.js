@@ -1336,7 +1336,7 @@ function fillInvoiceForm(invoice) {
     resolvedEmail: customerView.email
   });
   currentInvoiceId = invoice.id || null;
-  currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || []));
+  currentInvoiceLines = JSON.parse(JSON.stringify(getInvoiceRawLines(invoice)));
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
   document.getElementById("invoiceStatus").value = invoice.issuedAt ? normalizeInvoiceStatus(invoice.status) : INVOICE_STATUS_DRAFT;
   setFieldValue("stockDeductionStatus", smaregiSaleDisplay(invoice));
