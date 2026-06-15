@@ -167,6 +167,69 @@ function removeUnusedQuoteFields() {
   });
 }
 
+function arrangeQuoteSubjectBlock() {
+  const subjectLabel = document.getElementById("quoteSubject")?.closest("label");
+  const dateLabel = document.getElementById("quoteDate")?.closest("label");
+  const validLabel = document.getElementById("validUntil")?.closest("label");
+  const staffLabel = document.getElementById("quoteStaff")?.closest("label");
+  const transactionLabel = document.getElementById("transactionType")?.closest("label");
+  const discountLabel = document.getElementById("discountTemplate")?.closest("label");
+  if (!subjectLabel || !dateLabel || !validLabel || !staffLabel || !transactionLabel || !discountLabel) return;
+
+  const sourceRow = subjectLabel.parentElement;
+  let firstRow = document.getElementById("quoteSubjectDateRow");
+  if (!firstRow) {
+    firstRow = document.createElement("div");
+    firstRow.id = "quoteSubjectDateRow";
+    firstRow.className = "row three subject-date-row";
+    sourceRow.insertAdjacentElement("afterend", firstRow);
+  }
+  firstRow.appendChild(subjectLabel);
+  firstRow.appendChild(dateLabel);
+  firstRow.appendChild(validLabel);
+
+  let secondRow = document.getElementById("quoteStaffTransactionRow");
+  if (!secondRow) {
+    secondRow = document.createElement("div");
+    secondRow.id = "quoteStaffTransactionRow";
+    secondRow.className = "row three staff-transaction-row";
+    firstRow.insertAdjacentElement("afterend", secondRow);
+  }
+  secondRow.appendChild(staffLabel);
+  secondRow.appendChild(transactionLabel);
+  secondRow.appendChild(discountLabel);
+}
+
+function markQuoteRequiredLabels() {
+  const requiredIds = [
+    "customerName",
+    "quoteOrganizationName",
+    "customerType",
+    "customerAddress",
+    "customerPhone",
+    "customerEmail",
+    "quoteSubject",
+    "quoteDate",
+    "validUntil",
+    "quoteStaff",
+    "transactionType",
+    "discountTemplate",
+    "overallDiscountAmount"
+  ];
+  requiredIds.forEach(id => applyRequiredLabel(document.getElementById(id)?.closest("label")));
+}
+
+function applyRequiredLabel(label) {
+  if (!label || label.querySelector(":scope > .required-mark")) return;
+  label.classList.add("required-label");
+  const marker = document.createElement("span");
+  marker.className = "required-mark";
+  marker.textContent = " *";
+  const textNode = Array.from(label.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+  if (textNode) textNode.after(marker);
+  else label.prepend(marker);
+}
+
 function getCurrentTransactionType() {
   return document.getElementById("transactionType")?.value || "通常販売";
 }
@@ -396,6 +459,8 @@ async function refreshQuoteLineStocks() {
 document.addEventListener("DOMContentLoaded", async () => {
   if (!requireSalesAuth()) return;
   removeUnusedQuoteFields();
+  arrangeQuoteSubjectBlock();
+  markQuoteRequiredLabels();
   document.getElementById("customerType").innerHTML = ARICO_CUSTOMER_TYPES.map(type => `<option value="${type}">${type}</option>`).join("");
   document.getElementById("quoteDate").value = today();
   document.getElementById("validUntil").value = datePlusDays(today(), 14);
@@ -982,7 +1047,17 @@ function renderLines() {
       <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateLine(${index}, 'memo', this.value)" ${disabled}></label>
       <button type="button" class="danger" onclick="removeLine(${index})" ${disabled}>削除</button>
     </div>`).join("") : '<div class="message">見積商品を追加してください。</div>';
+  markLineRequiredLabels(area);
   recalcTotals();
+}
+
+function markLineRequiredLabels(area) {
+  area.querySelectorAll("label").forEach(label => {
+    const control = label.querySelector("input,select");
+    const handler = control?.getAttribute("onchange") || "";
+    if (handler.includes("'memo'")) return;
+    if (control || label.querySelector(".line-amount")) applyRequiredLabel(label);
+  });
 }
 
 function updateLine(index, key, value) {

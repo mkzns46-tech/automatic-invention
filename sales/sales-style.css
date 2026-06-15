@@ -178,4 +178,7 @@ input:focus,select:focus,textarea:focus{outline:3px solid var(--main-light);bord
 label:has(#sourceQuoteNo),
 label:has(#originalSlipNumber),
 label:has(#reasonMemo){display:none!important}
+.subject-date-row,
+.staff-transaction-row,
 .invoice-subject-date-row{align-items:end}
+.required-mark{color:#b45309;font-weight:900}

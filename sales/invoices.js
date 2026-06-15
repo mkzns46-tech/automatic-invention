@@ -109,6 +109,8 @@ function arrangeInvoiceSubjectDateRow() {
   const subjectLabel = document.getElementById("invoiceSubject")?.closest("label");
   const dateLabel = document.getElementById("invoiceDate")?.closest("label");
   const dueLabel = document.getElementById("dueDate")?.closest("label");
+  const staffLabel = document.getElementById("invoiceStaff")?.closest("label");
+  const transactionLabel = document.getElementById("transactionType")?.closest("label");
   const sourceRow = subjectLabel?.parentElement;
   if (!sourceRow || !subjectLabel || !dateLabel || !dueLabel) return;
   let row = document.getElementById("invoiceSubjectDateRow");
@@ -121,6 +123,49 @@ function arrangeInvoiceSubjectDateRow() {
   row.appendChild(subjectLabel);
   row.appendChild(dateLabel);
   row.appendChild(dueLabel);
+
+  if (!staffLabel || !transactionLabel) return;
+  let secondRow = document.getElementById("invoiceStaffTransactionRow");
+  if (!secondRow) {
+    secondRow = document.createElement("div");
+    secondRow.id = "invoiceStaffTransactionRow";
+    secondRow.className = "row three staff-transaction-row";
+    row.insertAdjacentElement("afterend", secondRow);
+  }
+  secondRow.appendChild(staffLabel);
+  secondRow.appendChild(transactionLabel);
+}
+
+function markInvoiceRequiredLabels() {
+  const requiredIds = [
+    "invoiceNo",
+    "invoiceStatus",
+    "issuedAt",
+    "customerName",
+    "invoiceOrganizationName",
+    "customerType",
+    "customerAddress",
+    "customerPhone",
+    "customerEmail",
+    "invoiceSubject",
+    "invoiceDate",
+    "dueDate",
+    "invoiceStaff",
+    "transactionType",
+    "overallDiscountAmount"
+  ];
+  requiredIds.forEach(id => applyRequiredLabel(document.getElementById(id)?.closest("label")));
+}
+
+function applyRequiredLabel(label) {
+  if (!label || label.querySelector(":scope > .required-mark")) return;
+  label.classList.add("required-label");
+  const marker = document.createElement("span");
+  marker.className = "required-mark";
+  marker.textContent = " *";
+  const textNode = Array.from(label.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+  if (textNode) textNode.after(marker);
+  else label.prepend(marker);
 }
 
 function escapeHtml(value) {
@@ -1055,6 +1100,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   removeUnusedInvoiceFields();
   arrangeInvoiceSubjectDateRow();
+  markInvoiceRequiredLabels();
   document.getElementById("invoiceStatus").innerHTML = INVOICE_STATUS_OPTIONS
     .map(status => `<option value="${status}">${status}</option>`)
     .join("");
@@ -1336,7 +1382,17 @@ function renderInvoiceLines() {
       <button type="button" class="danger" onclick="removeInvoiceLine(${index})" ${disabled}>削除</button>
     </div>`;
   }).join("") : '<div class="message">請求商品がありません。</div>';
+  markInvoiceLineRequiredLabels(area);
   recalcTotals();
+}
+
+function markInvoiceLineRequiredLabels(area) {
+  area.querySelectorAll("label").forEach(label => {
+    const control = label.querySelector("input,select");
+    const handler = control?.getAttribute("onchange") || "";
+    if (handler.includes("'memo'")) return;
+    if (control || label.querySelector(".line-amount")) applyRequiredLabel(label);
+  });
 }
 
 function updateInvoiceLine(index, key, value) {
