@@ -145,6 +145,13 @@ function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, number));
 }
 
+function defaultTradeSubject(dateValue = new Date()) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue || Date.now());
+  const safe = Number.isNaN(date.getTime()) ? new Date() : date;
+  const pad = value => String(value).padStart(2, "0");
+  return `${safe.getFullYear()}年${pad(safe.getMonth() + 1)}月${pad(safe.getDate())}日取引分`;
+}
+
 function getCurrentTransactionType() {
   return document.getElementById("transactionType")?.value || "通常販売";
 }
@@ -845,6 +852,7 @@ function newQuote(shouldScroll = false) {
   document.getElementById("discountTemplate").value = "none";
   document.getElementById("quoteDate").value = today();
   document.getElementById("validUntil").value = today();
+  setFieldValue("quoteSubject", defaultTradeSubject());
   document.getElementById("productSearchResults").innerHTML = "";
   ["salesCustomerId", "salesCustomerCode", "salesSmaregiCustomerId", "salesSmaregiCustomerCode", "quoteCustomerSearchInput"].forEach(id => {
     const el = document.getElementById(id);
@@ -1072,7 +1080,7 @@ function collectQuote() {
     address: document.getElementById("customerAddress").value.trim(),
     phone: document.getElementById("customerPhone").value.trim(),
     email: document.getElementById("customerEmail").value.trim(),
-    subject: document.getElementById("quoteSubject").value.trim(),
+    subject: document.getElementById("quoteSubject").value.trim() || defaultTradeSubject(document.getElementById("quoteDate").value || new Date()),
     quoteDate: document.getElementById("quoteDate").value,
     validUntil: document.getElementById("validUntil").value,
     staff: document.getElementById("quoteStaff").value,
@@ -1177,14 +1185,14 @@ async function saveQuote() {
     showSalesPopup("\u4fdd\u5b58\u3067\u304d\u307e\u305b\u3093", "\u9867\u5ba2\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044", "warn");
     return;
   }
+  if (!document.getElementById("quoteStaff")?.value) {
+    showSalesMessage("担当者を入力してください", "err");
+    showSalesPopup("保存できません", "担当者を入力してください", "warn");
+    return;
+  }
   if (!currentLines.length) {
     showSalesMessage("\u898b\u7a4d\u5546\u54c1\u3092\u8ffd\u52a0\u3057\u3066\u304f\u3060\u3055\u3044\u3002", "err");
     return;
-  }
-  try {
-    await refreshQuoteLineStocks();
-  } catch (_) {
-    showSalesMessage("\u6700\u65b0\u5728\u5eab\u306e\u518d\u78ba\u8a8d\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002\u898b\u7a4d\u306f\u4fdd\u5b58\u3067\u304d\u307e\u3059\u304c\u3001\u73fe\u5728\u5eab\u8868\u793a\u3092\u78ba\u8a8d\u3057\u3066\u304f\u3060\u3055\u3044\u3002", "warn");
   }
   const quote = collectQuote();
   console.log("save quote customer fields", pickCustomerFields(quote));
@@ -1228,7 +1236,7 @@ async function fillQuoteForm(quote) {
   document.getElementById("customerAddress").value = quote.address || "";
   document.getElementById("customerPhone").value = quote.phone || "";
   document.getElementById("customerEmail").value = quote.email || "";
-  document.getElementById("quoteSubject").value = quote.subject || "";
+  document.getElementById("quoteSubject").value = quote.subject || defaultTradeSubject(quote.quoteDate || quote.createdAt);
   document.getElementById("quoteDate").value = quote.quoteDate || today();
   document.getElementById("validUntil").value = quote.validUntil || today();
   document.getElementById("quoteStaff").value = quote.staff || "";

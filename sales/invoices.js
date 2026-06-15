@@ -83,6 +83,13 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function defaultTradeSubject(dateValue = new Date()) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue || Date.now());
+  const safe = Number.isNaN(date.getTime()) ? new Date() : date;
+  const pad = value => String(value).padStart(2, "0");
+  return `${safe.getFullYear()}年${pad(safe.getMonth() + 1)}月${pad(safe.getDate())}日取引分`;
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
     "&": "&amp;",
@@ -434,39 +441,6 @@ async function refreshInvoiceLineStocks() {
     }))
     .filter(target => target.barcode || target.productId);
   const unique = new Map(targets.map(target => [`${target.barcode}|${target.productId}`, target]));
-  try {
-    const response = await fetch("/api/smaregi-stock-refresh", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lines: currentInvoiceLines })
-    });
-    const text = await response.text().catch(() => "");
-    let data = null;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch (_) {
-      throw new Error(`Smaregi stock refresh JSON parse failed HTTP ${response.status}: ${text.slice(0, 500)}`);
-    }
-    if (!response.ok || data?.ok === false) {
-      throw new Error(data?.error || `Smaregi stock refresh API error HTTP ${response.status}: ${text.slice(0, 500)}`);
-    }
-    const stockRows = Array.isArray(data?.results) ? data.results.filter(row => row.ok) : [];
-    stockRows.forEach(row => {
-      const rowBarcode = String(row.barcode || row.productCode || "").trim();
-      const rowProductId = String(row.productId || row.smaregiProductId || row.smaregi_product_id || "").trim();
-      currentInvoiceLines.forEach(line => {
-        const sameBarcode = rowBarcode && String(line.barcode || line.productCode || "") === rowBarcode;
-        const sameProduct = rowProductId && String(line.smaregiProductId || line.smaregi_product_id || line.productId || "") === rowProductId;
-        if (sameBarcode || sameProduct) line.stock = Number(row.base_stock ?? row.stock ?? 0);
-      });
-    });
-    if (stockRows.length) {
-      renderInvoiceLines();
-      return;
-    }
-  } catch (error) {
-    console.warn("Smaregi invoice stock refresh failed; falling back to products.base_stock", error);
-  }
   for (const target of unique.values()) {
     let rows = [];
     if (target.barcode) {
@@ -901,7 +875,7 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     address: customerView.address,
     phone: customerView.phone,
     email: customerView.email,
-    subject: invoice.subject || "",
+    subject: invoice.subject || defaultTradeSubject(today()),
     staff: invoice.staff || "",
     transactionType: normalizeTransactionType(invoice.transactionType),
     originalSlipNumber: invoice.originalSlipNumber || "",
@@ -1236,6 +1210,7 @@ function clearInvoiceEditor() {
   document.getElementById("issuedAt").value = "";
   document.getElementById("invoiceDate").value = today();
   document.getElementById("dueDate").value = today();
+  setFieldValue("invoiceSubject", defaultTradeSubject());
   renderInvoiceLines();
   updateInvoiceLockState({ status: INVOICE_STATUS_DRAFT });
 }
@@ -1270,7 +1245,7 @@ function fillInvoiceForm(invoice) {
   document.getElementById("customerAddress").value = customerView.address;
   document.getElementById("customerPhone").value = customerView.phone;
   document.getElementById("customerEmail").value = customerView.email;
-  document.getElementById("invoiceSubject").value = invoice.subject || "";
+  document.getElementById("invoiceSubject").value = invoice.subject || defaultTradeSubject(invoice.invoiceDate || invoice.createdAt);
   document.getElementById("invoiceDate").value = invoice.invoiceDate || today();
   document.getElementById("dueDate").value = invoice.dueDate || today();
   setFieldValue("transactionType", normalizeTransactionType(invoice.transactionType));
@@ -1520,7 +1495,7 @@ function collectInvoice() {
     address: customerView.address,
     phone: customerView.phone,
     email: customerView.email,
-    subject: document.getElementById("invoiceSubject").value.trim(),
+    subject: document.getElementById("invoiceSubject").value.trim() || defaultTradeSubject(document.getElementById("invoiceDate").value || new Date()),
     invoiceDate: document.getElementById("invoiceDate").value,
     dueDate: document.getElementById("dueDate").value,
     staff: document.getElementById("invoiceStaff").value.trim(),

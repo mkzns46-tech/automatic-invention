@@ -199,51 +199,6 @@ function deliveryStockClass(line) {
   return Number(line.stock ?? line.base_stock ?? 0) > 0 ? "" : "line-stock warn";
 }
 
-async function refreshDeliveryLineStocks(deliveryId) {
-  const deliveries = readDeliveries();
-  const index = deliveries.findIndex(row => row.id === deliveryId);
-  if (index < 0) return null;
-  const delivery = deliveries[index];
-  const lines = Array.isArray(delivery.lines) ? delivery.lines : [];
-  const response = await fetch("/api/smaregi-stock-refresh", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lines })
-  });
-  const text = await response.text().catch(() => "");
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch (_) {
-    throw new Error(`Smaregi delivery stock refresh JSON parse failed HTTP ${response.status}: ${text.slice(0, 500)}`);
-  }
-  if (!response.ok || data?.ok === false) {
-    throw new Error(data?.error || `Smaregi delivery stock refresh API error HTTP ${response.status}: ${text.slice(0, 500)}`);
-  }
-  const stockRows = Array.isArray(data?.results) ? data.results.filter(row => row.ok) : [];
-  if (!stockRows.length) return delivery;
-  const nextLines = lines.map(line => {
-    const next = { ...line };
-    const lineBarcode = String(next.barcode || next.productCode || "").trim();
-    const lineProductId = String(next.smaregiProductId || next.smaregi_product_id || next.productId || "").trim();
-    const row = stockRows.find(stockRow => {
-      const rowBarcode = String(stockRow.barcode || stockRow.productCode || "").trim();
-      const rowProductId = String(stockRow.productId || stockRow.smaregiProductId || stockRow.smaregi_product_id || "").trim();
-      return (rowBarcode && rowBarcode === lineBarcode) || (rowProductId && rowProductId === lineProductId);
-    });
-    if (row) next.stock = Number(row.base_stock ?? row.stock ?? 0);
-    return next;
-  });
-  const nextDelivery = { ...delivery, lines: nextLines, items: nextLines, updatedAt: new Date().toISOString() };
-  deliveries[index] = nextDelivery;
-  writeDeliveries(deliveries);
-  if (currentDeliveryId === deliveryId) {
-    renderDeliveryLines(nextDelivery);
-    updateTotals(nextDelivery);
-  }
-  return nextDelivery;
-}
-
 function showSalesMessage(text, type) {
   const box = document.getElementById("salesMessage");
   if (!box) return;
@@ -466,9 +421,6 @@ function selectDelivery(id) {
   updateShippingMethodUi();
   renderDeliveryLines(delivery);
   updateTotals(delivery);
-  refreshDeliveryLineStocks(delivery.id).catch(error => {
-    console.warn("delivery stock refresh failed", error);
-  });
   history.replaceState(null, "", `delivery.html?id=${encodeURIComponent(delivery.id)}`);
   showSalesMessage(`${delivery.deliveryNo || ""} を表示しています。`, "ok");
 }
