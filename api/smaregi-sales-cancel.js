@@ -160,7 +160,7 @@ function normalizeLines(lines) {
     }
     return {
       transactionDetailId: String(index + 1),
-      transactionDetailDivision: "2",
+      transactionDetailDivision: "1",
       productId,
       productCode: isManualProduct ? MANUAL_PRODUCT_CODE : firstString(line.productCode, line.barcode),
       productName: isManualProduct ? MANUAL_PRODUCT_NAME : firstString(line.name, line.productName, line.itemName),
@@ -179,34 +179,6 @@ function normalizeLines(lines) {
   }).filter(line => Number(line.aricoQuantity) > 0 && (line.productId || line.productCode || line.productName));
 }
 
-function appendOverallDiscountLine(lines, discountValue, reason) {
-  const discount = Math.max(0, toInt(discountValue));
-  if (!discount) return lines;
-  return [
-    ...lines,
-    {
-      transactionDetailId: String(lines.length + 1),
-      transactionDetailDivision: "2",
-      productId: MANUAL_PRODUCT_ID,
-      productCode: MANUAL_PRODUCT_CODE,
-      productName: "全体値引き",
-      taxDivision: "0",
-      price: String(-discount),
-      salesPrice: String(-discount),
-      unitDiscountPrice: "0",
-      unitDiscountRate: "0",
-      quantity: "1",
-      salesDivision: "0",
-      productDivision: "0",
-      memo: firstString(reason, "販売管理 全体値引き取消"),
-      aricoAmount: -discount,
-      aricoQuantity: 0,
-      aricoManualProduct: true,
-      aricoOverallDiscountLine: true
-    }
-  ];
-}
-
 function findTransactionId(body) {
   if (!body || typeof body !== "object") return "";
   return String(body.transactionHeadId || body.transaction_head_id || body.id || "").trim();
@@ -215,13 +187,13 @@ function findTransactionId(body) {
 function buildCancelPayload(context, body) {
   const sourceTransactionId = firstString(body.smaregiTransactionId, body.transactionHeadId, body.transactionId);
   if (!sourceTransactionId) throw new Error("Smaregi transaction ID is required for sale cancel.");
-  const lines = appendOverallDiscountLine(normalizeLines(body.lines), body.overallDiscountAmount, body.overallDiscountReason);
+  const lines = normalizeLines(body.lines);
   if (!lines.length) throw new Error("No Smaregi cancel lines were provided.");
   const total = lines.reduce((sum, line) => sum + toInt(line.aricoAmount), 0);
   const taxInclude = toInt(body.tax ?? Math.floor(total * 10 / 110));
   const terminalTranIdSource = `${body.invoiceNo || ""}${Date.now()}`.replace(/\D/g, "");
   return {
-    transactionHeadDivision: "1",
+    transactionHeadDivision: "2",
     cancelDivision: "0",
     subtotal: String(total),
     total: String(total),
