@@ -4,7 +4,7 @@ const QUOTES_KEY = "arico_sales_quotes_v1";
 const INVOICES_KEY = "arico_sales_invoices_v1";
 const PRODUCT_UNITS_KEY = "arico_sales_product_units_v1";
 const UNIT_OPTIONS = ["個", "本", "袋", "箱", "セット", "台", "式", "ダース", "枚", "組"];
-const DEALER_BRANDS = ["FIVICS", "MK", "JET6", "WJ"];
+const DEALER_BRANDS = ["FIVICS", "MK", "JET6", "WJ", "ARICO"];
 const QUOTE_STATUS_DRAFT = "下書き";
 const QUOTE_STATUS_INVOICED = "請求書変換済み";
 const QUOTE_STATUS_INVOICE_ISSUED = "請求書発行済";
@@ -1001,8 +1001,17 @@ function removeLine(index) {
 }
 
 function isDealerBrand(name) {
-  const text = String(name || "").toUpperCase();
+  const text = normalizeDealerBrandText(name);
   return DEALER_BRANDS.some(brand => text.includes(brand));
+}
+
+function normalizeDealerBrandText(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/ＡＲＩＣＯ/g, "ARICO")
+    .replace(/ＡＲＣＨＥＲＹ/g, "ARCHERY")
+    .replace(/\s+/g, "")
+    .replace(/[　]/g, "");
 }
 
 function applyDiscountTemplate(render = true) {
