@@ -179,6 +179,34 @@ function normalizeLines(lines) {
   }).filter(line => Number(line.aricoQuantity) > 0 && (line.productId || line.productCode || line.productName));
 }
 
+function appendOverallDiscountLine(lines, discountValue, reason) {
+  const discount = Math.max(0, toInt(discountValue));
+  if (!discount) return lines;
+  return [
+    ...lines,
+    {
+      transactionDetailId: String(lines.length + 1),
+      transactionDetailDivision: "2",
+      productId: MANUAL_PRODUCT_ID,
+      productCode: MANUAL_PRODUCT_CODE,
+      productName: "全体値引き",
+      taxDivision: "0",
+      price: String(-discount),
+      salesPrice: String(-discount),
+      unitDiscountPrice: "0",
+      unitDiscountRate: "0",
+      quantity: "1",
+      salesDivision: "0",
+      productDivision: "0",
+      memo: firstString(reason, "販売管理 全体値引き取消"),
+      aricoAmount: -discount,
+      aricoQuantity: 0,
+      aricoManualProduct: true,
+      aricoOverallDiscountLine: true
+    }
+  ];
+}
+
 function findTransactionId(body) {
   if (!body || typeof body !== "object") return "";
   return String(body.transactionHeadId || body.transaction_head_id || body.id || "").trim();
@@ -187,7 +215,7 @@ function findTransactionId(body) {
 function buildCancelPayload(context, body) {
   const sourceTransactionId = firstString(body.smaregiTransactionId, body.transactionHeadId, body.transactionId);
   if (!sourceTransactionId) throw new Error("Smaregi transaction ID is required for sale cancel.");
-  const lines = normalizeLines(body.lines);
+  const lines = appendOverallDiscountLine(normalizeLines(body.lines), body.overallDiscountAmount, body.overallDiscountReason);
   if (!lines.length) throw new Error("No Smaregi cancel lines were provided.");
   const total = lines.reduce((sum, line) => sum + toInt(line.aricoAmount), 0);
   const taxInclude = toInt(body.tax ?? Math.floor(total * 10 / 110));
@@ -211,7 +239,7 @@ function buildCancelPayload(context, body) {
     ].join(" ").slice(0, 100),
     sellDivision: "0",
     taxRate: "10",
-    details: lines.map(({ aricoAmount, aricoQuantity, ...line }) => line),
+    details: lines.map(({ aricoAmount, aricoQuantity, aricoManualProduct, aricoOverallDiscountLine, ...line }) => line),
     payments: [
       {
         paymentMethodId: context.paymentMethodId,

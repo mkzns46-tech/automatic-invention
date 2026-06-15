@@ -669,6 +669,8 @@ async function cancelSmaregiSale(invoice, reason) {
       cancelReason: reason || "",
       cancelledAt: invoice.cancelledAt || invoice.canceledAt || new Date().toISOString(),
       tax: totals.tax,
+      overallDiscountAmount: totals.overallDiscountAmount || 0,
+      overallDiscountReason: invoice.overallDiscountReason || "",
       lines
     })
   });

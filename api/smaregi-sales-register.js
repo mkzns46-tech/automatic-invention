@@ -245,26 +245,37 @@ function normalizeLines(lines) {
   }).filter(line => Number(line.aricoQuantity) > 0 && (line.productId || line.productCode || line.productName));
 }
 
-function applyOverallDiscountToLines(lines, discountValue) {
-  let remaining = Math.max(0, toInt(discountValue));
-  if (!remaining) return lines;
-  return lines.map(line => {
-    if (remaining <= 0) return line;
-    const currentAmount = Math.max(0, toInt(line.aricoAmount));
-    if (!currentAmount) return line;
-    const applied = Math.min(currentAmount, remaining);
-    remaining -= applied;
-    return {
-      ...line,
-      unitDiscountPrice: String(toInt(line.unitDiscountPrice) + applied),
-      aricoAmount: Math.max(0, currentAmount - applied),
-      memo: firstString(line.memo, "全体値引き按分")
-    };
-  });
+function appendOverallDiscountLine(lines, discountValue, reason) {
+  const discount = Math.max(0, toInt(discountValue));
+  if (!discount) return lines;
+  return [
+    ...lines,
+    {
+      transactionDetailId: String(lines.length + 1),
+      transactionDetailDivision: "1",
+      productId: MANUAL_PRODUCT_ID,
+      productCode: MANUAL_PRODUCT_CODE,
+      productName: "全体値引き",
+      taxDivision: "0",
+      price: String(-discount),
+      salesPrice: String(-discount),
+      unitDiscountPrice: "0",
+      unitDiscountRate: "0",
+      quantity: "1",
+      salesDivision: "0",
+      productDivision: "0",
+      memo: firstString(reason, "販売管理 全体値引き"),
+      aricoAmount: -discount,
+      aricoQuantity: 0,
+      aricoManualProduct: true,
+      aricoOverallDiscountLine: true
+    }
+  ];
 }
 
 function buildTransactionPayload(context, body, paymentMethod) {
-  const lines = applyOverallDiscountToLines(normalizeLines(body.lines), body.overallDiscountAmount);
+  const productLines = normalizeLines(body.lines);
+  const lines = appendOverallDiscountLine(productLines, body.overallDiscountAmount, body.overallDiscountReason);
   if (!lines.length) throw new Error("No Smaregi sale lines were provided.");
   const subtotal = lines.reduce((sum, line) => sum + toInt(line.aricoAmount), 0);
   const total = subtotal;
@@ -292,7 +303,7 @@ function buildTransactionPayload(context, body, paymentMethod) {
     memo,
     sellDivision: "0",
     taxRate: "10",
-    details: lines.map(({ aricoAmount, aricoQuantity, aricoManualProduct, ...line }) => line),
+    details: lines.map(({ aricoAmount, aricoQuantity, aricoManualProduct, aricoOverallDiscountLine, ...line }) => line),
     payments: [
       {
         paymentMethodId: paymentMethod.paymentMethodId,
