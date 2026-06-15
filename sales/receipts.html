@@ -1,9 +1,9 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARICO ARCHERY 鬆伜庶譖ｸ</title>
+<title>ARICO ARCHERY 領収書</title>
 <link rel="stylesheet" href="sales-style.css?v=20260615-pdf-button-ui">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
@@ -17,51 +17,51 @@
   <header class="sales-header">
     <div>
       <div class="brand">ARICO ARCHERY</div>
-      <h1>鬆伜庶譖ｸ</h1>
-      <p class="lead">蜈･驥第ｸ医∩隲区ｱよ嶌縺九ｉ鬆伜庶譖ｸ繧剃ｽ懈・繝ｻ遒ｺ隱阪・PDF蜃ｺ蜉帙＠縺ｾ縺吶・/p>
+      <h1>領収書</h1>
+      <p class="lead">入金済み請求書から領収書を作成・確認・PDF出力します。</p>
     </div>
     <div class="sales-actions">
-      <a class="pill" href="payments.html">蜈･驥醍｢ｺ隱・/a>
-      <button type="button" class="secondary" onclick="logoutSales();">繝ｭ繧ｰ繧､繝ｳ逕ｻ髱｢縺ｫ謌ｻ繧・/button>
+      <a class="pill" href="payments.html">入金確認</a>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
     </div>
   </header>
 
-  <div id="salesMessage" class="message">蜈･驥第ｸ医∩隲区ｱよ嶌縺九ｉ鬆伜庶譖ｸ繧剃ｽ懈・縺ｧ縺阪∪縺吶・/div>
+  <div id="salesMessage" class="message">入金済み請求書から領収書を作成できます。</div>
 
   <section class="card collapsible-list-card" id="receiptListCard">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleReceiptList();">鬆伜庶譖ｸ荳隕ｧ <span class="status-badge muted" id="receiptListCount">0莉ｶ</span></h2>
+      <h2 class="list-heading" onclick="toggleReceiptList();">領収書一覧 <span class="status-badge muted" id="receiptListCount">0件</span></h2>
       <div class="list-header-actions">
-        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedReceipts();">PDF荳諡ｬ蜊ｰ蛻ｷ</button>
-        <button type="button" class="secondary list-toggle-button" id="receiptListToggle" onclick="toggleReceiptList();">荳隕ｧ繧帝幕縺・/button>
+        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedReceipts();">PDF一括印刷</button>
+        <button type="button" class="secondary list-toggle-button" id="receiptListToggle" onclick="toggleReceiptList();">一覧を開く</button>
       </div>
     </div>
     <div class="list-panel" id="receiptListPanel" hidden>
       <div class="list-filter-row">
-        <label>荳隕ｧ讀懃ｴ｢<input id="receiptSearch" placeholder="鬘ｧ螳｢蜷阪・諡・ｽ楢・・莉ｶ蜷阪・鬆伜庶譖ｸ逡ｪ蜿ｷ繝ｻ繧ｹ繝・・繧ｿ繧ｹ"></label>
-        <label>繧ｹ繝・・繧ｿ繧ｹ
+        <label>一覧検索<input id="receiptSearch" placeholder="顧客名・担当者・件名・領収書番号・ステータス"></label>
+        <label>ステータス
           <select id="receiptStatusFilter">
-            <option value="">蜈ｨ縺ｦ</option>
-            <option value="譛ｪ逋ｺ陦・>譛ｪ逋ｺ陦・/option>
-            <option value="逋ｺ陦梧ｸ医∩">逋ｺ陦梧ｸ医∩</option>
-            <option value="繧ｭ繝｣繝ｳ繧ｻ繝ｫ">繧ｭ繝｣繝ｳ繧ｻ繝ｫ</option>
+            <option value="">全て</option>
+            <option value="未発行">未発行</option>
+            <option value="発行済み">発行済み</option>
+            <option value="キャンセル">キャンセル</option>
           </select>
         </label>
-        <label>髢句ｧ区律<input id="receiptDateFromFilter" type="date"></label>
-        <label>邨ゆｺ・律<input id="receiptDateToFilter" type="date"></label>
+        <label>開始日<input id="receiptDateFromFilter" type="date"></label>
+        <label>終了日<input id="receiptDateToFilter" type="date"></label>
       </div>
-      <div class="list-subheading">譛ｪ逋ｺ陦後・鬆伜庶譖ｸ</div>
+      <div class="list-subheading">未発行の領収書</div>
       <div class="table-wrap list-scroll">
         <table>
-          <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('receipt-pdf-check', this.checked, this)"></th><th>莨晉･ｨ逡ｪ蜿ｷ</th><th>譌･莉・/th><th>蝗｣菴灘錐</th><th>鬘ｧ螳｢蜷・/th><th>蜷郁ｨ磯≡鬘・/th><th>繧ｹ繝・・繧ｿ繧ｹ</th><th>諡・ｽ楢・/th><th>謫堺ｽ・/th></tr></thead>
+          <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('receipt-pdf-check', this.checked, this)"></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
           <tbody id="receiptTargetListBody"></tbody>
         </table>
       </div>
       <div class="list-panel completed-list-panel" id="issuedReceiptListPanel">
-        <div class="list-subheading">逋ｺ陦梧ｸ医∩繝ｻ繧ｭ繝｣繝ｳ繧ｻ繝ｫ貂医∩</div>
+        <div class="list-subheading">発行済み・キャンセル済み</div>
         <div class="table-wrap list-scroll">
           <table>
-            <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('receipt-pdf-check', this.checked, this)"></th><th>莨晉･ｨ逡ｪ蜿ｷ</th><th>譌･莉・/th><th>蝗｣菴灘錐</th><th>鬘ｧ螳｢蜷・/th><th>蜷郁ｨ磯≡鬘・/th><th>繧ｹ繝・・繧ｿ繧ｹ</th><th>諡・ｽ楢・/th><th>謫堺ｽ・/th></tr></thead>
+            <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('receipt-pdf-check', this.checked, this)"></th><th>伝票番号</th><th>日付</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
             <tbody id="issuedReceiptListBody"></tbody>
           </table>
         </div>
@@ -70,37 +70,36 @@
   </section>
 
   <section class="card" id="receiptDetailCard">
-    <h2>鬆伜庶諠・ｱ</h2>
+    <h2>領収情報</h2>
     <div class="row">
-      <label>鬆伜庶譖ｸ逡ｪ蜿ｷ<input id="receiptNo" readonly></label>
-      <label>蜈・ｫ区ｱよ嶌逡ｪ蜿ｷ<input id="sourceInvoiceNo" readonly></label>
-      <label>繧ｹ繝・・繧ｿ繧ｹ<input id="receiptStatus" readonly></label>
-      <label>蜈･驥第婿豕・input id="receiptMethod" readonly></label>
+      <label>領収書番号<input id="receiptNo" readonly></label>
+      <label>元請求書番号<input id="sourceInvoiceNo" readonly></label>
+      <label>ステータス<input id="receiptStatus" readonly></label>
+      <label>入金方法<input id="receiptMethod" readonly></label>
     </div>
     <div class="row three">
-      <label>鬘ｧ螳｢蜷・input id="receiptCustomerName"></label>
-      <label>莉ｶ蜷・input id="receiptSubject"></label>
-      <label>諡・ｽ楢・input id="receiptStaff"></label>
+      <label>顧客名<input id="receiptCustomerName"></label>
+      <label>件名<input id="receiptSubject"></label>
+      <label>担当者<input id="receiptStaff"></label>
     </div>
     <div class="row three">
-      <label>蜈･驥第律<input id="receiptPaymentDate" type="date"></label>
-      <label>蜈･驥鷹｡・input id="receiptAmount" type="number" min="0" step="1"></label>
+      <label>入金日<input id="receiptPaymentDate" type="date"></label>
+      <label>入金額<input id="receiptAmount" type="number" min="0" step="1"></label>
     </div>
-    <label>菴・＠譖ｸ縺・textarea id="receiptMemo"></textarea></label>
+    <label>但し書き<textarea id="receiptMemo"></textarea></label>
     <div class="sales-actions" style="margin-top:14px">
-      <button type="button" class="primary" onclick="saveReceipt();">菫晏ｭ・/button>
-      <button type="button" class="secondary" onclick="issueReceipt();">逋ｺ陦梧ｸ医∩縺ｫ縺吶ｋ</button>
-      <button type="button" class="secondary" onclick="outputCurrentReceiptPdf();">PDF蜃ｺ蜉・/button>
+      <button type="button" class="primary" onclick="saveReceipt();">保存</button>
+      <button type="button" class="secondary" onclick="issueReceipt();">発行済みにする</button>
+      <button type="button" class="secondary" onclick="outputCurrentReceiptPdf();">PDF出力</button>
     </div>
   </section>
 </main>
 <div id="salesPopup" class="app-popup" style="display:none;">
   <div class="app-popup-card">
-    <div id="salesPopupTitle" class="app-popup-title">螳御ｺ・/div>
+    <div id="salesPopupTitle" class="app-popup-title">完了</div>
     <div id="salesPopupBody" class="app-popup-body"></div>
     <button type="button" id="salesPopupClose">OK</button>
   </div>
 </div>
 </body>
 </html>
-

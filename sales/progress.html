@@ -1,9 +1,9 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARICO ARCHERY 雋ｩ螢ｲ騾ｲ謐礼｢ｺ隱・/title>
+<title>ARICO ARCHERY 販売進捗確認</title>
 <link rel="stylesheet" href="sales-style.css?v=20260615-pdf-button-ui">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
@@ -16,39 +16,39 @@
   <header class="sales-header">
     <div>
       <div class="brand">ARICO ARCHERY</div>
-      <h1>雋ｩ螢ｲ騾ｲ謐礼｢ｺ隱・/h1>
-      <p class="lead">莨晉･ｨ縺斐→縺ｮ騾ｲ謐励∬ｫ区ｱゅ∵悴蜈･驥代∵悴邏榊刀繧堤｢ｺ隱阪＠縺ｾ縺吶・/p>
+      <h1>販売進捗確認</h1>
+      <p class="lead">伝票ごとの進捗、請求、未入金、未納品を確認します。</p>
     </div>
     <div class="sales-actions">
-      <a class="pill" href="index.html">繝医ャ繝・/a>
-      <button type="button" class="secondary" onclick="logoutSales();">繝ｭ繧ｰ繧､繝ｳ逕ｻ髱｢縺ｫ謌ｻ繧・/button>
+      <a class="pill" href="index.html">トップ</a>
+      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
     </div>
   </header>
 
-  <div id="salesMessage" class="message">雋ｩ螢ｲ騾ｲ謐励ｒ遒ｺ隱阪〒縺阪∪縺吶・/div>
+  <div id="salesMessage" class="message">販売進捗を確認できます。</div>
 
   <section class="card collapsible-list-card progress-section-card">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleProgressSection('ticket')">莨晉･ｨ荳隕ｧ <span class="status-badge muted" id="ticketProgressCount">0莉ｶ / 蜷郁ｨ・0蜀・/span></h2>
+      <h2 class="list-heading" onclick="toggleProgressSection('ticket')">伝票一覧 <span class="status-badge muted" id="ticketProgressCount">0件 / 合計 0円</span></h2>
       <div class="list-header-actions">
-        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedProgressTickets();">PDF荳諡ｬ蜊ｰ蛻ｷ</button>
-        <button type="button" class="secondary list-toggle-button" id="ticketProgressToggle" onclick="toggleProgressSection('ticket')">荳隕ｧ繧帝哩縺倥ｋ</button>
+        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedProgressTickets();">PDF一括印刷</button>
+        <button type="button" class="secondary list-toggle-button" id="ticketProgressToggle" onclick="toggleProgressSection('ticket')">一覧を閉じる</button>
       </div>
     </div>
     <div class="list-panel" id="ticketProgressPanel">
       <div class="progress-list-filter">
-        <label>莨晉･ｨ逡ｪ蜿ｷ<input id="ticketSlipFilter" placeholder="Q-000001 / INV-000001"></label>
-        <label>蝗｣菴灘錐<input id="ticketOrganizationFilter" placeholder="蝗｣菴灘錐"></label>
-        <label>鬘ｧ螳｢蜷・input id="ticketCustomerFilter" placeholder="鬘ｧ螳｢蜷・></label>
-        <label>諡・ｽ楢・input id="ticketStaffFilter" placeholder="諡・ｽ楢・></label>
-        <label>蜿門ｼ募玄蛻・select id="ticketTransactionFilter"></select></label>
-        <label>繧ｹ繝・・繧ｿ繧ｹ<select id="ticketStatusFilter"></select></label>
-        <label>髢句ｧ区律<input id="ticketDateFromFilter" type="date"></label>
-        <label>邨ゆｺ・律<input id="ticketDateToFilter" type="date"></label>
+        <label>伝票番号<input id="ticketSlipFilter" placeholder="Q-000001 / INV-000001"></label>
+        <label>団体名<input id="ticketOrganizationFilter" placeholder="団体名"></label>
+        <label>顧客名<input id="ticketCustomerFilter" placeholder="顧客名"></label>
+        <label>担当者<input id="ticketStaffFilter" placeholder="担当者"></label>
+        <label>取引区分<select id="ticketTransactionFilter"></select></label>
+        <label>ステータス<select id="ticketStatusFilter"></select></label>
+        <label>開始日<input id="ticketDateFromFilter" type="date"></label>
+        <label>終了日<input id="ticketDateToFilter" type="date"></label>
       </div>
       <div class="table-wrap list-scroll progress-scroll">
         <table class="progress-table">
-          <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('progress-ticket-pdf-check', this.checked, this)"></th><th>莨晉･ｨ逡ｪ蜿ｷ</th><th>蜿門ｼ募玄蛻・/th><th>蝗｣菴灘錐</th><th>鬘ｧ螳｢蜷・/th><th>隕狗ｩ・/th><th>隲区ｱ・/th><th>蜈･驥・/th><th>邏榊刀</th><th>蜷郁ｨ磯≡鬘・/th><th>諡・ｽ楢・/th><th>譛邨よ峩譁ｰ譌･</th><th>謫堺ｽ・/th></tr></thead>
+          <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('progress-ticket-pdf-check', this.checked, this)"></th><th>伝票番号</th><th>取引区分</th><th>団体名</th><th>顧客名</th><th>見積</th><th>請求</th><th>入金</th><th>納品</th><th>合計金額</th><th>担当者</th><th>最終更新日</th><th>操作</th></tr></thead>
           <tbody id="ticketProgressBody"></tbody>
         </table>
       </div>
@@ -57,23 +57,23 @@
 
   <section class="card collapsible-list-card progress-section-card">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleProgressSection('sales')">隲区ｱよ嶌荳隕ｧ <span class="status-badge muted" id="salesProgressCount">0莉ｶ / 蜷郁ｨ・0蜀・/span></h2>
-      <button type="button" class="secondary list-toggle-button" id="salesProgressToggle" onclick="toggleProgressSection('sales')">荳隕ｧ繧帝哩縺倥ｋ</button>
+      <h2 class="list-heading" onclick="toggleProgressSection('sales')">請求書一覧 <span class="status-badge muted" id="salesProgressCount">0件 / 合計 0円</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="salesProgressToggle" onclick="toggleProgressSection('sales')">一覧を閉じる</button>
     </div>
     <div class="list-panel" id="salesProgressPanel">
       <div class="progress-list-filter">
-        <label>莨晉･ｨ逡ｪ蜿ｷ<input id="salesSlipFilter" placeholder="莨晉･ｨ逡ｪ蜿ｷ"></label>
-        <label>蝗｣菴灘錐<input id="salesOrganizationFilter" placeholder="蝗｣菴灘錐"></label>
-        <label>鬘ｧ螳｢蜷・input id="salesCustomerFilter" placeholder="鬘ｧ螳｢蜷・></label>
-        <label>諡・ｽ楢・input id="salesStaffFilter" placeholder="諡・ｽ楢・></label>
-        <label>蜿門ｼ募玄蛻・select id="salesTransactionFilter"></select></label>
-        <label>繧ｹ繝・・繧ｿ繧ｹ<select id="salesStatusFilter"></select></label>
-        <label>髢句ｧ区律<input id="salesDateFromFilter" type="date"></label>
-        <label>邨ゆｺ・律<input id="salesDateToFilter" type="date"></label>
+        <label>伝票番号<input id="salesSlipFilter" placeholder="伝票番号"></label>
+        <label>団体名<input id="salesOrganizationFilter" placeholder="団体名"></label>
+        <label>顧客名<input id="salesCustomerFilter" placeholder="顧客名"></label>
+        <label>担当者<input id="salesStaffFilter" placeholder="担当者"></label>
+        <label>取引区分<select id="salesTransactionFilter"></select></label>
+        <label>ステータス<select id="salesStatusFilter"></select></label>
+        <label>開始日<input id="salesDateFromFilter" type="date"></label>
+        <label>終了日<input id="salesDateToFilter" type="date"></label>
       </div>
       <div class="table-wrap list-scroll progress-scroll">
         <table class="progress-sales-table">
-          <thead><tr><th>莨晉･ｨ逡ｪ蜿ｷ</th><th>隲区ｱよ律</th><th>蝗｣菴灘錐</th><th>鬘ｧ螳｢蜷・/th><th>蜷郁ｨ磯≡鬘・/th><th>繧ｹ繝・・繧ｿ繧ｹ</th><th>諡・ｽ楢・/th><th>謫堺ｽ・/th></tr></thead>
+          <thead><tr><th>伝票番号</th><th>請求日</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
           <tbody id="salesProgressBody"></tbody>
         </table>
       </div>
@@ -82,23 +82,23 @@
 
   <section class="card collapsible-list-card progress-section-card">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleProgressSection('unpaid')">譛ｪ蜈･驥台ｸ隕ｧ <span class="status-badge muted" id="unpaidProgressCount">0莉ｶ / 蜷郁ｨ・0蜀・/span></h2>
-      <button type="button" class="secondary list-toggle-button" id="unpaidProgressToggle" onclick="toggleProgressSection('unpaid')">荳隕ｧ繧帝哩縺倥ｋ</button>
+      <h2 class="list-heading" onclick="toggleProgressSection('unpaid')">未入金一覧 <span class="status-badge muted" id="unpaidProgressCount">0件 / 合計 0円</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="unpaidProgressToggle" onclick="toggleProgressSection('unpaid')">一覧を閉じる</button>
     </div>
     <div class="list-panel" id="unpaidProgressPanel">
       <div class="progress-list-filter">
-        <label>莨晉･ｨ逡ｪ蜿ｷ<input id="unpaidSlipFilter" placeholder="莨晉･ｨ逡ｪ蜿ｷ"></label>
-        <label>蝗｣菴灘錐<input id="unpaidOrganizationFilter" placeholder="蝗｣菴灘錐"></label>
-        <label>鬘ｧ螳｢蜷・input id="unpaidCustomerFilter" placeholder="鬘ｧ螳｢蜷・></label>
-        <label>諡・ｽ楢・input id="unpaidStaffFilter" placeholder="諡・ｽ楢・></label>
-        <label>蜿門ｼ募玄蛻・select id="unpaidTransactionFilter"></select></label>
-        <label>繧ｹ繝・・繧ｿ繧ｹ<select id="unpaidStatusFilter"></select></label>
-        <label>髢句ｧ区律<input id="unpaidDateFromFilter" type="date"></label>
-        <label>邨ゆｺ・律<input id="unpaidDateToFilter" type="date"></label>
+        <label>伝票番号<input id="unpaidSlipFilter" placeholder="伝票番号"></label>
+        <label>団体名<input id="unpaidOrganizationFilter" placeholder="団体名"></label>
+        <label>顧客名<input id="unpaidCustomerFilter" placeholder="顧客名"></label>
+        <label>担当者<input id="unpaidStaffFilter" placeholder="担当者"></label>
+        <label>取引区分<select id="unpaidTransactionFilter"></select></label>
+        <label>ステータス<select id="unpaidStatusFilter"></select></label>
+        <label>開始日<input id="unpaidDateFromFilter" type="date"></label>
+        <label>終了日<input id="unpaidDateToFilter" type="date"></label>
       </div>
       <div class="table-wrap list-scroll progress-scroll">
         <table class="progress-unpaid-table">
-          <thead><tr><th>莨晉･ｨ逡ｪ蜿ｷ</th><th>隲区ｱよ律</th><th>謾ｯ謇墓悄髯・/th><th>蝗｣菴灘錐</th><th>鬘ｧ螳｢蜷・/th><th>蜷郁ｨ磯≡鬘・/th><th>蜈･驥鷹｡・/th><th>譛ｪ蜈･驥鷹｡・/th><th>繧ｹ繝・・繧ｿ繧ｹ</th><th>諡・ｽ楢・/th><th>謫堺ｽ・/th></tr></thead>
+          <thead><tr><th>伝票番号</th><th>請求日</th><th>支払期限</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>入金額</th><th>未入金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
           <tbody id="unpaidProgressBody"></tbody>
         </table>
       </div>
@@ -107,23 +107,23 @@
 
   <section class="card collapsible-list-card progress-section-card">
     <div class="sales-actions section-heading-row">
-      <h2 class="list-heading" onclick="toggleProgressSection('delivery')">譛ｪ邏榊刀荳隕ｧ <span class="status-badge muted" id="undeliveredProgressCount">0莉ｶ / 蜷郁ｨ・0蜀・/span></h2>
-      <button type="button" class="secondary list-toggle-button" id="deliveryProgressToggle" onclick="toggleProgressSection('delivery')">荳隕ｧ繧帝哩縺倥ｋ</button>
+      <h2 class="list-heading" onclick="toggleProgressSection('delivery')">未納品一覧 <span class="status-badge muted" id="undeliveredProgressCount">0件 / 合計 0円</span></h2>
+      <button type="button" class="secondary list-toggle-button" id="deliveryProgressToggle" onclick="toggleProgressSection('delivery')">一覧を閉じる</button>
     </div>
     <div class="list-panel" id="deliveryProgressPanel">
       <div class="progress-list-filter">
-        <label>莨晉･ｨ逡ｪ蜿ｷ<input id="deliverySlipFilter" placeholder="莨晉･ｨ逡ｪ蜿ｷ"></label>
-        <label>蝗｣菴灘錐<input id="deliveryOrganizationFilter" placeholder="蝗｣菴灘錐"></label>
-        <label>鬘ｧ螳｢蜷・input id="deliveryCustomerFilter" placeholder="鬘ｧ螳｢蜷・></label>
-        <label>諡・ｽ楢・input id="deliveryStaffFilter" placeholder="諡・ｽ楢・></label>
-        <label>蜿門ｼ募玄蛻・select id="deliveryTransactionFilter"></select></label>
-        <label>繧ｹ繝・・繧ｿ繧ｹ<select id="deliveryStatusFilter"></select></label>
-        <label>髢句ｧ区律<input id="deliveryDateFromFilter" type="date"></label>
-        <label>邨ゆｺ・律<input id="deliveryDateToFilter" type="date"></label>
+        <label>伝票番号<input id="deliverySlipFilter" placeholder="伝票番号"></label>
+        <label>団体名<input id="deliveryOrganizationFilter" placeholder="団体名"></label>
+        <label>顧客名<input id="deliveryCustomerFilter" placeholder="顧客名"></label>
+        <label>担当者<input id="deliveryStaffFilter" placeholder="担当者"></label>
+        <label>取引区分<select id="deliveryTransactionFilter"></select></label>
+        <label>ステータス<select id="deliveryStatusFilter"></select></label>
+        <label>開始日<input id="deliveryDateFromFilter" type="date"></label>
+        <label>終了日<input id="deliveryDateToFilter" type="date"></label>
       </div>
       <div class="table-wrap list-scroll progress-scroll">
         <table class="progress-delivery-table">
-          <thead><tr><th>莨晉･ｨ逡ｪ蜿ｷ</th><th>邏榊刀譌･</th><th>蝗｣菴灘錐</th><th>鬘ｧ螳｢蜷・/th><th>蜷郁ｨ磯≡鬘・/th><th>邏榊刀繧ｹ繝・・繧ｿ繧ｹ</th><th>諡・ｽ楢・/th><th>謫堺ｽ・/th></tr></thead>
+          <thead><tr><th>伝票番号</th><th>納品日</th><th>団体名</th><th>顧客名</th><th>合計金額</th><th>納品ステータス</th><th>担当者</th><th>操作</th></tr></thead>
           <tbody id="undeliveredProgressBody"></tbody>
         </table>
       </div>
@@ -132,4 +132,3 @@
 </main>
 </body>
 </html>
-
