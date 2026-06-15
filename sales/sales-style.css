@@ -148,6 +148,22 @@ label:has(#smaregiMemberCode){display:none!important}
 .progress-unpaid-table{min-width:1360px}
 .progress-delivery-table,.progress-receipt-table{min-width:1060px}
 .sales-home-ticket-card{margin-top:16px}
+.sales-home-action-card{margin-top:16px}
+.sales-completed-toggle{display:flex;align-items:center;gap:8px;margin:0;color:var(--text);font-weight:700;white-space:nowrap}
+.sales-completed-toggle input{width:16px!important;height:16px!important;accent-color:var(--main-dark)}
+.sales-home-action-scroll{max-height:520px}
+.sales-home-action-table{min-width:1120px}
+.sales-home-action-table th:nth-child(1),.sales-home-action-table td:nth-child(1){width:100px}
+.sales-home-action-table th:nth-child(2),.sales-home-action-table td:nth-child(2){width:150px}
+.sales-home-action-table th:nth-child(3),.sales-home-action-table td:nth-child(3){width:180px}
+.sales-home-action-table th:nth-child(4),.sales-home-action-table td:nth-child(4){width:120px}
+.sales-home-action-table th:nth-child(5),.sales-home-action-table td:nth-child(5){width:120px}
+.sales-home-action-table th:nth-child(6),.sales-home-action-table td:nth-child(6){width:140px}
+.sales-home-action-table th:nth-child(7),.sales-home-action-table td:nth-child(7){width:150px}
+.sales-home-action-table th:nth-child(8),.sales-home-action-table td:nth-child(8){width:260px}
+.sales-home-action-buttons{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start}
+.sales-home-action-buttons button,.sales-home-action-buttons a{min-height:32px;padding:6px 9px;border-radius:9px;font-size:12px;text-decoration:none}
+.sales-home-action-buttons .primary-action{background:var(--main-dark);border-color:var(--main-dark);color:#fff}
 .sales-home-ticket-scroll{height:min(72vh,760px);max-height:min(72vh,760px)}
 .sales-home-ticket-table{min-width:1460px}
 .sales-home-ticket-table th:nth-child(1),.sales-home-ticket-table td:nth-child(1){width:150px}

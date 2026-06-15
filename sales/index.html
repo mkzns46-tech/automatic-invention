@@ -4,11 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 販売管理</title>
-<link rel="stylesheet" href="sales-style.css?v=20260615-home-menu-remove">
+<link rel="stylesheet" href="sales-style.css?v=20260616-home-action-list">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
-<script src="sales-home-progress.js?v=20260615-home-ticket-list" defer></script>
+<script src="staff-display.js?v=20260616-staff-display-map" defer></script>
+<script src="sales-archive.js?v=20260616-archive" defer></script>
+<script src="sales-pdf-format.js?v=20260615-unified-pdf" defer></script>
+<script src="sales-home-progress.js?v=20260616-home-action-list" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -16,15 +19,46 @@
     <div>
       <div class="brand">ARICO ARCHERY</div>
       <h1>販売管理</h1>
-      <p class="lead">見積・請求・入金確認などの販売業務を確認します。</p>
+      <p class="lead">見積、請求、入金確認、納品などの販売業務を確認します。</p>
     </div>
     <div class="sales-actions">
       <a class="pill" href="../portal/portal.html">システム入口に戻る</a>
-      <button type="button" class="secondary" onclick="logoutSales();">ログイン画面に戻る</button>
+      <button type="button" class="secondary" onclick="logoutSales();">ログアウト</button>
     </div>
   </header>
 
   <div id="salesMessage" class="message">販売管理トップです。左メニューから各機能へ移動できます。</div>
+
+  <section class="card sales-home-action-card">
+    <div class="section-title">
+      <div>
+        <h2>対応一覧 <span class="status-badge muted" id="homeActionCount">0件 / 合計 0円</span></h2>
+        <p class="section-note">今やるべき見積・請求・入金・納品だけを表示します。</p>
+      </div>
+      <label class="sales-completed-toggle">
+        <input type="checkbox" id="homeShowCompletedActions">
+        完了案件を表示
+      </label>
+    </div>
+
+    <div class="table-wrap sales-home-action-scroll">
+      <table class="sales-home-action-table">
+        <thead>
+          <tr>
+            <th>種別</th>
+            <th>伝票番号</th>
+            <th>顧客名</th>
+            <th>日付</th>
+            <th>金額</th>
+            <th>担当者</th>
+            <th>状態</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="homeActionBody"></tbody>
+      </table>
+    </div>
+  </section>
 
   <section class="card sales-home-ticket-card">
     <div class="section-title">
