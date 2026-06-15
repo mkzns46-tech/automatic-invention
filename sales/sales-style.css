@@ -120,6 +120,11 @@ label:has(#smaregiMemberCode){display:none!important}
 .settings-staff-table-wrap table{min-width:640px}
 .settings-staff-table-wrap th:first-child,.settings-staff-table-wrap td:first-child{width:42%}
 .staff-display-input{width:100%;min-height:38px;background:#fff}
+.settings-combined-grid{display:grid;grid-template-columns:repeat(2,minmax(240px,1fr));gap:14px}
+.settings-import-panel{border:1px solid var(--border);border-radius:8px;background:#fbfdfb;padding:16px;display:grid;gap:10px;align-content:start}
+.settings-import-panel h3{margin:0;color:var(--deep-green);font-size:1rem}
+.settings-import-panel button{justify-self:start}
+@media(max-width:720px){.settings-combined-grid{grid-template-columns:1fr}.settings-import-panel button{width:100%}}
 @media (max-width:640px){
   .pdf-bulk-list-row{grid-template-columns:1fr}
   .pdf-bulk-list-row button{width:100%}

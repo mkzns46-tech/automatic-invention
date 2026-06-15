@@ -1,5 +1,6 @@
 (function () {
   const STAFF_MAP_KEY = "arico_sales_staff_display_map_v1";
+  const STAFF_OVERRIDE_KEY = "arico_sales_staff_display_overrides_v1";
   const SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
   const SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 
@@ -35,6 +36,20 @@
     }
   }
 
+  function readOverrides() {
+    try {
+      return JSON.parse(localStorage.getItem(STAFF_OVERRIDE_KEY) || "{}");
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function writeOverrides(map) {
+    try {
+      localStorage.setItem(STAFF_OVERRIDE_KEY, JSON.stringify(map || {}));
+    } catch (_) {}
+  }
+
   function writeMap(map) {
     try {
       localStorage.setItem(STAFF_MAP_KEY, JSON.stringify(map || {}));
@@ -43,10 +58,11 @@
 
   function buildMap(rows) {
     const map = {};
+    const overrides = readOverrides();
     (rows || []).forEach(row => {
       const key = internalName(row);
       const shortKey = normalize(row?.name);
-      const label = displayName(row);
+      const label = overrides[key] || overrides[shortKey] || displayName(row);
       if (key && label) map[key] = label;
       if (shortKey && label) map[shortKey] = label;
     });
@@ -91,6 +107,35 @@
     return found ? found[0] : text;
   }
 
+  function getStaffDisplayOverride(row) {
+    const overrides = readOverrides();
+    const key = typeof row === "string" ? normalize(row) : internalName(row);
+    const shortKey = typeof row === "string" ? "" : normalize(row?.name);
+    if (key && Object.prototype.hasOwnProperty.call(overrides, key)) return overrides[key];
+    if (shortKey && Object.prototype.hasOwnProperty.call(overrides, shortKey)) return overrides[shortKey];
+    return undefined;
+  }
+
+  function saveStaffDisplayOverrides(rows, valuesByKey) {
+    const overrides = readOverrides();
+    (rows || []).forEach(row => {
+      const key = internalName(row);
+      const shortKey = normalize(row?.name);
+      if (!key) return;
+      const value = normalize(valuesByKey?.[key]);
+      if (value) {
+        overrides[key] = value;
+        if (shortKey) overrides[shortKey] = value;
+      } else {
+        delete overrides[key];
+        if (shortKey) delete overrides[shortKey];
+      }
+    });
+    writeOverrides(overrides);
+    buildMap(rows || []);
+    return overrides;
+  }
+
   function staffOptionValue(row) {
     return internalName(row);
   }
@@ -121,6 +166,8 @@
     staffOptionValue,
     staffOptionLabel,
     storageStaffName,
+    getStaffDisplayOverride,
+    saveStaffDisplayOverrides,
     buildMap,
     refreshSalesStaffDisplays
   };

@@ -64,6 +64,8 @@ const PDF_STAMP_KEY = "arico_sales_pdf_stamp";
 let staffDisplayRows = [];
 
 function staffDisplayValue(row) {
+  const localValue = window.SalesStaffDisplay?.getStaffDisplayOverride?.(row);
+  if (localValue !== undefined) return String(localValue || "").trim();
   return String(
     row?.sales_display_name ||
     row?.salesDisplayName ||
@@ -141,22 +143,46 @@ async function saveStaffDisplaySettings() {
     resultBox.className = "message";
   }
   try {
+    const valuesByKey = {};
+    inputs.forEach(input => {
+      const row = staffDisplayRows[Number(input.dataset.staffIndex)];
+      if (!row) return;
+      const key = staffInternalName(row);
+      if (key) valuesByKey[key] = String(input.value || "").trim();
+    });
+    window.SalesStaffDisplay?.saveStaffDisplayOverrides?.(staffDisplayRows, valuesByKey);
+
+    let remoteFailed = false;
+    let remoteError = "";
     for (const input of inputs) {
       const row = staffDisplayRows[Number(input.dataset.staffIndex)];
       if (!row) continue;
       const value = String(input.value || "").trim();
-      await salesFetch(staffRowPatchPath(row), {
-        method: "PATCH",
-        body: JSON.stringify({ sales_display_name: value || null })
-      });
+      try {
+        await salesFetch(staffRowPatchPath(row), {
+          method: "PATCH",
+          body: JSON.stringify({ sales_display_name: value || null })
+        });
+      } catch (error) {
+        remoteFailed = true;
+        remoteError = error?.message || String(error);
+      }
       row.sales_display_name = value;
     }
     window.SalesStaffDisplay?.buildMap?.(staffDisplayRows);
     if (resultBox) {
-      resultBox.textContent = "担当者表示名を保存しました。";
-      resultBox.className = "message ok";
+      resultBox.textContent = remoteFailed
+        ? "アプリ内に保存しました。Supabase の sales_display_name 列が未設定の場合はDB保存のみ保留されます。"
+        : "担当者表示名を保存しました。";
+      resultBox.className = remoteFailed ? "message warn" : "message ok";
     }
-    showSalesPopup("保存完了", "販売管理用の担当者表示名を保存しました。", "ok");
+    showSalesPopup(
+      remoteFailed ? "アプリ内保存完了" : "保存完了",
+      remoteFailed
+        ? "販売管理用の担当者表示名をアプリ内に保存しました。ページを移動しても再表示されます。"
+        : "販売管理用の担当者表示名を保存しました。",
+      remoteFailed ? "warn" : "ok"
+    );
   } catch (error) {
     const raw = error?.message || String(error);
     const message = raw.includes("sales_display_name")

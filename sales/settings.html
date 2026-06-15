@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 販売管理 設定</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-settings-imports">
+<link rel="stylesheet" href="sales-style.css?v=20260616-settings-layout">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-storage.js"></script>
 <script src="customers-storage.js?v=20260614-settings-imports"></script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="staff-display.js?v=20260616-staff-fullname"></script>
-<script src="settings.js?v=20260614-settings-imports" defer></script>
+<script src="settings.js?v=20260616-settings-display" defer></script>
 <script src="sales-smaregi.js?v=20260614-settings-imports" defer></script>
 </head>
 <body>
@@ -82,32 +82,29 @@
     </div>
   </section>
 
-  <section class="card sales-smaregi-card">
+    <section class="card sales-smaregi-card sales-settings-combined-card">
     <div class="section-title">
       <div>
-        <h2>スマレジ商品マスター取込</h2>
-        <p class="section-note">新スマレジから商品名・バーコード・スマレジ商品ID・販売価格を取得します。価格取得に失敗しても商品マスター取込は継続します。</p>
+        <h2>??????</h2>
+        <p class="section-note">???????????????????????????????</p>
       </div>
-      <div class="badge muted">新スマレジ</div>
+      <div class="badge muted">?????</div>
     </div>
-    <div class="settings-import-panel">
-      <button type="button" id="salesSmaregiImportBtn" class="primary" onclick="importSalesSmaregiProducts();">スマレジ商品マスター取込</button>
+    <div class="settings-combined-grid">
+      <div class="settings-import-panel">
+        <h3>????????</h3>
+        <p class="section-note">????????????????ID????????????</p>
+        <button type="button" id="salesSmaregiImportBtn" class="primary" onclick="importSalesSmaregiProducts();">????????</button>
+      </div>
+      <div class="settings-import-panel">
+        <h3>???????</h3>
+        <p class="section-note">?????????????????????????????</p>
+        <button type="button" id="customerSmaregiImportBtn" class="primary" onclick="importSettingsSmaregiCustomers();">???????</button>
+        <div id="customerImportResult" class="message">??????</div>
+      </div>
     </div>
   </section>
 
-  <section class="card sales-smaregi-card">
-    <div class="section-title">
-      <div>
-        <h2>スマレジ会員データ取込</h2>
-        <p class="section-note">新スマレジの会員データを販売管理の顧客マスターへ取り込みます。店舗選択は不要です。</p>
-      </div>
-      <div class="badge muted">新スマレジ</div>
-    </div>
-    <div class="settings-import-panel">
-      <button type="button" id="customerSmaregiImportBtn" class="primary" onclick="importSettingsSmaregiCustomers();">スマレジ会員データ取込</button>
-      <div id="customerImportResult" class="message">未取込です。</div>
-    </div>
-  </section>
 </main>
 <div id="salesPopup" class="app-popup" style="display:none;">
   <div class="app-popup-card">
