@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 見積書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-refund-memo-scroll">
+<link rel="stylesheet" href="sales-style.css?v=20260615-pdf-button-ui">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
@@ -32,9 +32,10 @@
   <section class="card collapsible-list-card" id="quoteListCard">
     <div class="sales-actions section-heading-row">
       <h2 class="list-heading" onclick="toggleQuoteList();">見積書一覧 <span class="status-badge muted" id="quoteListCount">0件</span></h2>
-      <button type="button" class="secondary list-toggle-button" id="quoteListToggle" onclick="toggleQuoteList();">一覧を閉じる</button>
-      <button type="button" class="secondary" onclick="printSelectedQuotes();">選択PDF印刷</button>
-      <button type="button" class="primary" onclick="newQuote(true);">新規見積</button>
+      <div class="list-header-actions">
+        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedQuotes();">PDF一括印刷</button>
+        <button type="button" class="secondary list-toggle-button" id="quoteListToggle" onclick="toggleQuoteList();">一覧を閉じる</button>
+      </div>
     </div>
     <div class="list-panel" id="quoteListPanel">
       <div class="list-filter-row">
@@ -70,7 +71,10 @@
   </section>
 
   <section class="card" id="quoteEditorCard">
-    <h2>顧客情報</h2>
+    <div class="sales-actions section-heading-row">
+      <h2>顧客情報</h2>
+      <button type="button" class="secondary" onclick="newQuote(true);">入力をクリア</button>
+    </div>
     <input id="salesCustomerId" type="hidden">
     <input id="salesCustomerCode" type="hidden">
     <input id="salesSmaregiCustomerId" type="hidden">

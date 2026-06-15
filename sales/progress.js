@@ -464,7 +464,7 @@ function renderTicketRows(allRows) {
   const rows = allRows.filter(row => !isCancelledRow(row)).filter(row => matchesFilters(row, "ticket")).sort(sortNewest);
   renderRows("ticketProgressBody", "ticketProgressCount", rows, row => `
     <tr>
-      <td><input type="checkbox" class="progress-ticket-pdf-check" value="${escapeHtml(row.origin)}"></td>
+      <td><input type="checkbox" class="progress-ticket-pdf-check pdf-select-checkbox" value="${escapeHtml(row.origin)}"></td>
       <td>${escapeHtml(row.origin)}</td>
       <td>${escapeHtml(row.transactionType)}</td>
       <td>${escapeHtml(row.organizationName)}</td>

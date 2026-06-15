@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 納品書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260615-shipping-status">
+<link rel="stylesheet" href="sales-style.css?v=20260615-pdf-button-ui">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
@@ -31,8 +31,10 @@
   <section class="card collapsible-list-card" id="deliveryListCard">
     <div class="sales-actions section-heading-row">
       <h2 class="list-heading" onclick="toggleDeliveryList();">納品書一覧 <span class="status-badge muted" id="deliveryListCount">0件</span></h2>
-      <button type="button" class="secondary list-toggle-button" id="deliveryListToggle" onclick="toggleDeliveryList();">一覧を閉じる</button>
-      <button type="button" class="secondary" onclick="printSelectedDeliveries();">選択PDF印刷</button>
+      <div class="list-header-actions">
+        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedDeliveries();">PDF一括印刷</button>
+        <button type="button" class="secondary list-toggle-button" id="deliveryListToggle" onclick="toggleDeliveryList();">一覧を閉じる</button>
+      </div>
     </div>
     <div class="list-panel" id="deliveryListPanel">
       <div class="list-filter-row">
@@ -73,7 +75,10 @@
   </section>
 
   <section class="card" id="deliveryDetailCard">
-    <h2>納品情報</h2>
+    <div class="sales-actions section-heading-row">
+      <h2>納品情報</h2>
+      <button type="button" class="secondary" onclick="clearDeliveryDetail();">入力をクリア</button>
+    </div>
     <div class="row">
       <label>納品書番号<input id="deliveryNo" readonly></label>
       <label>元請求書番号<input id="sourceInvoiceNo" readonly></label>

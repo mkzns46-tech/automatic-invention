@@ -722,7 +722,7 @@ function renderQuoteListRow(q) {
     ? `<button type="button" class="secondary next-step-button" onclick="convertQuoteToInvoice('${q.id}')">&#35531;&#27714;&#26360;&#12408;&#22793;&#25563;</button>`
     : "";
   return `<tr data-quote-id="${escapeHtml(q.id || "")}">
-    <td><input type="checkbox" class="quote-pdf-check" value="${escapeHtml(q.id || "")}"></td>
+    <td><input type="checkbox" class="quote-pdf-check pdf-select-checkbox" value="${escapeHtml(q.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(q.quoteNo)} ${quoteStatusBadge(q.status)}</span></td>
     <td>${escapeHtml(normalizeDateOnly(q.createdAt) || q.quoteDate || "")}</td>
     <td>${escapeHtml(q.organizationName || q.organization || q.companyName || "")}</td>

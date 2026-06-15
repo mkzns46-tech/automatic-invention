@@ -356,7 +356,7 @@ function renderDeliveryRow(delivery) {
   const status = normalizeDeliveryStatus(delivery.status);
   const displayNumber = delivery.originNumber || delivery.masterNumber || delivery.quoteNumber || delivery.deliveryNo || "";
   return `<tr>
-    <td><input type="checkbox" class="delivery-pdf-check" value="${escapeHtml(delivery.id || "")}"></td>
+    <td><input type="checkbox" class="delivery-pdf-check pdf-select-checkbox" value="${escapeHtml(delivery.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(displayNumber)} ${statusBadge(status)}</span></td>
     <td>${escapeHtml(normalizeDateOnly(delivery.shipmentDate) || normalizeDateOnly(delivery.handoverDate) || normalizeDateOnly(delivery.carryOutDate) || normalizeDateOnly(delivery.issuedAt) || delivery.deliveryDate || delivery.invoiceDate || "")}</td>
     <td>${escapeHtml(delivery.organizationName || delivery.organization || delivery.companyName || "")}</td>

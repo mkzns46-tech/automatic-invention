@@ -328,7 +328,7 @@ function renderReceiptTargetRow(row) {
   }
   const receipt = row.receipt;
   return `<tr>
-    <td><input type="checkbox" class="receipt-pdf-check" value="${escapeHtml(receipt.id || "")}"></td>
+    <td><input type="checkbox" class="receipt-pdf-check pdf-select-checkbox" value="${escapeHtml(receipt.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(receipt.receiptNo || "")} ${statusBadge(receipt.status)}</span></td>
     <td>${escapeHtml(normalizeDateOnly(receipt.issuedAt) || receipt.paymentDate || "")}</td>
     <td>${escapeHtml(receipt.organizationName || receipt.organization || receipt.companyName || "")}</td>

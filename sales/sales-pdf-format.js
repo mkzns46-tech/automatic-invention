@@ -400,9 +400,6 @@
       .summary-table td{padding:7px 10px;text-align:right;border:1px solid #ddd}
       .bank-info{margin-top:10px;border:1px solid #d7dfd9;padding:8px 10px;font-size:12px;line-height:1.55}
       .bank-title{font-weight:700;color:#2f744f;margin-bottom:2px}
-      .pdf-toolbar{position:sticky;top:0;z-index:10;display:flex;gap:8px;justify-content:flex-end;padding:8px 12px;background:#f7faf8;border-bottom:1px solid #d7dfd9}
-      .pdf-toolbar button{border:1px solid #2f744f;background:#2f744f;color:#fff;border-radius:6px;padding:7px 14px;font-weight:700;cursor:pointer}
-      .pdf-toolbar button.secondary{background:#fff;color:#2f744f}
       .note-title{background:#2f744f;color:#fff;font-weight:700;margin-top:16px;padding:6px 12px}
       .note-box{min-height:78px;border-bottom:1px solid #999;white-space:pre-wrap;padding:8px 4px}
       .footer{position:absolute;right:0;bottom:0;font-size:12px;text-align:right}
@@ -415,7 +412,7 @@
       .receipt-breakdown th{background:#2f744f;color:#fff;border:1px solid #2f744f;padding:8px}
       .receipt-breakdown td{border:1px solid #ddd;padding:8px}
       .receipt-breakdown td:last-child{text-align:right}
-      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.pdf-toolbar{display:none}}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
     </style>`;
   }
 
@@ -449,7 +446,36 @@
     return { pages, title, number, filename: pdfFilename(type, doc) };
   }
 
-  function openPdfWindow(documents) {
+  function showPdfActionPopup(filename, count) {
+    return new Promise(resolve => {
+      const popup = document.createElement("div");
+      popup.className = "app-popup";
+      popup.style.display = "flex";
+      popup.innerHTML = `
+        <div class="app-popup-card">
+          <div class="app-popup-title">PDF出力</div>
+          <div class="app-popup-body">${escapeHtml(count > 1 ? `${count}件のPDFを出力します。` : filename)}<br>出力方法を選択してください。</div>
+          <div class="sales-actions" style="justify-content:center;margin-top:12px">
+            <button type="button" class="primary" data-action="print">印刷</button>
+            <button type="button" class="secondary" data-action="save">保存</button>
+            <button type="button" class="secondary" data-action="cancel">キャンセル</button>
+          </div>
+        </div>
+      `;
+      const close = action => {
+        popup.remove();
+        resolve(action);
+      };
+      popup.addEventListener("click", event => {
+        const action = event.target?.dataset?.action;
+        if (action) close(action);
+        if (event.target === popup) close("cancel");
+      });
+      document.body.appendChild(popup);
+    });
+  }
+
+  function openPdfWindow(documents, action) {
     const built = documents.map(({ type, data }) => documentPages(type, data));
     const first = built[0] || { title: "伝票", number: "", filename: "伝票.pdf", pages: "" };
     const win = window.open("", "_blank");
@@ -458,18 +484,27 @@
     const body = built.map(item => item.pages).join("");
     const title = documents.length === 1 ? first.filename : `販売管理PDF-${formatDate(new Date()).replaceAll("/", "")}.pdf`;
     const safeTitleLiteral = JSON.stringify(title).replace(/</g, "\\u003c");
-    win.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><base href="${escapeHtml(baseHref)}"><title>${escapeHtml(title)}</title>${css()}</head><body><div class="pdf-toolbar"><button type="button" onclick="window.print()">印刷</button><button type="button" class="secondary" onclick="document.title=${safeTitleLiteral}; window.print()">保存(PDF)</button></div>${body}</body></html>`);
+    const autoScript = action === "print" || action === "save"
+      ? `<script>window.onload = () => { document.title=${safeTitleLiteral}; setTimeout(() => window.print(), 120); };</script>`
+      : "";
+    win.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><base href="${escapeHtml(baseHref)}"><title>${escapeHtml(title)}</title>${css()}</head><body>${body}${autoScript}</body></html>`);
     win.document.close();
   }
 
-  function printSalesDocument(type, data) {
-    openPdfWindow([{ type, data }]);
+  async function printSalesDocument(type, data) {
+    const info = documentPages(type, data);
+    const action = await showPdfActionPopup(info.filename, 1);
+    if (action === "cancel") return;
+    openPdfWindow([{ type, data }], action);
   }
 
-  function printSalesDocuments(documents) {
+  async function printSalesDocuments(documents) {
     const safeDocuments = (documents || []).filter(item => item && item.type && item.data);
     if (!safeDocuments.length) return;
-    openPdfWindow(safeDocuments);
+    const first = documentPages(safeDocuments[0].type, safeDocuments[0].data);
+    const action = await showPdfActionPopup(first.filename, safeDocuments.length);
+    if (action === "cancel") return;
+    openPdfWindow(safeDocuments, action);
   }
 
   window.SalesPdfFormat = { printSalesDocument, printSalesDocuments };

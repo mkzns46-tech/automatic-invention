@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 領収書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260614-html-repair">
+<link rel="stylesheet" href="sales-style.css?v=20260615-pdf-button-ui">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
@@ -31,8 +31,10 @@
   <section class="card collapsible-list-card" id="receiptListCard">
     <div class="sales-actions section-heading-row">
       <h2 class="list-heading" onclick="toggleReceiptList();">領収書一覧 <span class="status-badge muted" id="receiptListCount">0件</span></h2>
-      <button type="button" class="secondary list-toggle-button" id="receiptListToggle" onclick="toggleReceiptList();">一覧を開く</button>
-      <button type="button" class="secondary" onclick="printSelectedReceipts();">選択PDF印刷</button>
+      <div class="list-header-actions">
+        <button type="button" class="primary pdf-bulk-button" onclick="printSelectedReceipts();">PDF一括印刷</button>
+        <button type="button" class="secondary list-toggle-button" id="receiptListToggle" onclick="toggleReceiptList();">一覧を開く</button>
+      </div>
     </div>
     <div class="list-panel" id="receiptListPanel" hidden>
       <div class="list-filter-row">

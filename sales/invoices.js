@@ -1359,7 +1359,7 @@ function renderInvoiceListRow(invoice) {
   const status = normalizeInvoiceStatus(invoice.status);
   const customerView = getInvoiceCustomerView(invoice);
   return `<tr>
-    <td><input type="checkbox" class="invoice-pdf-check" value="${escapeHtml(invoice.id || "")}"></td>
+    <td><input type="checkbox" class="invoice-pdf-check pdf-select-checkbox" value="${escapeHtml(invoice.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo)} ${statusBadge(status)}</span></td>
     <td>${escapeHtml(invoice.invoiceDate || "")}</td>
     <td>${escapeHtml(customerView.organizationName)}</td>
