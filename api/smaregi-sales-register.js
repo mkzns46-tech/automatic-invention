@@ -2,6 +2,9 @@ const REQUIRED_TRANSACTION_SCOPES = ["pos.transactions:read", "pos.transactions:
 const DEFAULT_TRANSACTION_SCOPE = REQUIRED_TRANSACTION_SCOPES.join(" ");
 const DEFAULT_TRANSACTION_PATH = "/transactions";
 const DEFAULT_PAYMENT_METHOD_NAME = "請求書";
+const MANUAL_PRODUCT_ID = "2953";
+const MANUAL_PRODUCT_CODE = "9900000000073";
+const MANUAL_PRODUCT_NAME = "事務手数料";
 
 function sendJson(res, status, payload) {
   try {
@@ -205,12 +208,16 @@ function normalizeLines(lines) {
     const amount = toInt(line.amount);
     const gross = Math.max(0, Math.round(qty * Math.abs(unitPrice)));
     const discountAmount = Math.max(0, Math.min(gross, toInt(line.discountAmount ?? line.discountAmountInput ?? 0)));
+    const isManualProduct = Boolean(line.manualProduct) || (!firstString(line.smaregiProductId, line.smaregi_product_id, line.productId) && !firstString(line.productCode, line.barcode));
+    const productId = isManualProduct ? MANUAL_PRODUCT_ID : firstString(line.smaregiProductId, line.smaregi_product_id, line.productId);
+    const productCode = isManualProduct ? MANUAL_PRODUCT_CODE : firstString(line.productCode, line.barcode);
+    const productName = isManualProduct ? MANUAL_PRODUCT_NAME : firstString(line.name, line.productName, line.itemName);
     return {
       transactionDetailId: String(index + 1),
       transactionDetailDivision: "1",
-      productId: firstString(line.smaregiProductId, line.smaregi_product_id, line.productId),
-      productCode: firstString(line.productCode, line.barcode),
-      productName: firstString(line.name, line.productName, line.itemName),
+      productId,
+      productCode,
+      productName,
       taxDivision: "0",
       price: String(unitPrice),
       salesPrice: String(unitPrice),
@@ -219,15 +226,36 @@ function normalizeLines(lines) {
       quantity: String(qty),
       salesDivision: "0",
       productDivision: "0",
-      memo: firstString(line.memo, line.note),
+      memo: isManualProduct
+        ? firstString(line.name, line.productName, line.itemName, line.memo, line.note)
+        : firstString(line.memo, line.note),
       aricoAmount: amount,
-      aricoQuantity: qty
+      aricoQuantity: qty,
+      aricoManualProduct: isManualProduct
     };
   }).filter(line => Number(line.aricoQuantity) > 0 && (line.productId || line.productCode || line.productName));
 }
 
+function applyOverallDiscountToLines(lines, discountValue) {
+  let remaining = Math.max(0, toInt(discountValue));
+  if (!remaining) return lines;
+  return lines.map(line => {
+    if (remaining <= 0) return line;
+    const currentAmount = Math.max(0, toInt(line.aricoAmount));
+    if (!currentAmount) return line;
+    const applied = Math.min(currentAmount, remaining);
+    remaining -= applied;
+    return {
+      ...line,
+      unitDiscountPrice: String(toInt(line.unitDiscountPrice) + applied),
+      aricoAmount: Math.max(0, currentAmount - applied),
+      memo: firstString(line.memo, "全体値引き按分")
+    };
+  });
+}
+
 function buildTransactionPayload(context, body, paymentMethod) {
-  const lines = normalizeLines(body.lines);
+  const lines = applyOverallDiscountToLines(normalizeLines(body.lines), body.overallDiscountAmount);
   if (!lines.length) throw new Error("No Smaregi sale lines were provided.");
   const subtotal = lines.reduce((sum, line) => sum + toInt(line.aricoAmount), 0);
   const total = subtotal;
@@ -255,7 +283,7 @@ function buildTransactionPayload(context, body, paymentMethod) {
     memo,
     sellDivision: "0",
     taxRate: "10",
-    details: lines.map(({ aricoAmount, aricoQuantity, ...line }) => line),
+    details: lines.map(({ aricoAmount, aricoQuantity, aricoManualProduct, ...line }) => line),
     payments: [
       {
         paymentMethodId: paymentMethod.paymentMethodId,

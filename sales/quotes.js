@@ -197,9 +197,18 @@ function calcQuoteTotals(quote) {
     discount += Number(line.discountAmount || 0);
     total += Number(line.amount || 0);
   });
+  const overallDiscountAmount = Math.max(0, Number(quote?.overallDiscountAmount || 0));
+  const appliedOverallDiscount = isRefundTransaction(quote?.transactionType)
+    ? overallDiscountAmount
+    : Math.min(Math.max(0, total), overallDiscountAmount);
+  discount += appliedOverallDiscount;
+  total = isRefundTransaction(quote?.transactionType)
+    ? total + appliedOverallDiscount
+    : Math.max(0, total - appliedOverallDiscount);
   return {
     subtotal,
     discount,
+    overallDiscountAmount: appliedOverallDiscount,
     total,
     tax: Math.floor(total * 10 / 110)
   };
@@ -763,6 +772,8 @@ function buildInvoiceFromQuote(quote, invoices) {
     originalSlipNumber: quote.originalSlipNumber || "",
     reasonMemo: quote.reasonMemo || "",
     discountTemplate: quote.discountTemplate || "none",
+    overallDiscountAmount: Math.max(0, Number(quote.overallDiscountAmount || 0)),
+    overallDiscountReason: quote.overallDiscountReason || "",
     items: JSON.parse(JSON.stringify(lines)),
     lines: JSON.parse(JSON.stringify(lines))
   };
@@ -823,10 +834,11 @@ function newQuote(shouldScroll = false) {
   currentQuoteId = null;
   currentLines = [];
   currentQuoteLocked = false;
-  ["customerName", "customerAddress", "customerPhone", "customerEmail", "quoteSubject", "quoteMemo", "productSearchInput", "originalSlipNumber", "reasonMemo"].forEach(id => {
+  ["customerName", "customerAddress", "customerPhone", "customerEmail", "quoteSubject", "quoteMemo", "productSearchInput", "originalSlipNumber", "reasonMemo", "overallDiscountReason"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
+  setFieldValue("overallDiscountAmount", 0);
   document.getElementById("customerType").value = "個人";
   setFieldValue("transactionType", "通常販売");
   document.getElementById("discountTemplate").value = "none";
@@ -1010,7 +1022,11 @@ function applyDiscountTemplate(render = true) {
 
 function recalcTotals() {
   currentLines.forEach(recalcSalesLine);
-  const totals = calcQuoteTotals({ lines: currentLines });
+  const totals = calcQuoteTotals({
+    lines: currentLines,
+    transactionType: getCurrentTransactionType(),
+    overallDiscountAmount: document.getElementById("overallDiscountAmount")?.value || 0
+  });
   document.getElementById("subtotalText").textContent = money(totals.subtotal);
   document.getElementById("discountText").textContent = money(totals.discount);
   const totalText = document.getElementById("totalText");
@@ -1054,6 +1070,8 @@ function collectQuote() {
     memo: document.getElementById("quoteMemo").value,
     customerMemo: document.getElementById("quoteMemo").value,
     discountTemplate: document.getElementById("discountTemplate").value,
+    overallDiscountAmount: Math.max(0, Number(document.getElementById("overallDiscountAmount")?.value || 0)),
+    overallDiscountReason: document.getElementById("overallDiscountReason")?.value?.trim() || "",
     lines: currentLines.map(({ stock, ...line }) => recalcSalesLine({ ...line, transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value) }))
   };
 }
@@ -1062,7 +1080,7 @@ function printQuotePdf(quote) {
   const doc = JSON.parse(JSON.stringify(quote || {}));
   doc.transactionType = normalizeTransactionType(doc.transactionType);
   const lines = (doc.lines || doc.items || []).map(line => recalcSalesLine({ ...line, transactionType: doc.transactionType || line.transactionType || "通常販売" }));
-  const totals = calcQuoteTotals({ lines });
+  const totals = calcQuoteTotals({ ...doc, lines });
   const rows = lines.map((line, index) => `
     <tr>
       <td>${index + 1}</td>
@@ -1125,10 +1143,11 @@ function printQuotePdf(quote) {
   <div class="summary">
     <div><span>小計</span><strong>${money(totals.subtotal)}</strong></div>
     <div><span>値引</span><strong>${money(totals.discount)}</strong></div>
+    <div><span>全体値引き</span><strong>${money(totals.overallDiscountAmount || 0)}</strong></div>
     <div><span>合計</span><strong class="${amountClass(totals.total, doc.transactionType)}">${money(totals.total)}</strong></div>
     <div><span>内消費税 10%</span><strong>${money(totals.tax)}</strong></div>
   </div>
-  <div class="note">${escapeHtml(doc.memo || "")}</div>
+  <div class="note">${escapeHtml(doc.overallDiscountReason ? `全体値引き理由: ${doc.overallDiscountReason}\n${doc.memo || ""}` : doc.memo || "")}</div>
   <script>window.onload = () => { window.print(); setTimeout(() => { if (window.opener) window.opener.focus(); }, 300); };</script>
 </body>
 </html>`);
@@ -1205,6 +1224,8 @@ async function fillQuoteForm(quote) {
   setFieldValue("reasonMemo", quote.reasonMemo || "");
   document.getElementById("quoteMemo").value = quote.memo || "";
   document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
+  setFieldValue("overallDiscountAmount", quote.overallDiscountAmount || 0);
+  setFieldValue("overallDiscountReason", quote.overallDiscountReason || "");
   applyTransactionTypeToLines();
   renderLines();
   updateQuoteDeleteButton(quote);
@@ -1226,6 +1247,8 @@ function updateQuoteLockState(quote) {
     "originalSlipNumber",
     "reasonMemo",
     "discountTemplate",
+    "overallDiscountAmount",
+    "overallDiscountReason",
     "quoteMemo",
     "productSearchInput"
   ];

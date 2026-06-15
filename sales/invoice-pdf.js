@@ -67,9 +67,18 @@ function calcInvoicePdfTotals(invoice) {
     discount += Number(line.discountAmount || 0);
     total += Number(line.amount || 0);
   });
+  const overallDiscountAmount = Math.max(0, Number(invoice?.overallDiscountAmount || 0));
+  const appliedOverallDiscount = invoicePdfIsRefundTransaction(invoice?.transactionType)
+    ? overallDiscountAmount
+    : Math.min(Math.max(0, total), overallDiscountAmount);
+  discount += appliedOverallDiscount;
+  total = invoicePdfIsRefundTransaction(invoice?.transactionType)
+    ? total + appliedOverallDiscount
+    : Math.max(0, total - appliedOverallDiscount);
   return {
     subtotal,
     discount,
+    overallDiscountAmount: appliedOverallDiscount,
     total,
     tax: Math.floor(total * 10 / 110)
   };
@@ -147,10 +156,11 @@ function printInvoicePdf(invoice) {
   <div class="summary">
     <div><span>小計</span><strong>${invoicePdfMoney(totals.subtotal)}</strong></div>
     <div><span>値引</span><strong>${invoicePdfMoney(totals.discount)}</strong></div>
+    <div><span>全体値引き</span><strong>${invoicePdfMoney(totals.overallDiscountAmount || 0)}</strong></div>
     <div><span>合計</span><strong class="${invoicePdfAmountClass(totals.total, doc.transactionType)}">${invoicePdfMoney(totals.total)}</strong></div>
     <div><span>内消費税 10%</span><strong>${invoicePdfMoney(totals.tax)}</strong></div>
   </div>
-  <div class="note">${invoicePdfEscape(doc.memo || "")}</div>
+  <div class="note">${invoicePdfEscape(doc.overallDiscountReason ? `全体値引き理由: ${doc.overallDiscountReason}\n${doc.memo || ""}` : doc.memo || "")}</div>
   <div class="registration">登録番号 T8180001160066</div>
   <script>window.onload = () => { window.print(); setTimeout(() => { if (window.opener) window.opener.focus(); }, 300); };</script>
 </body>

@@ -520,9 +520,18 @@ function calcInvoiceTotals(invoice) {
     discount += Number(line.discountAmount || 0);
     total += Number(line.amount || 0);
   });
+  const overallDiscountAmount = Math.max(0, Number(invoice?.overallDiscountAmount || 0));
+  const appliedOverallDiscount = isRefundTransaction(invoice?.transactionType)
+    ? overallDiscountAmount
+    : Math.min(Math.max(0, total), overallDiscountAmount);
+  discount += appliedOverallDiscount;
+  total = isRefundTransaction(invoice?.transactionType)
+    ? total + appliedOverallDiscount
+    : Math.max(0, total - appliedOverallDiscount);
   return {
     subtotal,
     discount,
+    overallDiscountAmount: appliedOverallDiscount,
     total,
     tax: Math.floor(total * 10 / 110)
   };
@@ -554,6 +563,36 @@ function buildStockDeductionLines(invoice) {
       memo: normalizedLine.memo || line.memo || ""
     };
   }).filter(line => line.quantity > 0 && (line.productId || line.barcode || line.productCode));
+}
+
+function buildSmaregiSaleLines(invoice) {
+  return getInvoiceRawLines(invoice).map(line => {
+    const normalizedLine = recalcInvoiceLine({ ...line, transactionType: invoice.transactionType });
+    const qty = Math.abs(Number(normalizedLine.qty || normalizedLine.quantity || 0));
+    const productId = String(line.smaregiProductId || line.smaregi_product_id || line.productId || "").trim();
+    const barcode = String(line.barcode || line.productCode || "").trim();
+    const manualProduct = Boolean(line.manualProduct) || (!productId && !barcode);
+    return {
+      productId,
+      smaregiProductId: productId,
+      productCode: barcode,
+      barcode,
+      manualProduct,
+      name: String(normalizedLine.name || line.name || "").trim(),
+      productName: String(normalizedLine.name || line.name || "").trim(),
+      quantity: qty,
+      qty,
+      unit: normalizedLine.unit || line.unit || "",
+      unitPrice: Number(normalizedLine.unitPrice || 0),
+      price: Number(normalizedLine.unitPrice || 0),
+      discountRate: Number(normalizedLine.discountRate ?? normalizedLine.discountValue ?? 0),
+      discountValue: Number(normalizedLine.discountValue ?? normalizedLine.discountRate ?? 0),
+      discountAmount: Number(normalizedLine.discountAmount || 0),
+      discountAmountInput: Number(normalizedLine.discountAmountInput || 0),
+      amount: Number(normalizedLine.amount || 0),
+      memo: normalizedLine.memo || line.memo || ""
+    };
+  }).filter(line => line.quantity > 0 && (line.productId || line.barcode || line.productCode || line.manualProduct || line.name));
 }
 
 async function readStockApiJson(response) {
@@ -713,17 +752,18 @@ async function applyInvoiceStockDeduction(invoice) {
     next.smaregiSaleRegisteredAt = "";
     return next;
   }
-  const lines = buildStockDeductionLines(next);
-  if (!lines.length) {
+  const saleLines = buildSmaregiSaleLines(next);
+  if (!saleLines.length) {
     next.smaregiSaleStatus = SMAREGI_SALE_STATUS_SKIPPED;
     next.smaregiSaleError = "スマレジ売上登録対象の商品明細がありません。";
     next.smaregiSaleLines = [];
     next.smaregiSaleRegisteredAt = "";
     return next;
   }
+  const stockLines = buildStockDeductionLines(next);
   next.smaregiSaleStatus = SMAREGI_SALE_STATUS_PENDING;
   next.smaregiSaleError = "";
-  next.smaregiSaleLines = lines;
+  next.smaregiSaleLines = saleLines;
   try {
     const totals = calcInvoiceTotals(next);
     console.log("[Sales Smaregi sale request]", {
@@ -732,7 +772,7 @@ async function applyInvoiceStockDeduction(invoice) {
       originNumber: next.originNumber || next.masterNumber || next.sourceQuoteNo || "",
       transactionType: next.transactionType,
       total: totals.total,
-      lines
+      lines: saleLines
     });
     const response = await fetch("/api/smaregi-sales-register", {
       method: "POST",
@@ -750,16 +790,18 @@ async function applyInvoiceStockDeduction(invoice) {
         organizationName: next.organizationName || "",
         total: totals.total,
         tax: totals.tax,
+        overallDiscountAmount: totals.overallDiscountAmount || 0,
+        overallDiscountReason: next.overallDiscountReason || "",
         smaregiCustomerId: next.smaregiCustomerId || "",
         smaregiCustomerCode: next.smaregiCustomerCode || "",
         idempotencyKey: `${next.id || next.invoiceNo}:smaregi-sale`,
-        lines
+        lines: saleLines
       })
     });
     const data = await readStockApiJson(response);
     let baseStockSync = [];
     try {
-      baseStockSync = await syncProductsBaseStock(lines);
+      baseStockSync = await syncProductsBaseStock(stockLines);
       next.stockBaseStockSyncStatus = baseStockSync.every(row => row.ok) ? "success" : "failed";
     } catch (syncError) {
       next.stockBaseStockSyncStatus = "failed";
@@ -769,14 +811,14 @@ async function applyInvoiceStockDeduction(invoice) {
     next.smaregiSaleRegisteredAt = new Date().toISOString();
     next.smaregiSaleError = next.stockBaseStockSyncStatus === "failed" ? `products.base_stock同期失敗: ${next.stockBaseStockSyncError || "一部商品未同期"}` : "";
     next.smaregiTransactionId = data.smaregiTransactionId || "";
-    next.smaregiSaleLines = lines.map(line => ({ ...line }));
+    next.smaregiSaleLines = saleLines.map(line => ({ ...line }));
     next.stockBaseStockSyncLines = baseStockSync;
   } catch (error) {
     next.smaregiSaleStatus = SMAREGI_SALE_STATUS_FAILED;
     next.smaregiSaleRegisteredAt = "";
     next.smaregiSaleError = error.message || String(error);
     next.smaregiTransactionId = "";
-    next.smaregiSaleLines = lines.map(line => ({ ...line }));
+    next.smaregiSaleLines = saleLines.map(line => ({ ...line }));
   }
   return next;
 }
@@ -829,6 +871,8 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     transactionType: normalizeTransactionType(invoice.transactionType),
     originalSlipNumber: invoice.originalSlipNumber || "",
     reasonMemo: invoice.reasonMemo || "",
+    overallDiscountAmount: Math.max(0, Number(invoice.overallDiscountAmount || 0)),
+    overallDiscountReason: invoice.overallDiscountReason || "",
     memo: invoice.memo || invoice.customerMemo || "",
     customerMemo: invoice.customerMemo || invoice.memo || "",
     items: JSON.parse(JSON.stringify(invoice.lines || invoice.items || [])),
@@ -1142,10 +1186,11 @@ function matchesDateRange(values, from, to) {
 function clearInvoiceEditor() {
   currentInvoiceId = null;
   currentInvoiceLines = [];
-  ["invoiceNo", "sourceQuoteNo", "customerName", "invoiceOrganizationName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo", "originalSlipNumber", "reasonMemo", "stockDeductionStatus"].forEach(id => {
+  ["invoiceNo", "sourceQuoteNo", "customerName", "invoiceOrganizationName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo", "originalSlipNumber", "reasonMemo", "stockDeductionStatus", "overallDiscountReason"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
+  setFieldValue("overallDiscountAmount", 0);
   ["salesCustomerId", "salesCustomerCode", "salesSmaregiCustomerId", "salesSmaregiCustomerCode"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
@@ -1196,6 +1241,8 @@ function fillInvoiceForm(invoice) {
   setFieldValue("originalSlipNumber", invoice.originalSlipNumber || "");
   setFieldValue("reasonMemo", invoice.reasonMemo || "");
   document.getElementById("invoiceMemo").value = invoice.memo || "";
+  setFieldValue("overallDiscountAmount", invoice.overallDiscountAmount || 0);
+  setFieldValue("overallDiscountReason", invoice.overallDiscountReason || "");
   applyInvoiceTransactionTypeToLines();
   renderInvoiceLines();
   updateInvoiceLockState(invoice);
@@ -1323,7 +1370,9 @@ function updateInvoiceLockState(invoice) {
     "transactionType",
     "originalSlipNumber",
     "reasonMemo",
-    "invoiceMemo"
+    "invoiceMemo",
+    "overallDiscountAmount",
+    "overallDiscountReason"
   ];
   if (issueButton) {
     const hasInvoice = Boolean(currentInvoiceId || document.getElementById("invoiceNo")?.value);
@@ -1392,7 +1441,11 @@ function ensureIssueInvoiceButton() {
 
 function recalcTotals() {
   currentInvoiceLines.forEach(recalcInvoiceLine);
-  const totals = calcInvoiceTotals({ lines: currentInvoiceLines });
+  const totals = calcInvoiceTotals({
+    lines: currentInvoiceLines,
+    transactionType: getCurrentTransactionType(),
+    overallDiscountAmount: document.getElementById("overallDiscountAmount")?.value || 0
+  });
   document.getElementById("subtotalText").textContent = money(totals.subtotal);
   document.getElementById("discountText").textContent = money(totals.discount);
   const totalText = document.getElementById("totalText");
@@ -1440,6 +1493,8 @@ function collectInvoice() {
     reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
     memo: document.getElementById("invoiceMemo").value,
     customerMemo: existing?.customerMemo || document.getElementById("invoiceMemo").value,
+    overallDiscountAmount: Math.max(0, Number(document.getElementById("overallDiscountAmount")?.value || 0)),
+    overallDiscountReason: document.getElementById("overallDiscountReason")?.value?.trim() || "",
     items: currentInvoiceLines.map(line => recalcInvoiceLine({ ...line, transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value) })),
     lines: currentInvoiceLines.map(line => recalcInvoiceLine({ ...line, transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value) }))
   };
