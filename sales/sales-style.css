@@ -116,6 +116,10 @@ label:has(#smaregiMemberCode){display:none!important}
 .pdf-bulk-list-text{display:grid;gap:3px;min-width:0}
 .pdf-bulk-list-text strong{color:var(--main-dark);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pdf-bulk-list-text span{color:#5f7468;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.settings-staff-table-wrap{max-height:420px;margin-top:12px}
+.settings-staff-table-wrap table{min-width:640px}
+.settings-staff-table-wrap th:first-child,.settings-staff-table-wrap td:first-child{width:42%}
+.staff-display-input{width:100%;min-height:38px;background:#fff}
 @media (max-width:640px){
   .pdf-bulk-list-row{grid-template-columns:1fr}
   .pdf-bulk-list-row button{width:100%}

@@ -10,6 +10,7 @@
 <script src="sales-storage.js"></script>
 <script src="customers-storage.js?v=20260614-settings-imports"></script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
+<script src="staff-display.js?v=20260616-staff-fullname"></script>
 <script src="settings.js?v=20260614-settings-imports" defer></script>
 <script src="sales-smaregi.js?v=20260614-settings-imports" defer></script>
 </head>
@@ -53,6 +54,31 @@
     </div>
     <div class="sales-actions">
       <button type="button" class="secondary" onclick="clearPdfAssetSettings();">画像設定をクリア</button>
+    </div>
+  </section>
+
+  <section class="card sales-staff-display-card">
+    <div class="section-title">
+      <div>
+        <h2>担当者表示名</h2>
+        <p class="section-note">在庫管理のスタッフ登録を参照し、販売管理画面・PDFで表示するフルネームだけを設定します。内部管理名は変更しません。</p>
+      </div>
+      <div class="badge muted">販売管理</div>
+    </div>
+    <div class="settings-import-panel">
+      <button type="button" class="secondary" onclick="loadStaffDisplaySettings();">スタッフ一覧を再読込</button>
+      <button type="button" class="primary" onclick="saveStaffDisplaySettings();">表示名を保存</button>
+      <div id="staffDisplayResult" class="message">未読込です。</div>
+    </div>
+    <div class="table-wrap settings-staff-table-wrap">
+      <table>
+        <thead>
+          <tr><th>内部管理名</th><th>販売管理表示名</th></tr>
+        </thead>
+        <tbody id="staffDisplaySettingsBody">
+          <tr><td colspan="2">スタッフ一覧を読み込んでください。</td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 

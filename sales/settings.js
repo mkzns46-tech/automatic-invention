@@ -49,8 +49,126 @@ function settingsCustomerStorage() {
   };
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[ch]));
+}
+
 const PDF_LOGO_KEY = "arico_sales_pdf_logo";
 const PDF_STAMP_KEY = "arico_sales_pdf_stamp";
+let staffDisplayRows = [];
+
+function staffDisplayValue(row) {
+  return String(
+    row?.sales_display_name ||
+    row?.salesDisplayName ||
+    row?.sales_full_name ||
+    row?.salesFullName ||
+    row?.display_name ||
+    row?.displayName ||
+    row?.full_name ||
+    row?.fullName ||
+    ""
+  ).trim();
+}
+
+function staffInternalName(row) {
+  return window.SalesStaffDisplay?.staffOptionValue?.(row) || (row?.store_name ? `${row.name}（${row.store_name}）` : row?.name || "");
+}
+
+function staffRowPatchPath(row) {
+  if (row?.id !== undefined && row?.id !== null && row?.id !== "") {
+    return `staff_members?id=eq.${encodeURIComponent(row.id)}`;
+  }
+  const filters = [`name=eq.${encodeURIComponent(row?.name || "")}`];
+  if (row?.store_name) filters.push(`store_name=eq.${encodeURIComponent(row.store_name)}`);
+  return `staff_members?${filters.join("&")}`;
+}
+
+function renderStaffDisplaySettings(rows) {
+  const body = document.getElementById("staffDisplaySettingsBody");
+  if (!body) return;
+  staffDisplayRows = Array.isArray(rows) ? rows : [];
+  if (!staffDisplayRows.length) {
+    body.innerHTML = '<tr><td colspan="2">スタッフ登録が見つかりません。</td></tr>';
+    return;
+  }
+  body.innerHTML = staffDisplayRows.map((row, index) => `
+    <tr>
+      <td>${escapeHtml(staffInternalName(row))}</td>
+      <td><input class="staff-display-input" data-staff-index="${index}" value="${escapeHtml(staffDisplayValue(row))}" placeholder="例：田中 真人"></td>
+    </tr>
+  `).join("");
+}
+
+async function loadStaffDisplaySettings() {
+  const resultBox = document.getElementById("staffDisplayResult");
+  if (resultBox) {
+    resultBox.textContent = "スタッフ一覧を読み込んでいます。";
+    resultBox.className = "message";
+  }
+  try {
+    const rows = await (window.SalesStaffDisplay?.loadStaffDisplays?.() || salesFetch("staff_members?select=*&order=name.asc"));
+    renderStaffDisplaySettings(rows || []);
+    if (resultBox) {
+      resultBox.textContent = `${(rows || []).length}件のスタッフを読み込みました。`;
+      resultBox.className = "message ok";
+    }
+  } catch (error) {
+    const message = error?.message || String(error);
+    if (resultBox) {
+      resultBox.textContent = message;
+      resultBox.className = "message err";
+    }
+    showSalesPopup("読込失敗", message, "err");
+  }
+}
+
+async function saveStaffDisplaySettings() {
+  const resultBox = document.getElementById("staffDisplayResult");
+  const inputs = Array.from(document.querySelectorAll(".staff-display-input"));
+  if (!inputs.length) {
+    showSalesPopup("保存できません", "スタッフ一覧を先に読み込んでください。", "warn");
+    return;
+  }
+  if (resultBox) {
+    resultBox.textContent = "担当者表示名を保存しています。";
+    resultBox.className = "message";
+  }
+  try {
+    for (const input of inputs) {
+      const row = staffDisplayRows[Number(input.dataset.staffIndex)];
+      if (!row) continue;
+      const value = String(input.value || "").trim();
+      await salesFetch(staffRowPatchPath(row), {
+        method: "PATCH",
+        body: JSON.stringify({ sales_display_name: value || null })
+      });
+      row.sales_display_name = value;
+    }
+    window.SalesStaffDisplay?.buildMap?.(staffDisplayRows);
+    if (resultBox) {
+      resultBox.textContent = "担当者表示名を保存しました。";
+      resultBox.className = "message ok";
+    }
+    showSalesPopup("保存完了", "販売管理用の担当者表示名を保存しました。", "ok");
+  } catch (error) {
+    const raw = error?.message || String(error);
+    const message = raw.includes("sales_display_name")
+      ? "staff_members に sales_display_name 列がありません。列を追加してから保存してください。"
+      : raw;
+    if (resultBox) {
+      resultBox.textContent = message;
+      resultBox.className = "message err";
+    }
+    showSalesPopup("保存失敗", message, "err");
+  }
+}
 
 function bindPdfAssetSettings() {
   bindPdfAssetInput("pdfLogoInput", "pdfLogoPreview", PDF_LOGO_KEY);
@@ -159,4 +277,5 @@ async function importSettingsSmaregiCustomers() {
 document.addEventListener("DOMContentLoaded", () => {
   if (typeof requireSalesAuth === "function" && !requireSalesAuth()) return;
   bindPdfAssetSettings();
+  loadStaffDisplaySettings();
 });
