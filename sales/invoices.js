@@ -897,19 +897,24 @@ async function restoreProductsBaseStock(lines) {
 async function applyInvoiceCancel(invoice, reason) {
   const next = { ...invoice };
   const now = new Date().toISOString();
-  if (normalizeInvoiceStatus(next.status) === INVOICE_STATUS_CANCELLED || next.cancelStatus === "success") {
+  const alreadyCanceled = normalizeInvoiceStatus(next.status) === INVOICE_STATUS_CANCELLED ||
+    (next.cancelStatus === "success" && Boolean(next.cancelledAt || next.canceledAt));
+  if (alreadyCanceled) {
     throw new Error("This invoice is already canceled.");
   }
   next.cancelStatus = "pending";
   next.cancelReason = reason || "";
-  next.cancelledAt = now;
-  next.canceledAt = now;
+  next.cancelRequestedAt = now;
 
   const saleSucceeded = normalizeSmaregiSaleStatus(next.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS;
   const baseStockWasSynced = next.stockBaseStockSyncStatus === "success";
   if (!saleSucceeded) {
+    next.cancelStatus = "failed";
+    next.cancelError = "スマレジ売上登録が成功していないため、請求書キャンセルを完了できません。";
     next.smaregiCancelStatus = "skipped";
     next.stockRestoreStatus = "skipped";
+    next.updatedAt = new Date().toISOString();
+    return next;
   } else {
     if (next.smaregiCancelStatus === "success") {
       throw new Error("Smaregi sale cancel is already completed.");
@@ -929,15 +934,28 @@ async function applyInvoiceCancel(invoice, reason) {
       next.stockRestoreError = next.stockRestoreStatus === "failed" ? "Some products.base_stock restore lines failed." : "";
       next.stockRestoredAt = next.stockRestoreStatus === "success" ? new Date().toISOString() : "";
       next.stockRestoreLines = restoreResults;
+      if (next.stockRestoreStatus !== "success") {
+        next.cancelStatus = "failed";
+        next.cancelError = next.stockRestoreError || "products.base_stock復帰に失敗しました。";
+        next.updatedAt = new Date().toISOString();
+        return next;
+      }
     } else {
+      next.cancelStatus = "failed";
+      next.cancelError = "products.base_stockの減算成功履歴がないため、在庫復帰を確認できません。";
       next.stockRestoreStatus = "skipped";
-      next.stockRestoreError = "";
+      next.stockRestoreError = next.cancelError;
       next.stockRestoreLines = [];
+      next.updatedAt = new Date().toISOString();
+      return next;
     }
   }
 
   next.status = INVOICE_STATUS_CANCELLED;
   next.cancelStatus = "success";
+  next.cancelError = "";
+  next.cancelledAt = now;
+  next.canceledAt = now;
   next.updatedAt = new Date().toISOString();
   return next;
 }
@@ -1876,6 +1894,10 @@ async function cancelInvoice() {
     writeInvoices(invoices);
     fillInvoiceForm(updated);
     renderInvoiceList();
+    if (updated.cancelStatus !== "success") {
+      showSalesPopup("請求書キャンセル失敗", updated.cancelError || "キャンセル処理を完了できませんでした。", "warn");
+      return;
+    }
     const restoreMessage = updated.stockRestoreStatus === "failed"
       ? "\nproducts.base_stock復帰に失敗しました。詳細を確認してください。"
       : "";
