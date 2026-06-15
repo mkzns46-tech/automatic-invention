@@ -1,7 +1,7 @@
 const INVOICES_KEY = "arico_sales_invoices_v1";
 const DELIVERIES_KEY = "arico_sales_deliveries_v1";
 const QUOTES_KEY = "arico_sales_quotes_v1";
-const ARICO_SUPABASE_URL = "https://ciciykfuwxawszujdohq.supabase.co";
+const ARICO_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
 const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 const INVOICE_STATUS_OPTIONS = ["下書き", "発行済み", "入金待ち", "入金済み", "入金不要", "キャンセル"];
 const INVOICE_STATUS_DRAFT = "下書き";
@@ -14,6 +14,10 @@ const STOCK_DEDUCTION_STATUS_PENDING = "pending";
 const STOCK_DEDUCTION_STATUS_SUCCESS = "success";
 const STOCK_DEDUCTION_STATUS_FAILED = "failed";
 const STOCK_DEDUCTION_STATUS_SKIPPED = "skipped";
+const SMAREGI_SALE_STATUS_PENDING = "pending";
+const SMAREGI_SALE_STATUS_SUCCESS = "success";
+const SMAREGI_SALE_STATUS_FAILED = "failed";
+const SMAREGI_SALE_STATUS_SKIPPED = "skipped";
 
 let currentInvoiceId = null;
 let currentInvoiceLines = [];
@@ -53,24 +57,115 @@ function writeLinkedQuotes(quotes) {
 }
 
 async function salesRestFetch(path, options = {}) {
-  const response = await fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: ARICO_SUPABASE_API_KEY,
-      Authorization: `Bearer ${ARICO_SUPABASE_API_KEY}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
-  });
+  const url = `${ARICO_SUPABASE_URL}/rest/v1/${path}`;
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        apikey: ARICO_SUPABASE_API_KEY,
+        Authorization: `Bearer ${ARICO_SUPABASE_API_KEY}`,
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
+    });
+  } catch (error) {
+    throw new Error(`Supabase fetch failed: ${url}: ${error?.message || error}`);
+  }
   const text = await response.text().catch(() => "");
   if (!response.ok) {
-    throw new Error(`Supabase API ${response.status}: ${text.slice(0, 500)}`);
+    throw new Error(`Supabase API ${response.status}: ${url}: ${text.slice(0, 500)}`);
   }
   return text ? JSON.parse(text) : null;
 }
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function defaultTradeSubject(dateValue = new Date()) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue || Date.now());
+  const safe = Number.isNaN(date.getTime()) ? new Date() : date;
+  const pad = value => String(value).padStart(2, "0");
+  return `${safe.getFullYear()}年${pad(safe.getMonth() + 1)}月${pad(safe.getDate())}日取引分`;
+}
+
+function datePlusDays(value, days) {
+  const date = value ? new Date(value) : new Date();
+  const safe = Number.isNaN(date.getTime()) ? new Date() : date;
+  safe.setDate(safe.getDate() + Number(days || 0));
+  return safe.toISOString().slice(0, 10);
+}
+
+function removeUnusedInvoiceFields() {
+  ["sourceQuoteNo", "originalSlipNumber", "reasonMemo"].forEach(id => {
+    const input = document.getElementById(id);
+    const label = input?.closest("label");
+    if (label) label.remove();
+  });
+}
+
+function arrangeInvoiceSubjectDateRow() {
+  const subjectLabel = document.getElementById("invoiceSubject")?.closest("label");
+  const dateLabel = document.getElementById("invoiceDate")?.closest("label");
+  const dueLabel = document.getElementById("dueDate")?.closest("label");
+  const staffLabel = document.getElementById("invoiceStaff")?.closest("label");
+  const transactionLabel = document.getElementById("transactionType")?.closest("label");
+  const sourceRow = subjectLabel?.parentElement;
+  if (!sourceRow || !subjectLabel || !dateLabel || !dueLabel) return;
+  let row = document.getElementById("invoiceSubjectDateRow");
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "invoiceSubjectDateRow";
+    row.className = "row three invoice-subject-date-row";
+    sourceRow.insertAdjacentElement("afterend", row);
+  }
+  row.appendChild(subjectLabel);
+  row.appendChild(dateLabel);
+  row.appendChild(dueLabel);
+
+  if (!staffLabel || !transactionLabel) return;
+  let secondRow = document.getElementById("invoiceStaffTransactionRow");
+  if (!secondRow) {
+    secondRow = document.createElement("div");
+    secondRow.id = "invoiceStaffTransactionRow";
+    secondRow.className = "row three staff-transaction-row";
+    row.insertAdjacentElement("afterend", secondRow);
+  }
+  secondRow.appendChild(staffLabel);
+  secondRow.appendChild(transactionLabel);
+}
+
+function markInvoiceRequiredLabels() {
+  const requiredIds = [
+    "invoiceNo",
+    "invoiceStatus",
+    "issuedAt",
+    "customerName",
+    "invoiceOrganizationName",
+    "customerType",
+    "customerAddress",
+    "customerPhone",
+    "customerEmail",
+    "invoiceSubject",
+    "invoiceDate",
+    "dueDate",
+    "invoiceStaff",
+    "transactionType",
+    "overallDiscountAmount"
+  ];
+  requiredIds.forEach(id => applyRequiredLabel(document.getElementById(id)?.closest("label")));
+}
+
+function applyRequiredLabel(label) {
+  if (!label || label.querySelector(":scope > .required-mark")) return;
+  label.classList.add("required-label");
+  const marker = document.createElement("span");
+  marker.className = "required-mark";
+  marker.textContent = " *";
+  const textNode = Array.from(label.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+  if (textNode) textNode.after(marker);
+  else label.prepend(marker);
 }
 
 function escapeHtml(value) {
@@ -152,8 +247,15 @@ function normalizeInvoiceStatus(status) {
 }
 
 function isInvoiceEditable(invoiceOrStatus) {
+  if (invoiceOrStatus && typeof invoiceOrStatus === "object" && !invoiceOrStatus.issuedAt) return true;
   const status = normalizeInvoiceStatus(typeof invoiceOrStatus === "string" ? invoiceOrStatus : invoiceOrStatus?.status);
   return status === INVOICE_STATUS_DRAFT;
+}
+
+function isCurrentInvoiceEditable() {
+  const invoice = currentInvoiceId ? readInvoices().find(row => row.id === currentInvoiceId) : null;
+  if (invoice) return isInvoiceEditable(invoice);
+  return isInvoiceEditable(document.getElementById("invoiceStatus")?.value);
 }
 
 function pickInvoiceCustomerFields(row) {
@@ -272,6 +374,37 @@ function stockDeductionDisplay(invoiceOrStatus) {
   return stockDeductionLabel(invoiceOrStatus);
 }
 
+function normalizeSmaregiSaleStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === SMAREGI_SALE_STATUS_PENDING || value === "登録中") return SMAREGI_SALE_STATUS_PENDING;
+  if (value === SMAREGI_SALE_STATUS_SUCCESS || value === "登録済み") return SMAREGI_SALE_STATUS_SUCCESS;
+  if (value === SMAREGI_SALE_STATUS_FAILED || value === "登録失敗") return SMAREGI_SALE_STATUS_FAILED;
+  if (value === SMAREGI_SALE_STATUS_SKIPPED || value === "対象外") return SMAREGI_SALE_STATUS_SKIPPED;
+  return "";
+}
+
+function smaregiSaleLabel(status) {
+  const value = normalizeSmaregiSaleStatus(status);
+  if (value === SMAREGI_SALE_STATUS_PENDING) return "スマレジ売上登録中";
+  if (value === SMAREGI_SALE_STATUS_SUCCESS) return "スマレジ売上登録済み";
+  if (value === SMAREGI_SALE_STATUS_FAILED) return "スマレジ売上登録失敗";
+  if (value === SMAREGI_SALE_STATUS_SKIPPED) return "スマレジ売上登録対象外";
+  return "未登録";
+}
+
+function smaregiSaleDisplay(invoiceOrStatus) {
+  if (invoiceOrStatus && typeof invoiceOrStatus === "object") {
+    if (
+      normalizeSmaregiSaleStatus(invoiceOrStatus.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS &&
+      invoiceOrStatus.stockBaseStockSyncStatus === "failed"
+    ) {
+      return "スマレジ売上登録済み / 在庫同期失敗";
+    }
+    return smaregiSaleLabel(invoiceOrStatus.smaregiSaleStatus);
+  }
+  return smaregiSaleLabel(invoiceOrStatus);
+}
+
 function stockDeductionBadge(invoice) {
   if (invoice?.stockBaseStockSyncStatus === "failed") {
     return '<span class="status-badge danger">在庫同期失敗</span>';
@@ -293,9 +426,18 @@ function isStockDeductionTarget(invoice) {
   return type !== "返金";
 }
 
+function isSmaregiSaleTarget(invoice) {
+  return isStockDeductionTarget(invoice);
+}
+
 function canRetryStockDeduction(invoice) {
-  const status = normalizeStockDeductionStatus(invoice?.stockDeductionStatus);
-  return Boolean(invoice?.id && isStockDeductionTarget(invoice) && (status === STOCK_DEDUCTION_STATUS_FAILED || invoice.stockBaseStockSyncStatus === "failed"));
+  const status = normalizeSmaregiSaleStatus(invoice?.smaregiSaleStatus);
+  return Boolean(invoice?.id && isSmaregiSaleTarget(invoice) && (status === SMAREGI_SALE_STATUS_FAILED || invoice.stockBaseStockSyncStatus === "failed"));
+}
+
+function canOutputInvoicePdf(invoice) {
+  if (!invoice) return false;
+  return Boolean(invoice.issuedAt) && normalizeInvoiceStatus(invoice.status) !== INVOICE_STATUS_DRAFT;
 }
 
 function recalcInvoiceLine(line) {
@@ -315,6 +457,17 @@ function recalcInvoiceLine(line) {
   const netAmount = Math.max(0, gross - line.discountAmount);
   line.amount = isRefundTransaction(transactionType) ? -netAmount : netAmount;
   return line;
+}
+
+function formatInvoiceStock(line) {
+  if (line.manualProduct || (!line.barcode && !line.smaregiProductId && !line.productId)) return "手入力";
+  const value = Number(line.stock ?? line.base_stock ?? 0);
+  return value > 0 ? `現在庫 ${value}` : "取寄せ";
+}
+
+function invoiceStockClass(line) {
+  if (line.manualProduct || (!line.barcode && !line.smaregiProductId && !line.productId)) return "line-stock muted";
+  return Number(line.stock ?? line.base_stock ?? 0) > 0 ? "" : "line-stock warn";
 }
 
 function normalizeInvoiceLine(line) {
@@ -356,6 +509,33 @@ function getInvoiceRawLines(invoice) {
     invoice?.orderItems
   );
   return rows.map(normalizeInvoiceLine);
+}
+
+async function refreshInvoiceLineStocks() {
+  const targets = currentInvoiceLines
+    .map(line => ({
+      barcode: String(line.barcode || line.productCode || "").trim(),
+      productId: String(line.smaregiProductId || line.smaregi_product_id || line.productId || "").trim()
+    }))
+    .filter(target => target.barcode || target.productId);
+  const unique = new Map(targets.map(target => [`${target.barcode}|${target.productId}`, target]));
+  for (const target of unique.values()) {
+    let rows = [];
+    if (target.barcode) {
+      rows = await salesRestFetch(`products?select=barcode,base_stock,smaregi_product_id&barcode=eq.${encodeURIComponent(target.barcode)}&limit=1`).catch(() => []);
+    }
+    if ((!Array.isArray(rows) || !rows[0]) && target.productId) {
+      rows = await salesRestFetch(`products?select=barcode,base_stock,smaregi_product_id&smaregi_product_id=eq.${encodeURIComponent(target.productId)}&limit=1`).catch(() => []);
+    }
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) continue;
+    currentInvoiceLines.forEach(line => {
+      const sameBarcode = target.barcode && String(line.barcode || line.productCode || "") === target.barcode;
+      const sameProduct = target.productId && String(line.smaregiProductId || line.smaregi_product_id || line.productId || "") === target.productId;
+      if (sameBarcode || sameProduct) line.stock = Number(row.base_stock || 0);
+    });
+  }
+  renderInvoiceLines();
 }
 
 function normalizeInvoiceForView(invoice) {
@@ -425,9 +605,18 @@ function calcInvoiceTotals(invoice) {
     discount += Number(line.discountAmount || 0);
     total += Number(line.amount || 0);
   });
+  const overallDiscountAmount = Math.max(0, Number(invoice?.overallDiscountAmount || 0));
+  const appliedOverallDiscount = isRefundTransaction(invoice?.transactionType)
+    ? overallDiscountAmount
+    : Math.min(Math.max(0, total), overallDiscountAmount);
+  discount += appliedOverallDiscount;
+  total = isRefundTransaction(invoice?.transactionType)
+    ? total + appliedOverallDiscount
+    : Math.max(0, total - appliedOverallDiscount);
   return {
     subtotal,
     discount,
+    overallDiscountAmount: appliedOverallDiscount,
     total,
     tax: Math.floor(total * 10 / 110)
   };
@@ -435,7 +624,8 @@ function calcInvoiceTotals(invoice) {
 
 function buildStockDeductionLines(invoice) {
   return getInvoiceRawLines(invoice).map(line => {
-    const qty = Math.abs(Number(line.qty || line.quantity || 0));
+    const normalizedLine = recalcInvoiceLine({ ...line, transactionType: invoice.transactionType });
+    const qty = Math.abs(Number(normalizedLine.qty || normalizedLine.quantity || 0));
     const productId = String(line.smaregiProductId || line.smaregi_product_id || line.productId || "").trim();
     const barcode = String(line.barcode || line.productCode || "").trim();
     return {
@@ -443,10 +633,51 @@ function buildStockDeductionLines(invoice) {
       smaregiProductId: productId,
       productCode: barcode,
       barcode,
-      name: String(line.name || "").trim(),
-      quantity: qty
+      name: String(normalizedLine.name || line.name || "").trim(),
+      productName: String(normalizedLine.name || line.name || "").trim(),
+      quantity: qty,
+      qty,
+      unit: normalizedLine.unit || line.unit || "",
+      unitPrice: Number(normalizedLine.unitPrice || 0),
+      price: Number(normalizedLine.unitPrice || 0),
+      discountRate: Number(normalizedLine.discountRate ?? normalizedLine.discountValue ?? 0),
+      discountValue: Number(normalizedLine.discountValue ?? normalizedLine.discountRate ?? 0),
+      discountAmount: Number(normalizedLine.discountAmount || 0),
+      discountAmountInput: Number(normalizedLine.discountAmountInput || 0),
+      amount: Number(normalizedLine.amount || 0),
+      memo: normalizedLine.memo || line.memo || ""
     };
   }).filter(line => line.quantity > 0 && (line.productId || line.barcode || line.productCode));
+}
+
+function buildSmaregiSaleLines(invoice) {
+  return getInvoiceRawLines(invoice).map(line => {
+    const normalizedLine = recalcInvoiceLine({ ...line, transactionType: invoice.transactionType });
+    const qty = Math.abs(Number(normalizedLine.qty || normalizedLine.quantity || 0));
+    const productId = String(line.smaregiProductId || line.smaregi_product_id || line.productId || "").trim();
+    const barcode = String(line.barcode || line.productCode || "").trim();
+    const manualProduct = Boolean(line.manualProduct) || (!productId && !barcode);
+    return {
+      productId,
+      smaregiProductId: productId,
+      productCode: barcode,
+      barcode,
+      manualProduct,
+      name: String(normalizedLine.name || line.name || "").trim(),
+      productName: String(normalizedLine.name || line.name || "").trim(),
+      quantity: qty,
+      qty,
+      unit: normalizedLine.unit || line.unit || "",
+      unitPrice: Number(normalizedLine.unitPrice || 0),
+      price: Number(normalizedLine.unitPrice || 0),
+      discountRate: Number(normalizedLine.discountRate ?? normalizedLine.discountValue ?? 0),
+      discountValue: Number(normalizedLine.discountValue ?? normalizedLine.discountRate ?? 0),
+      discountAmount: Number(normalizedLine.discountAmount || 0),
+      discountAmountInput: Number(normalizedLine.discountAmountInput || 0),
+      amount: Number(normalizedLine.amount || 0),
+      memo: normalizedLine.memo || line.memo || ""
+    };
+  }).filter(line => line.quantity > 0 && (line.productId || line.barcode || line.productCode || line.manualProduct || line.name));
 }
 
 async function readStockApiJson(response) {
@@ -483,80 +714,198 @@ async function findProductForStockLine(line) {
   return null;
 }
 
-async function syncProductsBaseStock(lines) {
-  const results = [];
-  for (const line of lines) {
-    const found = await findProductForStockLine(line);
-    if (!found) {
-      results.push({ ...line, ok: false, error: "products row not found" });
-      continue;
-    }
-    const before = Number(found.row.base_stock || 0);
-    const after = Math.max(0, before - Number(line.quantity || 0));
-    await salesRestFetch(`products?${found.filter}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ base_stock: after })
-    });
-    results.push({ ...line, ok: true, before, after });
+async function syncProductsBaseStock(lines, mode = "decrement") {
+  const response = await fetch("/api/products-base-stock-sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lines, mode })
+  });
+  const text = await response.text().catch(() => "");
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (_) {
+    throw new Error(`products.base_stock sync JSON parse failed HTTP ${response.status}: ${text.slice(0, 500)}`);
   }
-  return results;
+  console.log("[products.base_stock sync response]", {
+    ok: response.ok,
+    status: response.status,
+    body: data || text
+  });
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || `products.base_stock sync API error HTTP ${response.status}: ${text.slice(0, 500)}`);
+  }
+  return Array.isArray(data?.results) ? data.results : [];
+}
+
+async function cancelSmaregiSale(invoice, reason) {
+  const lines = Array.isArray(invoice.smaregiSaleLines) && invoice.smaregiSaleLines.length
+    ? invoice.smaregiSaleLines
+    : buildStockDeductionLines(invoice);
+  const totals = calcInvoiceTotals(invoice);
+  const response = await fetch("/api/smaregi-sales-cancel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      invoiceId: invoice.id,
+      invoiceNo: invoice.invoiceNo,
+      originNumber: invoice.originNumber || invoice.masterNumber || invoice.sourceQuoteNo || "",
+      smaregiTransactionId: invoice.smaregiTransactionId || "",
+      cancelReason: reason || "",
+      cancelledAt: invoice.cancelledAt || invoice.canceledAt || new Date().toISOString(),
+      tax: totals.tax,
+      overallDiscountAmount: totals.overallDiscountAmount || 0,
+      overallDiscountReason: invoice.overallDiscountReason || "",
+      lines
+    })
+  });
+  const text = await response.text().catch(() => "");
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (_) {
+    throw new Error(`Smaregi sale cancel JSON parse failed HTTP ${response.status}: ${text.slice(0, 500)}`);
+  }
+  console.log("[Smaregi sale cancel response]", {
+    ok: response.ok,
+    status: response.status,
+    body: data || text
+  });
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || `Smaregi sale cancel API error HTTP ${response.status}: ${text.slice(0, 500)}`);
+  }
+  return { data, lines };
+}
+
+async function restoreProductsBaseStock(lines) {
+  return syncProductsBaseStock(lines, "restore");
+}
+
+async function applyInvoiceCancel(invoice, reason) {
+  const next = { ...invoice };
+  const now = new Date().toISOString();
+  if (normalizeInvoiceStatus(next.status) === INVOICE_STATUS_CANCELLED || next.cancelStatus === "success") {
+    throw new Error("This invoice is already canceled.");
+  }
+  next.cancelStatus = "pending";
+  next.cancelReason = reason || "";
+  next.cancelledAt = now;
+  next.canceledAt = now;
+
+  const saleSucceeded = normalizeSmaregiSaleStatus(next.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS;
+  const baseStockWasSynced = next.stockBaseStockSyncStatus === "success";
+  if (!saleSucceeded) {
+    next.smaregiCancelStatus = "skipped";
+    next.stockRestoreStatus = "skipped";
+  } else {
+    if (next.smaregiCancelStatus === "success") {
+      throw new Error("Smaregi sale cancel is already completed.");
+    }
+    next.smaregiCancelStatus = "pending";
+    const cancelResult = await cancelSmaregiSale(next, reason);
+    next.smaregiCancelStatus = "success";
+    next.smaregiCancelError = "";
+    next.smaregiCancelTransactionId = cancelResult.data.smaregiCancelTransactionId || "";
+    next.smaregiCanceledAt = now;
+    next.smaregiCancelLines = cancelResult.lines.map(line => ({ ...line }));
+
+    if (baseStockWasSynced) {
+      next.stockRestoreStatus = "pending";
+      const restoreResults = await restoreProductsBaseStock(cancelResult.lines);
+      next.stockRestoreStatus = restoreResults.every(row => row.ok) ? "success" : "failed";
+      next.stockRestoreError = next.stockRestoreStatus === "failed" ? "Some products.base_stock restore lines failed." : "";
+      next.stockRestoredAt = next.stockRestoreStatus === "success" ? new Date().toISOString() : "";
+      next.stockRestoreLines = restoreResults;
+    } else {
+      next.stockRestoreStatus = "skipped";
+      next.stockRestoreError = "";
+      next.stockRestoreLines = [];
+    }
+  }
+
+  next.status = INVOICE_STATUS_CANCELLED;
+  next.cancelStatus = "success";
+  next.updatedAt = new Date().toISOString();
+  return next;
 }
 
 async function applyInvoiceStockDeduction(invoice) {
   const next = { ...invoice };
-  if (normalizeStockDeductionStatus(next.stockDeductionStatus) === STOCK_DEDUCTION_STATUS_SUCCESS) return next;
-  if (!isStockDeductionTarget(next)) {
-    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_SKIPPED;
-    next.stockDeductionError = "";
-    next.stockDeductionLines = [];
-    next.stockDeductedAt = "";
+  if (normalizeSmaregiSaleStatus(next.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS) return next;
+  if (!isSmaregiSaleTarget(next)) {
+    next.smaregiSaleStatus = SMAREGI_SALE_STATUS_SKIPPED;
+    next.smaregiSaleError = "";
+    next.smaregiSaleLines = [];
+    next.smaregiSaleRegisteredAt = "";
     return next;
   }
-  const lines = buildStockDeductionLines(next);
-  if (!lines.length) {
-    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_SKIPPED;
-    next.stockDeductionError = "在庫減算対象の商品明細がありません。";
-    next.stockDeductionLines = [];
-    next.stockDeductedAt = "";
+  const saleLines = buildSmaregiSaleLines(next);
+  if (!saleLines.length) {
+    next.smaregiSaleStatus = SMAREGI_SALE_STATUS_SKIPPED;
+    next.smaregiSaleError = "スマレジ売上登録対象の商品明細がありません。";
+    next.smaregiSaleLines = [];
+    next.smaregiSaleRegisteredAt = "";
     return next;
   }
-  next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_PENDING;
-  next.stockDeductionError = "";
-  next.stockDeductionLines = lines;
+  const stockLines = buildStockDeductionLines(next);
+  next.smaregiSaleStatus = SMAREGI_SALE_STATUS_PENDING;
+  next.smaregiSaleError = "";
+  next.smaregiSaleLines = saleLines;
   try {
-    const response = await fetch("/api/smaregi-stock-decrement", {
+    const totals = calcInvoiceTotals(next);
+    console.log("[Sales Smaregi sale request]", {
+      invoiceId: next.id,
+      invoiceNo: next.invoiceNo,
+      originNumber: next.originNumber || next.masterNumber || next.sourceQuoteNo || "",
+      transactionType: next.transactionType,
+      total: totals.total,
+      lines: saleLines
+    });
+    const response = await fetch("/api/smaregi-sales-register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         invoiceId: next.id,
         invoiceNo: next.invoiceNo,
+        invoiceDate: next.invoiceDate,
+        confirmedAt: next.confirmedAt,
+        issuedAt: next.issuedAt,
+        updatedAt: next.updatedAt,
         originNumber: next.originNumber || next.masterNumber || next.sourceQuoteNo || "",
-        idempotencyKey: `${next.id || next.invoiceNo}:stock-deduction`,
-        lines
+        transactionType: next.transactionType,
+        customerName: next.customerName || "",
+        organizationName: next.organizationName || "",
+        total: totals.total,
+        tax: totals.tax,
+        overallDiscountAmount: totals.overallDiscountAmount || 0,
+        overallDiscountReason: next.overallDiscountReason || "",
+        smaregiCustomerId: next.smaregiCustomerId || "",
+        smaregiCustomerCode: next.smaregiCustomerCode || "",
+        idempotencyKey: `${next.id || next.invoiceNo}:smaregi-sale`,
+        lines: saleLines
       })
     });
     const data = await readStockApiJson(response);
     let baseStockSync = [];
     try {
-      baseStockSync = await syncProductsBaseStock(lines);
+      baseStockSync = await syncProductsBaseStock(stockLines);
       next.stockBaseStockSyncStatus = baseStockSync.every(row => row.ok) ? "success" : "failed";
     } catch (syncError) {
       next.stockBaseStockSyncStatus = "failed";
       next.stockBaseStockSyncError = syncError.message || String(syncError);
     }
-    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_SUCCESS;
-    next.stockDeductedAt = new Date().toISOString();
-    next.stockDeductionError = next.stockBaseStockSyncStatus === "failed" ? `products.base_stock同期失敗: ${next.stockBaseStockSyncError || "一部商品未同期"}` : "";
-    next.smaregiStockMovementId = data.smaregiStockMovementId || "";
-    next.stockDeductionLines = lines.map(line => ({ ...line }));
+    next.smaregiSaleStatus = SMAREGI_SALE_STATUS_SUCCESS;
+    next.smaregiSaleRegisteredAt = new Date().toISOString();
+    next.smaregiSaleError = next.stockBaseStockSyncStatus === "failed" ? `products.base_stock同期失敗: ${next.stockBaseStockSyncError || "一部商品未同期"}` : "";
+    next.smaregiTransactionId = data.smaregiTransactionId || "";
+    next.smaregiSaleLines = saleLines.map(line => ({ ...line }));
     next.stockBaseStockSyncLines = baseStockSync;
   } catch (error) {
-    next.stockDeductionStatus = STOCK_DEDUCTION_STATUS_FAILED;
-    next.stockDeductedAt = "";
-    next.stockDeductionError = error.message || String(error);
-    next.smaregiStockMovementId = "";
-    next.stockDeductionLines = lines.map(line => ({ ...line }));
+    next.smaregiSaleStatus = SMAREGI_SALE_STATUS_FAILED;
+    next.smaregiSaleRegisteredAt = "";
+    next.smaregiSaleError = error.message || String(error);
+    next.smaregiTransactionId = "";
+    next.smaregiSaleLines = saleLines.map(line => ({ ...line }));
   }
   return next;
 }
@@ -604,13 +953,16 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     address: customerView.address,
     phone: customerView.phone,
     email: customerView.email,
-    subject: invoice.subject || "",
+    subject: invoice.subject || defaultTradeSubject(today()),
     staff: invoice.staff || "",
     transactionType: normalizeTransactionType(invoice.transactionType),
-    originalSlipNumber: invoice.originalSlipNumber || "",
-    reasonMemo: invoice.reasonMemo || "",
-    memo: invoice.memo || invoice.customerMemo || "",
-    customerMemo: invoice.customerMemo || invoice.memo || "",
+    originalSlipNumber: "",
+    reasonMemo: "",
+    overallDiscountAmount: Math.max(0, Number(invoice.overallDiscountAmount || 0)),
+    overallDiscountReason: invoice.overallDiscountReason || "",
+    memo: invoice.slipMemo || invoice.memo || invoice.customerMemo || "",
+    slipMemo: invoice.slipMemo || invoice.memo || invoice.customerMemo || "",
+    customerMemo: invoice.customerMemo || invoice.slipMemo || invoice.memo || "",
     items: JSON.parse(JSON.stringify(invoice.lines || invoice.items || [])),
     lines: JSON.parse(JSON.stringify(invoice.lines || invoice.items || [])),
     subtotal: totals.subtotal,
@@ -746,6 +1098,9 @@ function confirmSalesPopup(title, body, type = "warn") {
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
+  removeUnusedInvoiceFields();
+  arrangeInvoiceSubjectDateRow();
+  markInvoiceRequiredLabels();
   document.getElementById("invoiceStatus").innerHTML = INVOICE_STATUS_OPTIONS
     .map(status => `<option value="${status}">${status}</option>`)
     .join("");
@@ -871,12 +1226,12 @@ function renderInvoiceListRow(invoice) {
     <td>${escapeHtml(customerView.organizationName)}</td>
     <td>${escapeHtml(customerView.customerName)}</td>
     <td class="${amountClass(totals.total, invoice.transactionType)}">${money(totals.total)}</td>
-    <td>${statusBadge(status)} ${stockDeductionBadge(invoice)}</td>
+    <td>${statusBadge(status)}</td>
     <td>${escapeHtml(invoice.staff || "")}</td>
     <td>
       <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">${status === INVOICE_STATUS_DRAFT ? "&#32232;&#38598;" : "&#35443;&#32048;"}</button>
-      <button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>
-      ${canRetryStockDeduction(invoice) ? `<button type="button" class="secondary" onclick="retryInvoiceStockDeduction('${invoice.id}')">在庫減算再実行</button>` : ""}
+      ${canOutputInvoicePdf(invoice) ? `<button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>` : `<button type="button" class="secondary" disabled title="請求書確定後にPDF出力できます">PDF&#20986;&#21147;</button>`}
+      ${canRetryStockDeduction(invoice) ? `<button type="button" class="secondary" onclick="retryInvoiceStockDeduction('${invoice.id}')">売上登録再実行</button>` : ""}
     </td>
   </tr>`;
 }
@@ -922,10 +1277,11 @@ function matchesDateRange(values, from, to) {
 function clearInvoiceEditor() {
   currentInvoiceId = null;
   currentInvoiceLines = [];
-  ["invoiceNo", "sourceQuoteNo", "customerName", "invoiceOrganizationName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo", "originalSlipNumber", "reasonMemo", "stockDeductionStatus"].forEach(id => {
+  ["invoiceNo", "sourceQuoteNo", "customerName", "invoiceOrganizationName", "customerType", "invoiceStaff", "customerAddress", "customerPhone", "customerEmail", "invoiceSubject", "invoiceMemo", "originalSlipNumber", "reasonMemo", "stockDeductionStatus", "overallDiscountReason"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
+  setFieldValue("overallDiscountAmount", 0);
   ["salesCustomerId", "salesCustomerCode", "salesSmaregiCustomerId", "salesSmaregiCustomerCode"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
@@ -934,7 +1290,8 @@ function clearInvoiceEditor() {
   setFieldValue("transactionType", "通常販売");
   document.getElementById("issuedAt").value = "";
   document.getElementById("invoiceDate").value = today();
-  document.getElementById("dueDate").value = today();
+  document.getElementById("dueDate").value = datePlusDays(today(), 14);
+  setFieldValue("invoiceSubject", defaultTradeSubject());
   renderInvoiceLines();
   updateInvoiceLockState({ status: INVOICE_STATUS_DRAFT });
 }
@@ -954,8 +1311,8 @@ function fillInvoiceForm(invoice) {
   currentInvoiceId = invoice.id || null;
   currentInvoiceLines = JSON.parse(JSON.stringify(invoice.lines || []));
   document.getElementById("invoiceNo").value = invoice.invoiceNo || "";
-  document.getElementById("invoiceStatus").value = normalizeInvoiceStatus(invoice.status);
-  setFieldValue("stockDeductionStatus", stockDeductionDisplay(invoice));
+  document.getElementById("invoiceStatus").value = invoice.issuedAt ? normalizeInvoiceStatus(invoice.status) : INVOICE_STATUS_DRAFT;
+  setFieldValue("stockDeductionStatus", smaregiSaleDisplay(invoice));
   document.getElementById("sourceQuoteNo").value = invoice.sourceQuoteNo || "";
   setFieldValue("salesCustomerId", invoice.customerId || "");
   setFieldValue("salesCustomerCode", invoice.customerCode || "");
@@ -969,16 +1326,21 @@ function fillInvoiceForm(invoice) {
   document.getElementById("customerAddress").value = customerView.address;
   document.getElementById("customerPhone").value = customerView.phone;
   document.getElementById("customerEmail").value = customerView.email;
-  document.getElementById("invoiceSubject").value = invoice.subject || "";
+  document.getElementById("invoiceSubject").value = invoice.subject || defaultTradeSubject(invoice.invoiceDate || invoice.createdAt);
   document.getElementById("invoiceDate").value = invoice.invoiceDate || today();
-  document.getElementById("dueDate").value = invoice.dueDate || today();
+  document.getElementById("dueDate").value = invoice.dueDate || datePlusDays(invoice.invoiceDate || today(), 14);
   setFieldValue("transactionType", normalizeTransactionType(invoice.transactionType));
-  setFieldValue("originalSlipNumber", invoice.originalSlipNumber || "");
-  setFieldValue("reasonMemo", invoice.reasonMemo || "");
-  document.getElementById("invoiceMemo").value = invoice.memo || "";
+  setFieldValue("originalSlipNumber", "");
+  setFieldValue("reasonMemo", "");
+  document.getElementById("invoiceMemo").value = invoice.slipMemo || invoice.memo || "";
+  setFieldValue("overallDiscountAmount", invoice.overallDiscountAmount || 0);
+  setFieldValue("overallDiscountReason", invoice.overallDiscountReason || "");
   applyInvoiceTransactionTypeToLines();
   renderInvoiceLines();
   updateInvoiceLockState(invoice);
+  refreshInvoiceLineStocks().catch(error => {
+    console.warn("invoice stock refresh failed", error);
+  });
 }
 
 function editInvoice(id) {
@@ -1002,11 +1364,13 @@ function scrollToInvoiceEditor() {
 
 function renderInvoiceLines() {
   const area = document.getElementById("invoiceLines");
-  const locked = !isInvoiceEditable(document.getElementById("invoiceStatus")?.value);
+  const locked = !isCurrentInvoiceEditable();
   const disabled = locked ? "disabled" : "";
+  const memoDisabled = "";
   area.innerHTML = currentInvoiceLines.length ? currentInvoiceLines.map((line, index) => {
     recalcInvoiceLine(line);
     return `<div class="invoice-line">
+      <label>現在庫<div class="${invoiceStockClass(line)}">${formatInvoiceStock(line)}</div></label>
       <label>商品名<input value="${escapeHtml(line.name || "")}" onchange="updateInvoiceLine(${index}, 'name', this.value)" ${disabled}></label>
       <label>数量<input type="number" min="0" step="1" value="${Number(line.qty || 0)}" onchange="updateInvoiceLine(${index}, 'qty', this.value)" ${disabled}></label>
       <label>単位<input value="${escapeHtml(line.unit || "")}" onchange="updateInvoiceLine(${index}, 'unit', this.value)" ${disabled}></label>
@@ -1014,15 +1378,26 @@ function renderInvoiceLines() {
       <label>値引率%<input type="number" min="0" max="100" step="1" value="${Number(line.discountValue || 0)}" onchange="updateInvoiceLine(${index}, 'discountValue', this.value)" ${disabled}></label>
       <label>値引額<input type="number" min="0" step="1" value="${Number(line.discountAmountInput || 0)}" onchange="updateInvoiceLine(${index}, 'discountAmountInput', this.value)" ${disabled}></label>
       <label>金額<div class="line-amount ${amountClass(line.amount, line.transactionType)}">${money(line.amount)} ${refundBadge(line.transactionType)}</div></label>
-      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateInvoiceLine(${index}, 'memo', this.value)" ${disabled}></label>
+      <label>備考<input value="${escapeHtml(line.memo || "")}" onchange="updateInvoiceLine(${index}, 'memo', this.value)" ${memoDisabled}></label>
       <button type="button" class="danger" onclick="removeInvoiceLine(${index})" ${disabled}>削除</button>
     </div>`;
   }).join("") : '<div class="message">請求商品がありません。</div>';
+  markInvoiceLineRequiredLabels(area);
   recalcTotals();
 }
 
+function markInvoiceLineRequiredLabels(area) {
+  area.querySelectorAll("label").forEach(label => {
+    const control = label.querySelector("input,select");
+    const handler = control?.getAttribute("onchange") || "";
+    if (handler.includes("'memo'")) return;
+    if (control || label.querySelector(".line-amount")) applyRequiredLabel(label);
+  });
+}
+
 function updateInvoiceLine(index, key, value) {
-  if (!isInvoiceEditable(document.getElementById("invoiceStatus")?.value)) {
+  const editable = isCurrentInvoiceEditable();
+  if (!editable && key !== "memo") {
     showSalesMessage("発行済みの請求書は商品明細を編集できません。", "warn");
     renderInvoiceLines();
     return;
@@ -1039,11 +1414,34 @@ function updateInvoiceLine(index, key, value) {
   else line[key] = value;
   if (key === "discountValue") line.discountRate = clampNumber(value, 0, 100);
   recalcInvoiceLine(line);
+  if (!editable && key === "memo") {
+    persistInvoiceLineMemos();
+    showSalesMessage("商品備考を保存しました。", "ok");
+  }
   renderInvoiceLines();
 }
 
+function persistInvoiceLineMemos() {
+  if (!currentInvoiceId) return;
+  const invoices = readInvoices();
+  const index = invoices.findIndex(row => row.id === currentInvoiceId);
+  if (index < 0) return;
+  const existing = invoices[index];
+  const lines = getInvoiceRawLines(existing).map((line, lineIndex) => ({
+    ...line,
+    memo: currentInvoiceLines[lineIndex]?.memo || ""
+  }));
+  invoices[index] = {
+    ...existing,
+    lines,
+    items: lines,
+    updatedAt: new Date().toISOString()
+  };
+  writeInvoices(invoices);
+}
+
 function removeInvoiceLine(index) {
-  if (!isInvoiceEditable(document.getElementById("invoiceStatus")?.value)) {
+  if (!isCurrentInvoiceEditable()) {
     showSalesMessage("発行済みの請求書は商品明細を編集できません。", "warn");
     return;
   }
@@ -1055,6 +1453,7 @@ function updateInvoiceLockState(invoice) {
   const editable = isInvoiceEditable(invoice);
   const issueButton = ensureIssueInvoiceButton();
   const saveButton = document.getElementById("saveInvoiceBtn");
+  const pdfButton = document.getElementById("invoicePdfBtn");
   const retryStockButton = document.getElementById("retryStockDeductionBtn");
   const alwaysReadonlyCustomerTargets = [
     "customerName",
@@ -1073,7 +1472,9 @@ function updateInvoiceLockState(invoice) {
     "transactionType",
     "originalSlipNumber",
     "reasonMemo",
-    "invoiceMemo"
+    "invoiceMemo",
+    "overallDiscountAmount",
+    "overallDiscountReason"
   ];
   if (issueButton) {
     const hasInvoice = Boolean(currentInvoiceId || document.getElementById("invoiceNo")?.value);
@@ -1081,11 +1482,17 @@ function updateInvoiceLockState(invoice) {
     issueButton.hidden = !shouldShow;
     issueButton.style.display = shouldShow ? "" : "none";
     issueButton.disabled = !shouldShow;
-    issueButton.textContent = "発行確定";
+    issueButton.textContent = "請求書確定";
   }
   if (saveButton) {
     saveButton.hidden = !editable;
     saveButton.disabled = !editable;
+  }
+  if (pdfButton) {
+    const pdfAvailable = canOutputInvoicePdf(invoice);
+    pdfButton.hidden = false;
+    pdfButton.disabled = !pdfAvailable;
+    pdfButton.title = pdfAvailable ? "" : "請求書確定後にPDF出力できます";
   }
   if (retryStockButton) {
     const shouldShowRetry = canRetryStockDeduction(invoice);
@@ -1106,7 +1513,7 @@ function updateInvoiceLockState(invoice) {
   });
   document.getElementById("invoiceEditorCard")?.classList.toggle("locked", !editable);
   showSalesMessage(
-    editable ? "請求書を編集できます。" : "発行済みのため請求情報・金額・商品明細は編集できません。PDF出力とキャンセル処理は可能です。",
+    editable ? "請求書を編集できます。" : "確定済みのため請求情報・金額・商品明細は編集できません。商品備考、PDF出力、キャンセル処理は可能です。",
     editable ? "" : "warn"
   );
   renderInvoiceLines();
@@ -1136,7 +1543,11 @@ function ensureIssueInvoiceButton() {
 
 function recalcTotals() {
   currentInvoiceLines.forEach(recalcInvoiceLine);
-  const totals = calcInvoiceTotals({ lines: currentInvoiceLines });
+  const totals = calcInvoiceTotals({
+    lines: currentInvoiceLines,
+    transactionType: getCurrentTransactionType(),
+    overallDiscountAmount: document.getElementById("overallDiscountAmount")?.value || 0
+  });
   document.getElementById("subtotalText").textContent = money(totals.subtotal);
   document.getElementById("discountText").textContent = money(totals.discount);
   const totalText = document.getElementById("totalText");
@@ -1160,7 +1571,7 @@ function collectInvoice() {
     masterNumber: originNumber,
     quoteNumber: existing?.quoteNumber || existing?.sourceQuoteNo || originNumber,
     sourceQuoteId: existing?.sourceQuoteId || "",
-    sourceQuoteNo: document.getElementById("sourceQuoteNo").value || existing?.sourceQuoteNo || "",
+    sourceQuoteNo: existing?.sourceQuoteNo || "",
     customerId: document.getElementById("salesCustomerId")?.value || existing?.customerId || "",
     customerCode: document.getElementById("salesCustomerCode")?.value || existing?.customerCode || "",
     smaregiCustomerId: document.getElementById("salesSmaregiCustomerId")?.value || existing?.smaregiCustomerId || "",
@@ -1175,15 +1586,18 @@ function collectInvoice() {
     address: customerView.address,
     phone: customerView.phone,
     email: customerView.email,
-    subject: document.getElementById("invoiceSubject").value.trim(),
+    subject: document.getElementById("invoiceSubject").value.trim() || defaultTradeSubject(document.getElementById("invoiceDate").value || new Date()),
     invoiceDate: document.getElementById("invoiceDate").value,
     dueDate: document.getElementById("dueDate").value,
     staff: document.getElementById("invoiceStaff").value.trim(),
     transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value || existing?.transactionType),
-    originalSlipNumber: document.getElementById("originalSlipNumber")?.value?.trim() || "",
-    reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
+    originalSlipNumber: "",
+    reasonMemo: "",
     memo: document.getElementById("invoiceMemo").value,
+    slipMemo: document.getElementById("invoiceMemo").value,
     customerMemo: existing?.customerMemo || document.getElementById("invoiceMemo").value,
+    overallDiscountAmount: Math.max(0, Number(document.getElementById("overallDiscountAmount")?.value || 0)),
+    overallDiscountReason: document.getElementById("overallDiscountReason")?.value?.trim() || "",
     items: currentInvoiceLines.map(line => recalcInvoiceLine({ ...line, transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value) })),
     lines: currentInvoiceLines.map(line => recalcInvoiceLine({ ...line, transactionType: normalizeTransactionType(document.getElementById("transactionType")?.value) }))
   };
@@ -1215,7 +1629,7 @@ async function issueInvoice() {
     showSalesMessage("先に請求書を保存してください。", "err");
     return;
   }
-  const confirmed = await confirmSalesPopup("発行確定", "この請求書を発行確定しますか？", "warn");
+  const confirmed = await confirmSalesPopup("請求書確定", "この請求書を確定しますか？", "warn");
   if (!confirmed) return;
   const invoices = readInvoices();
   const index = invoices.findIndex(row => row.id === currentInvoiceId);
@@ -1229,9 +1643,12 @@ async function issueInvoice() {
     return;
   }
   const totals = calcInvoiceTotals(invoice);
+  const confirmedAt = new Date().toISOString();
   invoice.status = totals.total <= 0 ? "no_payment_required" : "waiting_payment";
   const issuedAtInput = document.getElementById("issuedAt")?.value;
   invoice.issuedAt = issuedAtInput || new Date().toISOString();
+  invoice.confirmedAt = confirmedAt;
+  invoice.invoiceConfirmedAt = confirmedAt;
   invoice.updatedAt = new Date().toISOString();
   invoice = await applyInvoiceStockDeduction(invoice);
   ensureDeliveryForInvoice(invoice);
@@ -1242,9 +1659,9 @@ async function issueInvoice() {
   fillInvoiceForm(invoice);
   renderInvoiceList();
   const statusLabel = normalizeInvoiceStatus(invoice.status);
-  const stockMessage = stockDeductionDisplay(invoice);
-  showSalesMessage(`請求書を発行確定しました。ステータスを${statusLabel}に更新しました。在庫減算: ${stockMessage}`, invoice.stockDeductionStatus === STOCK_DEDUCTION_STATUS_FAILED ? "warn" : "ok");
-  showSalesPopup("発行確定", `請求書を発行確定しました\n在庫減算: ${stockMessage}${invoice.stockDeductionError ? `\n${invoice.stockDeductionError}` : ""}`, invoice.stockDeductionStatus === STOCK_DEDUCTION_STATUS_FAILED ? "warn" : "ok");
+  const saleMessage = smaregiSaleDisplay(invoice);
+  showSalesMessage(`請求書を確定しました。ステータスを${statusLabel}に更新しました。スマレジ売上登録: ${saleMessage}`, invoice.smaregiSaleStatus === SMAREGI_SALE_STATUS_FAILED ? "warn" : "ok");
+  showSalesPopup("請求書確定", `請求書を確定しました\nスマレジ売上登録: ${saleMessage}${invoice.smaregiSaleError ? `\n${invoice.smaregiSaleError}` : ""}`, invoice.smaregiSaleStatus === SMAREGI_SALE_STATUS_FAILED ? "warn" : "ok");
 }
 
 async function retryInvoiceStockDeduction(id) {
@@ -1256,29 +1673,29 @@ async function retryInvoiceStockDeduction(id) {
   }
   const original = normalizeInvoiceForView(invoices[index]);
   if (!canRetryStockDeduction(original)) {
-    showSalesMessage("在庫減算の再実行対象ではありません。", "warn");
+    showSalesMessage("スマレジ売上登録の再実行対象ではありません。", "warn");
     return;
   }
-  showSalesMessage("在庫減算を再実行しています。", "warn");
+  showSalesMessage("スマレジ売上登録を再実行しています。", "warn");
   let updated = null;
   if (
-    normalizeStockDeductionStatus(original.stockDeductionStatus) === STOCK_DEDUCTION_STATUS_SUCCESS &&
+    normalizeSmaregiSaleStatus(original.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS &&
     original.stockBaseStockSyncStatus === "failed"
   ) {
     updated = { ...original };
     try {
-      const lines = Array.isArray(updated.stockDeductionLines) && updated.stockDeductionLines.length
-        ? updated.stockDeductionLines
+      const lines = Array.isArray(updated.smaregiSaleLines) && updated.smaregiSaleLines.length
+        ? updated.smaregiSaleLines
         : buildStockDeductionLines(updated);
       const baseStockSync = await syncProductsBaseStock(lines);
       updated.stockBaseStockSyncStatus = baseStockSync.every(row => row.ok) ? "success" : "failed";
       updated.stockBaseStockSyncError = updated.stockBaseStockSyncStatus === "failed" ? "一部商品のproducts.base_stock同期に失敗しました。" : "";
-      updated.stockDeductionError = updated.stockBaseStockSyncStatus === "failed" ? updated.stockBaseStockSyncError : "";
+      updated.smaregiSaleError = updated.stockBaseStockSyncStatus === "failed" ? updated.stockBaseStockSyncError : "";
       updated.stockBaseStockSyncLines = baseStockSync;
     } catch (error) {
       updated.stockBaseStockSyncStatus = "failed";
       updated.stockBaseStockSyncError = error.message || String(error);
-      updated.stockDeductionError = `products.base_stock同期失敗: ${updated.stockBaseStockSyncError}`;
+      updated.smaregiSaleError = `products.base_stock同期失敗: ${updated.stockBaseStockSyncError}`;
     }
   } else {
     updated = await applyInvoiceStockDeduction(original);
@@ -1288,9 +1705,9 @@ async function retryInvoiceStockDeduction(id) {
   writeInvoices(invoices);
   if (currentInvoiceId === updated.id) fillInvoiceForm(updated);
   renderInvoiceList();
-  const type = updated.stockDeductionStatus === STOCK_DEDUCTION_STATUS_SUCCESS ? "ok" : "warn";
-  showSalesMessage(`在庫減算再実行: ${stockDeductionDisplay(updated)}`, type);
-  showSalesPopup("在庫減算再実行", `${stockDeductionDisplay(updated)}${updated.stockDeductionError ? `\n${updated.stockDeductionError}` : ""}`, type);
+  const type = updated.smaregiSaleStatus === SMAREGI_SALE_STATUS_SUCCESS ? "ok" : "warn";
+  showSalesMessage(`スマレジ売上登録再実行: ${smaregiSaleDisplay(updated)}`, type);
+  showSalesPopup("スマレジ売上登録再実行", `${smaregiSaleDisplay(updated)}${updated.smaregiSaleError ? `\n${updated.smaregiSaleError}` : ""}`, type);
 }
 
 function retryCurrentInvoiceStockDeduction() {
@@ -1301,15 +1718,42 @@ function retryCurrentInvoiceStockDeduction() {
   retryInvoiceStockDeduction(currentInvoiceId);
 }
 
-function cancelInvoice() {
+async function cancelInvoice() {
   if (!currentInvoiceId) return;
-  document.getElementById("invoiceStatus").value = INVOICE_STATUS_CANCELLED;
-  saveInvoice();
+  const confirmed = await confirmSalesPopup("請求書キャンセル", "この請求書をキャンセルしますか？", "warn");
+  if (!confirmed) return;
+  const reason = window.prompt("キャンセル理由を入力してください。\n例：注文キャンセル / 誤発行 / 商品変更 / 数量変更 / 返金対応 / その他", "") || "";
+  const invoices = readInvoices();
+  const index = invoices.findIndex(row => row.id === currentInvoiceId);
+  if (index < 0) {
+    showSalesMessage("請求書が見つかりません。", "err");
+    return;
+  }
+  const invoice = normalizeInvoiceForView(invoices[index]);
+  try {
+    const updated = await applyInvoiceCancel(invoice, reason);
+    invoices[index] = updated;
+    writeInvoices(invoices);
+    fillInvoiceForm(updated);
+    renderInvoiceList();
+    const restoreMessage = updated.stockRestoreStatus === "failed"
+      ? "\nproducts.base_stock復帰に失敗しました。詳細を確認してください。"
+      : "";
+    showSalesPopup("請求書キャンセル", `請求書をキャンセルしました${restoreMessage}`, updated.stockRestoreStatus === "failed" ? "warn" : "ok");
+  } catch (error) {
+    const message = error?.message || String(error);
+    showSalesPopup("請求書キャンセル失敗", message, "err");
+  }
 }
 
 function outputCurrentInvoicePdf() {
+  const invoice = currentInvoiceId ? readInvoices().find(row => row.id === currentInvoiceId) : null;
+  if (!canOutputInvoicePdf(invoice)) {
+    showSalesPopup("PDF出力", "請求書確定後にPDF出力できます", "warn");
+    return;
+  }
   try {
-    printInvoicePdf(normalizeInvoiceForView(collectInvoice()));
+    printInvoicePdf(normalizeInvoiceForView(invoice));
   } finally {
     restoreInvoiceEditorAfterPdf();
   }
@@ -1317,7 +1761,12 @@ function outputCurrentInvoicePdf() {
 
 function printInvoiceById(id) {
   const invoice = readInvoices().find(row => row.id === id);
-  if (invoice) printInvoicePdf(normalizeInvoiceForView(invoice));
+  if (!invoice) return;
+  if (!canOutputInvoicePdf(invoice)) {
+    showSalesPopup("PDF出力", "請求書確定後にPDF出力できます", "warn");
+    return;
+  }
+  printInvoicePdf(normalizeInvoiceForView(invoice));
 }
 
 function restoreInvoiceEditorAfterPdf() {
