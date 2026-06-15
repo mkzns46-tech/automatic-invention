@@ -1,6 +1,7 @@
 const REQUIRED_TRANSACTION_SCOPES = ["pos.transactions:read", "pos.transactions:write"];
 const DEFAULT_TRANSACTION_SCOPE = REQUIRED_TRANSACTION_SCOPES.join(" ");
 const DEFAULT_TRANSACTION_PATH = "/transactions";
+const DEFAULT_TRANSACTION_CANCEL_PATH = "/transactions/{transactionHeadId}/cancel";
 const DEFAULT_PAYMENT_METHOD_NAME = "請求書";
 const MANUAL_PRODUCT_ID = 2953;
 const MANUAL_PRODUCT_CODE = "9900000000073";
@@ -85,6 +86,10 @@ function resolveSmaregiContext() {
     "SMAREGI_TERMINAL_ID"
   ) || "4";
   const transactionPath = env("SMAREGI_NEW_TOKYO_TRANSACTION_PATH", "NEW_SMAREGI_TOKYO_TRANSACTION_PATH") || DEFAULT_TRANSACTION_PATH;
+  const transactionCancelPath = env(
+    "SMAREGI_NEW_TOKYO_TRANSACTION_CANCEL_PATH",
+    "NEW_SMAREGI_TOKYO_TRANSACTION_CANCEL_PATH"
+  ) || DEFAULT_TRANSACTION_CANCEL_PATH;
   const transactionScope = ensureRequiredScopes(env("SMAREGI_NEW_TOKYO_TRANSACTION_SCOPE", "NEW_SMAREGI_TOKYO_TRANSACTION_SCOPE") || DEFAULT_TRANSACTION_SCOPE);
   const paymentMethodId = env(
     "SMAREGI_NEW_TOKYO_INVOICE_PAYMENT_METHOD_ID",
@@ -96,7 +101,7 @@ function resolveSmaregiContext() {
     "NEW_SMAREGI_TOKYO_INVOICE_PAYMENT_METHOD_NAME",
     "SMAREGI_INVOICE_PAYMENT_METHOD_NAME"
   ) || DEFAULT_PAYMENT_METHOD_NAME;
-  return { contractId, clientId, clientSecret, apiBase, storeId, terminalId, transactionPath, transactionScope, paymentMethodId, paymentMethodName };
+  return { contractId, clientId, clientSecret, apiBase, storeId, terminalId, transactionPath, transactionCancelPath, transactionScope, paymentMethodId, paymentMethodName };
 }
 
 async function getAccessToken(context) {
@@ -184,35 +189,45 @@ function findTransactionId(body) {
   return String(body.transactionHeadId || body.transaction_head_id || body.id || "").trim();
 }
 
+function formatCancelPath(template, transactionHeadId) {
+  const id = encodeURIComponent(transactionHeadId);
+  const path = String(template || DEFAULT_TRANSACTION_CANCEL_PATH).trim() || DEFAULT_TRANSACTION_CANCEL_PATH;
+  if (path.includes("{transactionHeadId}")) return path.replaceAll("{transactionHeadId}", id);
+  if (path.includes(":transactionHeadId")) return path.replaceAll(":transactionHeadId", id);
+  if (path.includes("{id}")) return path.replaceAll("{id}", id);
+  if (path.includes(":id")) return path.replaceAll(":id", id);
+  return `${path.replace(/\/$/, "")}/${id}/cancel`;
+}
+
 function buildCancelPayload(context, body) {
   const sourceTransactionId = firstString(body.smaregiTransactionId, body.transactionHeadId, body.transactionId);
   if (!sourceTransactionId) throw new Error("Smaregi transaction ID is required for sale cancel.");
   const lines = normalizeLines(body.lines);
   if (!lines.length) throw new Error("No Smaregi cancel lines were provided.");
-  const total = lines.reduce((sum, line) => sum + toInt(line.aricoAmount), 0);
-  const taxInclude = toInt(body.tax ?? Math.floor(total * 10 / 110));
   const terminalTranIdSource = `${body.invoiceNo || ""}${Date.now()}`.replace(/\D/g, "");
+  const memo = [
+    "販売管理キャンセル",
+    `元取引:${sourceTransactionId}`,
+    `伝票:${firstString(body.invoiceNo, body.originNumber) || "-"}`,
+    `理由:${firstString(body.cancelReason) || "-"}`
+  ].join(" ").slice(0, 100);
+
+  // Use the original transaction cancel endpoint. Do not register a reverse sale,
+  // and do not send details/payments here; those made Smaregi treat the request
+  // as another transaction instead of a clear cancel/return operation.
   const payload = {
-    transactionHeadDivision: "2",
-    cancelDivision: "0",
-    subtotal: String(total),
-    total: String(total),
-    taxInclude: String(taxInclude),
-    taxExclude: "0",
     storeId: String(context.storeId),
     terminalId: String(context.terminalId),
     terminalTranId: terminalTranIdSource.slice(-10).padStart(1, "1"),
     terminalTranDateTime: smaregiDateTime(body.cancelledAt || body.canceledAt || new Date().toISOString()),
-    memo: [
-      "販売管理キャンセル",
-      `元取引:${firstString(body.smaregiTransactionId) || "-"}`,
-      `伝票:${firstString(body.invoiceNo, body.originNumber) || "-"}`,
-      `理由:${firstString(body.cancelReason) || "-"}`
-    ].join(" ").slice(0, 100),
-    sellDivision: "0",
-    taxRate: "10"
+    memo
   };
-  return payload;
+  return {
+    sourceTransactionId,
+    lines,
+    path: formatCancelPath(context.transactionCancelPath, sourceTransactionId),
+    payload
+  };
 }
 
 module.exports = async function handler(req, res) {
@@ -234,11 +249,13 @@ module.exports = async function handler(req, res) {
     step = "oauth_token";
     const token = await getAccessToken(context);
     step = "cancel_payload";
-    const payload = buildCancelPayload(context, body);
+    const cancelRequest = buildCancelPayload(context, body);
+    const payload = cancelRequest.payload;
     requestJson = payload;
+    console.log("[smaregi-sales-cancel] path", cancelRequest.path);
     console.log("[smaregi-sales-cancel] request_json", JSON.stringify(payload));
     step = "cancel_register";
-    const responseBody = await fetchJson(apiBase + context.transactionPath, token, {
+    const responseBody = await fetchJson(apiBase + cancelRequest.path, token, {
       method: "POST",
       body: JSON.stringify(payload)
     });
@@ -247,6 +264,9 @@ module.exports = async function handler(req, res) {
       step,
       status: 200,
       smaregiCancelTransactionId: findTransactionId(responseBody),
+      sourceTransactionId: cancelRequest.sourceTransactionId,
+      cancelPath: cancelRequest.path,
+      lines: cancelRequest.lines,
       requestJson,
       response: responseBody
     });
