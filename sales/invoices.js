@@ -1224,13 +1224,18 @@ function renderInvoiceList() {
   const completedBody = document.getElementById("invoiceCompletedListBody");
   const allInvoices = readInvoices().sort(sortNewestFirst);
   const invoices = allInvoices.filter(matchesInvoiceListFilters);
-  const activeInvoices = invoices.filter(invoice => {
-    const status = normalizeInvoiceStatus(invoice.status);
-    return status === INVOICE_STATUS_DRAFT || status === INVOICE_STATUS_ISSUED || status === INVOICE_STATUS_WAITING_PAYMENT;
-  });
+  const completedStatuses = new Set([INVOICE_STATUS_PAID, INVOICE_STATUS_NO_PAYMENT_REQUIRED, INVOICE_STATUS_CANCELLED]);
   const completedInvoices = invoices.filter(invoice => {
     const status = normalizeInvoiceStatus(invoice.status);
-    return status === INVOICE_STATUS_PAID || status === INVOICE_STATUS_NO_PAYMENT_REQUIRED || status === INVOICE_STATUS_CANCELLED;
+    return completedStatuses.has(status);
+  });
+  const activeInvoices = invoices.filter(invoice => !completedStatuses.has(normalizeInvoiceStatus(invoice.status)));
+  console.log("invoice list counts", {
+    stored: allInvoices.length,
+    filtered: invoices.length,
+    active: activeInvoices.length,
+    completed: completedInvoices.length,
+    statuses: invoices.map(invoice => invoice.status || "").filter(Boolean)
   });
   const count = document.getElementById("invoiceListCount");
   if (count) count.textContent = invoiceListSearchText || invoiceListStatusFilter || invoiceListDateFrom || invoiceListDateTo
@@ -1371,13 +1376,20 @@ function fillInvoiceForm(invoice) {
 }
 
 function editInvoice(id) {
-  const invoice = readInvoices().find(row => row.id === id);
+  const invoice = readInvoices().find(row =>
+    row.id === id ||
+    row.invoiceNo === id ||
+    row.invoiceNumber === id ||
+    row.sourceQuoteId === id ||
+    row.sourceQuoteNo === id ||
+    row.quoteNumber === id
+  );
   if (!invoice) {
     showSalesMessage("請求書が見つかりません。", "err");
     return;
   }
   fillInvoiceForm(invoice);
-  history.replaceState(null, "", `invoices.html?id=${encodeURIComponent(id)}`);
+  history.replaceState(null, "", `invoices.html?id=${encodeURIComponent(invoice.id || id)}`);
   scrollToInvoiceEditor();
 }
 
