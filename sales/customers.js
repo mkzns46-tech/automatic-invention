@@ -61,10 +61,48 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!document.getElementById("customerListBody")) return;
   bindCustomerListControls();
   populateCustomerTypeOptions();
+  arrangeCustomerFormLayout();
   clearCustomerForm();
   updateOrganizationSuggestions();
   renderCustomerList();
 });
+
+function arrangeCustomerFormLayout() {
+  const card = document.getElementById("customerEditCard");
+  const customerId = document.getElementById("customerId");
+  if (!card || !customerId) return;
+  let grid = document.getElementById("customerFormGrid");
+  if (!grid) {
+    grid = document.createElement("div");
+    grid.id = "customerFormGrid";
+    grid.className = "customer-form-grid";
+    customerId.insertAdjacentElement("afterend", grid);
+  }
+  [
+    "customerCode",
+    "customerName",
+    "customerKana",
+    "customerOrganizationName",
+    "customerType",
+    "customerStaff",
+    "customerPostalCode",
+    "customerPhone",
+    "customerEmail",
+    "customerAddress",
+    "customerMemo"
+  ].forEach(id => {
+    const label = document.getElementById(id)?.closest("label");
+    if (!label) return;
+    label.classList.toggle("customer-form-wide", id === "customerAddress" || id === "customerMemo");
+    grid.appendChild(label);
+    if (id === "customerOrganizationName") {
+      const datalist = document.getElementById("customerOrganizationSuggestions");
+      if (datalist) grid.appendChild(datalist);
+    }
+  });
+  const actions = document.getElementById("customerSaveButton")?.closest(".sales-actions");
+  actions?.classList.add("customer-form-actions");
+}
 
 function populateCustomerTypeOptions() {
   const filter = document.getElementById("customerTypeFilter");
