@@ -329,7 +329,8 @@ function buildReceiptFromInvoice(invoice, receipts) {
     method: "振込",
     payerName: payment.payerName || "",
     staff: payment.staff || invoice.staff || "",
-    memo: payment.memo || invoice.memo || "",
+    memo: payment.memo || invoice.slipMemo || invoice.memo || "",
+    slipMemo: payment.memo || invoice.slipMemo || invoice.memo || "",
     status: "draft",
     createdAt: now,
     updatedAt: now,
@@ -382,7 +383,7 @@ function selectReceipt(id) {
   document.getElementById("receiptPaymentDate").value = receipt.paymentDate || "";
   document.getElementById("receiptAmount").value = money(receipt.amount);
   document.getElementById("receiptMethod").value = receipt.method || "振込";
-  document.getElementById("receiptMemo").value = receipt.memo || "";
+  document.getElementById("receiptMemo").value = receipt.slipMemo || receipt.memo || "";
   history.replaceState(null, "", `receipts.html?id=${encodeURIComponent(receipt.id)}`);
   showSalesMessage(`${receipt.receiptNo || ""} を表示しています。`, "ok");
 }
@@ -397,6 +398,7 @@ function saveReceiptEditsSilently() {
   receipt.subject = document.getElementById("receiptSubject")?.value.trim() || receipt.subject || "";
   receipt.paymentDate = document.getElementById("receiptPaymentDate")?.value || receipt.paymentDate || "";
   receipt.memo = document.getElementById("receiptMemo")?.value || receipt.memo || "";
+  receipt.slipMemo = receipt.memo;
   receipt.updatedAt = new Date().toISOString();
   receipts[index] = receipt;
   writeReceipts(receipts);
@@ -418,6 +420,7 @@ function saveCurrentReceipt() {
   receipt.subject = document.getElementById("receiptSubject")?.value.trim() || "";
   receipt.paymentDate = document.getElementById("receiptPaymentDate")?.value || receipt.paymentDate || "";
   receipt.memo = document.getElementById("receiptMemo")?.value || "";
+  receipt.slipMemo = receipt.memo;
   receipt.updatedAt = new Date().toISOString();
   receipts[index] = receipt;
   writeReceipts(receipts);

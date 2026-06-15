@@ -22,7 +22,7 @@ function printReceiptPdf(receipt) {
       <tr><th>入金日</th><td>${receipt.paymentDate || ""}</td></tr>
       <tr><th>入金方法</th><td>${receipt.method || "振込"}</td></tr>
       <tr><th>担当者</th><td>${receipt.staff || ""}</td></tr>
-      <tr><th>備考</th><td>${receipt.memo || ""}</td></tr>
+      <tr><th>伝票備考</th><td>${receipt.slipMemo || receipt.memo || ""}</td></tr>
     </table>
     <div class="box" style="margin-top:28px">発行元：ARICO ARCHERY<br>登録番号：T8180001160066</div>
   </body></html>`);

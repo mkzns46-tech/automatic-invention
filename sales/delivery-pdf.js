@@ -15,8 +15,15 @@ function printDeliveryPdf(delivery) {
       <td>${line.memo || ""}</td>
     </tr>
   `).join("");
-  const shippingBox = delivery.shipmentDate || delivery.shippingCarrier || delivery.trackingNumber
-    ? `<div class="box">発送日：${delivery.shipmentDate || ""}<br>配送会社：${delivery.shippingCarrier || ""}<br>送り状番号：${delivery.trackingNumber || ""}<br>発送担当：${delivery.shippingStaff || ""}</div>`
+  const status = String(delivery.status || "").trim();
+  const shippingMethod = delivery.shippingMethod || (status === "手渡し済" ? "手渡し" : status === "担当者手持ち済" ? "担当者手持ち" : "配送");
+  const shippingDate = delivery.shipmentDate || delivery.handoverDate || delivery.carryOutDate || "";
+  const shippingDateLabel = shippingMethod === "手渡し" ? "受け渡し日" : shippingMethod === "担当者手持ち" ? "持ち出し日" : "発送日";
+  const deliveryOnlyInfo = shippingMethod === "配送"
+    ? `<br>配送会社：${delivery.shippingCarrier || ""}<br>送り状番号：${delivery.trackingNumber || ""}`
+    : "";
+  const shippingBox = shippingDate || delivery.shippingCarrier || delivery.trackingNumber || delivery.shippingMethod
+    ? `<div class="box">発送方法：${shippingMethod}<br>${shippingDateLabel}：${shippingDate || ""}${deliveryOnlyInfo}<br>担当者：${delivery.shippingStaff || ""}</div>`
     : "";
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>納品書 ${delivery.deliveryNo || ""}</title>
   <style>
@@ -33,6 +40,7 @@ function printDeliveryPdf(delivery) {
     ${shippingBox}
     <table><thead><tr><th>商品名</th><th>数量</th><th>単位</th><th>税込単価</th><th>値引率</th><th>金額</th><th>備考</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="summary"><div><span>小計</span><strong>${money(delivery.subtotal)}</strong></div><div><span>値引き</span><strong>${money(delivery.discount)}</strong></div><div><span>合計</span><strong class="${amountClass(delivery.total)}">${money(delivery.total)}</strong></div><div><span>内消費税</span><strong>${money(delivery.tax)}</strong></div></div>
+    ${delivery.slipMemo || delivery.memo ? `<div class="box">伝票備考<br>${delivery.slipMemo || delivery.memo || ""}</div>` : ""}
   </body></html>`);
   win.document.close();
   win.focus();

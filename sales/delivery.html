@@ -92,6 +92,7 @@
       <label>件名<input id="deliverySubject" readonly></label>
       <label>請求日<input id="deliveryInvoiceDate" readonly></label>
     </div>
+    <label>伝票備考<textarea id="deliverySlipMemo" rows="3" onchange="updateCurrentDeliverySlipMemo(this.value)"></textarea></label>
   </section>
 
   <section class="card" id="deliveryShippingCard">

@@ -766,8 +766,9 @@ function buildInvoiceFromQuote(quote, invoices) {
     invoiceDate: today(),
     dueDate: today(),
     staff: quote.staff || "",
-    memo: quote.memo || quote.customerMemo || linkedCustomer.memo || "",
-    customerMemo: quote.customerMemo || quote.memo || linkedCustomer.memo || "",
+    memo: quote.slipMemo || quote.memo || quote.customerMemo || linkedCustomer.memo || "",
+    slipMemo: quote.slipMemo || quote.memo || quote.customerMemo || "",
+    customerMemo: quote.customerMemo || quote.slipMemo || quote.memo || linkedCustomer.memo || "",
     transactionType: normalizeTransactionType(quote.transactionType),
     originalSlipNumber: quote.originalSlipNumber || "",
     reasonMemo: quote.reasonMemo || "",
@@ -1068,6 +1069,7 @@ function collectQuote() {
     originalSlipNumber: document.getElementById("originalSlipNumber")?.value?.trim() || "",
     reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
     memo: document.getElementById("quoteMemo").value,
+    slipMemo: document.getElementById("quoteMemo").value,
     customerMemo: document.getElementById("quoteMemo").value,
     discountTemplate: document.getElementById("discountTemplate").value,
     overallDiscountAmount: Math.max(0, Number(document.getElementById("overallDiscountAmount")?.value || 0)),
@@ -1147,7 +1149,7 @@ function printQuotePdf(quote) {
     <div><span>合計</span><strong class="${amountClass(totals.total, doc.transactionType)}">${money(totals.total)}</strong></div>
     <div><span>内消費税 10%</span><strong>${money(totals.tax)}</strong></div>
   </div>
-  <div class="note">${escapeHtml(doc.overallDiscountReason ? `全体値引き理由: ${doc.overallDiscountReason}\n${doc.memo || ""}` : doc.memo || "")}</div>
+  <div class="note">${escapeHtml(doc.overallDiscountReason ? `全体値引き理由: ${doc.overallDiscountReason}\n${doc.slipMemo || doc.memo || ""}` : doc.slipMemo || doc.memo || "")}</div>
   <script>window.onload = () => { window.print(); setTimeout(() => { if (window.opener) window.opener.focus(); }, 300); };</script>
 </body>
 </html>`);
@@ -1222,7 +1224,7 @@ async function fillQuoteForm(quote) {
   setFieldValue("transactionType", normalizeTransactionType(quote.transactionType));
   setFieldValue("originalSlipNumber", quote.originalSlipNumber || "");
   setFieldValue("reasonMemo", quote.reasonMemo || "");
-  document.getElementById("quoteMemo").value = quote.memo || "";
+  document.getElementById("quoteMemo").value = quote.slipMemo || quote.memo || "";
   document.getElementById("discountTemplate").value = quote.discountTemplate || "none";
   setFieldValue("overallDiscountAmount", quote.overallDiscountAmount || 0);
   setFieldValue("overallDiscountReason", quote.overallDiscountReason || "");

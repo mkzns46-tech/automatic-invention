@@ -160,7 +160,7 @@ function printInvoicePdf(invoice) {
     <div><span>合計</span><strong class="${invoicePdfAmountClass(totals.total, doc.transactionType)}">${invoicePdfMoney(totals.total)}</strong></div>
     <div><span>内消費税 10%</span><strong>${invoicePdfMoney(totals.tax)}</strong></div>
   </div>
-  <div class="note">${invoicePdfEscape(doc.overallDiscountReason ? `全体値引き理由: ${doc.overallDiscountReason}\n${doc.memo || ""}` : doc.memo || "")}</div>
+  <div class="note">${invoicePdfEscape(doc.overallDiscountReason ? `全体値引き理由: ${doc.overallDiscountReason}\n${doc.slipMemo || doc.memo || ""}` : doc.slipMemo || doc.memo || "")}</div>
   <div class="registration">登録番号 T8180001160066</div>
   <script>window.onload = () => { window.print(); setTimeout(() => { if (window.opener) window.opener.focus(); }, 300); };</script>
 </body>

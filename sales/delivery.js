@@ -367,6 +367,7 @@ function clearDeliveryDetail() {
     "deliverySubject",
     "deliveryInvoiceDate",
     "deliveryIssuedAt",
+    "deliverySlipMemo",
     "shippingMethod",
     "shipmentDate",
     "shippingCarrier",
@@ -399,6 +400,7 @@ function selectDelivery(id) {
   setFieldValue("deliverySubject", delivery.subject || "");
   setFieldValue("deliveryInvoiceDate", delivery.invoiceDate || "");
   setFieldValue("deliveryIssuedAt", formatDateTime(delivery.issuedAt));
+  setFieldValue("deliverySlipMemo", delivery.slipMemo || delivery.memo || "");
   setFieldValue("shippingMethod", shippingMethodForDelivery(delivery));
   setFieldValue("shipmentDate", normalizeDateOnly(delivery.shipmentDate) || normalizeDateOnly(delivery.handoverDate) || normalizeDateOnly(delivery.carryOutDate));
   setFieldValue("shippingCarrier", delivery.shippingCarrier || "");
@@ -443,6 +445,17 @@ function updateDeliveryLineMemo(index, value) {
   if (!updated) return;
   renderDeliveryLines(updated);
   showSalesMessage("納品商品の備考を保存しました。", "ok");
+}
+
+function updateCurrentDeliverySlipMemo(value) {
+  if (!currentDeliveryId) return;
+  const updated = updateDelivery(currentDeliveryId, current => {
+    current.slipMemo = value;
+    current.memo = value;
+    return current;
+  });
+  if (!updated) return;
+  showSalesMessage("伝票備考を保存しました。", "ok");
 }
 
 function updateTotals(delivery) {

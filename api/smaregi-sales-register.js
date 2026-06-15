@@ -2,7 +2,7 @@ const REQUIRED_TRANSACTION_SCOPES = ["pos.transactions:read", "pos.transactions:
 const DEFAULT_TRANSACTION_SCOPE = REQUIRED_TRANSACTION_SCOPES.join(" ");
 const DEFAULT_TRANSACTION_PATH = "/transactions";
 const DEFAULT_PAYMENT_METHOD_NAME = "請求書";
-const MANUAL_PRODUCT_ID = "2953";
+const MANUAL_PRODUCT_ID = 2953;
 const MANUAL_PRODUCT_CODE = "9900000000073";
 const MANUAL_PRODUCT_NAME = "事務手数料";
 
@@ -48,6 +48,11 @@ function toPositiveIntegerString(value) {
   const number = Number(text);
   if (!Number.isSafeInteger(number) || number <= 0) return "";
   return String(number);
+}
+
+function toPositiveInteger(value) {
+  const text = toPositiveIntegerString(value);
+  return text ? Number(text) : 0;
 }
 
 function firstString(...values) {
@@ -209,7 +214,11 @@ function normalizeLines(lines) {
     const gross = Math.max(0, Math.round(qty * Math.abs(unitPrice)));
     const discountAmount = Math.max(0, Math.min(gross, toInt(line.discountAmount ?? line.discountAmountInput ?? 0)));
     const isManualProduct = Boolean(line.manualProduct) || (!firstString(line.smaregiProductId, line.smaregi_product_id, line.productId) && !firstString(line.productCode, line.barcode));
-    const productId = isManualProduct ? MANUAL_PRODUCT_ID : firstString(line.smaregiProductId, line.smaregi_product_id, line.productId);
+    const rawProductId = isManualProduct ? MANUAL_PRODUCT_ID : firstString(line.smaregiProductId, line.smaregi_product_id, line.productId);
+    const productId = toPositiveInteger(rawProductId);
+    if (!productId) {
+      throw new Error(`Invalid Smaregi productId for sale line: ${firstString(line.name, line.productName, line.itemName, line.barcode) || index + 1}`);
+    }
     const productCode = isManualProduct ? MANUAL_PRODUCT_CODE : firstString(line.productCode, line.barcode);
     const productName = isManualProduct ? MANUAL_PRODUCT_NAME : firstString(line.name, line.productName, line.itemName);
     return {

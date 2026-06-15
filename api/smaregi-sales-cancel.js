@@ -2,6 +2,9 @@ const REQUIRED_TRANSACTION_SCOPES = ["pos.transactions:read", "pos.transactions:
 const DEFAULT_TRANSACTION_SCOPE = REQUIRED_TRANSACTION_SCOPES.join(" ");
 const DEFAULT_TRANSACTION_PATH = "/transactions";
 const DEFAULT_PAYMENT_METHOD_NAME = "請求書";
+const MANUAL_PRODUCT_ID = 2953;
+const MANUAL_PRODUCT_CODE = "9900000000073";
+const MANUAL_PRODUCT_NAME = "事務手数料";
 
 function sendJson(res, status, payload) {
   try {
@@ -37,6 +40,13 @@ function ensureRequiredScopes(value) {
 function toInt(value) {
   const number = Math.round(Number(value || 0));
   return Number.isFinite(number) ? number : 0;
+}
+
+function toPositiveInteger(value) {
+  const text = String(value ?? "").trim();
+  if (!/^\d+$/.test(text)) return 0;
+  const number = Number(text);
+  return Number.isSafeInteger(number) && number > 0 ? number : 0;
 }
 
 function firstString(...values) {
@@ -143,12 +153,17 @@ function normalizeLines(lines) {
     const qty = Math.abs(Number(line.qty ?? line.quantity ?? 0));
     const unitPrice = toInt(line.unitPrice ?? line.price ?? line.salesPrice ?? 0);
     const amount = Math.abs(toInt(line.amount));
+    const isManualProduct = Boolean(line.manualProduct) || (!firstString(line.smaregiProductId, line.smaregi_product_id, line.productId) && !firstString(line.productCode, line.barcode));
+    const productId = isManualProduct ? MANUAL_PRODUCT_ID : toPositiveInteger(firstString(line.smaregiProductId, line.smaregi_product_id, line.productId));
+    if (!productId) {
+      throw new Error(`Invalid Smaregi productId for cancel line: ${firstString(line.name, line.productName, line.itemName, line.barcode) || index + 1}`);
+    }
     return {
       transactionDetailId: String(index + 1),
       transactionDetailDivision: "2",
-      productId: firstString(line.smaregiProductId, line.smaregi_product_id, line.productId),
-      productCode: firstString(line.productCode, line.barcode),
-      productName: firstString(line.name, line.productName, line.itemName),
+      productId,
+      productCode: isManualProduct ? MANUAL_PRODUCT_CODE : firstString(line.productCode, line.barcode),
+      productName: isManualProduct ? MANUAL_PRODUCT_NAME : firstString(line.name, line.productName, line.itemName),
       taxDivision: "0",
       price: String(unitPrice),
       salesPrice: String(unitPrice),

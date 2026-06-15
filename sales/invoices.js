@@ -873,8 +873,9 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
     reasonMemo: invoice.reasonMemo || "",
     overallDiscountAmount: Math.max(0, Number(invoice.overallDiscountAmount || 0)),
     overallDiscountReason: invoice.overallDiscountReason || "",
-    memo: invoice.memo || invoice.customerMemo || "",
-    customerMemo: invoice.customerMemo || invoice.memo || "",
+    memo: invoice.slipMemo || invoice.memo || invoice.customerMemo || "",
+    slipMemo: invoice.slipMemo || invoice.memo || invoice.customerMemo || "",
+    customerMemo: invoice.customerMemo || invoice.slipMemo || invoice.memo || "",
     items: JSON.parse(JSON.stringify(invoice.lines || invoice.items || [])),
     lines: JSON.parse(JSON.stringify(invoice.lines || invoice.items || [])),
     subtotal: totals.subtotal,
@@ -1240,7 +1241,7 @@ function fillInvoiceForm(invoice) {
   setFieldValue("transactionType", normalizeTransactionType(invoice.transactionType));
   setFieldValue("originalSlipNumber", invoice.originalSlipNumber || "");
   setFieldValue("reasonMemo", invoice.reasonMemo || "");
-  document.getElementById("invoiceMemo").value = invoice.memo || "";
+  document.getElementById("invoiceMemo").value = invoice.slipMemo || invoice.memo || "";
   setFieldValue("overallDiscountAmount", invoice.overallDiscountAmount || 0);
   setFieldValue("overallDiscountReason", invoice.overallDiscountReason || "");
   applyInvoiceTransactionTypeToLines();
@@ -1492,6 +1493,7 @@ function collectInvoice() {
     originalSlipNumber: document.getElementById("originalSlipNumber")?.value?.trim() || "",
     reasonMemo: document.getElementById("reasonMemo")?.value?.trim() || "",
     memo: document.getElementById("invoiceMemo").value,
+    slipMemo: document.getElementById("invoiceMemo").value,
     customerMemo: existing?.customerMemo || document.getElementById("invoiceMemo").value,
     overallDiscountAmount: Math.max(0, Number(document.getElementById("overallDiscountAmount")?.value || 0)),
     overallDiscountReason: document.getElementById("overallDiscountReason")?.value?.trim() || "",
