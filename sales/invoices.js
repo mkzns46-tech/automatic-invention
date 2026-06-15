@@ -434,6 +434,39 @@ async function refreshInvoiceLineStocks() {
     }))
     .filter(target => target.barcode || target.productId);
   const unique = new Map(targets.map(target => [`${target.barcode}|${target.productId}`, target]));
+  try {
+    const response = await fetch("/api/smaregi-stock-refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lines: currentInvoiceLines })
+    });
+    const text = await response.text().catch(() => "");
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (_) {
+      throw new Error(`Smaregi stock refresh JSON parse failed HTTP ${response.status}: ${text.slice(0, 500)}`);
+    }
+    if (!response.ok || data?.ok === false) {
+      throw new Error(data?.error || `Smaregi stock refresh API error HTTP ${response.status}: ${text.slice(0, 500)}`);
+    }
+    const stockRows = Array.isArray(data?.results) ? data.results.filter(row => row.ok) : [];
+    stockRows.forEach(row => {
+      const rowBarcode = String(row.barcode || row.productCode || "").trim();
+      const rowProductId = String(row.productId || row.smaregiProductId || row.smaregi_product_id || "").trim();
+      currentInvoiceLines.forEach(line => {
+        const sameBarcode = rowBarcode && String(line.barcode || line.productCode || "") === rowBarcode;
+        const sameProduct = rowProductId && String(line.smaregiProductId || line.smaregi_product_id || line.productId || "") === rowProductId;
+        if (sameBarcode || sameProduct) line.stock = Number(row.base_stock ?? row.stock ?? 0);
+      });
+    });
+    if (stockRows.length) {
+      renderInvoiceLines();
+      return;
+    }
+  } catch (error) {
+    console.warn("Smaregi invoice stock refresh failed; falling back to products.base_stock", error);
+  }
   for (const target of unique.values()) {
     let rows = [];
     if (target.barcode) {
