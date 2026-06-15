@@ -1,13 +1,14 @@
 *{box-sizing:border-box}
-:root{--main:#2d6a4f;--main-dark:#1b4332;--main-light:#d8f3dc;--bg:#f4faf6;--text:#10251b;--border:#cfe6d7;--muted:#527161;--warn:#b45309;--danger:#b91c1c}
+:root{--main:#0f5132;--main-dark:#073b2d;--main-light:#d8f3dc;--bg:#f3f8f4;--text:#10251b;--border:#b7d7c4;--muted:#456b59;--warn:#b45309;--danger:#b91c1c}
 body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 a{color:inherit}.sales-wrap{max-width:1280px;margin:0 auto;padding:18px}
 .sales-has-sidebar .sales-wrap{max-width:none;margin-left:280px;padding:18px 24px}
-.sales-sidebar{position:fixed;top:12px;left:12px;bottom:12px;width:256px;padding:14px 10px;border:1px solid #d9e5dd;border-radius:16px;background:#fff;color:#1b4332;box-shadow:0 4px 20px rgba(27,67,50,.06);z-index:20;overflow:auto}
-.sales-sidebar-brand{display:grid;gap:4px;margin-bottom:18px;padding:0 9px}.sales-sidebar-brand strong{color:#6b7280;font-size:12px;font-weight:900;letter-spacing:.08em}.sales-sidebar-brand span{font-size:22px;font-weight:900;color:#1b4332}
-.sales-sidebar nav{display:grid;gap:4px}.sales-menu-link{display:flex;align-items:center;width:100%;min-height:42px;margin:0;padding:9px 12px;border:1px solid transparent;border-radius:10px;background:#fff;color:#1b4332;font-size:14px;font-weight:900;line-height:1.25;text-align:left;text-decoration:none;box-shadow:none}.sales-menu-link strong{font-size:14px}.sales-menu-link span{display:none}.sales-menu-link:hover{background:#f0f7f2}.sales-menu-link.active{border-color:#d8eee0;background:#eaf6ee;color:#0b5d40}
-.sales-language{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px;padding-top:12px;border-top:1px solid #e5e7eb}.sales-language a{display:flex;align-items:center;justify-content:center;min-height:38px;border:1px solid #d9e5dd;border-radius:999px;color:#1b4332;background:#fff;text-decoration:none;font-weight:900}.sales-language a.active{border-color:#d8eee0;background:#eaf6ee;color:#0b5d40}
-.sales-header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:16px;padding:24px 28px;border-radius:18px;background:linear-gradient(135deg,#0b4f35,#0f6b46);color:#fff;box-shadow:0 8px 28px rgba(27,67,50,.15)}
+.sales-sidebar{position:fixed;top:12px;left:12px;bottom:12px;width:256px;padding:14px 10px;border:1px solid #cfe1d6;border-radius:16px;background:#fbfdfb;color:#073b2d;box-shadow:0 4px 20px rgba(7,59,45,.08);z-index:20;overflow:auto;display:flex;flex-direction:column}
+.sales-sidebar-brand{display:grid;gap:4px;margin-bottom:16px;padding:0 9px}.sales-sidebar-brand strong{color:#456b59;font-size:12px;font-weight:900;letter-spacing:.08em}.sales-sidebar-brand span{font-size:22px;font-weight:900;color:#073b2d}
+.sales-sidebar nav{display:grid;gap:4px}.sales-menu-link{display:flex;align-items:center;width:100%;min-height:42px;margin:0;padding:9px 12px;border:1px solid transparent;border-radius:10px;background:transparent;color:#073b2d;font-size:14px;font-weight:900;line-height:1.25;text-align:left;text-decoration:none;box-shadow:none}.sales-menu-link strong{font-size:14px;font-weight:900}.sales-menu-link span{display:none}.sales-menu-link:hover{background:#edf7f0}.sales-menu-link.active{border-color:#c6e4cf;background:#dff2e5;color:#053225}
+.sales-sidebar-bottom{display:grid;gap:6px;margin-top:auto;padding-top:12px;border-top:1px solid #d9e5dd}.sales-menu-logout{width:100%;min-height:42px;border-radius:10px;background:#0f5132;color:#fff}
+.sales-header-language{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sales-header-language a{display:flex;align-items:center;justify-content:center;min-height:38px;padding:7px 13px;border:1px solid rgba(255,255,255,.48);border-radius:999px;color:#fff;background:rgba(255,255,255,.08);text-decoration:none;font-weight:900}.sales-header-language a.active{background:#fff;color:#073b2d}
+.sales-header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:16px;padding:24px 28px;border-radius:18px;background:linear-gradient(135deg,#073b2d,#0f5132);color:#fff;box-shadow:0 8px 28px rgba(7,59,45,.18)}
 .brand{font-weight:900;color:#f6e58d;letter-spacing:.04em}.sales-header h1{margin:2px 0 0;color:#fff;font-size:34px;line-height:1.15;font-weight:900}.lead{margin:8px 0 0;color:#ecfff3;font-weight:700;line-height:1.5}
 .sales-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
 .pill,.secondary{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 16px;border:1px solid var(--border);border-radius:10px;background:#fff;color:#0b4f35;font-weight:900;text-decoration:none;cursor:pointer}
@@ -183,6 +184,7 @@ label:has(#paymentMethod),
 label:has(#sourceInvoiceNo),
 label:has(#shippingCarrier),
 label:has(#receiptMethod),
+label:has(#receiptStatus),
 #retryStockDeductionBtn{display:none!important}
 .sales-header .sales-actions a.pill{display:none!important}
 .subject-date-row,
@@ -195,11 +197,14 @@ label:has(#quoteMemo) textarea,
 label:has(#invoiceMemo) textarea,
 label:has(#paymentMemo) textarea,
 label:has(#deliverySlipMemo) textarea,
+label:has(#shippingMemo) textarea,
 label:has(#receiptMemo) textarea{min-height:104px}
 label:has(#quoteMemo),
 label:has(#invoiceMemo),
 label:has(#paymentMemo),
 label:has(#deliverySlipMemo),
+label:has(#shippingMemo),
 label:has(#receiptMemo){grid-column:1/-1}
 .receipt-memo-row label{margin-top:10px}
 .delivery-detail-row,.delivery-shipping-main-row{align-items:end}
+label:has(#shippingMemo){margin-top:12px}

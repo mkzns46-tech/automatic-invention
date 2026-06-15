@@ -291,6 +291,8 @@ function arrangeDeliveryShippingLayout() {
     const label = document.getElementById(id)?.closest("label");
     if (label) row.appendChild(label);
   });
+  const memoLabel = document.getElementById("shippingMemo")?.closest("label");
+  if (memoLabel) row.insertAdjacentElement("afterend", memoLabel);
 }
 
 function bindDeliveryListControls() {

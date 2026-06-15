@@ -185,9 +185,8 @@ function arrangeReceiptDetailLayout() {
   const card = document.getElementById("receiptDetailCard");
   if (!card) return;
   const groups = [
-    ["receiptNo", "receiptStatus"],
-    ["receiptCustomerName", "receiptSubject", "receiptStaff"],
-    ["receiptPaymentDate", "receiptAmount"],
+    ["receiptNo", "receiptCustomerName", "receiptStaff"],
+    ["receiptPaymentDate", "receiptAmount", "receiptSubject"],
     ["receiptMemo"]
   ];
   groups.forEach((ids, index) => {
