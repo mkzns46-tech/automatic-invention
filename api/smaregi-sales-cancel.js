@@ -172,14 +172,17 @@ function findTransactionId(body) {
 function buildCancelPayload(context, body) {
   const sourceTransactionId = firstString(body.smaregiTransactionId, body.transactionHeadId, body.transactionId);
   if (!sourceTransactionId) throw new Error("Smaregi transaction ID is required for sale cancel.");
+  const lines = normalizeLines(body.lines);
+  if (!lines.length) throw new Error("No Smaregi cancel lines were provided.");
+  const total = lines.reduce((sum, line) => sum + toInt(line.aricoAmount), 0);
+  const taxInclude = toInt(body.tax ?? Math.floor(total * 10 / 110));
   const terminalTranIdSource = `${body.invoiceNo || ""}${Date.now()}`.replace(/\D/g, "");
   return {
     transactionHeadDivision: "1",
-    cancelDivision: "1",
-    cancelTransactionHeadId: sourceTransactionId,
-    subtotal: "0",
-    total: "0",
-    taxInclude: "0",
+    cancelDivision: "0",
+    subtotal: String(total),
+    total: String(total),
+    taxInclude: String(taxInclude),
     taxExclude: "0",
     storeId: String(context.storeId),
     terminalId: String(context.terminalId),
@@ -192,7 +195,15 @@ function buildCancelPayload(context, body) {
       `理由:${firstString(body.cancelReason) || "-"}`
     ].join(" ").slice(0, 100),
     sellDivision: "0",
-    taxRate: "10"
+    taxRate: "10",
+    details: lines.map(({ aricoAmount, aricoQuantity, ...line }) => line),
+    payments: [
+      {
+        paymentMethodId: context.paymentMethodId,
+        paymentMethodName: context.paymentMethodName,
+        paidAmount: total
+      }
+    ]
   };
 }
 
