@@ -204,24 +204,11 @@ function buildCancelPayload(context, body) {
   if (!sourceTransactionId) throw new Error("Smaregi transaction ID is required for sale cancel.");
   const lines = normalizeLines(body.lines);
   if (!lines.length) throw new Error("No Smaregi cancel lines were provided.");
-  const terminalTranIdSource = `${body.invoiceNo || ""}${Date.now()}`.replace(/\D/g, "");
-  const memo = [
-    "販売管理キャンセル",
-    `元取引:${sourceTransactionId}`,
-    `伝票:${firstString(body.invoiceNo, body.originNumber) || "-"}`,
-    `理由:${firstString(body.cancelReason) || "-"}`
-  ].join(" ").slice(0, 100);
-
-  // Use the original transaction cancel endpoint. Do not register a reverse sale,
-  // and do not send details/payments here; those made Smaregi treat the request
-  // as another transaction instead of a clear cancel/return operation.
-  const payload = {
-    storeId: String(context.storeId),
-    terminalId: String(context.terminalId),
-    terminalTranId: terminalTranIdSource.slice(-10).padStart(1, "1"),
-    terminalTranDateTime: smaregiDateTime(body.cancelledAt || body.canceledAt || new Date().toISOString()),
-    memo
-  };
+  // The original transaction cancel endpoint does not accept sale-registration
+  // fields such as storeId, terminalId, memo, details, payments, or totals.
+  // The target transaction is specified by the URL path, so the request body is
+  // intentionally empty.
+  const payload = {};
   return {
     sourceTransactionId,
     lines,
