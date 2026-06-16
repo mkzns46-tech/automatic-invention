@@ -39,6 +39,11 @@ function money(value) {
   return Number(value || 0).toLocaleString("ja-JP") + "円";
 }
 
+function extractSlipNumber(value) {
+  const matches = String(value || "").match(/\d+/g);
+  return matches ? Number(matches[matches.length - 1]) : 0;
+}
+
 function isRefundReceipt(row) {
   return String(row?.transactionType || "").trim() === "返金" || Number(row?.amount || 0) < 0;
 }
@@ -311,9 +316,22 @@ function renderReceiptLists() {
 }
 
 function sortReceiptRows(a, b) {
-  const aDate = a.type === "invoice" ? getLatestActivePayment(a.invoice)?.paymentDate : a.receipt.paymentDate;
-  const bDate = b.type === "invoice" ? getLatestActivePayment(b.invoice)?.paymentDate : b.receipt.paymentDate;
-  return String(bDate || "").localeCompare(String(aDate || ""));
+  const aDate = receiptSortDate(a);
+  const bDate = receiptSortDate(b);
+  const diff = String(bDate || "").localeCompare(String(aDate || ""));
+  if (diff) return diff;
+  const aNo = a.type === "invoice" ? a.invoice?.invoiceNo : a.receipt?.receiptNo;
+  const bNo = b.type === "invoice" ? b.invoice?.invoiceNo : b.receipt?.receiptNo;
+  return extractSlipNumber(bNo) - extractSlipNumber(aNo);
+}
+
+function receiptSortDate(row) {
+  if (row.type === "invoice") {
+    const payment = getLatestActivePayment(row.invoice) || {};
+    return row.invoice?.created_at || row.invoice?.createdAt || payment.created_at || payment.createdAt || row.invoice?.issuedAt || row.invoice?.invoiceDate || payment.paymentDate || row.invoice?.updated_at || row.invoice?.updatedAt || "";
+  }
+  const receipt = row.receipt || {};
+  return receipt.created_at || receipt.createdAt || receipt.issuedAt || receipt.receiptDate || receipt.paymentDate || receipt.updated_at || receipt.updatedAt || "";
 }
 
 function getReceiptRowAmount(row) {

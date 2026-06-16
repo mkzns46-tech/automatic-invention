@@ -120,9 +120,13 @@ function homeExtractNumber(value) {
   return matches ? Number(matches[matches.length - 1]) : 0;
 }
 
+function homeCreatedSortDate(row) {
+  return row?.created_at || row?.createdAt || row?.savedAt || row?.issuedAt || row?.invoiceDate || row?.quoteDate || row?.deliveryDate || row?.receiptDate || row?.paymentDate || row?.shipmentDate || row?.dueDate || row?.shippedAt || row?.updated_at || row?.updatedAt || "";
+}
+
 function homeSortNewest(a, b) {
-  const aDate = a.sortDate || a.updatedAt || a.createdAt || "";
-  const bDate = b.sortDate || b.updatedAt || b.createdAt || "";
+  const aDate = a.sortDate || homeCreatedSortDate(a);
+  const bDate = b.sortDate || homeCreatedSortDate(b);
   if (aDate || bDate) {
     const diff = String(bDate).localeCompare(String(aDate));
     if (diff) return diff;
@@ -211,8 +215,8 @@ function homeBuildGroups() {
 
 function homeLatestRow(rows) {
   return rows.slice().sort((a, b) => homeSortNewest(
-    { sortDate: a.updatedAt || a.createdAt, sortNumber: a.quoteNo || a.invoiceNo || a.deliveryNo || a.receiptNo },
-    { sortDate: b.updatedAt || b.createdAt, sortNumber: b.quoteNo || b.invoiceNo || b.deliveryNo || b.receiptNo }
+    { sortDate: homeCreatedSortDate(a), sortNumber: a.quoteNo || a.invoiceNo || a.deliveryNo || a.receiptNo },
+    { sortDate: homeCreatedSortDate(b), sortNumber: b.quoteNo || b.invoiceNo || b.deliveryNo || b.receiptNo }
   ))[0] || null;
 }
 
@@ -224,7 +228,7 @@ function homeMakeTicketRow(group) {
   const customer = homeCustomerView(invoice, quote, delivery, receipt);
   const transactionType = homeNormalizeTransactionType(invoice?.transactionType || quote?.transactionType || delivery?.transactionType || receipt?.transactionType);
   const sortDate = [quote, invoice, delivery, receipt]
-    .map(row => row?.updatedAt || row?.createdAt || "")
+    .map(homeCreatedSortDate)
     .sort((a, b) => String(b).localeCompare(String(a)))[0] || "";
   return {
     origin: group.origin,
@@ -603,7 +607,7 @@ function homeBuildActionRows() {
       amount: homeTotalAmount(quote),
       staff: homeStaffName(quote.staff || quote.personInCharge || quote.owner || ""),
       status: converted ? "請求書変換済" : "請求書未変換",
-      sortDate: quote.updatedAt || quote.createdAt || quote.quoteDate || "",
+      sortDate: homeCreatedSortDate(quote),
       sortNumber: homeQuoteNumber(quote),
       actions: [
         homeActionLink("編集", `quotes.html?id=${encodeURIComponent(id)}`),
@@ -628,7 +632,7 @@ function homeBuildActionRows() {
         amount: homeTotalAmount(invoice),
         staff: homeStaffName(invoice.staff || invoice.personInCharge || invoice.owner || ""),
         status: paid ? "入金済み" : (homeInvoiceIsNoPayment(invoice) ? "入金不要" : "入金待ち"),
-        sortDate: invoice.updatedAt || invoice.issuedAt || invoice.createdAt || "",
+        sortDate: homeCreatedSortDate(invoice),
         sortNumber: homeInvoiceNumber(invoice),
         actions: [
           homeActionLink("編集", `invoices.html?id=${encodeURIComponent(id)}`),
@@ -654,7 +658,7 @@ function homeBuildActionRows() {
       amount: Math.max(0, unpaid),
       staff: homeStaffName(invoice.staff || invoice.personInCharge || invoice.owner || ""),
       status: unpaid > 0 ? "未入金" : "入金済み",
-      sortDate: invoice.updatedAt || invoice.dueDate || invoice.createdAt || "",
+      sortDate: homeCreatedSortDate(invoice),
       sortNumber: homeInvoiceNumber(invoice),
       actions: unpaid > 0 ? [
         homeActionButton("入金済", `homeMarkInvoicePaid('${homeEscapeHtml(id)}')`, "primary-action"),
@@ -676,7 +680,7 @@ function homeBuildActionRows() {
       amount: homeTotalAmount(delivery),
       staff: homeStaffName(delivery.shippingStaff || delivery.staff || delivery.personInCharge || ""),
       status: shipped ? "発送済" : "未発送",
-      sortDate: delivery.updatedAt || delivery.shippedAt || delivery.createdAt || "",
+      sortDate: homeCreatedSortDate(delivery),
       sortNumber: homeDeliveryNumber(delivery),
       actions: [
         homeActionLink("編集", `delivery.html?id=${encodeURIComponent(id)}`),
@@ -698,7 +702,7 @@ function homeBuildActionRows() {
         amount: homeTotalAmount(receipt),
         staff: homeStaffName(receipt.staff || receipt.personInCharge || ""),
         status: homeReceiptIssued(receipt) ? "領収済" : "未発行",
-        sortDate: receipt.updatedAt || receipt.createdAt || "",
+        sortDate: homeCreatedSortDate(receipt),
         sortNumber: homeReceiptNumber(receipt),
         actions: [
           homeActionLink("編集", `receipts.html?id=${encodeURIComponent(id)}`),

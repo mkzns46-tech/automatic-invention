@@ -9,7 +9,6 @@
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="staff-display.js?v=20260616-staff-display-map"></script>
-<script src="sales-archive.js?v=20260616-archive"></script>
 <script src="sales-pdf-format.js?v=20260615-list-pdf"></script>
 <script src="progress.js?v=20260614-progress-filter-ui" defer></script>
 </head>
@@ -34,8 +33,6 @@
       <h2 class="list-heading" onclick="toggleProgressSection('ticket')">伝票一覧 <span class="status-badge muted" id="ticketProgressCount">0件 / 合計 0円</span></h2>
       <div class="list-header-actions">
         <button type="button" class="primary pdf-bulk-button" onclick="printSelectedProgressTickets();">PDF一括印刷</button>
-        <button type="button" class="secondary" onclick="archiveSelectedProgressTickets(true);">&#36984;&#25246;&#12434;&#38750;&#34920;&#31034;</button>
-        <button type="button" class="secondary" onclick="archiveSelectedProgressTickets(false);">&#36984;&#25246;&#12434;&#20877;&#34920;&#31034;</button>
         <button type="button" class="secondary list-toggle-button" id="ticketProgressToggle" onclick="toggleProgressSection('ticket')">一覧を閉じる</button>
       </div>
     </div>

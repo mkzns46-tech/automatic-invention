@@ -164,9 +164,13 @@ function extractNumber(value) {
   return matches ? Number(matches[matches.length - 1]) : 0;
 }
 
+function createdSortDate(row) {
+  return row?.created_at || row?.createdAt || row?.savedAt || row?.issuedAt || row?.invoiceDate || row?.quoteDate || row?.deliveryDate || row?.receiptDate || row?.paymentDate || row?.shipmentDate || row?.updated_at || row?.updatedAt || "";
+}
+
 function sortNewest(a, b) {
-  const aDate = a.sortDate || a.updatedAt || a.createdAt || "";
-  const bDate = b.sortDate || b.updatedAt || b.createdAt || "";
+  const aDate = a.sortDate || createdSortDate(a);
+  const bDate = b.sortDate || createdSortDate(b);
   if (aDate || bDate) {
     const diff = String(bDate).localeCompare(String(aDate));
     if (diff) return diff;
@@ -279,8 +283,8 @@ function buildGroups() {
 
 function latestRow(rows) {
   return rows.slice().sort((a, b) => sortNewest(
-    { sortDate: a.updatedAt || a.createdAt, sortNumber: a.quoteNo || a.invoiceNo || a.deliveryNo || a.receiptNo },
-    { sortDate: b.updatedAt || b.createdAt, sortNumber: b.quoteNo || b.invoiceNo || b.deliveryNo || b.receiptNo }
+    { sortDate: createdSortDate(a), sortNumber: a.quoteNo || a.invoiceNo || a.deliveryNo || a.receiptNo },
+    { sortDate: createdSortDate(b), sortNumber: b.quoteNo || b.invoiceNo || b.deliveryNo || b.receiptNo }
   ))[0] || null;
 }
 
@@ -292,7 +296,7 @@ function makeProgressRow(group) {
   const customer = customerView(invoice, quote, delivery, receipt);
   const transactionType = normalizeTransactionType(invoice?.transactionType || quote?.transactionType || delivery?.transactionType || receipt?.transactionType);
   const sortDate = [quote, invoice, delivery, receipt]
-    .map(row => row?.updatedAt || row?.createdAt || "")
+    .map(createdSortDate)
     .sort((a, b) => String(b).localeCompare(String(a)))[0] || "";
   return {
     origin: group.origin,

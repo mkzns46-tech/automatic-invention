@@ -231,9 +231,13 @@ function extractSlipNumber(value) {
   return matches ? Number(matches[matches.length - 1]) : 0;
 }
 
+function sortCreatedDate(row, fallbacks = []) {
+  return row?.created_at || row?.createdAt || row?.savedAt || row?.issuedAt || row?.invoiceDate || row?.updated_at || row?.updatedAt || fallbacks.find(Boolean) || "";
+}
+
 function sortNewestFirst(a, b) {
-  const aDate = a.updatedAt || a.createdAt || "";
-  const bDate = b.updatedAt || b.createdAt || "";
+  const aDate = sortCreatedDate(a);
+  const bDate = sortCreatedDate(b);
   if (aDate || bDate) {
     const diff = String(bDate).localeCompare(String(aDate));
     if (diff) return diff;
@@ -1339,7 +1343,7 @@ function renderInvoiceList() {
   const completedBody = document.getElementById("invoiceCompletedListBody");
   const allInvoices = readInvoices().sort(sortNewestFirst);
   const invoices = allInvoices.filter(matchesInvoiceListFilters);
-  const completedStatuses = new Set([INVOICE_STATUS_PAID, INVOICE_STATUS_CANCELLED]);
+  const completedStatuses = new Set([INVOICE_STATUS_PAID, INVOICE_STATUS_NO_PAYMENT_REQUIRED, INVOICE_STATUS_CANCELLED]);
   const completedInvoices = invoices.filter(invoice => {
     const status = normalizeInvoiceStatus(invoice.status);
     return completedStatuses.has(status);

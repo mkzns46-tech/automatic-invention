@@ -57,9 +57,13 @@ function extractSlipNumber(value) {
   return matches ? Number(matches[matches.length - 1]) : 0;
 }
 
+function sortCreatedDate(row, fallbacks = []) {
+  return row?.created_at || row?.createdAt || row?.savedAt || row?.issuedAt || row?.deliveryDate || row?.shipmentDate || row?.handoverDate || row?.carryOutDate || row?.updated_at || row?.updatedAt || fallbacks.find(Boolean) || "";
+}
+
 function sortNewestFirst(a, b) {
-  const aDate = a.updatedAt || a.createdAt || "";
-  const bDate = b.updatedAt || b.createdAt || "";
+  const aDate = sortCreatedDate(a);
+  const bDate = sortCreatedDate(b);
   if (aDate || bDate) {
     const diff = String(bDate).localeCompare(String(aDate));
     if (diff) return diff;
