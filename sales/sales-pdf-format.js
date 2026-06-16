@@ -331,8 +331,9 @@
     </div>`;
   }
 
-  function receiptHtml({ doc, title, number, totals, note }) {
+  function receiptHtml({ doc, title, number, totals, note, pageIndex = 0, pageTotal = 1 }) {
     return `<div class="sheet receipt-sheet">
+      ${pageTotal > 1 ? `<div class="page-count top-count">${pageIndex + 1}/${pageTotal}</div>` : ""}
       <h1>${escapeHtml(title)}</h1>
       <div class="receipt-top">
         <div>
@@ -350,7 +351,7 @@
           ${companyBlock(doc.staff)}
         </div>
       </div>
-      <div class="footer">1/1</div>
+      <div class="footer">${pageIndex + 1}/${pageTotal}<br>（ ${escapeHtml(number)} ）</div>
     </div>`;
   }
 
@@ -434,7 +435,7 @@
     const linePages = splitLines(lines, type);
     const pageTotal = type === "receipt" ? 1 : linePages.length;
     const pages = type === "receipt"
-      ? receiptHtml({ doc, title, number, totals, note })
+      ? receiptHtml({ doc, title, number, totals, note, pageIndex: 0, pageTotal })
       : linePages.map((pageLines, index) => tablePageHtml({
         type,
         doc,
