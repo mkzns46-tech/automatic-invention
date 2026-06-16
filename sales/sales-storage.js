@@ -87,12 +87,16 @@ async function salesFetch(path, options = {}) {
 
   function fromDbRow(row) {
     const data = row?.data && typeof row.data === "object" ? { ...row.data } : {};
+    if (row?.id && !data.id) data.id = row.id;
     if (row?.id && !data.supabaseId) data.supabaseId = row.id;
     if (row?.created_at && !data.created_at) data.created_at = row.created_at;
     if (row?.updated_at) data.updated_at = row.updated_at;
     if (row?.status && !data.status) data.status = row.status;
     if (row?.document_no && !data.document_no) data.document_no = row.document_no;
+    if (row?.document_no && !data.quoteNo) data.quoteNo = row.document_no;
+    if (row?.document_no && !data.quoteNumber) data.quoteNumber = row.document_no;
     if (row?.customer_code && !data.customer_code) data.customer_code = row.customer_code;
+    if (row?.customer_code && !data.customerCode) data.customerCode = row.customer_code;
     return data;
   }
 

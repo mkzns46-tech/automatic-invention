@@ -637,9 +637,15 @@ function bindQuoteCustomerSearch() {
   const input = document.getElementById("quoteCustomerSearchInput");
   if (!input) return;
   input.addEventListener("input", () => renderQuoteCustomerSearchResults(input.value));
+  input.addEventListener("focus", () => renderQuoteCustomerSearchResults(input.value));
 }
 
-function renderQuoteCustomerSearchResults(query) {
+async function ensureQuoteCustomersLoaded() {
+  if (window.SalesCustomerStorage?.readCustomers?.().length) return;
+  await window.SalesCustomerStorage?.initCustomersStorage?.();
+}
+
+async function renderQuoteCustomerSearchResults(query) {
   const results = document.getElementById("quoteCustomerSearchResults");
   if (!results) return;
   const text = String(query || "").trim();
@@ -647,6 +653,9 @@ function renderQuoteCustomerSearchResults(query) {
     results.innerHTML = "";
     return;
   }
+  await ensureQuoteCustomersLoaded().catch(error => {
+    console.error("[quote customer search] customer reload failed", error);
+  });
   const customers = window.SalesCustomerStorage?.searchCustomers
     ? window.SalesCustomerStorage.searchCustomers(text, 20)
     : [];
