@@ -1619,3 +1619,69 @@ function printQuotePdf(quote) {
   }
   showSalesPopup("PDF出力失敗", "PDFフォーマットを読み込めませんでした。", "err");
 }
+
+window.renderQuoteCustomerSearchResults = async function renderQuoteCustomerSearchResultsGlobal(query) {
+  const results = document.getElementById("quoteCustomerSearchResults");
+  if (!results) return;
+  const text = String(query || "").trim();
+  if (!text) {
+    results.innerHTML = "";
+    return;
+  }
+  await ensureQuoteCustomersLoaded().catch(error => {
+    console.error("[quote customer search] customer reload failed", error);
+  });
+  let customers = window.SalesCustomerStorage?.searchCustomers
+    ? window.SalesCustomerStorage.searchCustomers(text, 20)
+    : searchQuoteCustomersFallback(text, 20);
+  if (!customers.length) {
+    await reloadQuoteCustomersFromSupabase().catch(error => {
+      console.error("[quote customer search] direct Supabase reload failed", error);
+    });
+    customers = window.SalesCustomerStorage?.searchCustomers
+      ? window.SalesCustomerStorage.searchCustomers(text, 20)
+      : searchQuoteCustomersFallback(text, 20);
+  }
+  if (!customers.length) {
+    results.innerHTML = `<div class="message warn">該当顧客が見つかりません</div><button type="button" class="secondary" onclick="openQuoteNewCustomerModal('${escapeHtml(text)}')">新規顧客登録</button>`;
+    return;
+  }
+  results.innerHTML = `<div class="table-wrap"><table><thead><tr><th>顧客名</th><th>団体名</th><th>顧客区分</th><th>電話番号</th><th>メール</th><th>操作</th></tr></thead><tbody>${customers.map(customer => {
+    const customerKey = customer.id || customer.supabaseId || customer.customerCode || customer.customer_code || "";
+    const customerName = customer.customerName || customer.customer_name || customer.name || "";
+    const organizationName = customer.organizationName || customer.organization_name || "";
+    const customerType = customer.customerType || customer.customer_type || "";
+    return `<tr>
+      <td>${escapeHtml(customerName)}</td>
+      <td>${escapeHtml(organizationName)}</td>
+      <td>${escapeHtml(customerType)}</td>
+      <td>${escapeHtml(customer.phone)}</td>
+      <td>${escapeHtml(customer.email)}</td>
+      <td><button type="button" class="secondary" onclick="selectQuoteCustomer('${escapeHtml(customerKey)}')">選択</button></td>
+    </tr>`;
+  }).join("")}</tbody></table></div>`;
+};
+
+renderQuoteCustomerSearchResults = window.renderQuoteCustomerSearchResults;
+
+window.selectQuoteCustomer = function selectQuoteCustomerGlobal(customerId) {
+  const key = String(customerId || "").trim();
+  const customer = (window.SalesCustomerStorage?.readCustomers?.() || []).find(row => {
+    return [
+      row.id,
+      row.supabaseId,
+      row.customerCode,
+      row.customer_code,
+      row.smaregiMemberId,
+      row.smaregi_member_id
+    ].some(value => String(value || "").trim() === key);
+  });
+  if (!customer) return;
+  applyCustomerToQuote(customer);
+  setFieldValue("quoteCustomerSearchInput", "");
+  const results = document.getElementById("quoteCustomerSearchResults");
+  if (results) results.innerHTML = "";
+  showSalesPopup("完了", "顧客情報を反映しました", "ok");
+};
+
+selectQuoteCustomer = window.selectQuoteCustomer;
