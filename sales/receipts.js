@@ -11,6 +11,7 @@ let receiptTransactionTypeFilter = "";
 let receiptDateFrom = "";
 let receiptDateTo = "";
 let receiptListCollapsed = true;
+let receiptShowCompleted = false;
 
 function readInvoices() {
   return JSON.parse(localStorage.getItem(RECEIPTS_INVOICES_KEY) || "[]");
@@ -56,7 +57,7 @@ function normalizeInvoiceStatus(status) {
 function normalizeReceiptStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (!value || value === "draft" || value === "未発行") return RECEIPT_STATUS_DRAFT;
-  if (value === "issued" || value === "発行済み") return RECEIPT_STATUS_ISSUED;
+  if (value === "issued" || value === "receipt_issued" || value === "completed" || value === "complete" || value === "発行済" || value === "発行済み") return RECEIPT_STATUS_ISSUED;
   if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return RECEIPT_STATUS_CANCELLED;
   return status || RECEIPT_STATUS_DRAFT;
 }
@@ -175,7 +176,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   arrangeReceiptDetailLayout();
   bindReceiptControls();
-  window.SalesArchive?.bindToggle?.(renderReceiptLists);
   renderReceiptLists();
   const id = new URLSearchParams(location.search).get("id");
   if (id) selectReceipt(id);
@@ -244,6 +244,14 @@ function bindReceiptControls() {
     receiptDateTo = event.target.value;
     renderReceiptLists();
   });
+  const showCompleted = document.getElementById("receiptShowCompleted");
+  if (showCompleted) {
+    receiptShowCompleted = showCompleted.checked;
+    showCompleted.addEventListener("change", () => {
+      receiptShowCompleted = showCompleted.checked;
+      renderReceiptLists();
+    });
+  }
   setReceiptListCollapsed(true);
 }
 
@@ -261,14 +269,13 @@ function setReceiptListCollapsed(collapsed) {
   const panel = document.getElementById("issuedReceiptListPanel");
   const button = document.getElementById("receiptListToggle") || document.getElementById("receiptIssuedToggle");
   if (listPanel) listPanel.hidden = receiptListCollapsed;
-  if (panel) panel.hidden = receiptListCollapsed;
+  if (panel) panel.hidden = receiptListCollapsed || !receiptShowCompleted;
   if (button) button.textContent = receiptListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
 function getPaidInvoiceTargets() {
-  const receipts = readReceipts().filter(receipt => window.SalesArchive?.shouldShow?.(receipt) ?? true);
+  const receipts = readReceipts();
   return readInvoices()
-    .filter(invoice => window.SalesArchive?.shouldShow?.(invoice) ?? true)
     .filter(invoice => ["入金済み", "入金不要"].includes(normalizeInvoiceStatus(invoice.status)))
     .filter(invoice => !receipts.some(receipt => receipt.sourceInvoiceNo === invoice.invoiceNo))
     .map(invoice => ({ type: "invoice", invoice }))
@@ -277,7 +284,6 @@ function getPaidInvoiceTargets() {
 
 function getReceiptRows() {
   return readReceipts()
-    .filter(receipt => window.SalesArchive?.shouldShow?.(receipt) ?? true)
     .map(receipt => ({ type: "receipt", receipt }))
     .filter(matchesReceiptTargetFilters);
 }
@@ -289,7 +295,7 @@ function renderReceiptLists() {
   const issuedReceipts = receipts.filter(row => normalizeReceiptStatus(row.receipt.status) !== RECEIPT_STATUS_DRAFT);
   const activeRows = [...targets, ...draftReceipts].sort(sortReceiptRows);
   const completedRows = issuedReceipts.sort(sortReceiptRows);
-  const displayedRows = [...activeRows, ...completedRows];
+  const displayedRows = receiptShowCompleted ? [...activeRows, ...completedRows] : activeRows;
   const listCount = document.getElementById("receiptListCount");
   if (listCount) listCount.textContent = `${displayedRows.length}件 / 合計 ${money(displayedRows.reduce((sum, row) => sum + getReceiptRowAmount(row), 0))}`;
   const count = document.getElementById("receiptTargetCount");
@@ -300,6 +306,8 @@ function renderReceiptLists() {
   document.getElementById("issuedReceiptListBody").innerHTML = completedRows.length
     ? completedRows.map(renderReceiptTargetRow).join("")
     : '<tr><td colspan="9">発行済み・キャンセル済みの領収書はありません。</td></tr>';
+  const completedPanel = document.getElementById("issuedReceiptListPanel");
+  if (completedPanel) completedPanel.hidden = receiptListCollapsed || !receiptShowCompleted;
 }
 
 function sortReceiptRows(a, b) {
@@ -330,9 +338,6 @@ function renderReceiptTargetRow(row) {
     </tr>`;
   }
   const receipt = row.receipt;
-  const archiveButton = window.SalesArchive?.isArchived?.(receipt)
-    ? `<button type="button" class="secondary" onclick="archiveReceipt('${receipt.id}', false)">再表示</button>`
-    : `<button type="button" class="secondary" onclick="archiveReceipt('${receipt.id}', true)">非表示</button>`;
   return `<tr>
     <td><input type="checkbox" class="receipt-pdf-check pdf-select-checkbox" value="${escapeHtml(receipt.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(receipt.receiptNo || "")} ${statusBadge(receipt.status)}</span></td>
@@ -345,38 +350,10 @@ function renderReceiptTargetRow(row) {
     <td>
       <button type="button" class="secondary" onclick="selectReceipt('${receipt.id}')">&#35443;&#32048;</button>
       <button type="button" class="secondary" onclick="printReceiptById('${receipt.id}')">PDF&#20986;&#21147;</button>
-      ${archiveButton}
     </td>
   </tr>`;
 }
 
-function archiveReceipt(id, archived = true) {
-  const receipts = readReceipts();
-  const receipt = receipts.find(row => row.id === id);
-  if (!receipt) return;
-  window.SalesArchive?.markArchived?.(receipt, archived);
-  writeReceipts(receipts);
-  renderReceiptLists();
-  showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
-}
-
-function archiveSelectedReceipts(archived = true) {
-  const ids = Array.from(document.querySelectorAll(".receipt-pdf-check:checked")).map(input => input.value);
-  if (!ids.length) {
-    showSalesPopup("対象未選択", "非表示にする領収書を選択してください。", "warn");
-    return;
-  }
-  const receipts = readReceipts();
-  let count = 0;
-  receipts.forEach(receipt => {
-    if (!ids.includes(String(receipt.id))) return;
-    window.SalesArchive?.markArchived?.(receipt, archived);
-    count += 1;
-  });
-  writeReceipts(receipts);
-  renderReceiptLists();
-  showSalesPopup(archived ? "一括非表示にしました" : "一括再表示しました", `${count}件を更新しました。履歴は削除していません。`, "ok");
-}
 
 function printSelectedReceipts() {
   const ids = Array.from(document.querySelectorAll(".receipt-pdf-check:checked")).map(input => input.value);

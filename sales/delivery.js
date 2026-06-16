@@ -15,6 +15,7 @@ let deliveryStatusFilter = "";
 let deliveryDateFrom = "";
 let deliveryDateTo = "";
 let deliveryListCollapsed = false;
+let deliveryShowCompleted = false;
 
 function readDeliveries() {
   try {
@@ -71,7 +72,7 @@ function normalizeDeliveryStatus(status) {
   const lower = value.toLowerCase();
   if (!value || lower === "draft" || value === "未発行") return DELIVERY_STATUS_DRAFT;
   if (lower === "issued" || value === "発行済み" || value === "納品書発行済" || value === "発送準備中") return DELIVERY_STATUS_ISSUED;
-  if (lower === "shipped" || value === "発送済" || value === "納品済み") return DELIVERY_STATUS_SHIPPED;
+  if (lower === "shipped" || lower === "delivered" || lower === "completed" || lower === "complete" || value === "発送済" || value === "納品済み") return DELIVERY_STATUS_SHIPPED;
   if (lower === "hand_delivered" || lower === "hand_delivery" || value === "手渡し済") return DELIVERY_STATUS_HAND_DELIVERED;
   if (lower === "staff_carry" || lower === "staff_carried" || value === "担当者手持ち済") return DELIVERY_STATUS_STAFF_CARRY;
   if (lower === "cancel" || lower === "cancelled" || lower === "canceled" || value === "キャンセル") return DELIVERY_STATUS_CANCELLED;
@@ -245,7 +246,6 @@ document.addEventListener("DOMContentLoaded", () => {
   arrangeDeliveryDetailLayout();
   arrangeDeliveryShippingLayout();
   bindDeliveryListControls();
-  window.SalesArchive?.bindToggle?.(renderDeliveryList);
   renderDeliveryList();
   const id = new URLSearchParams(location.search).get("id");
   if (id) selectDelivery(id);
@@ -313,6 +313,14 @@ function bindDeliveryListControls() {
     deliveryDateTo = event.target.value;
     renderDeliveryList();
   });
+  const showCompleted = document.getElementById("deliveryShowCompleted");
+  if (showCompleted) {
+    deliveryShowCompleted = showCompleted.checked;
+    showCompleted.addEventListener("change", () => {
+      deliveryShowCompleted = showCompleted.checked;
+      renderDeliveryList();
+    });
+  }
   document.getElementById("shippingMethod")?.addEventListener("change", updateShippingMethodUi);
   updateShippingMethodUi();
   setDeliveryListCollapsed(false);
@@ -325,13 +333,15 @@ function toggleDeliveryList() {
 function setDeliveryListCollapsed(collapsed) {
   deliveryListCollapsed = collapsed;
   const listPanel = document.getElementById("deliveryListPanel");
+  const completedPanel = document.getElementById("deliveryCompletedListPanel");
   const button = document.getElementById("deliveryListToggle");
   if (listPanel) listPanel.hidden = deliveryListCollapsed;
+  if (completedPanel) completedPanel.hidden = deliveryListCollapsed || !deliveryShowCompleted;
   if (button) button.textContent = deliveryListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
 function renderDeliveryList() {
-  const allDeliveries = readDeliveries().filter(delivery => window.SalesArchive?.shouldShow?.(delivery) ?? true).sort(sortNewestFirst);
+  const allDeliveries = readDeliveries().sort(sortNewestFirst);
   const deliveries = allDeliveries.filter(matchesDeliveryFilters);
   const activeDeliveries = deliveries.filter(delivery => {
     const status = normalizeDeliveryStatus(delivery.status);
@@ -351,14 +361,13 @@ function renderDeliveryList() {
   document.getElementById("deliveryCompletedListBody").innerHTML = completedDeliveries.length
     ? completedDeliveries.map(renderDeliveryRow).join("")
     : '<tr><td colspan="9">完了済み・キャンセル済みの納品書はありません。</td></tr>';
+  const completedPanel = document.getElementById("deliveryCompletedListPanel");
+  if (completedPanel) completedPanel.hidden = deliveryListCollapsed || !deliveryShowCompleted;
 }
 
 function renderDeliveryRow(delivery) {
   const status = normalizeDeliveryStatus(delivery.status);
   const displayNumber = delivery.originNumber || delivery.masterNumber || delivery.quoteNumber || delivery.deliveryNo || "";
-  const archiveButton = window.SalesArchive?.isArchived?.(delivery)
-    ? `<button type="button" class="secondary" onclick="archiveDelivery('${delivery.id}', false)">再表示</button>`
-    : `<button type="button" class="secondary" onclick="archiveDelivery('${delivery.id}', true)">非表示</button>`;
   return `<tr>
     <td><input type="checkbox" class="delivery-pdf-check pdf-select-checkbox" value="${escapeHtml(delivery.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(displayNumber)} ${statusBadge(status)}</span></td>
@@ -372,38 +381,10 @@ function renderDeliveryRow(delivery) {
       <button type="button" class="secondary" onclick="selectDelivery('${delivery.id}')">詳細</button>
       <button type="button" class="secondary" onclick="printDeliveryById('${delivery.id}')">PDF出力</button>
       ${!isCompletedDeliveryStatus(status) && status !== DELIVERY_STATUS_CANCELLED ? `<button type="button" class="invoice-issue-button" onclick="quickShipDelivery('${delivery.id}')">発送済</button>` : ""}
-      ${archiveButton}
     </td>
   </tr>`;
 }
 
-function archiveDelivery(id, archived = true) {
-  const deliveries = readDeliveries();
-  const delivery = deliveries.find(row => row.id === id);
-  if (!delivery) return;
-  window.SalesArchive?.markArchived?.(delivery, archived);
-  writeDeliveries(deliveries);
-  renderDeliveryList();
-  showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
-}
-
-function archiveSelectedDeliveries(archived = true) {
-  const ids = Array.from(document.querySelectorAll(".delivery-pdf-check:checked")).map(input => input.value);
-  if (!ids.length) {
-    showSalesPopup("対象未選択", "非表示にする納品書を選択してください。", "warn");
-    return;
-  }
-  const deliveries = readDeliveries();
-  let count = 0;
-  deliveries.forEach(delivery => {
-    if (!ids.includes(String(delivery.id))) return;
-    window.SalesArchive?.markArchived?.(delivery, archived);
-    count += 1;
-  });
-  writeDeliveries(deliveries);
-  renderDeliveryList();
-  showSalesPopup(archived ? "一括非表示にしました" : "一括再表示しました", `${count}件を更新しました。履歴は削除していません。`, "ok");
-}
 
 function printSelectedDeliveries() {
   const ids = Array.from(document.querySelectorAll(".delivery-pdf-check:checked")).map(input => input.value);

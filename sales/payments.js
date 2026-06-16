@@ -11,6 +11,7 @@ let paymentStatusFilter = "";
 let paymentDateFrom = "";
 let paymentDateTo = "";
 let paymentListCollapsed = false;
+let paymentShowCompleted = false;
 
 function readPaymentInvoices() {
   return JSON.parse(localStorage.getItem(PAYMENTS_INVOICES_KEY) || "[]");
@@ -42,7 +43,7 @@ function normalizePaymentStatus(status) {
   const value = String(status || "").trim().toLowerCase();
   if (value === "issued" || value === "発行済み") return PAYMENT_STATUS_ISSUED;
   if (value === "waiting_payment" || value === "payment_waiting" || value === "入金待ち") return PAYMENT_STATUS_WAITING;
-  if (value === "paid" || value === "入金済み") return PAYMENT_STATUS_PAID;
+  if (value === "paid" || value === "payment_confirmed" || value === "confirmed_paid" || value === "completed" || value === "complete" || value === "入金済" || value === "入金済み") return PAYMENT_STATUS_PAID;
   if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return PAYMENT_STATUS_CANCELLED;
   return status || "";
 }
@@ -275,7 +276,6 @@ function printPaymentInvoicePdf(id) {
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   bindPaymentListControls();
-  window.SalesArchive?.bindToggle?.(renderPaymentInvoiceList);
   clearPaymentForm();
   renderPaymentInvoiceList();
   const id = new URLSearchParams(location.search).get("id");
@@ -311,6 +311,14 @@ function bindPaymentListControls() {
       renderPaymentInvoiceList();
     });
   }
+  const showCompleted = document.getElementById("paymentShowCompleted");
+  if (showCompleted) {
+    paymentShowCompleted = showCompleted.checked;
+    showCompleted.addEventListener("change", () => {
+      paymentShowCompleted = showCompleted.checked;
+      renderPaymentInvoiceList();
+    });
+  }
   setPaymentListCollapsed(false);
 }
 
@@ -324,7 +332,7 @@ function setPaymentListCollapsed(collapsed) {
   const panel = document.getElementById("paymentCompletedListPanel");
   const button = document.getElementById("paymentInvoiceListToggle");
   if (listPanel) listPanel.hidden = paymentListCollapsed;
-  if (panel) panel.hidden = paymentListCollapsed;
+  if (panel) panel.hidden = paymentListCollapsed || !paymentShowCompleted;
   if (button) button.textContent = paymentListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
@@ -337,7 +345,7 @@ function getPaymentTargetInvoices() {
 function renderPaymentInvoiceList() {
   const body = document.getElementById("paymentInvoiceListBody");
   const completedBody = document.getElementById("paymentCompletedListBody");
-  const allInvoices = getPaymentTargetInvoices().filter(invoice => window.SalesArchive?.shouldShow?.(invoice) ?? true);
+  const allInvoices = getPaymentTargetInvoices();
   const invoices = allInvoices.filter(matchesPaymentInvoiceFilters);
   const activeInvoices = invoices.filter(invoice => {
     const status = normalizePaymentStatus(invoice.status);
@@ -356,6 +364,8 @@ function renderPaymentInvoiceList() {
   if (completedBody) {
     completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderPaymentInvoiceRow).join("") : '<tr><td colspan="9">完了済み・キャンセル済みの入金確認はありません。</td></tr>';
   }
+  const completedPanel = document.getElementById("paymentCompletedListPanel");
+  if (completedPanel) completedPanel.hidden = paymentListCollapsed || !paymentShowCompleted;
 }
 
 function renderPaymentInvoiceRow(invoice) {
@@ -367,11 +377,7 @@ function renderPaymentInvoiceRow(invoice) {
   const cancelButton = status === PAYMENT_STATUS_PAID
     ? `<button type="button" class="danger" onclick="cancelPayment('${invoice.id}')">&#20837;&#37329;&#21462;&#28040;</button>`
     : "";
-  const archiveButton = window.SalesArchive?.isArchived?.(invoice)
-    ? `<button type="button" class="secondary" onclick="archivePaymentInvoice('${invoice.id}', false)">再表示</button>`
-    : `<button type="button" class="secondary" onclick="archivePaymentInvoice('${invoice.id}', true)">非表示</button>`;
   return `<tr>
-    <td><input type="checkbox" class="payment-archive-check pdf-select-checkbox" value="${escapeHtml(invoice.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo || "")} ${statusBadge(status)}</span></td>
     <td>${escapeHtml(invoice.invoiceDate || "")}</td>
     <td>${escapeHtml(paymentDate || "")}</td>
@@ -380,37 +386,10 @@ function renderPaymentInvoiceRow(invoice) {
     <td>${money(total)}</td>
     <td>${statusBadge(status)}</td>
     <td>${escapeHtml(getSalesStaffDisplayName(invoice.staff || ""))}</td>
-    <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">&#36984;&#25246;</button><button type="button" class="secondary" onclick="printPaymentInvoicePdf('${invoice.id}')">PDF出力</button>${cancelButton}${archiveButton}</td>
+    <td><button type="button" class="secondary" onclick="selectPaymentInvoice('${invoice.id}')">&#36984;&#25246;</button><button type="button" class="secondary" onclick="printPaymentInvoicePdf('${invoice.id}')">PDF出力</button>${cancelButton}</td>
   </tr>`;
 }
 
-function archivePaymentInvoice(id, archived = true) {
-  const invoices = readPaymentInvoices();
-  const invoice = invoices.find(row => row.id === id);
-  if (!invoice) return;
-  window.SalesArchive?.markArchived?.(invoice, archived);
-  writePaymentInvoices(invoices);
-  renderPaymentInvoiceList();
-  showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
-}
-
-function archiveSelectedPaymentInvoices(archived = true) {
-  const ids = Array.from(document.querySelectorAll(".payment-archive-check:checked")).map(input => input.value);
-  if (!ids.length) {
-    showSalesPopup("対象未選択", "非表示にする入金確認対象を選択してください。", "warn");
-    return;
-  }
-  const invoices = readPaymentInvoices();
-  let count = 0;
-  invoices.forEach(invoice => {
-    if (!ids.includes(String(invoice.id))) return;
-    window.SalesArchive?.markArchived?.(invoice, archived);
-    count += 1;
-  });
-  writePaymentInvoices(invoices);
-  renderPaymentInvoiceList();
-  showSalesPopup(archived ? "一括非表示にしました" : "一括再表示しました", `${count}件を更新しました。履歴は削除していません。`, "ok");
-}
 
 function matchesPaymentInvoiceFilters(invoice) {
   const status = normalizePaymentStatus(invoice.status);

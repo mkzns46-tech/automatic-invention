@@ -385,7 +385,7 @@ function homeWriteJson(key, rows) {
 }
 
 function homeVisibleRows(rows) {
-  return (rows || []).filter(row => window.SalesArchive?.shouldShow?.(row) ?? true);
+  return rows || [];
 }
 
 function homeStaffName(name) {

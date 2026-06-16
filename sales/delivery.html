@@ -9,7 +9,6 @@
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="staff-display.js?v=20260616-staff-display-map"></script>
-<script src="sales-archive.js?v=20260616-archive"></script>
 <script src="sales-pdf-format.js?v=20260615-unified-pdf"></script>
 <script src="delivery-pdf.js?v=20260614-lists-hidden"></script>
 <script src="delivery.js?v=20260615-line-memo" defer></script>
@@ -34,9 +33,8 @@
     <div class="sales-actions section-heading-row">
       <h2 class="list-heading" onclick="toggleDeliveryList();">納品書一覧 <span class="status-badge muted" id="deliveryListCount">0件</span></h2>
       <div class="list-header-actions">
+        <label class="sales-completed-toggle"><input type="checkbox" id="deliveryShowCompleted">完了案件を表示</label>
         <button type="button" class="primary pdf-bulk-button" onclick="printSelectedDeliveries();">PDF一括印刷</button>
-        <button type="button" class="secondary" onclick="archiveSelectedDeliveries(true);">選択を非表示</button>
-        <button type="button" class="secondary" onclick="archiveSelectedDeliveries(false);">選択を再表示</button>
         <button type="button" class="secondary list-toggle-button" id="deliveryListToggle" onclick="toggleDeliveryList();">一覧を閉じる</button>
       </div>
     </div>

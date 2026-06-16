@@ -270,10 +270,10 @@ function ensureGroup(map, origin) {
 
 function buildGroups() {
   const groups = new Map();
-  readQuotes().filter(row => window.SalesArchive?.shouldShow?.(row) ?? true).forEach(quote => ensureGroup(groups, getOriginNumber(quote, quote.quoteNo)).quotes.push(quote));
-  readInvoices().filter(row => window.SalesArchive?.shouldShow?.(row) ?? true).forEach(invoice => ensureGroup(groups, getInvoiceOrigin(invoice)).invoices.push(invoice));
-  readDeliveries().filter(row => window.SalesArchive?.shouldShow?.(row) ?? true).forEach(delivery => ensureGroup(groups, getOriginNumber(delivery, delivery.deliveryNo)).deliveries.push(delivery));
-  readReceipts().filter(row => window.SalesArchive?.shouldShow?.(row) ?? true).forEach(receipt => ensureGroup(groups, getOriginNumber(receipt, receipt.receiptNo)).receipts.push(receipt));
+  readQuotes().forEach(quote => ensureGroup(groups, getOriginNumber(quote, quote.quoteNo)).quotes.push(quote));
+  readInvoices().forEach(invoice => ensureGroup(groups, getInvoiceOrigin(invoice)).invoices.push(invoice));
+  readDeliveries().forEach(delivery => ensureGroup(groups, getOriginNumber(delivery, delivery.deliveryNo)).deliveries.push(delivery));
+  readReceipts().forEach(receipt => ensureGroup(groups, getOriginNumber(receipt, receipt.receiptNo)).receipts.push(receipt));
   return Array.from(groups.values());
 }
 
@@ -478,33 +478,6 @@ function printSelectedProgressTickets() {
   window.SalesPdfFormat.printSalesDocuments(documents);
 }
 
-function archiveSelectedProgressTickets(archived = true) {
-  const origins = Array.from(document.querySelectorAll(".progress-ticket-pdf-check:checked")).map(input => input.value);
-  if (!origins.length) {
-    alert("非表示にする伝票を選択してください。");
-    return;
-  }
-  const originSet = new Set(origins.map(String));
-  const datasets = [
-    [PROGRESS_KEYS.quotes, readQuotes()],
-    [PROGRESS_KEYS.invoices, readInvoices()],
-    [PROGRESS_KEYS.deliveries, readDeliveries()],
-    [PROGRESS_KEYS.receipts, readReceipts()]
-  ];
-  let count = 0;
-  datasets.forEach(([, rows]) => {
-    rows.forEach(row => {
-      const origin = getOriginNumber(row, row.invoiceNo || row.deliveryNo || row.receiptNo || "");
-      const invoiceOrigin = row.invoiceNo ? getInvoiceOrigin(row) : origin;
-      if (!originSet.has(String(origin)) && !originSet.has(String(invoiceOrigin))) return;
-      window.SalesArchive?.markArchived?.(row, archived);
-      count += 1;
-    });
-  });
-  datasets.forEach(([key, rows]) => writeJson(key, rows));
-  renderProgressSections();
-  alert(`${count}件を${archived ? "非表示" : "再表示"}にしました。履歴は削除していません。`);
-}
 
 function renderRows(bodyId, countId, rows, renderer, emptyMessage, colspan) {
   const body = document.getElementById(bodyId);
@@ -673,6 +646,5 @@ function toggleProgressSection(name) {
 document.addEventListener("DOMContentLoaded", () => {
   if (!requireSalesAuth()) return;
   bindProgressControls();
-  window.SalesArchive?.bindToggle?.(renderProgressSections);
   renderProgressSections();
 });

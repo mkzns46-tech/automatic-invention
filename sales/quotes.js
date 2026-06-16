@@ -18,6 +18,7 @@ let quoteListStatusFilter = "";
 let quoteListDateFrom = "";
 let quoteListDateTo = "";
 let quoteListCollapsed = false;
+let quoteShowCompleted = false;
 let currentQuoteLocked = false;
 
 function salesFetch(path) {
@@ -321,6 +322,30 @@ function quoteStatusBadge(status) {
   return `<span class="status-badge ${type}">${escapeHtml(value)}</span>`;
 }
 
+function quoteHasInvoice(quote, invoices = readInvoices()) {
+  const quoteId = String(quote?.id || "").trim();
+  const quoteNo = String(quote?.quoteNo || quote?.quoteNumber || "").trim();
+  const origin = String(quote?.originNumber || quote?.masterNumber || quoteNo || "").trim();
+  return invoices.some(invoice => {
+    const values = [
+      invoice.sourceQuoteId,
+      invoice.quoteId,
+      invoice.originQuoteId,
+      invoice.sourceQuoteNo,
+      invoice.quoteNo,
+      invoice.quoteNumber,
+      invoice.originNumber,
+      invoice.masterNumber
+    ].map(value => String(value || "").trim()).filter(Boolean);
+    return values.includes(quoteId) || values.includes(quoteNo) || values.includes(origin);
+  });
+}
+
+function isQuoteCompletedForList(quote, invoices = readInvoices()) {
+  const status = normalizeQuoteStatus(quote?.status);
+  return status !== QUOTE_STATUS_DRAFT || quoteHasInvoice(quote, invoices);
+}
+
 function isQuoteEditable(quoteOrStatus) {
   return normalizeQuoteStatus(typeof quoteOrStatus === "string" ? quoteOrStatus : quoteOrStatus?.status) !== QUOTE_STATUS_INVOICE_ISSUED;
 }
@@ -475,7 +500,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindProductAutoSearch();
   bindQuoteCustomerSearch();
   bindQuoteListControls();
-  window.SalesArchive?.bindToggle?.(renderQuoteList);
   bindTransactionTypeControls();
   await loadStaffOptions();
   renderQuoteList();
@@ -496,6 +520,14 @@ function bindQuoteListControls() {
   if (status) {
     status.addEventListener("change", () => {
       quoteListStatusFilter = status.value;
+      renderQuoteList();
+    });
+  }
+  const showCompleted = document.getElementById("quoteShowCompleted");
+  if (showCompleted) {
+    quoteShowCompleted = showCompleted.checked;
+    showCompleted.addEventListener("change", () => {
+      quoteShowCompleted = showCompleted.checked;
       renderQuoteList();
     });
   }
@@ -524,7 +556,7 @@ function setQuoteListCollapsed(collapsed) {
   const panel = document.getElementById("quoteCompletedListPanel");
   const button = document.getElementById("quoteListToggle");
   if (listPanel) listPanel.hidden = quoteListCollapsed;
-  if (panel) panel.hidden = quoteListCollapsed;
+  if (panel) panel.hidden = quoteListCollapsed || !quoteShowCompleted;
   if (button) button.textContent = quoteListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
@@ -701,10 +733,11 @@ async function loadStaffOptions() {
 function renderQuoteList() {
   const body = document.getElementById("quoteListBody");
   const completedBody = document.getElementById("quoteCompletedListBody");
-  const allQuotes = readQuotes().filter(quote => window.SalesArchive?.shouldShow?.(quote) ?? true).sort(sortNewestFirst);
+  const allQuotes = readQuotes().sort(sortNewestFirst);
   const quotes = allQuotes.filter(matchesQuoteListFilters);
-  const activeQuotes = quotes.filter(quote => normalizeQuoteStatus(quote.status) === QUOTE_STATUS_DRAFT);
-  const completedQuotes = quotes.filter(quote => normalizeQuoteStatus(quote.status) !== QUOTE_STATUS_DRAFT);
+  const invoices = readInvoices();
+  const activeQuotes = quotes.filter(quote => !isQuoteCompletedForList(quote, invoices));
+  const completedQuotes = quotes.filter(quote => isQuoteCompletedForList(quote, invoices));
   const count = document.getElementById("quoteListCount");
   if (count) count.textContent = quoteListSearchText || quoteListStatusFilter || quoteListDateFrom || quoteListDateTo
     ? `下書き ${activeQuotes.length}件 / 全${quotes.length}件`
@@ -713,13 +746,12 @@ function renderQuoteList() {
   if (completedBody) {
     completedBody.innerHTML = completedQuotes.length ? completedQuotes.map(renderQuoteListRow).join("") : '<tr><td colspan="9">完了済み・キャンセル済みの見積書はありません。</td></tr>';
   }
+  const completedPanel = document.getElementById("quoteCompletedListPanel");
+  if (completedPanel) completedPanel.hidden = quoteListCollapsed || !quoteShowCompleted;
 }
 
 function renderQuoteListRow(q) {
   const status = normalizeQuoteStatus(q.status);
-  const archiveButton = window.SalesArchive?.isArchived?.(q)
-    ? `<button type="button" class="secondary" onclick="archiveQuote('${q.id}', false)">再表示</button>`
-    : `<button type="button" class="secondary" onclick="archiveQuote('${q.id}', true)">非表示</button>`;
   const deleteButton = canDeleteQuote(q)
     ? `<button type="button" class="danger" onclick="deleteQuote('${q.id}')">&#21066;&#38500;</button>`
     : "";
@@ -739,7 +771,6 @@ function renderQuoteListRow(q) {
       <button type="button" class="secondary" onclick="editQuote('${q.id}')">${status === QUOTE_STATUS_INVOICE_ISSUED ? "詳細" : "&#32232;&#38598;"}</button>
       <button type="button" class="secondary" onclick="printQuoteById('${q.id}')">PDF&#20986;&#21147;</button>
       <button type="button" class="secondary" onclick="duplicateQuote('${q.id}')">&#35079;&#35069;</button>
-      ${archiveButton}
       ${convertButton}
       ${deleteButton}
     </td>
@@ -1449,33 +1480,6 @@ async function deleteQuote(id) {
   showSalesPopup("削除完了", "見積書を削除しました", "ok");
 }
 
-function archiveQuote(id, archived = true) {
-  const quotes = readQuotes();
-  const quote = quotes.find(q => q.id === id);
-  if (!quote) return;
-  window.SalesArchive?.markArchived?.(quote, archived);
-  writeQuotes(quotes);
-  renderQuoteList();
-  showSalesPopup(archived ? "非表示にしました" : "再表示しました", "履歴は削除せず、通常一覧の表示だけを切り替えました。", "ok");
-}
-
-function archiveSelectedQuotes(archived = true) {
-  const ids = Array.from(document.querySelectorAll(".quote-pdf-check:checked")).map(input => input.value);
-  if (!ids.length) {
-    showSalesPopup("対象未選択", "非表示にする見積書を選択してください。", "warn");
-    return;
-  }
-  const quotes = readQuotes();
-  let count = 0;
-  quotes.forEach(quote => {
-    if (!ids.includes(String(quote.id))) return;
-    window.SalesArchive?.markArchived?.(quote, archived);
-    count += 1;
-  });
-  writeQuotes(quotes);
-  renderQuoteList();
-  showSalesPopup(archived ? "一括非表示にしました" : "一括再表示しました", `${count}件を更新しました。履歴は削除していません。`, "ok");
-}
 
 function outputCurrentQuotePdf() {
   try {

@@ -27,6 +27,7 @@ let invoiceListStatusFilter = "";
 let invoiceListDateFrom = "";
 let invoiceListDateTo = "";
 let invoiceListCollapsed = false;
+let invoiceShowCompleted = false;
 
 function readInvoices() {
   return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
@@ -274,7 +275,7 @@ function normalizeInvoiceStatus(status) {
   if (!value || value === "draft" || value === "下書き") return INVOICE_STATUS_DRAFT;
   if (value === "issued" || value === "発行済み") return INVOICE_STATUS_ISSUED;
   if (value === "waiting_payment" || value === "payment_waiting" || value === "入金待ち") return INVOICE_STATUS_WAITING_PAYMENT;
-  if (value === "paid" || value === "入金済み") return INVOICE_STATUS_PAID;
+  if (value === "paid" || value === "payment_confirmed" || value === "confirmed_paid" || value === "completed" || value === "complete" || value === "入金済" || value === "入金済み") return INVOICE_STATUS_PAID;
   if (value === "no_payment_required" || value === "no_payment" || value === "payment_not_required" || value === "入金不要") return INVOICE_STATUS_NO_PAYMENT_REQUIRED;
   if (value === "cancel" || value === "cancelled" || value === "canceled" || value === "キャンセル") return INVOICE_STATUS_CANCELLED;
   return status || INVOICE_STATUS_DRAFT;
@@ -1240,7 +1241,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("invoiceStatus").disabled = true;
   bindInvoiceTransactionTypeControls();
   bindInvoiceListControls();
-  window.SalesArchive?.bindToggle?.(renderInvoiceList);
   renderInvoiceList();
   const id = new URLSearchParams(location.search).get("id");
   if (id) editInvoice(id);
@@ -1297,6 +1297,14 @@ function bindInvoiceListControls() {
       renderInvoiceList();
     });
   }
+  const showCompleted = document.getElementById("invoiceShowCompleted");
+  if (showCompleted) {
+    invoiceShowCompleted = showCompleted.checked;
+    showCompleted.addEventListener("change", () => {
+      invoiceShowCompleted = showCompleted.checked;
+      renderInvoiceList();
+    });
+  }
   if (dateFrom) {
     dateFrom.addEventListener("input", () => {
       invoiceListDateFrom = dateFrom.value;
@@ -1322,16 +1330,16 @@ function setInvoiceListCollapsed(collapsed) {
   const panel = document.getElementById("invoiceCompletedListPanel");
   const button = document.getElementById("invoiceListToggle");
   if (listPanel) listPanel.hidden = invoiceListCollapsed;
-  if (panel) panel.hidden = invoiceListCollapsed;
+  if (panel) panel.hidden = invoiceListCollapsed || !invoiceShowCompleted;
   if (button) button.textContent = invoiceListCollapsed ? "一覧を開く" : "一覧を閉じる";
 }
 
 function renderInvoiceList() {
   const body = document.getElementById("invoiceListBody");
   const completedBody = document.getElementById("invoiceCompletedListBody");
-  const allInvoices = readInvoices().filter(invoice => window.SalesArchive?.shouldShow?.(invoice) ?? true).sort(sortNewestFirst);
+  const allInvoices = readInvoices().sort(sortNewestFirst);
   const invoices = allInvoices.filter(matchesInvoiceListFilters);
-  const completedStatuses = new Set([INVOICE_STATUS_PAID, INVOICE_STATUS_NO_PAYMENT_REQUIRED, INVOICE_STATUS_CANCELLED]);
+  const completedStatuses = new Set([INVOICE_STATUS_PAID, INVOICE_STATUS_CANCELLED]);
   const completedInvoices = invoices.filter(invoice => {
     const status = normalizeInvoiceStatus(invoice.status);
     return completedStatuses.has(status);
@@ -1352,6 +1360,8 @@ function renderInvoiceList() {
   if (completedBody) {
     completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="9">完了済み・キャンセル済みの請求書はありません。</td></tr>';
   }
+  const completedPanel = document.getElementById("invoiceCompletedListPanel");
+  if (completedPanel) completedPanel.hidden = invoiceListCollapsed || !invoiceShowCompleted;
 }
 
 function renderInvoiceListRow(invoice) {
@@ -1359,9 +1369,6 @@ function renderInvoiceListRow(invoice) {
   const totals = calcInvoiceTotals(invoice);
   const status = normalizeInvoiceStatus(invoice.status);
   const customerView = getInvoiceCustomerView(invoice);
-  const archiveButton = window.SalesArchive?.isArchived?.(invoice)
-    ? `<button type="button" class="secondary" onclick="archiveInvoice('${invoice.id}', false)">再表示</button>`
-    : `<button type="button" class="secondary" onclick="archiveInvoice('${invoice.id}', true)">非表示</button>`;
   return `<tr>
     <td><input type="checkbox" class="invoice-pdf-check pdf-select-checkbox" value="${escapeHtml(invoice.id || "")}"></td>
     <td><span class="number-with-status">${escapeHtml(invoice.invoiceNo)} ${statusBadge(status)}</span></td>
@@ -1375,7 +1382,6 @@ function renderInvoiceListRow(invoice) {
       <button type="button" class="secondary" onclick="editInvoice('${invoice.id}')">${status === INVOICE_STATUS_DRAFT ? "&#32232;&#38598;" : "&#35443;&#32048;"}</button>
       ${canOutputInvoicePdf(invoice) ? `<button type="button" class="secondary" onclick="printInvoiceById('${invoice.id}')">PDF&#20986;&#21147;</button>` : `<button type="button" class="secondary" disabled title="請求書確定後にPDF出力できます">PDF&#20986;&#21147;</button>`}
       ${canRetryStockDeduction(invoice) ? `<button type="button" class="secondary" onclick="retryInvoiceStockDeduction('${invoice.id}')">売上登録再実行</button>` : ""}
-      ${archiveButton}
     </td>
   </tr>`;
 }
@@ -1952,33 +1958,6 @@ function printInvoiceById(id) {
   printInvoicePdf(normalizeInvoiceForView(invoice));
 }
 
-function archiveInvoice(id, archived = true) {
-  const invoices = readInvoices();
-  const invoice = invoices.find(row => row.id === id);
-  if (!invoice) return;
-  window.SalesArchive?.markArchived?.(invoice, archived);
-  writeInvoices(invoices);
-  renderInvoiceList();
-  showSalesPopup(archived ? "\u975e\u8868\u793a\u306b\u3057\u307e\u3057\u305f" : "\u518d\u8868\u793a\u3057\u307e\u3057\u305f", "\u5c65\u6b74\u306f\u524a\u9664\u305b\u305a\u3001\u901a\u5e38\u4e00\u89a7\u306e\u8868\u793a\u3060\u3051\u3092\u5207\u308a\u66ff\u3048\u307e\u3057\u305f\u3002", "ok");
-}
-
-function archiveSelectedInvoices(archived = true) {
-  const ids = Array.from(document.querySelectorAll(".invoice-pdf-check:checked")).map(input => input.value);
-  if (!ids.length) {
-    showSalesPopup("\u5bfe\u8c61\u672a\u9078\u629e", "\u975e\u8868\u793a\u306b\u3059\u308b\u8acb\u6c42\u66f8\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044\u3002", "warn");
-    return;
-  }
-  const invoices = readInvoices();
-  let count = 0;
-  invoices.forEach(invoice => {
-    if (!ids.includes(String(invoice.id))) return;
-    window.SalesArchive?.markArchived?.(invoice, archived);
-    count += 1;
-  });
-  writeInvoices(invoices);
-  renderInvoiceList();
-  showSalesPopup(archived ? "\u4e00\u62ec\u975e\u8868\u793a\u306b\u3057\u307e\u3057\u305f" : "\u4e00\u62ec\u518d\u8868\u793a\u3057\u307e\u3057\u305f", count + "\u4ef6\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f\u3002\u5c65\u6b74\u306f\u524a\u9664\u3057\u3066\u3044\u307e\u305b\u3093\u3002", "ok");
-}
 
 function restoreInvoiceEditorAfterPdf() {
   window.setTimeout(() => {

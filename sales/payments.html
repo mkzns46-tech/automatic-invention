@@ -9,7 +9,6 @@
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="staff-display.js?v=20260616-staff-display-map"></script>
-<script src="sales-archive.js?v=20260616-archive"></script>
 <script src="customers-storage.js?v=20260614-html-repair"></script>
 <script src="sales-pdf-format.js?v=20260615-list-pdf"></script>
 <script src="payments.js?v=20260614-progress-sort" defer></script>
@@ -33,8 +32,7 @@
   <section class="card collapsible-list-card" id="paymentInvoiceListCard">
     <div class="sales-actions section-heading-row">
       <h2 class="list-heading" onclick="togglePaymentInvoiceList();">入金確認一覧 <span class="status-badge muted" id="paymentInvoiceListCount">0件</span></h2>
-      <button type="button" class="secondary" onclick="archiveSelectedPaymentInvoices(true);">&#36984;&#25246;&#12434;&#38750;&#34920;&#31034;</button>
-      <button type="button" class="secondary" onclick="archiveSelectedPaymentInvoices(false);">&#36984;&#25246;&#12434;&#20877;&#34920;&#31034;</button>
+      <label class="sales-completed-toggle"><input type="checkbox" id="paymentShowCompleted">完了案件を表示</label>
       <button type="button" class="secondary list-toggle-button" id="paymentInvoiceListToggle" onclick="togglePaymentInvoiceList();">一覧を閉じる</button>
     </div>
     <div class="list-panel" id="paymentInvoiceListPanel">
@@ -55,7 +53,7 @@
       <div class="list-subheading">対応が必要な請求書</div>
       <div class="table-wrap list-scroll">
         <table>
-          <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('payment-archive-check', this.checked, this)"></th><th>伝票番号</th><th>請求日</th><th>入金日</th><th>支払期限</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+          <thead><tr><th>伝票番号</th><th>請求日</th><th>入金日</th><th>支払期限</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
           <tbody id="paymentInvoiceListBody"></tbody>
         </table>
       </div>
@@ -63,7 +61,7 @@
         <div class="list-subheading">完了済み・キャンセル済み</div>
         <div class="table-wrap list-scroll">
           <table>
-            <thead><tr><th><input type="checkbox" class="pdf-select-checkbox" onchange="SalesPdfFormat.toggleVisiblePdfChecks('payment-archive-check', this.checked, this)"></th><th>伝票番号</th><th>請求日</th><th>入金日</th><th>支払期限</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
+            <thead><tr><th>伝票番号</th><th>請求日</th><th>入金日</th><th>支払期限</th><th>顧客名</th><th>合計金額</th><th>ステータス</th><th>担当者</th><th>操作</th></tr></thead>
             <tbody id="paymentCompletedListBody"></tbody>
           </table>
         </div>
