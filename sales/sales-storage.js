@@ -136,10 +136,10 @@ async function salesFetch(path, options = {}) {
       created_at: row?.created_at || row?.createdAt || undefined,
       updated_at: row?.updated_at || row?.updatedAt || new Date().toISOString()
     };
-    if (row?.invoiceNo || row?.invoiceNumber || row?.originNumber) {
+    if (["deliveries", "receipts"].includes(type) && (row?.invoiceNo || row?.invoiceNumber || row?.originNumber)) {
       dbRow.invoice_document_no = row.invoiceNo || row.invoiceNumber || row.originNumber || null;
     }
-    if (row?.quoteNo || row?.quoteNumber || row?.sourceQuoteNo) {
+    if (type === "invoices" && (row?.quoteNo || row?.quoteNumber || row?.sourceQuoteNo)) {
       dbRow.quote_document_no = row.quoteNo || row.quoteNumber || row.sourceQuoteNo || null;
     }
     if (config.documentKey === "customer_code") dbRow.customer_code = documentNo;
