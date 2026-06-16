@@ -646,13 +646,64 @@ async function ensureQuoteCustomersLoaded() {
 }
 
 async function reloadQuoteCustomersFromSupabase() {
-  if (!window.SalesStorage?.listSalesRecords) return [];
-  const customers = await window.SalesStorage.listSalesRecords("customers");
+  let customers = [];
+  if (window.SalesStorage?.listSalesRecords) {
+    customers = await window.SalesStorage.listSalesRecords("customers");
+  } else {
+    const rows = await salesFetch("sales_customers?select=*&order=created_at.desc");
+    customers = Array.isArray(rows) ? rows.map(row => {
+      const data = row?.data && typeof row.data === "object" ? { ...row.data } : {};
+      if (row?.id && !data.id) data.id = row.id;
+      if (row?.id && !data.supabaseId) data.supabaseId = row.id;
+      if (row?.customer_code && !data.customerCode) data.customerCode = row.customer_code;
+      if (row?.customer_code && !data.customer_code) data.customer_code = row.customer_code;
+      if (!data.customerName && data.customer_name) data.customerName = data.customer_name;
+      if (!data.organizationName && data.organization_name) data.organizationName = data.organization_name;
+      if (!data.customerType && data.customer_type) data.customerType = data.customer_type;
+      if (!data.smaregiMemberId && data.smaregi_member_id) data.smaregiMemberId = data.smaregi_member_id;
+      if (!data.smaregiMemberCode && data.smaregi_member_code) data.smaregiMemberCode = data.smaregi_member_code;
+      return data;
+    }) : [];
+  }
   if (Array.isArray(customers)) {
-    window.SalesStorage.writeCachedSalesCollection?.("customers", customers);
+    if (window.SalesStorage?.writeCachedSalesCollection) {
+      window.SalesStorage.writeCachedSalesCollection("customers", customers);
+    } else {
+      localStorage.setItem("arico_sales_customers_v1", JSON.stringify(customers));
+    }
     return customers;
   }
   return [];
+}
+
+function searchQuoteCustomersFallback(query, limit = 20) {
+  const text = normalizeSearchText(query);
+  if (!text) return [];
+  const customers = window.SalesCustomerStorage?.readCustomers?.() || [];
+  return customers.filter(customer => {
+    const haystack = [
+      customer.id,
+      customer.customerName,
+      customer.customer_name,
+      customer.organizationName,
+      customer.organization_name,
+      customer.kana,
+      customer.phone,
+      customer.email,
+      customer.customerType,
+      customer.customer_type,
+      customer.staff,
+      customer.smaregiMemberCode,
+      customer.smaregi_member_code,
+      customer.smaregiCustomerCode,
+      customer.smaregiMemberId,
+      customer.smaregi_member_id,
+      customer.smaregiCustomerId,
+      customer.customerCode,
+      customer.customer_code
+    ].map(value => normalizeSearchText(value)).join(" ");
+    return haystack.includes(text);
+  }).slice(0, limit);
 }
 
 async function renderQuoteCustomerSearchResults(query) {
@@ -668,14 +719,14 @@ async function renderQuoteCustomerSearchResults(query) {
   });
   let customers = window.SalesCustomerStorage?.searchCustomers
     ? window.SalesCustomerStorage.searchCustomers(text, 20)
-    : [];
+    : searchQuoteCustomersFallback(text, 20);
   if (!customers.length) {
     await reloadQuoteCustomersFromSupabase().catch(error => {
       console.error("[quote customer search] direct Supabase reload failed", error);
     });
     customers = window.SalesCustomerStorage?.searchCustomers
       ? window.SalesCustomerStorage.searchCustomers(text, 20)
-      : [];
+      : searchQuoteCustomersFallback(text, 20);
   }
   results.innerHTML = customers.length ? `<div class="table-wrap"><table><thead><tr><th>顧客名</th><th>顧客区分</th><th>電話番号</th><th>メールアドレス</th><th>スマレジ会員コード</th><th>操作</th></tr></thead><tbody>${customers.map(customer => `<tr>
     <td>${escapeHtml(customer.customerName)}</td>
