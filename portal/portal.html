@@ -15,7 +15,7 @@ const ARICO_INVENTORY_URL = "https://automatic-invention-eight.vercel.app/";
 if (typeof checkAuthOrRedirect === "function") checkAuthOrRedirect("../index.html");
 function aricoLogout(){ clearAuthSession(); sessionStorage.removeItem(ARICO_PORTAL_LOGIN_KEY); location.href = "https://arico-portal.vercel.app/index.html"; }
 function openInventory(){ location.href = ARICO_INVENTORY_URL; }
-function openSales(){ location.href = "https://automatic-invention-eight.vercel.app/sales/sales-login.html"; }
+function openSales(){ location.href = "/sales/index.html"; }
 </script>
 </head>
 <body>
