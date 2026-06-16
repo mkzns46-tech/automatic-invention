@@ -1,5 +1,5 @@
-const ARICO_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
-const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
+const QUOTE_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
+const QUOTE_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 const QUOTES_KEY = "arico_sales_quotes_v1";
 const INVOICES_KEY = "arico_sales_invoices_v1";
 const PRODUCT_UNITS_KEY = "arico_sales_product_units_v1";
@@ -22,10 +22,10 @@ let quoteShowCompleted = false;
 let currentQuoteLocked = false;
 
 function salesFetch(path) {
-  return fetch(`${ARICO_SUPABASE_URL}/rest/v1/${path}`, {
+  return fetch(`${QUOTE_SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey: ARICO_SUPABASE_API_KEY,
-      Authorization: `Bearer ${ARICO_SUPABASE_API_KEY}`
+      apikey: QUOTE_SUPABASE_API_KEY,
+      Authorization: `Bearer ${QUOTE_SUPABASE_API_KEY}`
     }
   }).then(async res => {
     if (!res.ok) throw new Error(await res.text());
