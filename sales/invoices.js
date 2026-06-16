@@ -401,15 +401,7 @@ function stockDeductionLabel(status) {
 }
 
 function stockDeductionDisplay(invoiceOrStatus) {
-  if (invoiceOrStatus && typeof invoiceOrStatus === "object") {
-    if (
-      normalizeStockDeductionStatus(invoiceOrStatus.stockDeductionStatus) === STOCK_DEDUCTION_STATUS_SUCCESS &&
-      invoiceOrStatus.stockBaseStockSyncStatus === "failed"
-    ) {
-      return "在庫同期失敗";
-    }
-    return stockDeductionLabel(invoiceOrStatus.stockDeductionStatus);
-  }
+  if (invoiceOrStatus && typeof invoiceOrStatus === "object") return stockDeductionLabel(invoiceOrStatus.stockDeductionStatus);
   return stockDeductionLabel(invoiceOrStatus);
 }
 
@@ -432,22 +424,11 @@ function smaregiSaleLabel(status) {
 }
 
 function smaregiSaleDisplay(invoiceOrStatus) {
-  if (invoiceOrStatus && typeof invoiceOrStatus === "object") {
-    if (
-      normalizeSmaregiSaleStatus(invoiceOrStatus.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS &&
-      invoiceOrStatus.stockBaseStockSyncStatus === "failed"
-    ) {
-      return "スマレジ売上登録済み / 在庫同期失敗";
-    }
-    return smaregiSaleLabel(invoiceOrStatus.smaregiSaleStatus);
-  }
+  if (invoiceOrStatus && typeof invoiceOrStatus === "object") return smaregiSaleLabel(invoiceOrStatus.smaregiSaleStatus);
   return smaregiSaleLabel(invoiceOrStatus);
 }
 
 function stockDeductionBadge(invoice) {
-  if (invoice?.stockBaseStockSyncStatus === "failed") {
-    return '<span class="status-badge danger">在庫同期失敗</span>';
-  }
   const value = normalizeStockDeductionStatus(invoice?.stockDeductionStatus);
   if (!value) return "";
   const type = value === STOCK_DEDUCTION_STATUS_SUCCESS
@@ -471,7 +452,7 @@ function isSmaregiSaleTarget(invoice) {
 
 function canRetryStockDeduction(invoice) {
   const status = normalizeSmaregiSaleStatus(invoice?.smaregiSaleStatus);
-  return Boolean(invoice?.id && isSmaregiSaleTarget(invoice) && (status === SMAREGI_SALE_STATUS_FAILED || invoice.stockBaseStockSyncStatus === "failed"));
+  return Boolean(invoice?.id && isSmaregiSaleTarget(invoice) && status === SMAREGI_SALE_STATUS_FAILED);
 }
 
 function canOutputInvoicePdf(invoice) {
@@ -832,30 +813,6 @@ async function findProductForStockLine(line) {
   return null;
 }
 
-async function syncProductsBaseStock(lines, mode = "decrement") {
-  const response = await fetch("/api/products-base-stock-sync", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ lines, mode })
-  });
-  const text = await response.text().catch(() => "");
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch (_) {
-    throw new Error(`products.base_stock sync JSON parse failed HTTP ${response.status}: ${text.slice(0, 500)}`);
-  }
-  console.log("[products.base_stock sync response]", {
-    ok: response.ok,
-    status: response.status,
-    body: data || text
-  });
-  if (!response.ok || data?.ok === false) {
-    throw new Error(data?.error || `products.base_stock sync API error HTTP ${response.status}: ${text.slice(0, 500)}`);
-  }
-  return Array.isArray(data?.results) ? data.results : [];
-}
-
 async function cancelSmaregiSale(invoice, reason) {
   const lines = Array.isArray(invoice.smaregiSaleLines) && invoice.smaregiSaleLines.length
     ? invoice.smaregiSaleLines
@@ -895,10 +852,6 @@ async function cancelSmaregiSale(invoice, reason) {
   return { data, lines };
 }
 
-async function restoreProductsBaseStock(lines) {
-  return syncProductsBaseStock(lines, "restore");
-}
-
 async function applyInvoiceCancel(invoice, reason) {
   const next = { ...invoice };
   const now = new Date().toISOString();
@@ -912,7 +865,6 @@ async function applyInvoiceCancel(invoice, reason) {
   next.cancelRequestedAt = now;
 
   const saleSucceeded = normalizeSmaregiSaleStatus(next.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS;
-  const baseStockWasSynced = next.stockBaseStockSyncStatus === "success";
   if (!saleSucceeded) {
     next.cancelStatus = "failed";
     next.cancelError = "スマレジ売上登録が成功していないため、請求書キャンセルを完了できません。";
@@ -932,28 +884,10 @@ async function applyInvoiceCancel(invoice, reason) {
     next.smaregiCanceledAt = now;
     next.smaregiCancelLines = cancelResult.lines.map(line => ({ ...line }));
 
-    if (baseStockWasSynced) {
-      next.stockRestoreStatus = "pending";
-      const restoreResults = await restoreProductsBaseStock(cancelResult.lines);
-      next.stockRestoreStatus = restoreResults.every(row => row.ok) ? "success" : "failed";
-      next.stockRestoreError = next.stockRestoreStatus === "failed" ? "Some products.base_stock restore lines failed." : "";
-      next.stockRestoredAt = next.stockRestoreStatus === "success" ? new Date().toISOString() : "";
-      next.stockRestoreLines = restoreResults;
-      if (next.stockRestoreStatus !== "success") {
-        next.cancelStatus = "failed";
-        next.cancelError = next.stockRestoreError || "products.base_stock復帰に失敗しました。";
-        next.updatedAt = new Date().toISOString();
-        return next;
-      }
-    } else {
-      next.cancelStatus = "failed";
-      next.cancelError = "products.base_stockの減算成功履歴がないため、在庫復帰を確認できません。";
-      next.stockRestoreStatus = "skipped";
-      next.stockRestoreError = next.cancelError;
-      next.stockRestoreLines = [];
-      next.updatedAt = new Date().toISOString();
-      return next;
-    }
+    next.stockRestoreStatus = "skipped";
+    next.stockRestoreError = "";
+    next.stockRestoreLines = [];
+    next.stockRestoredAt = "";
   }
 
   next.status = INVOICE_STATUS_CANCELLED;
@@ -983,7 +917,6 @@ async function applyInvoiceStockDeduction(invoice) {
     next.smaregiSaleRegisteredAt = "";
     return next;
   }
-  const stockLines = buildStockDeductionLines(next);
   next.smaregiSaleStatus = SMAREGI_SALE_STATUS_PENDING;
   next.smaregiSaleError = "";
   next.smaregiSaleLines = saleLines;
@@ -1022,20 +955,14 @@ async function applyInvoiceStockDeduction(invoice) {
       })
     });
     const data = await readStockApiJson(response);
-    let baseStockSync = [];
-    try {
-      baseStockSync = await syncProductsBaseStock(stockLines);
-      next.stockBaseStockSyncStatus = baseStockSync.every(row => row.ok) ? "success" : "failed";
-    } catch (syncError) {
-      next.stockBaseStockSyncStatus = "failed";
-      next.stockBaseStockSyncError = syncError.message || String(syncError);
-    }
     next.smaregiSaleStatus = SMAREGI_SALE_STATUS_SUCCESS;
     next.smaregiSaleRegisteredAt = new Date().toISOString();
-    next.smaregiSaleError = next.stockBaseStockSyncStatus === "failed" ? `products.base_stock同期失敗: ${next.stockBaseStockSyncError || "一部商品未同期"}` : "";
+    next.smaregiSaleError = "";
     next.smaregiTransactionId = data.smaregiTransactionId || "";
     next.smaregiSaleLines = saleLines.map(line => ({ ...line }));
-    next.stockBaseStockSyncLines = baseStockSync;
+    next.stockBaseStockSyncStatus = "skipped";
+    next.stockBaseStockSyncError = "";
+    next.stockBaseStockSyncLines = [];
   } catch (error) {
     next.smaregiSaleStatus = SMAREGI_SALE_STATUS_FAILED;
     next.smaregiSaleRegisteredAt = "";
@@ -1861,29 +1788,7 @@ async function retryInvoiceStockDeduction(id) {
     return;
   }
   showSalesMessage("スマレジ売上登録を再実行しています。", "warn");
-  let updated = null;
-  if (
-    normalizeSmaregiSaleStatus(original.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS &&
-    original.stockBaseStockSyncStatus === "failed"
-  ) {
-    updated = { ...original };
-    try {
-      const lines = Array.isArray(updated.smaregiSaleLines) && updated.smaregiSaleLines.length
-        ? updated.smaregiSaleLines
-        : buildStockDeductionLines(updated);
-      const baseStockSync = await syncProductsBaseStock(lines);
-      updated.stockBaseStockSyncStatus = baseStockSync.every(row => row.ok) ? "success" : "failed";
-      updated.stockBaseStockSyncError = updated.stockBaseStockSyncStatus === "failed" ? "一部商品のproducts.base_stock同期に失敗しました。" : "";
-      updated.smaregiSaleError = updated.stockBaseStockSyncStatus === "failed" ? updated.stockBaseStockSyncError : "";
-      updated.stockBaseStockSyncLines = baseStockSync;
-    } catch (error) {
-      updated.stockBaseStockSyncStatus = "failed";
-      updated.stockBaseStockSyncError = error.message || String(error);
-      updated.smaregiSaleError = `products.base_stock同期失敗: ${updated.stockBaseStockSyncError}`;
-    }
-  } else {
-    updated = await applyInvoiceStockDeduction(original);
-  }
+  let updated = await applyInvoiceStockDeduction(original);
   updated.updatedAt = new Date().toISOString();
   invoices[index] = updated;
   writeInvoices(invoices);
@@ -1929,10 +1834,7 @@ async function cancelInvoice() {
       showSalesPopup("請求書キャンセル失敗", updated.cancelError || "キャンセル処理を完了できませんでした。", "warn");
       return;
     }
-    const restoreMessage = updated.stockRestoreStatus === "failed"
-      ? "\nproducts.base_stock復帰に失敗しました。詳細を確認してください。"
-      : "";
-    showSalesPopup("請求書キャンセル", `請求書をキャンセルしました${restoreMessage}`, updated.stockRestoreStatus === "failed" ? "warn" : "ok");
+    showSalesPopup("請求書キャンセル", "請求書をキャンセルしました", "ok");
   } catch (error) {
     const message = error?.message || String(error);
     showSalesPopup("請求書キャンセル失敗", message, "err");
