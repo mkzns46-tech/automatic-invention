@@ -14,10 +14,17 @@ let paymentListCollapsed = false;
 let paymentShowCompleted = false;
 
 function readPaymentInvoices() {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection("invoices");
+  }
   return JSON.parse(localStorage.getItem(PAYMENTS_INVOICES_KEY) || "[]");
 }
 
 function writePaymentInvoices(invoices) {
+  if (window.SalesStorage?.writeCachedSalesCollection) {
+    window.SalesStorage.writeCachedSalesCollection("invoices", invoices || []);
+    return;
+  }
   localStorage.setItem(PAYMENTS_INVOICES_KEY, JSON.stringify(invoices));
 }
 
@@ -277,8 +284,12 @@ function printPaymentInvoicePdf(id) {
   window.SalesPdfFormat.printSalesDocument("invoice", invoice);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if (!requireSalesAuth()) return;
+  await window.SalesStorage?.initSalesCollections?.(["customers", "invoices"]).catch(error => {
+    console.error("[payments] Supabase init failed", error);
+    showSalesMessage("Supabase読込に失敗しました。localStorageキャッシュを表示します。", "warn");
+  });
   bindPaymentListControls();
   clearPaymentForm();
   renderPaymentInvoiceList();

@@ -41,6 +41,7 @@ async function salesFetch(path, options = {}) {
     customers: {
       table: "sales_customers",
       localKey: "arico_sales_customers_v1",
+      backupKey: "arico_sales_local_backup_v1_customers",
       conflictKey: "customer_code",
       documentKey: "customer_code",
       getDocumentNo: row => row.customerCode || row.customer_code || row.code || ""
@@ -48,11 +49,44 @@ async function salesFetch(path, options = {}) {
     quotes: {
       table: "sales_quotes",
       localKey: "arico_sales_quotes_v1",
+      backupKey: "arico_sales_local_backup_v1_quotes",
       conflictKey: "document_no",
       documentKey: "document_no",
       getDocumentNo: row => row.quoteNo || row.quoteNumber || row.document_no || row.documentNo || ""
+    },
+    invoices: {
+      table: "sales_invoices",
+      localKey: "arico_sales_invoices_v1",
+      backupKey: "arico_sales_local_backup_v1_invoices",
+      conflictKey: "document_no",
+      documentKey: "document_no",
+      getDocumentNo: row => row.invoiceNo || row.invoiceNumber || row.document_no || row.documentNo || row.originNumber || ""
+    },
+    deliveries: {
+      table: "sales_deliveries",
+      localKey: "arico_sales_deliveries_v1",
+      backupKey: "arico_sales_local_backup_v1_deliveries",
+      conflictKey: "document_no",
+      documentKey: "document_no",
+      getDocumentNo: row => row.deliveryNo || row.deliveryNumber || row.document_no || row.documentNo || row.originNumber || ""
+    },
+    receipts: {
+      table: "sales_receipts",
+      localKey: "arico_sales_receipts_v1",
+      backupKey: "arico_sales_local_backup_v1_receipts",
+      conflictKey: "document_no",
+      documentKey: "document_no",
+      getDocumentNo: row => row.receiptNo || row.receiptNumber || row.document_no || row.documentNo || row.originNumber || ""
     }
   };
+  const SETTINGS_BACKUP_KEY = "arico_sales_local_backup_v1_settings";
+  const PAYMENTS_BACKUP_KEY = "arico_sales_local_backup_v1_payments";
+  const SETTINGS_LOCAL_KEYS = [
+    "arico_sales_pdf_logo",
+    "arico_sales_pdf_stamp",
+    "arico_sales_staff_display_map_v1",
+    "arico_sales_staff_display_overrides_v1"
+  ];
 
   function readLocalJson(key, fallback) {
     try {
@@ -65,6 +99,28 @@ async function salesFetch(path, options = {}) {
 
   function writeLocalJson(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function backupLocalValue(sourceKey, backupKey) {
+    if (localStorage.getItem(backupKey) !== null) return;
+    const value = localStorage.getItem(sourceKey);
+    if (value !== null) localStorage.setItem(backupKey, value);
+  }
+
+  function backupPaymentsFromInvoices() {
+    if (localStorage.getItem(PAYMENTS_BACKUP_KEY) !== null) return;
+    const invoices = readLocalJson("arico_sales_invoices_v1", []);
+    const payments = [];
+    invoices.forEach(invoice => {
+      (Array.isArray(invoice?.payments) ? invoice.payments : []).forEach(payment => {
+        payments.push({
+          ...payment,
+          invoice_document_no: invoice.invoiceNo || invoice.invoiceNumber || invoice.document_no || invoice.documentNo || "",
+          invoice_id: invoice.id || ""
+        });
+      });
+    });
+    localStorage.setItem(PAYMENTS_BACKUP_KEY, JSON.stringify(payments));
   }
 
   function migrationKey(type) {
@@ -80,6 +136,12 @@ async function salesFetch(path, options = {}) {
       created_at: row?.created_at || row?.createdAt || undefined,
       updated_at: row?.updated_at || row?.updatedAt || new Date().toISOString()
     };
+    if (row?.invoiceNo || row?.invoiceNumber || row?.originNumber) {
+      dbRow.invoice_document_no = row.invoiceNo || row.invoiceNumber || row.originNumber || null;
+    }
+    if (row?.quoteNo || row?.quoteNumber || row?.sourceQuoteNo) {
+      dbRow.quote_document_no = row.quoteNo || row.quoteNumber || row.sourceQuoteNo || null;
+    }
     if (config.documentKey === "customer_code") dbRow.customer_code = documentNo;
     else dbRow.document_no = documentNo;
     return dbRow;
@@ -97,6 +159,8 @@ async function salesFetch(path, options = {}) {
     if (row?.document_no && !data.quoteNumber) data.quoteNumber = row.document_no;
     if (row?.customer_code && !data.customer_code) data.customer_code = row.customer_code;
     if (row?.customer_code && !data.customerCode) data.customerCode = row.customer_code;
+    if (row?.invoice_document_no && !data.invoice_document_no) data.invoice_document_no = row.invoice_document_no;
+    if (row?.quote_document_no && !data.quote_document_no) data.quote_document_no = row.quote_document_no;
     if (!data.customerName && data.customer_name) data.customerName = data.customer_name;
     if (!data.organizationName && data.organization_name) data.organizationName = data.organization_name;
     if (!data.customerType && data.customer_type) data.customerType = data.customer_type;
@@ -151,6 +215,8 @@ async function salesFetch(path, options = {}) {
 
   async function migrateLocalToSupabase(type) {
     const config = CONFIG[type];
+    backupLocalValue(config.localKey, config.backupKey);
+    if (type === "invoices") backupPaymentsFromInvoices();
     if (localStorage.getItem(migrationKey(type)) === "true") return;
     const localRows = readLocalJson(config.localKey, []);
     if (localRows.length) {
@@ -170,7 +236,20 @@ async function salesFetch(path, options = {}) {
     await migrateLocalToSupabase(type);
     const rows = await listSalesRecords(type);
     writeLocalJson(config.localKey, rows);
+    if (type === "invoices") {
+      saveSalesPaymentsForInvoices(rows).catch(error => {
+        console.warn("[SalesStorage] payment summary init failed", error);
+      });
+    }
     return rows;
+  }
+
+  async function initSalesCollections(types) {
+    const result = {};
+    for (const type of types || []) {
+      result[type] = await initSalesCollection(type);
+    }
+    return result;
   }
 
   function readCachedSalesCollection(type) {
@@ -184,6 +263,11 @@ async function salesFetch(path, options = {}) {
     upsertSalesRecords(type, rows || []).catch(error => {
       console.error(`[SalesStorage] Supabase save failed: ${type}`, error);
     });
+    if (type === "invoices") {
+      saveSalesPaymentsForInvoices(rows || []).catch(error => {
+        console.warn("[SalesStorage] payment summary save failed", error);
+      });
+    }
   }
 
   async function saveSalesRecord(type, row) {
@@ -198,15 +282,112 @@ async function salesFetch(path, options = {}) {
     else rows.push(row);
     writeLocalJson(config.localKey, rows);
     await upsertSalesRecord(type, row);
+    if (type === "invoices") {
+      await saveSalesPaymentsForInvoices(rows).catch(error => {
+        console.warn("[SalesStorage] payment summary record save failed", error);
+      });
+    }
     return row;
+  }
+
+  async function saveSalesPaymentsForInvoices(invoices) {
+    const targets = (invoices || []).filter(invoice => Array.isArray(invoice?.payments) && invoice.payments.length);
+    for (const invoice of targets) {
+      const invoiceNo = invoice.invoiceNo || invoice.invoiceNumber || invoice.document_no || invoice.documentNo || "";
+      if (!invoiceNo) continue;
+      const payload = {
+        invoice_document_no: invoiceNo,
+        data: {
+          invoiceId: invoice.id || "",
+          invoiceNo,
+          customerName: invoice.customerName || "",
+          payments: invoice.payments || []
+        },
+        status: invoice.status || "",
+        updated_at: invoice.updated_at || invoice.updatedAt || new Date().toISOString()
+      };
+      const existing = await salesFetch(`sales_payments?select=id&invoice_document_no=eq.${encodeURIComponent(invoiceNo)}&limit=1`).catch(() => []);
+      const id = Array.isArray(existing) && existing[0]?.id;
+      if (id) {
+        await salesFetch(`sales_payments?id=eq.${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload)
+        }).catch(error => console.warn(`[SalesStorage] payment summary update failed: ${invoiceNo}`, error));
+      } else {
+        await salesFetch("sales_payments", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        }).catch(error => console.warn(`[SalesStorage] payment summary insert failed: ${invoiceNo}`, error));
+      }
+    }
+  }
+
+  async function listSalesSettings() {
+    const rows = await salesFetch("sales_settings?select=*");
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async function saveSalesSetting(key, value) {
+    if (!key) return null;
+    return salesFetch("sales_settings?on_conflict=key", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify({ key, value })
+    });
+  }
+
+  async function initSalesSettings(options = {}) {
+    const migrateLocal = options.migrateLocal !== false;
+    if (localStorage.getItem(SETTINGS_BACKUP_KEY) === null) {
+      const backup = {};
+      SETTINGS_LOCAL_KEYS.forEach(key => {
+        backup[key] = localStorage.getItem(key);
+      });
+      localStorage.setItem(SETTINGS_BACKUP_KEY, JSON.stringify(backup));
+    }
+    if (migrateLocal) {
+      for (const key of SETTINGS_LOCAL_KEYS) {
+        const value = localStorage.getItem(key);
+        if (value !== null) {
+          const remoteKey = key.replace(/^arico_sales_/, "");
+          await saveSalesSetting(remoteKey, value).catch(error => {
+            console.warn(`[SalesStorage] settings migration failed: ${remoteKey}`, error);
+          });
+        }
+      }
+    }
+    const settings = await listSalesSettings().catch(() => []);
+    settings.forEach(row => {
+      const localKey = row.key?.startsWith("arico_sales_") ? row.key : `arico_sales_${row.key}`;
+      const value = row.value;
+      if (typeof value === "string") localStorage.setItem(localKey, value);
+      else if (value !== undefined && value !== null) localStorage.setItem(localKey, JSON.stringify(value));
+    });
+    return settings;
+  }
+
+  async function migrateAllLocalSalesData() {
+    const result = await initSalesCollections(Object.keys(CONFIG));
+    await initSalesSettings();
+    return result;
   }
 
   window.SalesStorage = {
     initSalesCollection,
+    initSalesCollections,
     readCachedSalesCollection,
     writeCachedSalesCollection,
     saveSalesRecord,
     upsertSalesRecords,
-    listSalesRecords
+    saveSalesPaymentsForInvoices,
+    listSalesRecords,
+    initSalesSettings,
+    saveSalesSetting,
+    listSalesSettings,
+    migrateAllLocalSalesData
   };
+
+  initSalesSettings({ migrateLocal: false }).catch(error => {
+    console.warn("[SalesStorage] settings preload failed", error);
+  });
 })();

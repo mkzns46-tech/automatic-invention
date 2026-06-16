@@ -11,7 +11,7 @@
 <script src="customers-storage.js?v=20260614-settings-imports"></script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="staff-display.js?v=20260616-staff-display-map"></script>
-<script src="settings.js?v=20260616-settings-display" defer></script>
+<script src="settings.js?v=20260616-sales-supabase-settings" defer></script>
 <script src="sales-smaregi.js?v=20260614-settings-imports" defer></script>
 </head>
 <body>
@@ -57,32 +57,34 @@
     </div>
   </section>
 
-  <section class="card sales-staff-display-card">
+    <section class="card sales-staff-display-card">
     <div class="section-title">
       <div>
-        <h2>担当者表示名</h2>
-        <p class="section-note">在庫管理のスタッフ登録を参照し、販売管理画面・PDFで表示するフルネームだけを設定します。内部管理名は変更しません。</p>
+        <h2>??????</h2>
+        <p class="section-note">???????????????????????PDF??????????????????????????????</p>
       </div>
-      <div class="badge muted">販売管理</div>
+      <div class="badge muted">????</div>
     </div>
-    <div class="settings-import-panel">
-      <button type="button" class="secondary" onclick="loadStaffDisplaySettings();">スタッフ一覧を再読込</button>
-      <button type="button" class="primary" onclick="saveStaffDisplaySettings();">表示名を保存</button>
-      <div id="staffDisplayResult" class="message">未読込です。</div>
+    <div class="settings-staff-toolbar">
+      <div class="settings-staff-buttons">
+        <button type="button" class="secondary" onclick="loadStaffDisplaySettings();">??????????</button>
+        <button type="button" class="primary" onclick="saveStaffDisplaySettings();">??????</button>
+      </div>
+      <div id="staffDisplayResult" class="message settings-staff-message">??????</div>
     </div>
     <div class="table-wrap settings-staff-table-wrap">
       <table>
         <thead>
-          <tr><th>内部管理名</th><th>販売管理表示名</th></tr>
+          <tr><th>?????</th><th>???????</th></tr>
         </thead>
         <tbody id="staffDisplaySettingsBody">
-          <tr><td colspan="2">スタッフ一覧を読み込んでください。</td></tr>
+          <tr><td colspan="2">?????????????????</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
-  <section class="card sales-smaregi-card sales-settings-combined-card">
+<section class="card sales-smaregi-card sales-settings-combined-card">
     <div class="section-title">
       <div>
         <h2>スマレジデータ取込</h2>

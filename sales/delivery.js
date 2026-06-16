@@ -18,6 +18,9 @@ let deliveryListCollapsed = false;
 let deliveryShowCompleted = false;
 
 function readDeliveries() {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection("deliveries");
+  }
   try {
     return JSON.parse(localStorage.getItem(DELIVERIES_KEY) || "[]");
   } catch (_) {
@@ -26,6 +29,10 @@ function readDeliveries() {
 }
 
 function writeDeliveries(deliveries) {
+  if (window.SalesStorage?.writeCachedSalesCollection) {
+    window.SalesStorage.writeCachedSalesCollection("deliveries", deliveries || []);
+    return;
+  }
   localStorage.setItem(DELIVERIES_KEY, JSON.stringify(deliveries));
 }
 
@@ -245,8 +252,12 @@ function showSalesPopup(title, body, type = "ok") {
   playNotifySound();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if (!requireSalesAuth()) return;
+  await window.SalesStorage?.initSalesCollections?.(["deliveries"]).catch(error => {
+    console.error("[delivery] Supabase init failed", error);
+    showSalesMessage("Supabase読込に失敗しました。localStorageキャッシュを表示します。", "warn");
+  });
   arrangeDeliveryDetailLayout();
   arrangeDeliveryShippingLayout();
   bindDeliveryListControls();

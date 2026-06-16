@@ -14,14 +14,24 @@ let receiptListCollapsed = true;
 let receiptShowCompleted = false;
 
 function readInvoices() {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection("invoices");
+  }
   return JSON.parse(localStorage.getItem(RECEIPTS_INVOICES_KEY) || "[]");
 }
 
 function readReceipts() {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection("receipts");
+  }
   return JSON.parse(localStorage.getItem(RECEIPTS_KEY) || "[]");
 }
 
 function writeReceipts(receipts) {
+  if (window.SalesStorage?.writeCachedSalesCollection) {
+    window.SalesStorage.writeCachedSalesCollection("receipts", receipts || []);
+    return;
+  }
   localStorage.setItem(RECEIPTS_KEY, JSON.stringify(receipts));
 }
 
@@ -177,8 +187,12 @@ function showSalesPopup(title, body, type = "ok") {
   playSalesNoticeSound(type);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if (!requireSalesAuth()) return;
+  await window.SalesStorage?.initSalesCollections?.(["invoices", "receipts"]).catch(error => {
+    console.error("[receipts] Supabase init failed", error);
+    showSalesMessage("Supabase読込に失敗しました。localStorageキャッシュを表示します。", "warn");
+  });
   arrangeReceiptDetailLayout();
   bindReceiptControls();
   renderReceiptLists();

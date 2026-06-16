@@ -2,8 +2,8 @@ const INVOICES_KEY = "arico_sales_invoices_v1";
 const DELIVERIES_KEY = "arico_sales_deliveries_v1";
 const RECEIPTS_KEY = "arico_sales_receipts_v1";
 const QUOTES_KEY = "arico_sales_quotes_v1";
-const ARICO_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
-const ARICO_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
+const INVOICE_SUPABASE_URL = "https://ihsbkknysozkstvylqff.supabase.co";
+const INVOICE_SUPABASE_API_KEY = "sb_publishable_8f005IzGsMeOZktqtNtTRQ_ms6bzvze";
 const INVOICE_STATUS_OPTIONS = ["下書き", "発行済み", "入金待ち", "入金済み", "入金不要", "キャンセル"];
 const INVOICE_STATUS_DRAFT = "下書き";
 const INVOICE_STATUS_ISSUED = "発行済み";
@@ -30,18 +30,31 @@ let invoiceListCollapsed = false;
 let invoiceShowCompleted = false;
 
 function readInvoices() {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection("invoices");
+  }
   return JSON.parse(localStorage.getItem(INVOICES_KEY) || "[]");
 }
 
 function writeInvoices(invoices) {
+  if (window.SalesStorage?.writeCachedSalesCollection) {
+    window.SalesStorage.writeCachedSalesCollection("invoices", invoices || []);
+    return;
+  }
   localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
 }
 
 function readDeliveries() {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection("deliveries");
+  }
   return JSON.parse(localStorage.getItem(DELIVERIES_KEY) || "[]");
 }
 
 function readReceipts() {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection("receipts");
+  }
   try {
     return JSON.parse(localStorage.getItem(RECEIPTS_KEY) || "[]");
   } catch (_) {
@@ -50,10 +63,17 @@ function readReceipts() {
 }
 
 function writeDeliveries(deliveries) {
+  if (window.SalesStorage?.writeCachedSalesCollection) {
+    window.SalesStorage.writeCachedSalesCollection("deliveries", deliveries || []);
+    return;
+  }
   localStorage.setItem(DELIVERIES_KEY, JSON.stringify(deliveries));
 }
 
 function readLinkedQuotes() {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection("quotes");
+  }
   try {
     const rows = JSON.parse(localStorage.getItem(QUOTES_KEY) || "[]");
     return Array.isArray(rows) ? rows : [];
@@ -63,18 +83,22 @@ function readLinkedQuotes() {
 }
 
 function writeLinkedQuotes(quotes) {
+  if (window.SalesStorage?.writeCachedSalesCollection) {
+    window.SalesStorage.writeCachedSalesCollection("quotes", quotes || []);
+    return;
+  }
   localStorage.setItem(QUOTES_KEY, JSON.stringify(quotes));
 }
 
 async function salesRestFetch(path, options = {}) {
-  const url = `${ARICO_SUPABASE_URL}/rest/v1/${path}`;
+  const url = `${INVOICE_SUPABASE_URL}/rest/v1/${path}`;
   let response;
   try {
     response = await fetch(url, {
       ...options,
       headers: {
-        apikey: ARICO_SUPABASE_API_KEY,
-        Authorization: `Bearer ${ARICO_SUPABASE_API_KEY}`,
+        apikey: INVOICE_SUPABASE_API_KEY,
+        Authorization: `Bearer ${INVOICE_SUPABASE_API_KEY}`,
         "Content-Type": "application/json",
         ...(options.headers || {})
       }
@@ -1159,8 +1183,12 @@ function confirmSalesPopup(title, body, type = "warn") {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if (!requireSalesAuth()) return;
+  await window.SalesStorage?.initSalesCollections?.(["customers", "quotes", "invoices", "deliveries", "receipts"]).catch(error => {
+    console.error("[invoices] Supabase init failed", error);
+    showSalesMessage("Supabase読込に失敗しました。localStorageキャッシュを表示します。", "warn");
+  });
   removeUnusedInvoiceFields();
   arrangeInvoiceHeaderRow();
   arrangeInvoiceSubjectDateRow();

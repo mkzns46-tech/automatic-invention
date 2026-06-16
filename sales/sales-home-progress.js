@@ -27,6 +27,13 @@ function homeReadJson(key) {
   }
 }
 
+function homeReadSalesCollection(type, key) {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection(type);
+  }
+  return homeReadJson(key);
+}
+
 function homeEscapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
     "&": "&amp;",
@@ -135,7 +142,7 @@ function homeSortNewest(a, b) {
 }
 
 function homeResolveCustomer(row) {
-  const customers = homeReadJson(HOME_PROGRESS_KEYS.customers);
+  const customers = homeReadSalesCollection("customers", HOME_PROGRESS_KEYS.customers);
   return customers.find(customer =>
     homeSameKey(customer.id, row?.customerId) ||
     homeSameKey(customer.customerId, row?.customerId) ||
@@ -206,10 +213,10 @@ function homeEnsureGroup(map, origin) {
 
 function homeBuildGroups() {
   const groups = new Map();
-  homeVisibleRows(homeReadJson(HOME_PROGRESS_KEYS.quotes)).forEach(quote => homeEnsureGroup(groups, homeGetOriginNumber(quote, quote.quoteNo)).quotes.push(quote));
-  homeVisibleRows(homeReadJson(HOME_PROGRESS_KEYS.invoices)).forEach(invoice => homeEnsureGroup(groups, homeGetInvoiceOrigin(invoice)).invoices.push(invoice));
-  homeVisibleRows(homeReadJson(HOME_PROGRESS_KEYS.deliveries)).forEach(delivery => homeEnsureGroup(groups, homeGetOriginNumber(delivery, delivery.deliveryNo)).deliveries.push(delivery));
-  homeVisibleRows(homeReadJson(HOME_PROGRESS_KEYS.receipts)).forEach(receipt => homeEnsureGroup(groups, homeGetOriginNumber(receipt, receipt.receiptNo)).receipts.push(receipt));
+  homeVisibleRows(homeReadSalesCollection("quotes", HOME_PROGRESS_KEYS.quotes)).forEach(quote => homeEnsureGroup(groups, homeGetOriginNumber(quote, quote.quoteNo)).quotes.push(quote));
+  homeVisibleRows(homeReadSalesCollection("invoices", HOME_PROGRESS_KEYS.invoices)).forEach(invoice => homeEnsureGroup(groups, homeGetInvoiceOrigin(invoice)).invoices.push(invoice));
+  homeVisibleRows(homeReadSalesCollection("deliveries", HOME_PROGRESS_KEYS.deliveries)).forEach(delivery => homeEnsureGroup(groups, homeGetOriginNumber(delivery, delivery.deliveryNo)).deliveries.push(delivery));
+  homeVisibleRows(homeReadSalesCollection("receipts", HOME_PROGRESS_KEYS.receipts)).forEach(receipt => homeEnsureGroup(groups, homeGetOriginNumber(receipt, receipt.receiptNo)).receipts.push(receipt));
   return Array.from(groups.values());
 }
 
@@ -533,7 +540,7 @@ function homeOpenActionPdf(type, id) {
 }
 
 function homeMarkInvoicePaid(id) {
-  const invoices = homeReadJson(HOME_PROGRESS_KEYS.invoices);
+  const invoices = homeReadSalesCollection("invoices", HOME_PROGRESS_KEYS.invoices);
   const invoice = invoices.find(item => homeSameKey(homeRecordId(item, "invoice"), id) || homeSameKey(homeInvoiceNumber(item), id));
   if (!invoice) {
     alert("対象の請求書が見つかりません。");
@@ -566,7 +573,7 @@ function homeMarkInvoicePaid(id) {
 }
 
 function homeMarkDeliveryShipped(id) {
-  const deliveries = homeReadJson(HOME_PROGRESS_KEYS.deliveries);
+  const deliveries = homeReadSalesCollection("deliveries", HOME_PROGRESS_KEYS.deliveries);
   const delivery = deliveries.find(item => homeSameKey(homeRecordId(item, "delivery"), id) || homeSameKey(homeDeliveryNumber(item), id));
   if (!delivery) {
     alert("対象の納品書が見つかりません。");
@@ -587,10 +594,10 @@ function homeMarkDeliveryShipped(id) {
 
 function homeBuildActionRows() {
   const showCompleted = document.getElementById("homeShowCompletedActions")?.checked;
-  const quotes = homeVisibleRows(homeReadJson(HOME_PROGRESS_KEYS.quotes));
-  const invoices = homeVisibleRows(homeReadJson(HOME_PROGRESS_KEYS.invoices));
-  const deliveries = homeVisibleRows(homeReadJson(HOME_PROGRESS_KEYS.deliveries));
-  const receipts = homeVisibleRows(homeReadJson(HOME_PROGRESS_KEYS.receipts));
+  const quotes = homeVisibleRows(homeReadSalesCollection("quotes", HOME_PROGRESS_KEYS.quotes));
+  const invoices = homeVisibleRows(homeReadSalesCollection("invoices", HOME_PROGRESS_KEYS.invoices));
+  const deliveries = homeVisibleRows(homeReadSalesCollection("deliveries", HOME_PROGRESS_KEYS.deliveries));
+  const receipts = homeVisibleRows(homeReadSalesCollection("receipts", HOME_PROGRESS_KEYS.receipts));
   const rows = [];
 
   quotes.forEach(quote => {
@@ -741,8 +748,11 @@ function bindHomeActionList() {
   if (toggle) toggle.addEventListener("change", renderHomeActionList);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if (!requireSalesAuth()) return;
+  await window.SalesStorage?.initSalesCollections?.(["customers", "quotes", "invoices", "deliveries", "receipts"]).catch(error => {
+    console.error("[home] Supabase init failed", error);
+  });
   bindHomeActionList();
   renderHomeActionList();
   bindHomeTicketFilters();

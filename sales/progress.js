@@ -42,6 +42,13 @@ function writeJson(key, rows) {
   localStorage.setItem(key, JSON.stringify(rows || []));
 }
 
+function readSalesCollection(type, key) {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection(type);
+  }
+  return readJson(key);
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
     "&": "&amp;",
@@ -145,11 +152,11 @@ function sameKey(a, b) {
   return String(a || "").trim() && String(a || "").trim() === String(b || "").trim();
 }
 
-function readQuotes() { return readJson(PROGRESS_KEYS.quotes); }
-function readInvoices() { return readJson(PROGRESS_KEYS.invoices); }
-function readDeliveries() { return readJson(PROGRESS_KEYS.deliveries); }
-function readReceipts() { return readJson(PROGRESS_KEYS.receipts); }
-function readCustomers() { return readJson(PROGRESS_KEYS.customers); }
+function readQuotes() { return readSalesCollection("quotes", PROGRESS_KEYS.quotes); }
+function readInvoices() { return readSalesCollection("invoices", PROGRESS_KEYS.invoices); }
+function readDeliveries() { return readSalesCollection("deliveries", PROGRESS_KEYS.deliveries); }
+function readReceipts() { return readSalesCollection("receipts", PROGRESS_KEYS.receipts); }
+function readCustomers() { return readSalesCollection("customers", PROGRESS_KEYS.customers); }
 
 function getOriginNumber(row, fallback = "") {
   return row?.originNumber || row?.masterNumber || row?.quoteNumber || row?.quoteNo || row?.sourceQuoteNo || fallback || "";
@@ -647,7 +654,10 @@ function toggleProgressSection(name) {
   if (button) button.textContent = progressCollapsed[name] ? "一覧を開く" : "一覧を閉じる";
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  await window.SalesStorage?.initSalesCollections?.(["customers", "quotes", "invoices", "deliveries", "receipts"]).catch(error => {
+    console.error("[progress] Supabase init failed", error);
+  });
   if (!requireSalesAuth()) return;
   bindProgressControls();
   renderProgressSections();

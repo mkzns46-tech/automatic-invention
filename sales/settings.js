@@ -151,6 +151,9 @@ async function saveStaffDisplaySettings() {
       if (key) valuesByKey[key] = String(input.value || "").trim();
     });
     window.SalesStaffDisplay?.saveStaffDisplayOverrides?.(staffDisplayRows, valuesByKey);
+    window.SalesStorage?.saveSalesSetting?.("staff_display_overrides_v1", valuesByKey).catch(error => {
+      console.warn("[settings] staff display setting save failed", error);
+    });
 
     let remoteFailed = false;
     let remoteError = "";
@@ -212,7 +215,12 @@ function bindPdfAssetInput(inputId, previewId, storageKey) {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        localStorage.setItem(storageKey, String(reader.result || ""));
+        const value = String(reader.result || "");
+        localStorage.setItem(storageKey, value);
+        const settingKey = storageKey.replace(/^arico_sales_/, "");
+        window.SalesStorage?.saveSalesSetting?.(settingKey, value).catch(error => {
+          console.warn(`[settings] Supabase setting save failed: ${settingKey}`, error);
+        });
         updatePdfAssetPreview(previewId, storageKey);
         showSalesMessage("PDF画像設定を保存しました。", "ok");
         showSalesPopup("保存完了", "PDF画像設定を保存しました。", "ok");
@@ -235,9 +243,48 @@ function updatePdfAssetPreview(previewId, storageKey) {
 function clearPdfAssetSettings() {
   localStorage.removeItem(PDF_LOGO_KEY);
   localStorage.removeItem(PDF_STAMP_KEY);
+  window.SalesStorage?.saveSalesSetting?.("pdf_logo", "").catch(() => {});
+  window.SalesStorage?.saveSalesSetting?.("pdf_stamp", "").catch(() => {});
   updatePdfAssetPreview("pdfLogoPreview", PDF_LOGO_KEY);
   updatePdfAssetPreview("pdfStampPreview", PDF_STAMP_KEY);
   showSalesPopup("クリア完了", "PDF画像設定をクリアしました。", "ok");
+}
+
+async function migrateLocalSalesDataToSupabase() {
+  const confirmed = confirm("localStorageの販売管理データをSupabaseへ移行します。既存localStorageは削除しません。実行しますか？");
+  if (!confirmed) return;
+  showSalesMessage("販売管理データをSupabaseへ移行しています。", "warn");
+  try {
+    const result = await window.SalesStorage?.migrateAllLocalSalesData?.();
+    showSalesPopup("移行完了", "localStorageからSupabaseへの移行処理が完了しました。", "ok");
+    showSalesMessage("Supabase移行が完了しました。", "ok");
+    console.log("[sales migration result]", result);
+  } catch (error) {
+    const message = error?.message || String(error);
+    showSalesPopup("移行失敗", message, "err");
+    showSalesMessage(message, "err");
+  }
+}
+
+function ensureMigrationButton() {
+  if (document.getElementById("salesMigrationButton")) return;
+  const firstCard = document.querySelector(".sales-pdf-assets-card");
+  if (!firstCard) return;
+  const section = document.createElement("section");
+  section.className = "card sales-migration-card";
+  section.innerHTML = `
+    <div class="section-title">
+      <div>
+        <h2>Supabase移行</h2>
+        <p class="section-note">会社PCのlocalStorageに残っている販売管理データをSupabaseへ移行します。既存データは削除しません。</p>
+      </div>
+      <div class="badge muted">管理者</div>
+    </div>
+    <div class="sales-actions">
+      <button type="button" id="salesMigrationButton" class="primary" onclick="migrateLocalSalesDataToSupabase();">localStorageからSupabaseへ移行</button>
+    </div>
+  `;
+  firstCard.insertAdjacentElement("beforebegin", section);
 }
 
 async function importSettingsSmaregiCustomers() {
@@ -300,8 +347,12 @@ async function importSettingsSmaregiCustomers() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if (typeof requireSalesAuth === "function" && !requireSalesAuth()) return;
+  await window.SalesStorage?.initSalesSettings?.().catch(error => {
+    console.error("[settings] Supabase settings init failed", error);
+  });
+  ensureMigrationButton();
   bindPdfAssetSettings();
   loadStaffDisplaySettings();
 });
