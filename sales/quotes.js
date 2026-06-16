@@ -216,7 +216,14 @@ function arrangeQuoteSubjectBlock() {
   }
   secondRow.appendChild(staffLabel);
   secondRow.appendChild(transactionLabel);
-  secondRow.appendChild(discountLabel);
+}
+
+function moveQuoteDiscountTemplateToSummary() {
+  const label = document.getElementById("discountTemplate")?.closest("label");
+  const subtotalBox = document.getElementById("subtotalText")?.closest("div");
+  if (!label || !subtotalBox || label.closest(".summary")) return;
+  label.classList.add("summary-input-box", "discount-template-summary-box");
+  subtotalBox.insertAdjacentElement("afterend", label);
 }
 
 function moveQuoteOverallDiscountToSummary() {
@@ -517,6 +524,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   removeUnusedQuoteFields();
   arrangeQuoteSubjectBlock();
+  moveQuoteDiscountTemplateToSummary();
   moveQuoteOverallDiscountToSummary();
   markQuoteRequiredLabels();
   document.getElementById("customerType").innerHTML = ARICO_CUSTOMER_TYPES.map(type => `<option value="${type}">${type}</option>`).join("");
