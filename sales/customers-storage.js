@@ -62,16 +62,25 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
     if (!text) return [];
     return readCustomers().filter(customer => {
       const haystack = [
+        customer.id,
         customer.customerName,
+        customer.customer_name,
         customer.organizationName,
+        customer.organization_name,
         customer.kana,
         customer.phone,
         customer.email,
         customer.customerType,
+        customer.customer_type,
         customer.staff,
         customer.smaregiMemberCode,
+        customer.smaregi_member_code,
+        customer.smaregiCustomerCode,
         customer.smaregiMemberId,
-        customer.customerCode
+        customer.smaregi_member_id,
+        customer.smaregiCustomerId,
+        customer.customerCode,
+        customer.customer_code
       ].map(value => normalizeKey(value)).join(" ");
       return haystack.includes(text);
     }).slice(0, limit);

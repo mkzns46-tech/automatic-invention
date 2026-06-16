@@ -645,6 +645,16 @@ async function ensureQuoteCustomersLoaded() {
   await window.SalesCustomerStorage?.initCustomersStorage?.();
 }
 
+async function reloadQuoteCustomersFromSupabase() {
+  if (!window.SalesStorage?.listSalesRecords) return [];
+  const customers = await window.SalesStorage.listSalesRecords("customers");
+  if (Array.isArray(customers)) {
+    window.SalesStorage.writeCachedSalesCollection?.("customers", customers);
+    return customers;
+  }
+  return [];
+}
+
 async function renderQuoteCustomerSearchResults(query) {
   const results = document.getElementById("quoteCustomerSearchResults");
   if (!results) return;
@@ -656,9 +666,17 @@ async function renderQuoteCustomerSearchResults(query) {
   await ensureQuoteCustomersLoaded().catch(error => {
     console.error("[quote customer search] customer reload failed", error);
   });
-  const customers = window.SalesCustomerStorage?.searchCustomers
+  let customers = window.SalesCustomerStorage?.searchCustomers
     ? window.SalesCustomerStorage.searchCustomers(text, 20)
     : [];
+  if (!customers.length) {
+    await reloadQuoteCustomersFromSupabase().catch(error => {
+      console.error("[quote customer search] direct Supabase reload failed", error);
+    });
+    customers = window.SalesCustomerStorage?.searchCustomers
+      ? window.SalesCustomerStorage.searchCustomers(text, 20)
+      : [];
+  }
   results.innerHTML = customers.length ? `<div class="table-wrap"><table><thead><tr><th>顧客名</th><th>顧客区分</th><th>電話番号</th><th>メールアドレス</th><th>スマレジ会員コード</th><th>操作</th></tr></thead><tbody>${customers.map(customer => `<tr>
     <td>${escapeHtml(customer.customerName)}</td>
     <td>${escapeHtml(customer.customerType)}</td>

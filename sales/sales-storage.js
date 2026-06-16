@@ -97,6 +97,13 @@ async function salesFetch(path, options = {}) {
     if (row?.document_no && !data.quoteNumber) data.quoteNumber = row.document_no;
     if (row?.customer_code && !data.customer_code) data.customer_code = row.customer_code;
     if (row?.customer_code && !data.customerCode) data.customerCode = row.customer_code;
+    if (!data.customerName && data.customer_name) data.customerName = data.customer_name;
+    if (!data.organizationName && data.organization_name) data.organizationName = data.organization_name;
+    if (!data.customerType && data.customer_type) data.customerType = data.customer_type;
+    if (!data.smaregiMemberId && data.smaregi_member_id) data.smaregiMemberId = data.smaregi_member_id;
+    if (!data.smaregiMemberCode && data.smaregi_member_code) data.smaregiMemberCode = data.smaregi_member_code;
+    if (!data.smaregiCustomerId && data.smaregi_customer_id) data.smaregiCustomerId = data.smaregi_customer_id;
+    if (!data.smaregiCustomerCode && data.smaregi_customer_code) data.smaregiCustomerCode = data.smaregi_customer_code;
     return data;
   }
 
