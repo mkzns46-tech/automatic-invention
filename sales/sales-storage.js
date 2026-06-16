@@ -133,14 +133,14 @@ async function salesFetch(path, options = {}) {
     const dbRow = {
       data: row || {},
       status: row?.status || "",
-      created_at: row?.created_at || row?.createdAt || undefined,
+      created_at: row?.created_at || row?.createdAt || row?.savedAt || row?.issuedAt || row?.invoiceDate || row?.quoteDate || row?.deliveryDate || row?.receiptDate || new Date().toISOString(),
       updated_at: row?.updated_at || row?.updatedAt || new Date().toISOString()
     };
-    if (["deliveries", "receipts"].includes(type) && (row?.invoiceNo || row?.invoiceNumber || row?.originNumber)) {
-      dbRow.invoice_document_no = row.invoiceNo || row.invoiceNumber || row.originNumber || null;
+    if (["deliveries", "receipts"].includes(type)) {
+      dbRow.invoice_document_no = row?.invoiceNo || row?.invoiceNumber || row?.originNumber || row?.invoice_document_no || null;
     }
-    if (type === "invoices" && (row?.quoteNo || row?.quoteNumber || row?.sourceQuoteNo)) {
-      dbRow.quote_document_no = row.quoteNo || row.quoteNumber || row.sourceQuoteNo || null;
+    if (type === "invoices") {
+      dbRow.quote_document_no = row?.quoteNo || row?.quoteNumber || row?.sourceQuoteNo || row?.quote_document_no || null;
     }
     if (config.documentKey === "customer_code") dbRow.customer_code = documentNo;
     else dbRow.document_no = documentNo;
