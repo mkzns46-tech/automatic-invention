@@ -15,6 +15,9 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
   }
 
   function readCustomers() {
+    if (window.SalesStorage?.readCachedSalesCollection) {
+      return window.SalesStorage.readCachedSalesCollection("customers");
+    }
     try {
       const rows = JSON.parse(localStorage.getItem(CUSTOMERS_KEY) || "[]");
       return Array.isArray(rows) ? rows : [];
@@ -24,7 +27,18 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
   }
 
   function writeCustomers(customers) {
+    if (window.SalesStorage?.writeCachedSalesCollection) {
+      window.SalesStorage.writeCachedSalesCollection("customers", customers);
+      return;
+    }
     localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
+  }
+
+  async function initCustomersStorage() {
+    if (window.SalesStorage?.initSalesCollection) {
+      return window.SalesStorage.initSalesCollection("customers");
+    }
+    return readCustomers();
   }
 
   function normalizeCustomerType(value) {
@@ -204,6 +218,7 @@ var ARICO_CUSTOMER_TYPES = ["個人", "学校", "協会", "企業", "ショッ�
 
   window.ARICO_CUSTOMER_TYPES = ARICO_CUSTOMER_TYPES;
   window.SalesCustomerStorage = {
+    initCustomersStorage,
     readCustomers,
     writeCustomers,
     normalizeCustomerType,

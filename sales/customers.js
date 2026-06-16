@@ -56,9 +56,13 @@ function matchesDateRange(value, from, to) {
   return true;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if (typeof requireSalesAuth === "function" && !requireSalesAuth()) return;
   if (!document.getElementById("customerListBody")) return;
+  await customerStorage().initCustomersStorage?.().catch(error => {
+    console.error("[sales customers] Supabase init failed. Using local cache.", error);
+    showCustomerMessage("Supabaseから顧客データを取得できませんでした。ローカルキャッシュを表示しています。", "warn");
+  });
   bindCustomerListControls();
   populateCustomerTypeOptions();
   arrangeCustomerFormLayout();
@@ -361,6 +365,7 @@ async function importSmaregiCustomers() {
     console.log("[smaregi-customers] field hits", data.diagnostics?.fieldHits || {});
 
     const result = customerStorage().upsertSmaregiCustomers(data.customers || []);
+    await window.SalesStorage?.upsertSalesRecords?.("customers", customerStorage().readCustomers());
     const skipped = Number(data.skipped || 0) + Number(result.skipped || 0);
     const skipReasons = data.diagnostics?.skipReasons || {};
     const message = [
@@ -440,7 +445,7 @@ function setCustomerFormMode(mode) {
   if (button) button.textContent = isNew ? "\u767b\u9332" : "\u4fdd\u5b58";
 }
 
-function saveCustomer() {
+async function saveCustomer() {
   const customers = customerStorage().readCustomers();
   const id = getValue("customerId") || makeCustomerId();
   const existingIndex = customers.findIndex(row => row.id === id);
@@ -473,6 +478,12 @@ function saveCustomer() {
   if (existingIndex >= 0) customers[existingIndex] = customer;
   else customers.push(customer);
   customerStorage().writeCustomers(customers);
+  try {
+    await window.SalesStorage?.saveSalesRecord?.("customers", customer);
+  } catch (error) {
+    showSalesPopup("Supabase保存失敗", error?.message || String(error), "err");
+    return;
+  }
   setValue("customerId", customer.id);
   setValue("customerCode", customer.customerCode);
   setCustomerFormMode("edit");

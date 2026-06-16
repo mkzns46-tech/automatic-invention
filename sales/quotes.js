@@ -34,11 +34,25 @@ function salesFetch(path) {
 }
 
 function readQuotes() {
+  if (window.SalesStorage?.readCachedSalesCollection) {
+    return window.SalesStorage.readCachedSalesCollection("quotes");
+  }
   return JSON.parse(localStorage.getItem(QUOTES_KEY) || "[]");
 }
 
 function writeQuotes(quotes) {
+  if (window.SalesStorage?.writeCachedSalesCollection) {
+    window.SalesStorage.writeCachedSalesCollection("quotes", quotes);
+    return;
+  }
   localStorage.setItem(QUOTES_KEY, JSON.stringify(quotes));
+}
+
+async function initQuoteStorage() {
+  if (window.SalesStorage?.initSalesCollection) {
+    return window.SalesStorage.initSalesCollection("quotes");
+  }
+  return readQuotes();
 }
 
 function readUnits() {
@@ -494,6 +508,13 @@ async function refreshQuoteLineStocks() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (!requireSalesAuth()) return;
+  await Promise.all([
+    initQuoteStorage(),
+    window.SalesCustomerStorage?.initCustomersStorage?.() || Promise.resolve()
+  ]).catch(error => {
+    console.error("[sales quotes] Supabase init failed. Using local cache.", error);
+    showSalesMessage("Supabaseから見積・顧客データを取得できませんでした。ローカルキャッシュを表示しています。", "warn");
+  });
   removeUnusedQuoteFields();
   arrangeQuoteSubjectBlock();
   moveQuoteOverallDiscountToSummary();
@@ -692,7 +713,7 @@ function closeQuoteNewCustomerModal() {
   if (modal) modal.style.display = "none";
 }
 
-function saveQuoteNewCustomer() {
+async function saveQuoteNewCustomer() {
   try {
     const customer = window.SalesCustomerStorage.createManualCustomer({
       customerName: document.getElementById("quoteNewCustomerName")?.value,
@@ -704,6 +725,7 @@ function saveQuoteNewCustomer() {
       email: document.getElementById("quoteNewCustomerEmail")?.value,
       memo: document.getElementById("quoteNewCustomerMemo")?.value
     });
+    await window.SalesStorage?.saveSalesRecord?.("customers", customer);
     closeQuoteNewCustomerModal();
     applyCustomerToQuote(customer);
     setFieldValue("quoteCustomerSearchInput", "");
@@ -1356,6 +1378,12 @@ async function saveQuote() {
   if (index >= 0) quotes[index] = quote;
   else quotes.push(quote);
   writeQuotes(quotes);
+  try {
+    await window.SalesStorage?.saveSalesRecord?.("quotes", quote);
+  } catch (error) {
+    showSalesPopup("Supabase保存失敗", error?.message || String(error), "err");
+    return;
+  }
   currentQuoteId = quote.id;
   renderQuoteList();
   updateQuoteDeleteButton(quote);
