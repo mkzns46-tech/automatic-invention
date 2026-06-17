@@ -27,7 +27,7 @@ let invoiceListStatusFilter = "";
 let invoiceListDateFrom = "";
 let invoiceListDateTo = "";
 let invoiceListCollapsed = false;
-let invoiceShowCompleted = false;
+let invoiceShowCompleted = true;
 
 function readInvoices() {
   if (window.SalesStorage?.readCachedSalesCollection) {
@@ -1258,7 +1258,8 @@ function bindInvoiceListControls() {
   }
   const showCompleted = document.getElementById("invoiceShowCompleted");
   if (showCompleted) {
-    invoiceShowCompleted = showCompleted.checked;
+    showCompleted.checked = true;
+    invoiceShowCompleted = true;
     showCompleted.addEventListener("change", () => {
       invoiceShowCompleted = showCompleted.checked;
       renderInvoiceList();
@@ -1313,8 +1314,8 @@ function renderInvoiceList() {
   });
   const count = document.getElementById("invoiceListCount");
   if (count) count.textContent = invoiceListSearchText || invoiceListStatusFilter || invoiceListDateFrom || invoiceListDateTo
-    ? `入金待ち ${activeInvoices.length}件 / 全${invoices.length}件`
-    : `入金待ち ${activeInvoices.length}件`;
+    ? `対応 ${activeInvoices.length}件 / 完了 ${completedInvoices.length}件 / 全${invoices.length}件`
+    : `対応 ${activeInvoices.length}件 / 完了 ${completedInvoices.length}件 / 全${invoices.length}件`;
   body.innerHTML = activeInvoices.length ? activeInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="9">対応が必要な請求書はありません。</td></tr>';
   if (completedBody) {
     completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="9">完了済み・キャンセル済みの請求書はありません。</td></tr>';
