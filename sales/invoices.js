@@ -1290,8 +1290,32 @@ function setInvoiceListCollapsed(collapsed) {
   const panel = document.getElementById("invoiceCompletedListPanel");
   const button = document.getElementById("invoiceListToggle");
   if (listPanel) listPanel.hidden = invoiceListCollapsed;
-  if (panel) panel.hidden = invoiceListCollapsed || !invoiceShowCompleted;
+  setCompletedInvoicePanelVisibility();
   if (button) button.textContent = invoiceListCollapsed ? "一覧を開く" : "一覧を閉じる";
+}
+
+function setCompletedInvoicePanelVisibility() {
+  const panel = document.getElementById("invoiceCompletedListPanel");
+  if (!panel) return;
+  const shouldShow = !invoiceListCollapsed && invoiceShowCompleted;
+  panel.hidden = !shouldShow;
+  if (shouldShow) {
+    panel.removeAttribute("hidden");
+    panel.classList.add("invoice-completed-visible");
+    panel.style.display = "";
+  } else {
+    panel.classList.remove("invoice-completed-visible");
+  }
+}
+
+function renderInvoiceRowsSafely(rows, emptyMessage) {
+  if (!rows.length) return emptyMessage;
+  try {
+    return rows.map(renderInvoiceListRow).join("");
+  } catch (error) {
+    console.error("[invoice render rows failed]", error, rows);
+    return `<tr><td colspan="9">請求書一覧の描画でエラーが発生しました。Consoleを確認してください。</td></tr>`;
+  }
 }
 
 function renderInvoiceList() {
@@ -1305,7 +1329,24 @@ function renderInvoiceList() {
     return completedStatuses.has(status);
   });
   const activeInvoices = invoices.filter(invoice => !completedStatuses.has(normalizeInvoiceStatus(invoice.status)));
-  console.log("invoice list counts", {
+  console.log("[invoice debug]", {
+    invoices: invoices?.length,
+    activeInvoices: activeInvoices?.length,
+    completedInvoices: completedInvoices?.length,
+    showCompleted: invoiceShowCompleted
+  });
+  console.log("[invoice render]", {
+    invoices
+  });
+  const completedContainer = document.getElementById("invoiceCompletedListPanel");
+  console.log("[completed invoices render]", {
+    completedInvoicesLength: completedInvoices.length,
+    invoiceShowCompleted,
+    completedContainer,
+    completedContainerHidden: completedContainer?.hidden,
+    completedContainerDisplay: completedContainer ? getComputedStyle(completedContainer).display : null
+  });
+  console.log("[invoice list counts]", {
     stored: allInvoices.length,
     filtered: invoices.length,
     active: activeInvoices.length,
@@ -1316,12 +1357,11 @@ function renderInvoiceList() {
   if (count) count.textContent = invoiceListSearchText || invoiceListStatusFilter || invoiceListDateFrom || invoiceListDateTo
     ? `対応 ${activeInvoices.length}件 / 完了 ${completedInvoices.length}件 / 全${invoices.length}件`
     : `対応 ${activeInvoices.length}件 / 完了 ${completedInvoices.length}件 / 全${invoices.length}件`;
-  body.innerHTML = activeInvoices.length ? activeInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="9">対応が必要な請求書はありません。</td></tr>';
+  body.innerHTML = renderInvoiceRowsSafely(activeInvoices, '<tr><td colspan="9">対応が必要な請求書はありません。</td></tr>');
   if (completedBody) {
-    completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="9">完了済み・キャンセル済みの請求書はありません。</td></tr>';
+    completedBody.innerHTML = renderInvoiceRowsSafely(completedInvoices, '<tr><td colspan="9">完了済み・キャンセル済みの請求書はありません。</td></tr>');
   }
-  const completedPanel = document.getElementById("invoiceCompletedListPanel");
-  if (completedPanel) completedPanel.hidden = invoiceListCollapsed || !invoiceShowCompleted;
+  setCompletedInvoicePanelVisibility();
 }
 
 function renderInvoiceListRow(invoice) {
@@ -1345,6 +1385,8 @@ function renderInvoiceListRow(invoice) {
     </td>
   </tr>`;
 }
+
+window.renderInvoices = renderInvoiceList;
 
 function printSelectedInvoices() {
   const ids = Array.from(document.querySelectorAll(".invoice-pdf-check:checked")).map(input => input.value);
