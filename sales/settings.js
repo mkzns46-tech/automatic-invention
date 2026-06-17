@@ -251,16 +251,16 @@ function clearPdfAssetSettings() {
 }
 
 async function migrateLocalSalesDataToSupabase() {
-  const confirmed = confirm("localStorageの販売管理データをSupabaseへ再移行します。既存localStorageは削除しません。同じ伝票番号・顧客コードがSupabaseにあるデータはスキップします。実行しますか？");
+  const confirmed = confirm("会社PCのlocalStorageに残っている販売管理データをSupabaseへ救出します。既存localStorageは削除しません。同じ伝票番号・顧客コードがSupabaseにある場合は、会社PCのlocalStorage内容で上書き更新します。実行しますか？");
   if (!confirmed) return;
   const resultBox = document.getElementById("salesMigrationResult");
   const button = document.getElementById("salesMigrationButton");
   if (button) button.disabled = true;
   if (resultBox) {
-    resultBox.textContent = "販売管理データをSupabaseへ再移行しています。";
+    resultBox.textContent = "販売管理データをSupabaseへ救出しています。";
     resultBox.className = "message warn";
   }
-  showSalesMessage("販売管理データをSupabaseへ再移行しています。", "warn");
+  showSalesMessage("販売管理データをSupabaseへ救出しています。", "warn");
   try {
     const result = await window.SalesStorage?.migrateAllLocalSalesData?.({ force: true });
     const message = formatMigrationResult(result);
@@ -268,7 +268,7 @@ async function migrateLocalSalesDataToSupabase() {
       resultBox.textContent = message;
       resultBox.className = "message ok";
     }
-    showSalesPopup("再移行完了", message, "ok");
+    showSalesPopup("救出完了", message, "ok");
     showSalesMessage(message, "ok");
     console.log("[sales migration result]", result);
   } catch (error) {
@@ -294,11 +294,11 @@ function formatMigrationResult(result) {
     receipts: "領収",
     settings: "ロゴ・印鑑・担当者表示名・販売管理設定"
   };
-  const lines = ["localStorageからSupabaseへの再移行が完了しました。"];
+  const lines = ["localStorageからSupabaseへの救出が完了しました。"];
   Object.keys(labels).forEach(key => {
     const stats = result?.[key];
     if (!stats) return;
-    lines.push(`${labels[key]}：localStorage ${stats.localCount || 0}件 / 移行 ${stats.inserted || 0}件 / スキップ ${stats.skipped || 0}件 / エラー ${stats.errors || 0}件`);
+    lines.push(`${labels[key]}：localStorage ${stats.localCount || 0}件 / 新規 ${stats.inserted || 0}件 / 更新 ${stats.updated || 0}件 / スキップ ${stats.skipped || 0}件 / エラー ${stats.errors || 0}件`);
     if (Array.isArray(stats.errorMessages) && stats.errorMessages.length) {
       lines.push(`  エラー例：${stats.errorMessages.join(" / ")}`);
     }
@@ -315,13 +315,13 @@ function ensureMigrationButton() {
   section.innerHTML = `
     <div class="section-title">
       <div>
-        <h2>Supabase再移行</h2>
-        <p class="section-note">会社PCのlocalStorageに残っている販売管理データをSupabaseへ再移行します。既存データとlocalStorageは削除しません。</p>
+        <h2>Supabase救出</h2>
+        <p class="section-note">会社PCのlocalStorageに残っている販売管理データをSupabaseへ保存します。同じ伝票番号・顧客コードは会社PCの内容で更新します。</p>
       </div>
       <div class="badge muted">管理者</div>
     </div>
     <div class="sales-actions">
-      <button type="button" id="salesMigrationButton" class="primary" onclick="migrateLocalSalesDataToSupabase();">localStorageからSupabaseへ再移行</button>
+      <button type="button" id="salesMigrationButton" class="primary" onclick="migrateLocalSalesDataToSupabase();">localStorageからSupabaseへ救出</button>
     </div>
     <div id="salesMigrationResult" class="message">未実行です。</div>
   `;

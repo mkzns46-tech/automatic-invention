@@ -193,6 +193,7 @@ async function salesFetch(path, options = {}) {
       label,
       localCount,
       inserted: 0,
+      updated: 0,
       skipped: 0,
       errors: 0,
       errorMessages: []
@@ -268,15 +269,16 @@ async function salesFetch(path, options = {}) {
 
     for (const row of localRows) {
       const key = getRecordKey(type, row);
-      if (!key || seenLocalKeys.has(key) || remoteKeys.has(key)) {
+      if (!key || seenLocalKeys.has(key)) {
         stats.skipped += 1;
         continue;
       }
       seenLocalKeys.add(key);
       try {
         await upsertSalesRecord(type, row);
+        if (remoteKeys.has(key)) stats.updated += 1;
+        else stats.inserted += 1;
         remoteKeys.add(key);
-        stats.inserted += 1;
       } catch (error) {
         addMigrationError(stats, error);
       }
@@ -411,7 +413,7 @@ async function salesFetch(path, options = {}) {
 
     for (const payment of payments) {
       const invoiceNo = paymentDocumentNo(payment);
-      if (!invoiceNo || seenLocalKeys.has(invoiceNo) || remoteKeys.has(invoiceNo)) {
+      if (!invoiceNo || seenLocalKeys.has(invoiceNo)) {
         stats.skipped += 1;
         continue;
       }
@@ -423,12 +425,22 @@ async function salesFetch(path, options = {}) {
         updated_at: payment?.updated_at || payment?.updatedAt || new Date().toISOString()
       };
       try {
-        await salesFetch("sales_payments", {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
+        const existing = await salesFetch(`sales_payments?select=id&invoice_document_no=eq.${encodeURIComponent(invoiceNo)}&limit=1`).catch(() => []);
+        const id = Array.isArray(existing) && existing[0]?.id;
+        if (id) {
+          await salesFetch(`sales_payments?id=eq.${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            body: JSON.stringify(payload)
+          });
+          stats.updated += 1;
+        } else {
+          await salesFetch("sales_payments", {
+            method: "POST",
+            body: JSON.stringify(payload)
+          });
+          stats.inserted += 1;
+        }
         remoteKeys.add(invoiceNo);
-        stats.inserted += 1;
       } catch (error) {
         addMigrationError(stats, error);
       }
@@ -508,14 +520,11 @@ async function salesFetch(path, options = {}) {
     const remoteKeys = new Set((Array.isArray(remoteRows) ? remoteRows : []).map(row => String(row?.key || "").trim()).filter(Boolean));
 
     for (const [key, value] of uniqueEntries) {
-      if (remoteKeys.has(key)) {
-        stats.skipped += 1;
-        continue;
-      }
       try {
         await saveSalesSetting(key, value);
+        if (remoteKeys.has(key)) stats.updated += 1;
+        else stats.inserted += 1;
         remoteKeys.add(key);
-        stats.inserted += 1;
       } catch (error) {
         addMigrationError(stats, error);
       }
