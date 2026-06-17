@@ -37,6 +37,7 @@ async function salesFetch(path, options = {}) {
 
 (function () {
   const MIGRATION_PREFIX = "arico_sales_supabase_migrated_v1_";
+  const memoryCache = {};
   const CONFIG = {
     customers: {
       table: "sales_customers",
@@ -89,6 +90,10 @@ async function salesFetch(path, options = {}) {
   ];
 
   function readLocalJson(key, fallback) {
+    if (Object.prototype.hasOwnProperty.call(memoryCache, key)) {
+      const value = memoryCache[key];
+      return Array.isArray(fallback) ? (Array.isArray(value) ? value : fallback) : (value && typeof value === "object" ? value : fallback);
+    }
     try {
       const value = JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
       return Array.isArray(fallback) ? (Array.isArray(value) ? value : fallback) : (value && typeof value === "object" ? value : fallback);
@@ -98,7 +103,12 @@ async function salesFetch(path, options = {}) {
   }
 
   function writeLocalJson(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
+    memoryCache[key] = value;
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.warn(`[SalesStorage] localStorage write skipped: ${key}`, error);
+    }
   }
 
   function backupLocalValue(sourceKey, backupKey) {
@@ -120,7 +130,12 @@ async function salesFetch(path, options = {}) {
         });
       });
     });
-    localStorage.setItem(PAYMENTS_BACKUP_KEY, JSON.stringify(payments));
+    try {
+      localStorage.setItem(PAYMENTS_BACKUP_KEY, JSON.stringify(payments));
+    } catch (error) {
+      memoryCache[PAYMENTS_BACKUP_KEY] = payments;
+      console.warn("[SalesStorage] payments backup kept in memory", error);
+    }
   }
 
   function migrationKey(type) {
