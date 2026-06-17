@@ -251,19 +251,59 @@ function clearPdfAssetSettings() {
 }
 
 async function migrateLocalSalesDataToSupabase() {
-  const confirmed = confirm("localStorageの販売管理データをSupabaseへ移行します。既存localStorageは削除しません。実行しますか？");
+  const confirmed = confirm("localStorageの販売管理データをSupabaseへ再移行します。既存localStorageは削除しません。同じ伝票番号・顧客コードがSupabaseにあるデータはスキップします。実行しますか？");
   if (!confirmed) return;
-  showSalesMessage("販売管理データをSupabaseへ移行しています。", "warn");
+  const resultBox = document.getElementById("salesMigrationResult");
+  const button = document.getElementById("salesMigrationButton");
+  if (button) button.disabled = true;
+  if (resultBox) {
+    resultBox.textContent = "販売管理データをSupabaseへ再移行しています。";
+    resultBox.className = "message warn";
+  }
+  showSalesMessage("販売管理データをSupabaseへ再移行しています。", "warn");
   try {
-    const result = await window.SalesStorage?.migrateAllLocalSalesData?.();
-    showSalesPopup("移行完了", "localStorageからSupabaseへの移行処理が完了しました。", "ok");
-    showSalesMessage("Supabase移行が完了しました。", "ok");
+    const result = await window.SalesStorage?.migrateAllLocalSalesData?.({ force: true });
+    const message = formatMigrationResult(result);
+    if (resultBox) {
+      resultBox.textContent = message;
+      resultBox.className = "message ok";
+    }
+    showSalesPopup("再移行完了", message, "ok");
+    showSalesMessage(message, "ok");
     console.log("[sales migration result]", result);
   } catch (error) {
     const message = error?.message || String(error);
+    if (resultBox) {
+      resultBox.textContent = message;
+      resultBox.className = "message err";
+    }
     showSalesPopup("移行失敗", message, "err");
     showSalesMessage(message, "err");
+  } finally {
+    if (button) button.disabled = false;
   }
+}
+
+function formatMigrationResult(result) {
+  const labels = {
+    customers: "顧客",
+    quotes: "見積",
+    invoices: "請求",
+    payments: "入金",
+    deliveries: "納品",
+    receipts: "領収",
+    settings: "ロゴ・印鑑・担当者表示名・販売管理設定"
+  };
+  const lines = ["localStorageからSupabaseへの再移行が完了しました。"];
+  Object.keys(labels).forEach(key => {
+    const stats = result?.[key];
+    if (!stats) return;
+    lines.push(`${labels[key]}：localStorage ${stats.localCount || 0}件 / 移行 ${stats.inserted || 0}件 / スキップ ${stats.skipped || 0}件 / エラー ${stats.errors || 0}件`);
+    if (Array.isArray(stats.errorMessages) && stats.errorMessages.length) {
+      lines.push(`  エラー例：${stats.errorMessages.join(" / ")}`);
+    }
+  });
+  return lines.join("\n");
 }
 
 function ensureMigrationButton() {
@@ -275,14 +315,15 @@ function ensureMigrationButton() {
   section.innerHTML = `
     <div class="section-title">
       <div>
-        <h2>Supabase移行</h2>
-        <p class="section-note">会社PCのlocalStorageに残っている販売管理データをSupabaseへ移行します。既存データは削除しません。</p>
+        <h2>Supabase再移行</h2>
+        <p class="section-note">会社PCのlocalStorageに残っている販売管理データをSupabaseへ再移行します。既存データとlocalStorageは削除しません。</p>
       </div>
       <div class="badge muted">管理者</div>
     </div>
     <div class="sales-actions">
-      <button type="button" id="salesMigrationButton" class="primary" onclick="migrateLocalSalesDataToSupabase();">localStorageからSupabaseへ移行</button>
+      <button type="button" id="salesMigrationButton" class="primary" onclick="migrateLocalSalesDataToSupabase();">localStorageからSupabaseへ再移行</button>
     </div>
+    <div id="salesMigrationResult" class="message">未実行です。</div>
   `;
   firstCard.insertAdjacentElement("beforebegin", section);
 }

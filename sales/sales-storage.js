@@ -183,6 +183,28 @@ async function salesFetch(path, options = {}) {
     });
   }
 
+  function getRecordKey(type, row) {
+    const config = CONFIG[type];
+    return String(config.getDocumentNo(row) || "").trim();
+  }
+
+  function createMigrationStats(label, localCount = 0) {
+    return {
+      label,
+      localCount,
+      inserted: 0,
+      skipped: 0,
+      errors: 0,
+      errorMessages: []
+    };
+  }
+
+  function addMigrationError(stats, error) {
+    stats.errors += 1;
+    const message = error?.message || String(error);
+    if (message && stats.errorMessages.length < 5) stats.errorMessages.push(message);
+  }
+
   async function listSalesRecords(type) {
     const config = CONFIG[type];
     const rows = await salesFetch(`${config.table}?select=*&order=created_at.desc`);
@@ -229,6 +251,39 @@ async function salesFetch(path, options = {}) {
       if (missingRows.length) await upsertSalesRecords(type, missingRows);
     }
     localStorage.setItem(migrationKey(type), "true");
+  }
+
+  async function remigrateLocalCollectionToSupabase(type) {
+    const config = CONFIG[type];
+    backupLocalValue(config.localKey, config.backupKey);
+    if (type === "invoices") backupPaymentsFromInvoices();
+    const localRows = readLocalJson(config.localKey, []);
+    const stats = createMigrationStats(type, localRows.length);
+    const remoteRows = await listSalesRecords(type).catch(error => {
+      addMigrationError(stats, error);
+      return [];
+    });
+    const remoteKeys = new Set(remoteRows.map(row => getRecordKey(type, row)).filter(Boolean));
+    const seenLocalKeys = new Set();
+
+    for (const row of localRows) {
+      const key = getRecordKey(type, row);
+      if (!key || seenLocalKeys.has(key) || remoteKeys.has(key)) {
+        stats.skipped += 1;
+        continue;
+      }
+      seenLocalKeys.add(key);
+      try {
+        await upsertSalesRecord(type, row);
+        remoteKeys.add(key);
+        stats.inserted += 1;
+      } catch (error) {
+        addMigrationError(stats, error);
+      }
+    }
+
+    localStorage.setItem(migrationKey(type), "true");
+    return stats;
   }
 
   async function initSalesCollection(type) {
@@ -322,6 +377,66 @@ async function salesFetch(path, options = {}) {
     }
   }
 
+  function readLocalPaymentsForMigration() {
+    const directPayments = readLocalJson("arico_sales_payments_v1", []);
+    const invoiceRows = readLocalJson("arico_sales_invoices_v1", []);
+    const invoicePayments = [];
+    invoiceRows.forEach(invoice => {
+      const invoiceNo = invoice?.invoiceNo || invoice?.invoiceNumber || invoice?.document_no || invoice?.documentNo || "";
+      (Array.isArray(invoice?.payments) ? invoice.payments : []).forEach(payment => {
+        invoicePayments.push({
+          ...payment,
+          invoice_document_no: payment?.invoice_document_no || invoiceNo,
+          invoice_id: payment?.invoice_id || invoice?.id || ""
+        });
+      });
+    });
+    return [...directPayments, ...invoicePayments];
+  }
+
+  function paymentDocumentNo(payment) {
+    return String(payment?.invoice_document_no || payment?.invoiceNo || payment?.invoiceNumber || payment?.document_no || payment?.documentNo || "").trim();
+  }
+
+  async function remigrateLocalPaymentsToSupabase() {
+    backupPaymentsFromInvoices();
+    const payments = readLocalPaymentsForMigration();
+    const stats = createMigrationStats("payments", payments.length);
+    const remoteRows = await salesFetch("sales_payments?select=invoice_document_no").catch(error => {
+      addMigrationError(stats, error);
+      return [];
+    });
+    const remoteKeys = new Set((Array.isArray(remoteRows) ? remoteRows : []).map(row => String(row?.invoice_document_no || "").trim()).filter(Boolean));
+    const seenLocalKeys = new Set();
+
+    for (const payment of payments) {
+      const invoiceNo = paymentDocumentNo(payment);
+      if (!invoiceNo || seenLocalKeys.has(invoiceNo) || remoteKeys.has(invoiceNo)) {
+        stats.skipped += 1;
+        continue;
+      }
+      seenLocalKeys.add(invoiceNo);
+      const payload = {
+        invoice_document_no: invoiceNo,
+        data: payment || {},
+        status: payment?.status || "",
+        updated_at: payment?.updated_at || payment?.updatedAt || new Date().toISOString()
+      };
+      try {
+        await salesFetch("sales_payments", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        remoteKeys.add(invoiceNo);
+        stats.inserted += 1;
+      } catch (error) {
+        addMigrationError(stats, error);
+      }
+    }
+
+    return stats;
+  }
+
   async function listSalesSettings() {
     const rows = await salesFetch("sales_settings?select=*");
     return Array.isArray(rows) ? rows : [];
@@ -366,7 +481,60 @@ async function salesFetch(path, options = {}) {
     return settings;
   }
 
-  async function migrateAllLocalSalesData() {
+  async function remigrateLocalSettingsToSupabase() {
+    const entries = [];
+    SETTINGS_LOCAL_KEYS.forEach(key => {
+      if (localStorage.getItem(key) !== null) entries.push([key.replace(/^arico_sales_/, ""), localStorage.getItem(key)]);
+    });
+    const settingsObject = readLocalJson("arico_sales_settings_v1", {});
+    Object.entries(settingsObject || {}).forEach(([key, value]) => {
+      if (!key) return;
+      entries.push([key.replace(/^arico_sales_/, ""), typeof value === "string" ? value : JSON.stringify(value)]);
+    });
+
+    const uniqueEntries = [];
+    const seen = new Set();
+    entries.forEach(([key, value]) => {
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      uniqueEntries.push([key, value]);
+    });
+
+    const stats = createMigrationStats("settings", uniqueEntries.length);
+    const remoteRows = await listSalesSettings().catch(error => {
+      addMigrationError(stats, error);
+      return [];
+    });
+    const remoteKeys = new Set((Array.isArray(remoteRows) ? remoteRows : []).map(row => String(row?.key || "").trim()).filter(Boolean));
+
+    for (const [key, value] of uniqueEntries) {
+      if (remoteKeys.has(key)) {
+        stats.skipped += 1;
+        continue;
+      }
+      try {
+        await saveSalesSetting(key, value);
+        remoteKeys.add(key);
+        stats.inserted += 1;
+      } catch (error) {
+        addMigrationError(stats, error);
+      }
+    }
+    return stats;
+  }
+
+  async function remigrateAllLocalSalesData() {
+    const result = {};
+    for (const type of Object.keys(CONFIG)) {
+      result[type] = await remigrateLocalCollectionToSupabase(type);
+    }
+    result.payments = await remigrateLocalPaymentsToSupabase();
+    result.settings = await remigrateLocalSettingsToSupabase();
+    return result;
+  }
+
+  async function migrateAllLocalSalesData(options = {}) {
+    if (options.force) return remigrateAllLocalSalesData();
     const result = await initSalesCollections(Object.keys(CONFIG));
     await initSalesSettings();
     return result;
@@ -384,7 +552,8 @@ async function salesFetch(path, options = {}) {
     initSalesSettings,
     saveSalesSetting,
     listSalesSettings,
-    migrateAllLocalSalesData
+    migrateAllLocalSalesData,
+    remigrateAllLocalSalesData
   };
 
   initSalesSettings({ migrateLocal: false }).catch(error => {
