@@ -208,8 +208,20 @@ async function salesFetch(path, options = {}) {
 
   async function listSalesRecords(type) {
     const config = CONFIG[type];
-    const rows = await salesFetch(`${config.table}?select=*&order=created_at.desc`);
+    const rows = await salesFetchAll(`${config.table}?select=*&order=created_at.desc`);
     return Array.isArray(rows) ? rows.map(fromDbRow) : [];
+  }
+
+  async function salesFetchAll(path, pageSize = 1000) {
+    const rows = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const separator = path.includes("?") ? "&" : "?";
+      const page = await salesFetch(`${path}${separator}limit=${pageSize}&offset=${offset}`);
+      const pageRows = Array.isArray(page) ? page : [];
+      rows.push(...pageRows);
+      if (pageRows.length < pageSize) break;
+    }
+    return rows;
   }
 
   async function upsertSalesRecord(type, row) {
@@ -404,7 +416,7 @@ async function salesFetch(path, options = {}) {
     backupPaymentsFromInvoices();
     const payments = readLocalPaymentsForMigration();
     const stats = createMigrationStats("payments", payments.length);
-    const remoteRows = await salesFetch("sales_payments?select=invoice_document_no").catch(error => {
+    const remoteRows = await salesFetchAll("sales_payments?select=invoice_document_no").catch(error => {
       addMigrationError(stats, error);
       return [];
     });
