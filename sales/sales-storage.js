@@ -102,8 +102,14 @@ async function salesFetch(path, options = {}) {
     }
   }
 
+  function shouldPersistLocalKey(key, value) {
+    if (key === CONFIG.customers.localKey && Array.isArray(value) && value.length > 1000) return false;
+    return true;
+  }
+
   function writeLocalJson(key, value) {
     memoryCache[key] = value;
+    if (!shouldPersistLocalKey(key, value)) return;
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
@@ -162,7 +168,7 @@ async function salesFetch(path, options = {}) {
     return dbRow;
   }
 
-  function fromDbRow(row) {
+  function fromDbRow(row, type = "") {
     const data = row?.data && typeof row.data === "object" ? { ...row.data } : {};
     if (row?.id && !data.id) data.id = row.id;
     if (row?.id && !data.supabaseId) data.supabaseId = row.id;
@@ -170,12 +176,25 @@ async function salesFetch(path, options = {}) {
     if (row?.updated_at) data.updated_at = row.updated_at;
     if (row?.status && !data.status) data.status = row.status;
     if (row?.document_no && !data.document_no) data.document_no = row.document_no;
-    if (row?.document_no && !data.quoteNo) data.quoteNo = row.document_no;
-    if (row?.document_no && !data.quoteNumber) data.quoteNumber = row.document_no;
+    if (row?.document_no && type === "quotes") {
+      if (!data.quoteNo) data.quoteNo = row.document_no;
+      if (!data.quoteNumber) data.quoteNumber = row.document_no;
+    }
+    if (row?.document_no && type === "invoices") {
+      if (!data.invoiceNo) data.invoiceNo = row.document_no;
+      if (!data.invoiceNumber) data.invoiceNumber = row.document_no;
+    }
+    if (row?.document_no && type === "deliveries" && !data.deliveryNo) data.deliveryNo = row.document_no;
+    if (row?.document_no && type === "receipts" && !data.receiptNo) data.receiptNo = row.document_no;
     if (row?.customer_code && !data.customer_code) data.customer_code = row.customer_code;
     if (row?.customer_code && !data.customerCode) data.customerCode = row.customer_code;
     if (row?.invoice_document_no && !data.invoice_document_no) data.invoice_document_no = row.invoice_document_no;
     if (row?.quote_document_no && !data.quote_document_no) data.quote_document_no = row.quote_document_no;
+    if (row?.quote_document_no && type === "invoices") {
+      if (!data.sourceQuoteNo) data.sourceQuoteNo = row.quote_document_no;
+      if (!data.quoteNo) data.quoteNo = row.quote_document_no;
+      if (!data.quoteNumber) data.quoteNumber = row.quote_document_no;
+    }
     if (!data.customerName && data.customer_name) data.customerName = data.customer_name;
     if (!data.organizationName && data.organization_name) data.organizationName = data.organization_name;
     if (!data.customerType && data.customer_type) data.customerType = data.customer_type;
@@ -224,7 +243,7 @@ async function salesFetch(path, options = {}) {
   async function listSalesRecords(type) {
     const config = CONFIG[type];
     const rows = await salesFetchAll(`${config.table}?select=*&order=created_at.desc`);
-    return Array.isArray(rows) ? rows.map(fromDbRow) : [];
+    return Array.isArray(rows) ? rows.map(row => fromDbRow(row, type)) : [];
   }
 
   async function salesFetchAll(path, pageSize = 1000) {
