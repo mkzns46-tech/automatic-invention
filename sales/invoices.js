@@ -910,42 +910,10 @@ async function findProductForStockLine(line) {
 }
 
 async function cancelSmaregiSale(invoice, reason) {
-  const lines = Array.isArray(invoice.smaregiSaleLines) && invoice.smaregiSaleLines.length
-    ? invoice.smaregiSaleLines
-    : buildStockDeductionLines(invoice);
-  const totals = calcInvoiceTotals(invoice);
-  const response = await fetch("/api/smaregi-sales-cancel", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      invoiceId: invoice.id,
-      invoiceNo: invoice.invoiceNo,
-      originNumber: invoice.originNumber || invoice.masterNumber || invoice.sourceQuoteNo || "",
-      smaregiTransactionId: invoice.smaregiTransactionId || "",
-      cancelReason: reason || "",
-      cancelledAt: invoice.cancelledAt || invoice.canceledAt || new Date().toISOString(),
-      tax: totals.tax,
-      overallDiscountAmount: totals.overallDiscountAmount || 0,
-      overallDiscountReason: invoice.overallDiscountReason || "",
-      lines
-    })
-  });
-  const text = await response.text().catch(() => "");
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch (_) {
-    throw new Error(`Smaregi sale cancel JSON parse failed HTTP ${response.status}: ${text.slice(0, 500)}`);
-  }
-  console.log("[Smaregi sale cancel response]", {
-    ok: response.ok,
-    status: response.status,
-    body: data || text
-  });
-  if (!response.ok || data?.ok === false) {
-    throw new Error(data?.error || `Smaregi sale cancel API error HTTP ${response.status}: ${text.slice(0, 500)}`);
-  }
-  return { data, lines };
+  return {
+    data: { ok: false, disabled: true, mode: "csv", error: EXTERNAL_API_CSV_MODE_MESSAGE },
+    lines: []
+  };
 }
 
 async function applyInvoiceCancel(invoice, reason) {

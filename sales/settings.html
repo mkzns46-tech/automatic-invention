@@ -96,14 +96,14 @@
       <div class="settings-import-panel">
         <h3>スマレジ商品マスター取込</h3>
         <p class="section-note">商品名・バーコード・スマレジ商品ID・販売価格を取得します。</p>
-        <button type="button" id="salesSmaregiImportBtn" class="secondary" onclick="importSalesSmaregiProducts();">API停止中（CSV取込）</button>
+        <button type="button" id="salesSmaregiImportBtn" class="secondary" onclick="importSalesSmaregiProducts();" disabled title="現在はCSV運用中です">API停止中（CSV取込）</button>
       </div>
       <div class="settings-import-panel">
         <h3>スマレジ会員データ取込</h3>
         <p class="section-note">スマレジからダウンロードした会員CSVを確認して、販売管理の顧客マスターへ取り込みます。</p>
         <input type="file" id="smaregiCustomerCsvFile" accept=".csv,text/csv">
         <button type="button" class="primary" onclick="importSettingsSmaregiCustomerCsv();">会員CSVを確認して取込</button>
-        <button type="button" id="customerSmaregiImportBtn" class="secondary" onclick="importSettingsSmaregiCustomers();">API停止中（CSV取込）</button>
+        <button type="button" id="customerSmaregiImportBtn" class="secondary" onclick="importSettingsSmaregiCustomers();" disabled title="現在はCSV運用中です">API停止中（CSV取込）</button>
         <div id="customerImportResult" class="message">未取込です。</div>
       </div>
     </div>
