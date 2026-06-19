@@ -1,8 +1,17 @@
 /* ARICO inventory app: Smaregi CSV check state and product-code display overrides. */
 var smaregiCheckDisplayMode=window.smaregiCheckDisplayMode||"unchecked";
+const SMAREGI_DEFAULT_LAST_CHECKED_AT="2026-06-16T00:00:00+09:00";
+
+function getSmaregiRawLastCheckedAt(){
+  return smaregiSnapshot?.completed_at||smaregiSnapshot?.range_from||"";
+}
 
 function getSmaregiLastCheckedAt(){
-  return smaregiSnapshot?.completed_at||smaregiSnapshot?.range_from||"";
+  return getSmaregiRawLastCheckedAt()||SMAREGI_DEFAULT_LAST_CHECKED_AT;
+}
+
+function isSmaregiLastCheckedAtFallback(){
+  return !getSmaregiRawLastCheckedAt();
 }
 
 function getInventoryProductCodeByBarcode(barcode){
@@ -108,7 +117,7 @@ function renderSmaregiStockChecks(){
   if(!smaregiSnapshot){
     body.innerHTML='<tr><td colspan="10">スマレジ在庫変動CSVを取り込むと、前回チェック完了以降の変動商品が表示されます。</td></tr>';
     if(badge)badge.textContent="スマレジ在庫変動CSV未取込";
-    if(progress)progress.innerHTML='<div>前回チェック完了：未完了</div>';
+    if(progress)progress.innerHTML=`<div>前回チェック完了：${fmt(SMAREGI_DEFAULT_LAST_CHECKED_AT)}</div><div class="smaregi-warning">前回チェック日時未設定のため 2026/06/16 を基準にしています</div>`;
     if(complete)complete.disabled=true;
     renderSmaregiDiffOnlyPanel();
     return;
@@ -122,6 +131,7 @@ function renderSmaregiStockChecks(){
     progress.innerHTML=`
       <div class="smaregi-progress-main">今回チェック対象 <span>${stats.total}件</span></div>
       <div>前回チェック完了：<strong>${esc(lastLabel)}</strong></div>
+      ${isSmaregiLastCheckedAtFallback()?'<div class="smaregi-warning">前回チェック日時未設定のため 2026/06/16 を基準にしています</div>':""}
       <div>今回チェック対象：前回チェック完了以降のスマレジ在庫変動</div>
       <div>チェック済み：${stats.completed}件 / 未チェック：${stats.unchecked}件</div>
     `;
