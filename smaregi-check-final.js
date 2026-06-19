@@ -18,14 +18,11 @@
     }catch(_){}
   }
 
-  window.startSmaregiAutoRefresh=function(){
-    stopSmaregiAutoRefresh();
-  };
-
   window.stopSmaregiAutoRefresh=stopSmaregiAutoRefresh;
 
-  window.refreshSmaregiCheckStateSilently=async function(){
-    return;
+  window.startSmaregiAutoRefresh=function(){
+    stopSmaregiAutoRefresh();
+    smaregiAutoRefreshTimer=setInterval(()=>window.refreshSmaregiCheckStateSilently(),5000);
   };
 
   function getChangeForItem(item){
@@ -55,10 +52,42 @@
     return typeof isSmaregiLastCheckedAtFallback==="function" && isSmaregiLastCheckedAtFallback();
   }
 
+  function isExcludedCheck(check){
+    if(typeof isSmaregiExcludedCheck==="function")return isSmaregiExcludedCheck(check);
+    return check?.excluded===true || String(check?.checked_by||"").startsWith("除外:");
+  }
+
+  function hasActualStock(check){
+    return check && check.actual_stock!==null && check.actual_stock!==undefined && String(check.actual_stock)!=="";
+  }
+
   function isCheckedItem(item){
     const barcode=String(item?.barcode||"");
     const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(barcode) : null;
-    return !!check;
+    return hasActualStock(check) || isExcludedCheck(check);
+  }
+
+  function getCsvSmaregiStock(item){
+    const change=getChangeForItem(item);
+    const candidates=[
+      item?.smaregi_stock,
+      item?.smaregi_stock_quantity,
+      item?.stock_amount,
+      change?.stock_amount,
+      change?.smaregi_stock_quantity
+    ];
+    for(const candidate of candidates){
+      if(candidate===null || candidate===undefined || String(candidate).trim()==="")continue;
+      const number=Number(String(candidate).replace(/,/g,""));
+      if(Number.isFinite(number))return number;
+    }
+    return null;
+  }
+
+  function displayNumber(value,emptyLabel="未入力"){
+    if(value===null || value===undefined || String(value)==="")return emptyLabel;
+    const number=Number(value);
+    return Number.isFinite(number) ? String(number) : emptyLabel;
   }
 
   window.getSmaregiCurrentTargetItems=function(){
@@ -85,12 +114,30 @@
 
   window.getSmaregiStats=function(){
     const target=window.getSmaregiCurrentTargetItems();
-    const completed=target.filter(isCheckedItem).length;
-    return {
-      total:target.length,
-      completed,
-      unchecked:target.length-completed
-    };
+    const excluded=target.filter(item=>{
+      const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(String(item?.barcode||"")) : null;
+      return isExcludedCheck(check);
+    }).length;
+    const completed=target.filter(item=>{
+      const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(String(item?.barcode||"")) : null;
+      return hasActualStock(check) && !isExcludedCheck(check);
+    }).length;
+    const unchecked=Math.max(0,target.length-completed-excluded);
+    const percent=target.length>0 ? Math.round(((completed+excluded)/target.length)*100) : 0;
+    return {total:target.length,completed,unchecked,excluded,percent};
+  };
+
+  window.refreshSmaregiCheckStateSilently=async function(){
+    if(!smaregiSnapshot)return;
+    try{
+      const snapshotId=smaregiSnapshot.id;
+      const latestChecks=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=eq.${encodeURIComponent(snapshotId)}&order=checked_at.desc`,1000,20000);
+      smaregiStockChecks=Array.isArray(latestChecks) ? latestChecks : [];
+      updateSmaregiProgressOnly();
+      renderSmaregiDiffOnlyPanel();
+    }catch(error){
+      console.warn("[smaregi progress refresh]",error);
+    }
   };
 
   function collectDraftValues(){
@@ -109,12 +156,7 @@
     const body=typeof el==="function" ? el("smaregiStockCheckBody") : document.getElementById("smaregiStockCheckBody");
     const header=body?.closest("table")?.querySelector("thead tr");
     if(!header)return;
-    header.innerHTML=[
-      "<th>商品情報</th>",
-      "<th>実在庫入力</th>",
-      "<th>保存</th>",
-      "<th>除外</th>"
-    ].join("");
+    header.innerHTML="<th>商品情報</th><th>実在庫入力</th><th>保存</th><th>除外</th>";
   }
 
   function buildProductInfo(item){
@@ -122,11 +164,96 @@
     const changedAt=change.changed_at || change.movement_datetime || item?.changed_at || item?.movement_datetime || "";
     const dateLabel=changedAt && typeof fmt==="function" ? fmt(changedAt) : changedAt;
     return `<div class="smaregi-final-product-info">
-      <strong>${safeText(getItemName(item))}</strong>
-      <small>バーコード：${safeText(getItemBarcode(item) || "バーコードなし")}</small>
-      <small>最終変動：${safeText(dateLabel || "-")}</small>
+      <strong>${safeText(getItemName(item)||"商品名未設定")}</strong>
+      <small>バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</small>
+      <small>最終変動：${safeText(dateLabel||"-")}</small>
     </div>`;
   }
+
+  function updateSmaregiProgressOnly(){
+    const badge=typeof el==="function" ? el("smaregiStockSnapshotBadge") : document.getElementById("smaregiStockSnapshotBadge");
+    const progress=typeof el==="function" ? el("smaregiStockProgress") : document.getElementById("smaregiStockProgress");
+    const complete=typeof el==="function" ? el("completeSmaregiStockCheckBtn") : document.getElementById("completeSmaregiStockCheckBtn");
+    const stats=getSmaregiStats();
+    const lastCheckedAt=getLastCheckedAtSafe();
+    const lastLabel=lastCheckedAt && typeof fmt==="function" ? fmt(lastCheckedAt) : String(lastCheckedAt||"前回チェック未設定");
+    const checker=typeof getSmaregiCheckerName==="function" ? getSmaregiCheckerName() : "";
+    if(badge)badge.textContent=smaregiSnapshot ? `前回チェック完了：${lastLabel}` : "スマレジ変動CSV未取込";
+    if(progress){
+      progress.innerHTML=[
+        `<div class="smaregi-progress-main">今回チェック対象 <span>${stats.total}件</span></div>`,
+        `<div>チェック済み：${stats.completed}件 / 未チェック：${stats.unchecked}件 / 除外：${stats.excluded||0}件</div>`,
+        `<div>担当者：<strong>${safeText(checker||"担当者未設定")}</strong></div>`,
+        `<div>前回チェック完了：<strong>${safeText(lastLabel||"前回チェック未設定")}</strong></div>`,
+        isFallbackLastCheckedAt()?'<div class="smaregi-warning">前回チェック日時未設定のため 2026/06/16 を基準にしています</div>':"",
+        `<div class="smaregi-progress-area"><div id="smaregiProgressGraph" class="smaregi-progress-graph" role="progressbar" aria-label="チェック進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stats.percent||0}"><div id="smaregiProgressFill" class="smaregi-progress-fill" style="width:${stats.percent||0}%"></div></div><div id="smaregiProgressText" class="smaregi-progress-text">進捗 ${stats.percent||0}%</div></div>`
+      ].join("");
+    }
+    if(complete)complete.disabled=!stats.total;
+  }
+
+  function getDiffRows(){
+    const target=window.getSmaregiCurrentTargetItems();
+    return target.map(item=>{
+      const barcode=String(item?.barcode||"");
+      const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(barcode) : null;
+      if(!hasActualStock(check))return null;
+      if(isExcludedCheck(check))return null;
+      const actual=Number(check.actual_stock);
+      const smaregiStock=getCsvSmaregiStock(item);
+      if(!Number.isFinite(actual)||!Number.isFinite(smaregiStock))return null;
+      const difference=actual-smaregiStock;
+      if(difference===0)return null;
+      return {item,check,actual,smaregiStock,difference};
+    }).filter(Boolean);
+  }
+
+  window.renderSmaregiDiffOnlyPanel=function(){
+    const panel=typeof el==="function" ? el("smaregiDiffOnlyPanel") : document.getElementById("smaregiDiffOnlyPanel");
+    const body=typeof el==="function" ? el("smaregiDiffOnlyBody") : document.getElementById("smaregiDiffOnlyBody");
+    const summary=typeof el==="function" ? el("smaregiDiffSummary") : document.getElementById("smaregiDiffSummary");
+    if(!panel||!body)return;
+    if(typeof isSmaregiManager==="function" && !isSmaregiManager()){
+      panel.hidden=true;
+      body.innerHTML="";
+      if(summary)summary.textContent="";
+      return;
+    }
+    const stats=getSmaregiStats();
+    const rows=getDiffRows();
+    if(summary)summary.textContent=`差異：${rows.length}件 / チェック済み：${stats.completed||0}件 / 未チェック：${stats.unchecked||0}件 / 除外：${stats.excluded||0}件`;
+    if(!smaregiSnapshot){
+      body.innerHTML='<tr><td colspan="10" class="smaregi-empty">スマレジ変動CSV未取込です。</td></tr>';
+      return;
+    }
+    if(!rows.length){
+      body.innerHTML='<tr><td colspan="10" class="smaregi-empty">差異のある商品はありません。</td></tr>';
+      return;
+    }
+    body.innerHTML=rows.map(({item,check,actual,smaregiStock,difference})=>{
+      const barcode=String(item?.barcode||"");
+      const name=getItemName(item)||"商品名未設定";
+      const checkedBy=typeof getSmaregiDisplayCheckedBy==="function" ? getSmaregiDisplayCheckedBy(check) : (check?.checked_by||"");
+      const differenceClass=difference<0 ? " is-negative" : " is-positive";
+      return `<tr>
+        <td>${safeText(name)}<div class="smaregi-movement-note">バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</div></td>
+        <td>${displayNumber(actual)}</td>
+        <td>0</td>
+        <td>0</td>
+        <td>${displayNumber(smaregiStock)}</td>
+        <td>${displayNumber(smaregiStock)}</td>
+        <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
+        <td>${safeText(checkedBy||"担当者未設定")}</td>
+        <td>${check?.checked_at && typeof fmt==="function" ? safeText(fmt(check.checked_at)) : "未入力"}</td>
+        <td><div class="diff-action-group"><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${safeText(barcode)}">原因確認</button></div></td>
+      </tr>`;
+    }).join("");
+    body.querySelectorAll(".smaregi-diff-cause-btn").forEach(button=>{
+      button.onclick=()=>{
+        if(typeof showSmaregiCauseDetail==="function")showSmaregiCauseDetail(button.dataset.barcode);
+      };
+    });
+  };
 
   function ensureSmaregiCsvClearButton(){
     const host=document.getElementById("smaregiCheckFilterControls")
@@ -135,6 +262,11 @@
       || document.getElementById("smaregiStockCheckCard");
     if(!host)return;
     let button=document.getElementById("clearSmaregiMovementCsvBtn");
+    const canManage=typeof hasInventoryPrivilegedAccess!=="function" || hasInventoryPrivilegedAccess();
+    if(!canManage){
+      if(button)button.hidden=true;
+      return;
+    }
     if(!button){
       button=document.createElement("button");
       button.type="button";
@@ -143,6 +275,7 @@
       button.textContent="取込済みスマレジ変動CSVを削除";
       host.appendChild(button);
     }
+    button.hidden=false;
     button.onclick=clearSmaregiMovementCsvImports;
   }
 
@@ -159,10 +292,14 @@
         headers:{Prefer:"return=minimal"}
       });
       if(Array.isArray(smaregiStockItems))smaregiStockItems.length=0;
+      smaregiStockChecks=[];
+      smaregiSnapshot=null;
       try{ smaregiLatestChangeByBarcode.clear(); }catch(_){}
+      updateSmaregiProgressOnly();
+      renderSmaregiDiffOnlyPanel();
+      renderSmaregiStockChecks();
       showPopup?.("削除完了","取込済みスマレジ変動CSVデータを削除しました。");
       showMessage?.("取込済みスマレジ変動CSVデータを削除しました。","ok");
-      window.renderSmaregiStockChecks();
     }catch(error){
       showMessage?.("スマレジ変動CSV削除エラー\n"+error.message,"err");
     }
@@ -217,8 +354,7 @@
     try{
       button.disabled=true;
       const checkedAt=new Date().toISOString();
-      const change=getChangeForItem(item);
-      const smaregiStock=Number(item.smaregi_stock ?? change.stock_amount ?? 0);
+      const smaregiStock=Number(getCsvSmaregiStock(item) ?? 0);
       const previousCheck=typeof getSmaregiCheck==="function" ? getSmaregiCheck(barcode) : null;
       const payload={
         snapshot_id:smaregiSnapshot.id,
@@ -250,7 +386,7 @@
       smaregiStockChecks=smaregiStockChecks.filter(row=>String(row.barcode)!==barcode);
       smaregiStockChecks.push({...savedRow,snapshot_id:smaregiSnapshot.id,barcode,actual_stock:actualStock,checked_by:checkedBy,checked_at:checkedAt});
       showMessage?.(`実在庫を保存しました：${getItemName(item)}`,"ok");
-      window.renderSmaregiStockChecks();
+      renderSmaregiStockChecks();
       return true;
     }catch(error){
       button.disabled=false;
@@ -260,43 +396,26 @@
   };
 
   window.renderSmaregiStockChecks=function(){
-    stopSmaregiAutoRefresh();
     const body=typeof el==="function" ? el("smaregiStockCheckBody") : document.getElementById("smaregiStockCheckBody");
     if(!body)return;
     const drafts=collectDraftValues();
     setSmaregiCheckTableHeader();
     if(typeof ensureSmaregiCheckFilterControls==="function")ensureSmaregiCheckFilterControls();
     ensureSmaregiCsvClearButton();
-    const badge=typeof el==="function" ? el("smaregiStockSnapshotBadge") : document.getElementById("smaregiStockSnapshotBadge");
-    const progress=typeof el==="function" ? el("smaregiStockProgress") : document.getElementById("smaregiStockProgress");
     const complete=typeof el==="function" ? el("completeSmaregiStockCheckBtn") : document.getElementById("completeSmaregiStockCheckBtn");
     if(!smaregiSnapshot){
       body.innerHTML='<tr><td colspan="4">スマレジ在庫変動CSVを取り込むと、前回チェック完了以降の変動商品が表示されます。</td></tr>';
-      if(badge)badge.textContent="スマレジ在庫変動CSV未取込";
-      if(progress)progress.innerHTML='<div>前回チェック完了：2026/06/16 00:00</div><div class="smaregi-warning">前回チェック日時未設定のため 2026/06/16 を基準にしています</div>';
+      updateSmaregiProgressOnly();
       if(complete)complete.disabled=true;
-      if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
+      renderSmaregiDiffOnlyPanel();
       return;
     }
 
-    const stats=getSmaregiStats();
-    const lastCheckedAt=getLastCheckedAtSafe();
-    const lastLabel=lastCheckedAt && typeof fmt==="function" ? fmt(lastCheckedAt) : String(lastCheckedAt||"2026/06/16 00:00");
-    if(badge)badge.textContent=`前回チェック完了：${lastLabel}`;
-    if(progress){
-      progress.innerHTML=[
-        `<div class="smaregi-progress-main">今回チェック対象 <span>${stats.total}件</span></div>`,
-        `<div>前回チェック完了：<strong>${safeText(lastLabel)}</strong></div>`,
-        isFallbackLastCheckedAt()?'<div class="smaregi-warning">前回チェック日時未設定のため 2026/06/16 を基準にしています</div>':"",
-        `<div>保存済み：${stats.completed}件 / 未チェック：${stats.unchecked}件</div>`
-      ].join("");
-    }
-    if(complete)complete.disabled=!stats.total;
-
+    updateSmaregiProgressOnly();
     const visible=getSmaregiFilteredTargetItems();
     if(!visible.length){
       body.innerHTML='<tr><td colspan="4">条件に一致するチェック対象商品はありません。</td></tr>';
-      if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
+      renderSmaregiDiffOnlyPanel();
       return;
     }
 
@@ -306,8 +425,8 @@
       const checked=!!check;
       const savedActual=check?.actual_stock ?? "";
       const actual=drafts.has(barcode) ? drafts.get(barcode) : savedActual;
-      const excludeButton=(typeof hasInventoryPrivilegedAccess==="function" && hasInventoryPrivilegedAccess())
-        ? `<button type="button" class="secondary smaregi-row-exclude-btn" data-barcode="${safeText(barcode)}">除外</button>`
+      const excludeButton=(typeof hasInventoryPrivilegedAccess==="function" && !hasInventoryPrivilegedAccess())
+        ? ""
         : `<button type="button" class="secondary smaregi-row-exclude-btn" data-barcode="${safeText(barcode)}">除外</button>`;
       return `<tr class="smaregi-work-row ${checked?"is-checked":"is-unchecked"}">
         <td>${buildProductInfo(item)}</td>
@@ -329,13 +448,40 @@
         if(typeof excludeSmaregiStockItem==="function")excludeSmaregiStockItem(button.dataset.barcode,button);
       };
     });
-    if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
+    renderSmaregiDiffOnlyPanel();
   };
 
+  function bindFinalRefreshButton(){
+    const button=document.getElementById("refreshSmaregiChecksBtn");
+    if(!button||button.dataset.finalRefreshBound==="1")return;
+    button.dataset.finalRefreshBound="1";
+    button.onclick=async ()=>{
+      try{
+        button.disabled=true;
+        if(typeof refreshSmaregiChecksFromSupabase==="function"){
+          await refreshSmaregiChecksFromSupabase();
+        }else if(typeof loadLatestSmaregiSnapshot==="function"){
+          await loadLatestSmaregiSnapshot();
+        }
+        renderSmaregiStockChecks();
+        showMessage?.("最新状態に更新しました。","ok");
+      }catch(error){
+        showMessage?.("最新状態の更新エラー\n"+error.message,"err");
+      }finally{
+        button.disabled=false;
+      }
+    };
+  }
+
   function bootFinalSmaregiCheck(){
-    stopSmaregiAutoRefresh();
+    bindFinalRefreshButton();
     if(document.getElementById("smaregiStockCheckBody")){
-      try{ window.renderSmaregiStockChecks(); }catch(error){ console.warn("[smaregi final render]",error); }
+      try{
+        renderSmaregiStockChecks();
+        startSmaregiAutoRefresh();
+      }catch(error){
+        console.warn("[smaregi final render]",error);
+      }
     }
   }
 
