@@ -545,34 +545,37 @@
   function renderCauseAppLogRows(logs,barcode){
     const lastCheckTime=getLastCheckTimeValue();
     const lastCheckLabel=typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe();
-    let dividerInserted=false;
     const rows=[];
     if(!logs.length){
       rows.push(`<tr><td colspan="6">バーコード ${safeText(barcode||"未設定")} の在庫管理側履歴はありません。</td></tr>`);
     }
+    const newestLogs=[];
+    const olderLogs=[];
     logs.forEach(log=>{
       const logTime=new Date(log.created_at).getTime();
-      if(!dividerInserted && Number.isFinite(logTime) && logTime<=lastCheckTime){
-        dividerInserted=true;
-        rows.push(`<tr class="smaregi-last-check-divider"><td colspan="6">前回チェック締め：${safeText(lastCheckLabel)}</td></tr>`);
-      }
+      if(Number.isFinite(logTime) && logTime<=lastCheckTime)olderLogs.push(log);
+      else newestLogs.push(log);
+    });
+    const renderLog=(log)=>{
       const type=INVENTORY_TYPE_LABELS[String(log.type||"").trim()] || log.type || "";
       const qty=log.quantity ?? log.qty ?? log.amount ?? "";
       const staff=log.staff || log.staff_name || log.created_by || "";
       const memo=log.memo || log.note || "";
       const after=log.after_stock ?? log.stock_after ?? log.base_stock_after ?? "";
-      rows.push(`<tr>
+      return `<tr>
         <td>${safeText(log.created_at && typeof fmt==="function" ? fmt(log.created_at) : log.created_at || "")}</td>
         <td>${safeText(type)}</td>
         <td>${safeText(qty)}</td>
         <td>${safeText(staff)}</td>
         <td>${safeText(memo)}</td>
         <td>${safeText(after===""?"-":after)}</td>
-      </tr>`);
-    });
-    if(!dividerInserted && Number.isFinite(lastCheckTime)){
+      </tr>`;
+    };
+    rows.push(...newestLogs.map(renderLog));
+    if(Number.isFinite(lastCheckTime)){
       rows.push(`<tr class="smaregi-last-check-divider"><td colspan="6">前回チェック締め：${safeText(lastCheckLabel)}</td></tr>`);
     }
+    rows.push(...olderLogs.slice(0,5).map(renderLog));
     return rows.join("");
   }
 
@@ -581,26 +584,30 @@
       return `<tr><td colspan="5">バーコード ${safeText(barcode||"未設定")} のCSV取込済み履歴はありません。</td></tr>`;
     }
     const lastCheckTime=getLastCheckTimeValue();
-    let dividerInserted=false;
     const rows=[];
+    const newestChanges=[];
+    const olderChanges=[];
     changes.forEach(change=>{
       const changedAt=getChangeDateValue(change);
       const changedTime=new Date(changedAt).getTime();
-      if(!dividerInserted && Number.isFinite(changedTime) && changedTime<=lastCheckTime){
-        dividerInserted=true;
-        rows.push(`<tr class="smaregi-last-check-divider"><td colspan="5">前回チェック締め：${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}（ここまで前回確認済み）</td></tr>`);
-      }
-      rows.push(`<tr>
+      if(Number.isFinite(changedTime) && changedTime<=lastCheckTime)olderChanges.push(change);
+      else newestChanges.push(change);
+    });
+    const renderChange=(change)=>{
+      const changedAt=getChangeDateValue(change);
+      return `<tr>
         <td>${safeText(changedAt && typeof fmt==="function" ? fmt(changedAt) : changedAt || "")}</td>
         <td>${safeText(change.stock_division || change.movement_type || "")}</td>
         <td>${safeText(change.amount ?? change.movement_quantity ?? "")}</td>
         <td>${safeText(change.stock_amount ?? change.smaregi_stock_quantity ?? "")}</td>
         <td>${safeText(change.memo || change.movement_reason || "")}</td>
-      </tr>`);
-    });
-    if(!dividerInserted){
+      </tr>`;
+    };
+    rows.push(...newestChanges.map(renderChange));
+    if(Number.isFinite(lastCheckTime)){
       rows.push(`<tr class="smaregi-last-check-divider"><td colspan="5">前回チェック締め：${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}</td></tr>`);
     }
+    rows.push(...olderChanges.slice(0,5).map(renderChange));
     return rows.join("");
   }
 
@@ -653,12 +660,18 @@
           <button type="button" id="saveSmaregiDifferenceReasonBtn">原因を保存</button>
         </div>
         <p class="section-note">原因記入者：${safeText(check?.difference_reason_by||"未記入")} / 原因記入日時：${safeText(check?.difference_reason_at&&typeof fmt==="function" ? fmt(check.difference_reason_at) : check?.difference_reason_at||"未記入")}</p>
-        <h3>在庫管理側の履歴</h3>
-        <p class="section-note">バーコード ${safeText(itemBarcode||"未設定")} の在庫管理側履歴を表示します。前回チェック締め位置を青い区切りで表示します。</p>
-        <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>数量</th><th>担当者</th><th>備考</th><th>処理後在庫</th></tr></thead><tbody>${renderCauseAppLogRows(appLogs,itemBarcode)}</tbody></table></div>
-        <h3>スマレジ側の在庫変動履歴</h3>
-        <p class="section-note">CSV取込済みの smaregi_stock_changes を、バーコード優先で検索しています。スマレジ在庫はCSV H列「在庫数」、最終変動日時はCSV J列「更新日時」です。</p>
-        <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>変動数</th><th>在庫数</th><th>理由・備考</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
+        <div class="smaregi-cause-history-grid">
+          <section class="smaregi-cause-history-card">
+            <h3>在庫管理側の履歴</h3>
+            <p class="section-note">バーコード ${safeText(itemBarcode||"未設定")} の在庫管理側履歴を表示します。前回チェック締め位置を青い区切りで表示します。</p>
+            <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>数量</th><th>担当者</th><th>備考</th><th>処理後在庫</th></tr></thead><tbody>${renderCauseAppLogRows(appLogs,itemBarcode)}</tbody></table></div>
+          </section>
+          <section class="smaregi-cause-history-card">
+            <h3>スマレジ側の在庫変動履歴</h3>
+            <p class="section-note">CSV取込済みの smaregi_stock_changes を、バーコード優先で検索しています。スマレジ在庫はCSV H列「在庫数」、最終変動日時はCSV J列「更新日時」です。</p>
+            <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>変動数</th><th>在庫数</th><th>理由・備考</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
+          </section>
+        </div>
       `;
       const closeButton=document.getElementById("closeSmaregiCauseDetailBtn");
       if(closeButton)closeButton.onclick=()=>{detail.hidden=true;detail.innerHTML="";};
@@ -779,6 +792,45 @@
     },true);
   }
 
+  function injectCauseHistoryLayoutStyle(){
+    if(document.getElementById("smaregiCauseHistoryLayoutStyle"))return;
+    const style=document.createElement("style");
+    style.id="smaregiCauseHistoryLayoutStyle";
+    style.textContent=`
+      .smaregi-cause-history-grid{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+        gap:16px;
+        align-items:start;
+      }
+      .smaregi-cause-history-card{
+        min-width:0;
+      }
+      .smaregi-cause-history-card .table-wrap{
+        max-height:520px;
+        overflow:auto;
+      }
+      .smaregi-cause-history-card table{
+        min-width:640px;
+      }
+      @media (max-width:800px){
+        .smaregi-cause-history-grid{
+          display:block;
+        }
+        .smaregi-cause-history-card{
+          margin-top:14px;
+        }
+        .smaregi-cause-history-card:first-child{
+          margin-top:0;
+        }
+        .smaregi-cause-history-card .table-wrap{
+          max-height:none;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   const INVENTORY_TYPE_LABELS={
     equipment_transfer:"備品転用",
     event_pick:"イベント持出",
@@ -825,6 +877,7 @@
 
   function bootFinalSmaregiCheck(){
     bindPopupKeyboardClose();
+    injectCauseHistoryLayoutStyle();
     wrapDifferenceReasonSave();
     bindFinalRefreshButton();
     applyInventoryTypeDisplayLabels();
