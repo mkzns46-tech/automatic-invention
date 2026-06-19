@@ -5283,3 +5283,49 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     width:100%;
   }
 }
+
+/* Final compact Smaregi check button layout. */
+.smaregi-check-filter-controls,
+#smaregiCheckFilterControls,
+#smaregiStockProgress{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+}
+.smaregi-check-filter-controls button,
+#smaregiCheckFilterControls button,
+.smaregi-clear-csv-button{
+  width:auto;
+  min-width:120px;
+  max-width:260px;
+  white-space:normal;
+}
+.smaregi-check-table{
+  width:100%;
+  table-layout:auto;
+}
+.smaregi-check-table .smaregi-row-save-btn,
+.smaregi-check-table .smaregi-row-exclude-btn{
+  width:auto;
+  min-width:72px;
+  max-width:110px;
+  padding:7px 10px !important;
+}
+@media(max-width:800px){
+  .smaregi-check-filter-controls,
+  #smaregiCheckFilterControls,
+  #smaregiStockProgress{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+  .smaregi-check-filter-controls button,
+  #smaregiCheckFilterControls button,
+  .smaregi-clear-csv-button{
+    width:100%;
+    max-width:none;
+  }
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(4){
+    display:none !important;
+  }
+}
