@@ -5184,3 +5184,102 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     max-width:none;
   }
 }
+
+/* Final Smaregi movement check override: count-and-save only. */
+.smaregi-check-table.final-count-only-table th:nth-child(1),
+.smaregi-check-table.final-count-only-table td:nth-child(1),
+.smaregi-check-table th:nth-child(1),
+.smaregi-check-table td:nth-child(1){
+  width:auto !important;
+  min-width:260px;
+}
+.smaregi-check-table th:nth-child(2),
+.smaregi-check-table td:nth-child(2){
+  width:150px !important;
+  text-align:center;
+}
+.smaregi-check-table th:nth-child(3),
+.smaregi-check-table td:nth-child(3),
+.smaregi-check-table th:nth-child(4),
+.smaregi-check-table td:nth-child(4){
+  width:110px !important;
+  text-align:center;
+}
+.smaregi-final-product-info{
+  display:grid;
+  gap:2px;
+  min-width:0;
+}
+.smaregi-final-product-info strong{
+  color:#113b2b;
+  font-size:14px;
+  line-height:1.25;
+  white-space:normal;
+}
+.smaregi-final-product-info small{
+  color:#315f4d;
+  font-size:12px;
+  line-height:1.2;
+  white-space:normal;
+  word-break:break-all;
+}
+.smaregi-clear-csv-button{
+  max-width:260px;
+}
+@media(max-width:800px){
+  .smaregi-check-table,
+  .smaregi-check-table tbody,
+  .smaregi-check-table tr,
+  .smaregi-check-table td{
+    display:block;
+    width:100% !important;
+    min-width:0 !important;
+  }
+  .smaregi-check-table thead{
+    display:none !important;
+  }
+  .smaregi-check-table tr.smaregi-work-row{
+    margin:8px 0;
+    padding:10px;
+    border:1px solid #bfdcc9;
+    border-radius:10px;
+    background:#f7fcf8;
+  }
+  .smaregi-check-table tr.smaregi-work-row td{
+    padding:5px 0 !important;
+    border:0 !important;
+    text-align:left !important;
+  }
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(2),
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(3),
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(4){
+    display:grid;
+    grid-template-columns:88px 1fr;
+    gap:8px;
+    align-items:center;
+  }
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(2)::before{
+    content:"実在庫";
+    color:#315f4d;
+    font-size:13px;
+    font-weight:800;
+  }
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(3)::before{
+    content:"保存";
+    color:#315f4d;
+    font-size:13px;
+    font-weight:800;
+  }
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(4)::before{
+    content:"除外";
+    color:#315f4d;
+    font-size:13px;
+    font-weight:800;
+  }
+  .smaregi-check-table .smaregi-row-save-btn,
+  .smaregi-check-table .smaregi-row-exclude-btn,
+  .smaregi-clear-csv-button{
+    max-width:none;
+    width:100%;
+  }
+}
