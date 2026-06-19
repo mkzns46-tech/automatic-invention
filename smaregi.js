@@ -1335,6 +1335,28 @@ function smaregiMovementKey(row){
 */
 }
 
+function smaregiStableHash(value){
+  const text=String(value||"");
+  let hash=2166136261;
+  for(let i=0;i<text.length;i++){
+    hash^=text.charCodeAt(i);
+    hash=Math.imul(hash,16777619);
+  }
+  return (hash>>>0).toString(36);
+}
+
+function buildSmaregiCsvChangeId(change){
+  const identity=String(change.barcode||change.product_code||change.product_name||"").trim();
+  const raw=[
+    identity,
+    String(change.changed_at||"").trim(),
+    String(change.amount||"").trim(),
+    String(change.stock_division||"").trim(),
+    String(change.memo||"").trim()
+  ].join("|");
+  return `csv_${smaregiStableHash(raw)}`;
+}
+
 function smaregiMovementCsvToChanges(text){
   const parsed=parseCsv(text);
   if(parsed.length<2)throw new Error("CSVにデータ行がありません。");
@@ -1405,7 +1427,7 @@ function smaregiMovementCsvToChanges(text){
     const stockAmount=Number(stockRaw||0);
     if(!Number.isFinite(amount))throw new Error(`${i+1}行目：変動数が数値ではありません。`);
     if(!Number.isFinite(stockAmount))throw new Error(`${i+1}行目：処理後在庫が数値ではありません。`);
-    changes.push({
+    const change={
       barcode:productIdentity,
       product_code:productCode,
       product_name:productName,
@@ -1414,7 +1436,9 @@ function smaregiMovementCsvToChanges(text){
       amount,
       stock_amount:stockAmount,
       memo
-    });
+    };
+    change.smaregi_change_id=buildSmaregiCsvChangeId(change);
+    changes.push(change);
   }
   if(!changes.length)throw new Error("取込対象の在庫変動データがありません。");
   return changes;
@@ -1446,11 +1470,12 @@ async function importSmaregiStockCsvFile(file){
     showMessage("スマレジ在庫変動CSVを取込中...");
     const text=decodeCsvBuffer(await file.arrayBuffer());
     const changes=smaregiMovementCsvToChanges(text);
-    const existing=await sbAll("smaregi_stock_changes?select=barcode,changed_at,stock_division,amount,stock_amount,memo",1000,50000).catch(()=>[]);
+    const existing=await sbAll("smaregi_stock_changes?select=smaregi_change_id,barcode,changed_at,stock_division,amount,stock_amount,memo",1000,50000).catch(()=>[]);
     const existingKeys=new Set((existing||[]).map(smaregiMovementKey));
     const deduped=dedupeSmaregiMovementChanges(changes,existingKeys);
     const newChanges=deduped.unique;
     const duplicateCount=deduped.duplicates.length;
+    const errorCount=0;
     const snapshotId=(typeof crypto!=="undefined"&&crypto.randomUUID) ? crypto.randomUUID() : `csv-movement-${Date.now()}`;
     const now=new Date().toISOString();
     await sb("smaregi_stock_snapshots",{
@@ -1468,6 +1493,7 @@ async function importSmaregiStockCsvFile(file){
         method:"POST",
         headers:{Prefer:"return=minimal"},
         body:JSON.stringify(newChanges.slice(i,i+500).map(change=>({
+          smaregi_change_id:change.smaregi_change_id||buildSmaregiCsvChangeId(change),
           snapshot_id:snapshotId,
           barcode:change.barcode,
           changed_at:change.changed_at,
@@ -1494,8 +1520,8 @@ async function importSmaregiStockCsvFile(file){
       });
     }
     await loadLatestSmaregiSnapshot();
-    showMessage(`\u30b9\u30de\u30ec\u30b8\u5728\u5eab\u5909\u52d5CSV\u3092\u53d6\u8fbc\u307e\u3057\u305f\uff1a\u53d6\u8fbc ${changes.length}\u4ef6 / \u65b0\u898f ${newChanges.length}\u4ef6 / \u91cd\u8907\u9664\u5916 ${duplicateCount}\u4ef6\uff08API\u901a\u4fe1\u306a\u3057\uff09`,"ok");
-    if(typeof showPopup==="function")showPopup("\u30b9\u30de\u30ec\u30b8\u5728\u5eab\u5909\u52d5CSV\u53d6\u8fbc\u5b8c\u4e86",`\u53d6\u8fbc\u4ef6\u6570\uff1a${changes.length}\u4ef6\n\u65b0\u898f\u4ef6\u6570\uff1a${newChanges.length}\u4ef6\n\u91cd\u8907\u9664\u5916\u4ef6\u6570\uff1a${duplicateCount}\u4ef6`);
+    showMessage(`\u30b9\u30de\u30ec\u30b8\u5728\u5eab\u5909\u52d5CSV\u3092\u53d6\u8fbc\u307e\u3057\u305f\uff1a\u53d6\u8fbc ${changes.length}\u4ef6 / \u65b0\u898f ${newChanges.length}\u4ef6 / \u91cd\u8907\u9664\u5916 ${duplicateCount}\u4ef6 / \u30a8\u30e9\u30fc ${errorCount}\u4ef6\uff08API\u901a\u4fe1\u306a\u3057\uff09`,"ok");
+    if(typeof showPopup==="function")showPopup("\u30b9\u30de\u30ec\u30b8\u5728\u5eab\u5909\u52d5CSV\u53d6\u8fbc\u5b8c\u4e86",`\u53d6\u8fbc\u4ef6\u6570\uff1a${changes.length}\u4ef6\n\u65b0\u898f\u4ef6\u6570\uff1a${newChanges.length}\u4ef6\n\u91cd\u8907\u9664\u5916\u4ef6\u6570\uff1a${duplicateCount}\u4ef6\n\u30a8\u30e9\u30fc\u4ef6\u6570\uff1a${errorCount}\u4ef6`);
     return;
     showMessage(`スマレジ在庫変動CSVを取込ました：代表商品 ${latestItems.length}件 / 新規変動 ${newChanges.length}件（API通信なし）`,"ok");
   }catch(e){
