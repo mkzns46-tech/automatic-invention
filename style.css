@@ -5110,3 +5110,77 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     font-size:13px;
   }
 }
+
+/* Count-only Smaregi movement check: 4-column final layout. */
+.smaregi-check-table th:nth-child(1),
+.smaregi-check-table td:nth-child(1){
+  width:58% !important;
+}
+.smaregi-check-table th:nth-child(2),
+.smaregi-check-table td:nth-child(2){
+  width:16% !important;
+  text-align:center;
+}
+.smaregi-check-table th:nth-child(3),
+.smaregi-check-table td:nth-child(3),
+.smaregi-check-table th:nth-child(4),
+.smaregi-check-table td:nth-child(4){
+  width:13% !important;
+  text-align:center;
+}
+.smaregi-check-table .smaregi-row-save-btn,
+.smaregi-check-table .smaregi-row-exclude-btn{
+  width:100%;
+  max-width:92px;
+}
+@media(max-width:800px){
+  .smaregi-check-table,
+  .smaregi-check-table tbody,
+  .smaregi-check-table tr,
+  .smaregi-check-table td{
+    display:block;
+    width:100% !important;
+  }
+  .smaregi-check-table tr.smaregi-work-row{
+    margin:8px 0;
+    padding:10px;
+    border:1px solid #bfdcc9;
+    border-radius:10px;
+    background:#f7fcf8;
+  }
+  .smaregi-check-table tr.smaregi-work-row td{
+    padding:4px 0 !important;
+    border:0 !important;
+    text-align:left !important;
+  }
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(2),
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(3),
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(4){
+    display:grid;
+    grid-template-columns:86px 1fr;
+    gap:8px;
+    align-items:center;
+  }
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(2)::before{
+    content:"実在庫";
+    color:#315f4d;
+    font-size:13px;
+    font-weight:800;
+  }
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(3)::before{
+    content:"保存";
+    color:#315f4d;
+    font-size:13px;
+    font-weight:800;
+  }
+  .smaregi-check-table tr.smaregi-work-row td:nth-child(4)::before{
+    content:"除外";
+    color:#315f4d;
+    font-size:13px;
+    font-weight:800;
+  }
+  .smaregi-check-table .smaregi-row-save-btn,
+  .smaregi-check-table .smaregi-row-exclude-btn{
+    max-width:none;
+  }
+}
