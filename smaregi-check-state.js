@@ -524,6 +524,156 @@ async function clearSmaregiMovementCsvImports(){
   }
 }
 
+/* Final fix: read actual stock from the clicked row/card, not from a global selector. */
+function getSmaregiActualInputFromButton(button){
+  const row=button?.closest("tr");
+  return row?.querySelector(".smaregi-actual-stock-input")||null;
+}
+
+function validateSmaregiActualStockInputFromButton(button){
+  const input=getSmaregiActualInputFromButton(button);
+  const rawValue=String(input?.value??"").trim();
+  console.log("[smaregi actual stock save]",{
+    barcode:button?.dataset?.barcode||"",
+    rawValue
+  });
+  if(rawValue===""){
+    showMessage("実在庫を入力してください。0は保存できます。","err");
+    input?.focus();
+    return null;
+  }
+  const value=Number(rawValue);
+  if(!Number.isInteger(value)||value<0){
+    showMessage("実在庫は0以上の整数で入力してください。","err");
+    input?.focus();
+    return null;
+  }
+  return value;
+}
+
+async function saveSmaregiCountOnlyActualStockFromButton(button){
+  if(!smaregiSnapshot)return false;
+  const barcode=String(button?.dataset?.barcode||"");
+  const actualStock=validateSmaregiActualStockInputFromButton(button);
+  if(actualStock===null)return false;
+  const item=smaregiStockItems.find(row=>String(row.barcode)===barcode);
+  if(!item){
+    showMessage("対象商品が見つかりません。","err");
+    return false;
+  }
+  const checkedBy=getSmaregiCheckerName();
+  if(!checkedBy){
+    showMessage("担当者を選択してください。","err");
+    el("smaregiCheckerName")?.focus();
+    return false;
+  }
+  try{
+    button.disabled=true;
+    const checkedAt=new Date().toISOString();
+    const smaregiStock=Number(item.smaregi_stock||0);
+    const previousCheck=getSmaregiCheck(barcode);
+    const payload={
+      snapshot_id:smaregiSnapshot.id,
+      barcode,
+      actual_stock:actualStock,
+      difference:actualStock-smaregiStock,
+      checked_by:checkedBy,
+      checked_at:checkedAt,
+      excluded:false,
+      no_issue:previousCheck?.no_issue===true,
+      no_issue_by:previousCheck?.no_issue_by||null,
+      no_issue_at:previousCheck?.no_issue_at||null,
+      no_issue_reason:previousCheck?.no_issue_reason||"",
+      difference_reason_category:previousCheck?.difference_reason_category||null,
+      difference_reason_memo:previousCheck?.difference_reason_memo||"",
+      difference_reason_by:previousCheck?.difference_reason_by||null,
+      difference_reason_at:previousCheck?.difference_reason_at||null
+    };
+    await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+      method:"DELETE",
+      headers:{Prefer:"return=minimal"}
+    });
+    const savedRows=await sb("smaregi_stock_checks",{
+      method:"POST",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify([payload])
+    });
+    const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : payload;
+    smaregiStockChecks=smaregiStockChecks.filter(c=>String(c.barcode)!==barcode);
+    smaregiStockChecks.push({...savedRow,snapshot_id:smaregiSnapshot.id,barcode,actual_stock:actualStock,checked_by:checkedBy,checked_at:checkedAt});
+    showMessage(`実在庫を保存しました：${getSmaregiItemProductName(item)}`,"ok");
+    renderSmaregiStockChecks();
+    return true;
+  }catch(e){
+    button.disabled=false;
+    showMessage("実在庫保存エラー。\n"+e.message,"err");
+    return false;
+  }
+}
+
+function setSmaregiCheckTableHeader(){
+  const body=el("smaregiStockCheckBody");
+  const header=body?.closest("table")?.querySelector("thead tr");
+  if(!header)return;
+  header.innerHTML="<th>商品情報</th><th>実在庫入力</th><th>保存</th><th>除外</th>";
+}
+
+function renderSmaregiStockChecks(){
+  const body=el("smaregiStockCheckBody");
+  if(!body)return;
+  setSmaregiCheckTableHeader();
+  ensureSmaregiCheckFilterControls();
+  ensureSmaregiCsvClearButton();
+  const badge=el("smaregiStockSnapshotBadge");
+  const progress=el("smaregiStockProgress");
+  const complete=el("completeSmaregiStockCheckBtn");
+  if(!smaregiSnapshot){
+    body.innerHTML='<tr><td colspan="4">スマレジ在庫変動CSVを取り込むと、前回チェック完了以降の変動商品が表示されます。</td></tr>';
+    if(badge)badge.textContent="スマレジ在庫変動CSV未取込";
+    if(progress)progress.innerHTML=`<div>前回チェック完了：${fmt(SMAREGI_DEFAULT_LAST_CHECKED_AT)}</div><div class="smaregi-warning">前回チェック日時未設定のため 2026/06/16 を基準にしています</div>`;
+    if(complete)complete.disabled=true;
+    renderSmaregiDiffOnlyPanel();
+    return;
+  }
+  const stats=getSmaregiStats();
+  const lastCheckedAt=getSmaregiLastCheckedAt();
+  const lastLabel=lastCheckedAt ? fmt(lastCheckedAt) : "未完了";
+  if(badge)badge.textContent=`前回チェック完了：${lastLabel}`;
+  if(progress){
+    progress.innerHTML=`
+      <div class="smaregi-progress-main">今回チェック対象 <span>${stats.total}件</span></div>
+      <div>前回チェック完了：<strong>${esc(lastLabel)}</strong></div>
+      ${isSmaregiLastCheckedAtFallback()?'<div class="smaregi-warning">前回チェック日時未設定のため 2026/06/16 を基準にしています</div>':""}
+      <div>チェック済み：${stats.completed}件 / 未チェック：${stats.unchecked}件</div>
+    `;
+  }
+  if(complete)complete.disabled=!stats.total;
+  const visible=getSmaregiFilteredTargetItems();
+  if(!visible.length){
+    body.innerHTML='<tr><td colspan="4">条件に一致するチェック対象商品はありません。</td></tr>';
+    renderSmaregiDiffOnlyPanel();
+    return;
+  }
+  body.innerHTML=visible.map(item=>{
+    const barcode=String(item.barcode||"");
+    const check=getSmaregiCheck(barcode);
+    const checked=!!check;
+    const actual=check?.actual_stock??"";
+    const excludeButton=(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())
+      ? `<button type="button" class="secondary smaregi-row-exclude-btn" data-barcode="${esc(barcode)}">除外</button>`
+      : "";
+    return `<tr class="smaregi-work-row ${checked?"is-checked":"is-unchecked"}">
+      <td>${buildInventoryProductIdentityHtml(item)}</td>
+      <td><input type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" class="smaregi-actual-stock-input" data-barcode="${esc(barcode)}" value="${esc(actual)}"></td>
+      <td><button type="button" class="smaregi-row-save-btn" data-barcode="${esc(barcode)}">${checked?"保存済み":"保存"}</button></td>
+      <td>${excludeButton}</td>
+    </tr>`;
+  }).join("");
+  body.querySelectorAll(".smaregi-row-save-btn").forEach(button=>button.onclick=()=>saveSmaregiCountOnlyActualStockFromButton(button));
+  body.querySelectorAll(".smaregi-row-exclude-btn").forEach(button=>button.onclick=()=>excludeSmaregiStockItem(button.dataset.barcode,button));
+  renderSmaregiDiffOnlyPanel();
+}
+
 /* Final mobile work UI and Smaregi YY/MM/DD datetime support. Keep this block last. */
 function normalizeSmaregiCsvUpdatedAt(value,rowNumber){
   const text=String(value||"").trim();
