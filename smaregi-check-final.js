@@ -118,6 +118,16 @@
     return Number.isFinite(number) ? String(number) : emptyLabel;
   }
 
+  function getChangeDateValue(change){
+    return change?.changed_at || change?.movement_datetime || change?.updated_at_from_csv || change?.updated_at || "";
+  }
+
+  function getLastCheckTimeValue(){
+    const lastCheckedAt=getLastCheckedAtSafe();
+    const time=new Date(lastCheckedAt).getTime();
+    return Number.isFinite(time) ? time : new Date("2026-06-16T00:00:00+09:00").getTime();
+  }
+
   window.getSmaregiCurrentTargetItems=function(){
     const items=getAllMovementItems();
     const lastCheckedAt=getLastCheckedAtSafe();
@@ -204,6 +214,7 @@
   function updateSmaregiProgressOnly(){
     const badge=typeof el==="function" ? el("smaregiStockSnapshotBadge") : document.getElementById("smaregiStockSnapshotBadge");
     const progress=typeof el==="function" ? el("smaregiStockProgress") : document.getElementById("smaregiStockProgress");
+    const legacyBadge=typeof el==="function" ? el("smaregiProgressBadge") : document.getElementById("smaregiProgressBadge");
     const complete=typeof el==="function" ? el("completeSmaregiStockCheckBtn") : document.getElementById("completeSmaregiStockCheckBtn");
     const stats=getSmaregiStats();
     const hasMovementData=stats.total>0;
@@ -224,6 +235,19 @@
     const graph=document.getElementById("smaregiProgressGraph");
     const fill=document.getElementById("smaregiProgressFill");
     const text=document.getElementById("smaregiProgressText");
+    if(legacyBadge){
+      legacyBadge.classList.remove("muted");
+      legacyBadge.innerHTML=`<div class="smaregi-progress-card-inner">
+        <div class="smaregi-progress-main">チェック済み <span>${stats.completed+stats.excluded} / ${stats.total}</span></div>
+        <div class="smaregi-progress-sub">未チェック ${stats.unchecked}件　除外 ${stats.excluded||0}件</div>
+        <div class="smaregi-progress-area">
+          <div class="smaregi-progress-graph" role="progressbar" aria-label="チェック進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${stats.percent||0}">
+            <div class="smaregi-progress-fill" style="width:${stats.percent||0}%"></div>
+          </div>
+          <div class="smaregi-progress-text">進捗 ${stats.completed+stats.excluded}/${stats.total}件（${stats.percent||0}%）</div>
+        </div>
+      </div>`;
+    }
     if(graph)graph.setAttribute("aria-valuenow",String(stats.percent||0));
     if(fill)fill.style.width=`${stats.percent||0}%`;
     if(text)text.textContent=`進捗 ${stats.completed+stats.excluded}/${stats.total}件（${stats.percent||0}%）`;
@@ -457,6 +481,188 @@
       return false;
     }
   }
+
+  function mergeRowsById(rows){
+    const seen=new Set();
+    return (rows||[]).filter(row=>{
+      const key=String(row?.id || JSON.stringify(row));
+      if(seen.has(key))return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  async function loadInventoryLogsForCause(barcode,productName){
+    const results=[];
+    try{
+      if(barcode){
+        const direct=await sbAll(`inventory_logs?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=created_at.desc`,1000,10000);
+        if(Array.isArray(direct))results.push(...direct);
+      }
+    }catch(error){
+      console.warn("[cause inventory_logs by barcode]",error);
+    }
+    if(!results.length && barcode && typeof loadProductHistoryByBarcode==="function"){
+      try{
+        const fallback=await loadProductHistoryByBarcode(barcode);
+        if(Array.isArray(fallback))results.push(...fallback);
+      }catch(error){
+        console.warn("[cause loadProductHistoryByBarcode]",error);
+      }
+    }
+    if(!results.length && !barcode && productName){
+      try{
+        const byName=await sbAll(`inventory_logs?select=*&product_name=ilike.*${encodeURIComponent(productName)}*&order=created_at.desc`,1000,10000);
+        if(Array.isArray(byName))results.push(...byName);
+      }catch(error){
+        console.warn("[cause inventory_logs by product name]",error);
+      }
+    }
+    return mergeRowsById(results);
+  }
+
+  async function loadSmaregiChangesForCause(barcode,productName){
+    const results=[];
+    try{
+      if(barcode){
+        const direct=await sbAll(`smaregi_stock_changes?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=changed_at.desc`,1000,20000);
+        if(Array.isArray(direct))results.push(...direct);
+      }
+    }catch(error){
+      console.warn("[cause smaregi_stock_changes by barcode]",error);
+    }
+    if(!results.length && productName){
+      try{
+        const byName=await sbAll(`smaregi_stock_changes?select=*&product_name=ilike.*${encodeURIComponent(productName)}*&order=changed_at.desc`,1000,20000);
+        if(Array.isArray(byName))results.push(...byName);
+      }catch(error){
+        console.warn("[cause smaregi_stock_changes by product name]",error);
+      }
+    }
+    return mergeRowsById(results).sort((a,b)=>new Date(getChangeDateValue(b)||0)-new Date(getChangeDateValue(a)||0));
+  }
+
+  function renderCauseAppLogRows(logs,barcode){
+    if(!logs.length){
+      return `<tr><td colspan="6">バーコード ${safeText(barcode||"未設定")} の前回チェック以降の履歴はありません。</td></tr>`;
+    }
+    return logs.map(log=>{
+      const type=INVENTORY_TYPE_LABELS[String(log.type||"").trim()] || log.type || "";
+      const qty=log.quantity ?? log.qty ?? log.amount ?? "";
+      const staff=log.staff || log.staff_name || log.created_by || "";
+      const memo=log.memo || log.note || "";
+      const after=log.after_stock ?? log.stock_after ?? log.base_stock_after ?? "";
+      return `<tr>
+        <td>${safeText(log.created_at && typeof fmt==="function" ? fmt(log.created_at) : log.created_at || "")}</td>
+        <td>${safeText(type)}</td>
+        <td>${safeText(qty)}</td>
+        <td>${safeText(staff)}</td>
+        <td>${safeText(memo)}</td>
+        <td>${safeText(after===""?"-":after)}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  function renderCauseSmaregiRows(changes,barcode){
+    if(!changes.length){
+      return `<tr><td colspan="5">バーコード ${safeText(barcode||"未設定")} のCSV取込済み履歴はありません。</td></tr>`;
+    }
+    const lastCheckTime=getLastCheckTimeValue();
+    let dividerInserted=false;
+    const rows=[];
+    changes.forEach(change=>{
+      const changedAt=getChangeDateValue(change);
+      const changedTime=new Date(changedAt).getTime();
+      if(!dividerInserted && Number.isFinite(changedTime) && changedTime<=lastCheckTime){
+        dividerInserted=true;
+        rows.push(`<tr class="smaregi-last-check-divider"><td colspan="5">前回チェック締め：${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}（ここまで前回確認済み）</td></tr>`);
+      }
+      rows.push(`<tr>
+        <td>${safeText(changedAt && typeof fmt==="function" ? fmt(changedAt) : changedAt || "")}</td>
+        <td>${safeText(change.stock_division || change.movement_type || "")}</td>
+        <td>${safeText(change.amount ?? change.movement_quantity ?? "")}</td>
+        <td>${safeText(change.stock_amount ?? change.smaregi_stock_quantity ?? "")}</td>
+        <td>${safeText(change.memo || change.movement_reason || "")}</td>
+      </tr>`);
+    });
+    if(!dividerInserted){
+      rows.push(`<tr class="smaregi-last-check-divider"><td colspan="5">前回チェック締め：${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}</td></tr>`);
+    }
+    return rows.join("");
+  }
+
+  window.showSmaregiCauseDetail=async function(barcode){
+    if(typeof isSmaregiManager==="function" && !isSmaregiManager()){
+      showMessage?.("原因確認は分析画面のパスワード認証後に操作できます。","err");
+      return;
+    }
+    const detail=typeof el==="function" ? el("smaregiCauseDetail") : document.getElementById("smaregiCauseDetail");
+    const item=getAllMovementItems().find(row=>String(row.barcode||"")===String(barcode));
+    if(!detail||!item)return;
+    const itemName=getItemName(item)||"商品名未設定";
+    const itemBarcode=getItemBarcode(item)||barcode||"";
+    showMessage?.("原因確認データを読み込み中...");
+    detail.hidden=false;
+    detail.innerHTML='<div class="message">原因確認データを読み込み中...</div>';
+    try{
+      const lastCheckTime=getLastCheckTimeValue();
+      const [allAppLogs,allSmaregiChanges]=await Promise.all([
+        loadInventoryLogsForCause(itemBarcode,itemName),
+        loadSmaregiChangesForCause(itemBarcode,itemName)
+      ]);
+      const appLogs=allAppLogs.filter(log=>{
+        const time=new Date(log.created_at).getTime();
+        return Number.isFinite(time) ? time>=lastCheckTime : true;
+      });
+      const smaregiChanges=allSmaregiChanges;
+      const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(itemBarcode) : null;
+      const smaregiStock=getCsvSmaregiStock(item);
+      const actual=check?.actual_stock ?? "";
+      const difference=actual===""||actual===null||actual===undefined||smaregiStock===null ? "-" : Number(actual)-Number(smaregiStock);
+      detail.innerHTML=`
+        <div class="section-title"><h3>差異原因確認</h3><button type="button" id="closeSmaregiCauseDetailBtn" class="secondary">閉じる</button></div>
+        <div class="smaregi-detail-summary">
+          <div><strong>商品名</strong><span>${safeText(itemName)}</span></div>
+          <div><strong>バーコード</strong><span>${safeText(itemBarcode||"バーコードなし")}</span></div>
+          <div><strong>スマレジ在庫</strong><span>${safeText(smaregiStock===null?"未取得":smaregiStock)}</span></div>
+          <div><strong>実在庫</strong><span>${safeText(actual===""?"未入力":actual)}</span></div>
+          <div><strong>差異</strong><span class="smaregi-difference${Number(difference)<0 ? " is-negative" : (Number(difference)>0 ? " is-positive" : "")}">${safeText(difference)}</span></div>
+          <div><strong>担当者</strong><span>${safeText(check?.checked_by||"担当者未設定")}</span></div>
+          <div><strong>チェック日時</strong><span>${safeText(check?.checked_at&&typeof fmt==="function" ? fmt(check.checked_at) : check?.checked_at||"未入力")}</span></div>
+        </div>
+        <div class="smaregi-reason-form">
+          <label>原因カテゴリ
+            <select id="smaregiDifferenceReasonCategory">
+              <option value="">選択してください</option>
+              ${((window.SMAREGI_DIFFERENCE_REASON_CATEGORIES)||(typeof SMAREGI_DIFFERENCE_REASON_CATEGORIES!=="undefined" ? SMAREGI_DIFFERENCE_REASON_CATEGORIES : [])).map(category=>`<option value="${safeText(category)}" ${check?.difference_reason_category===category?"selected":""}>${safeText(category)}</option>`).join("")}
+            </select>
+          </label>
+          <label>原因メモ
+            <input id="smaregiDifferenceReasonMemo" value="${safeText(check?.difference_reason_memo||"")}" placeholder="状況や再発防止に必要な補足を入力"/>
+          </label>
+          <button type="button" id="saveSmaregiDifferenceReasonBtn">原因を保存</button>
+        </div>
+        <p class="section-note">原因記入者：${safeText(check?.difference_reason_by||"未記入")} / 原因記入日時：${safeText(check?.difference_reason_at&&typeof fmt==="function" ? fmt(check.difference_reason_at) : check?.difference_reason_at||"未記入")}</p>
+        <h3>在庫管理側の履歴</h3>
+        <p class="section-note">バーコード ${safeText(itemBarcode||"未設定")} の前回チェック以降の履歴を表示します。</p>
+        <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>数量</th><th>担当者</th><th>備考</th><th>処理後在庫</th></tr></thead><tbody>${renderCauseAppLogRows(appLogs,itemBarcode)}</tbody></table></div>
+        <h3>スマレジ側の在庫変動履歴</h3>
+        <p class="section-note">CSV取込済みの smaregi_stock_changes を、バーコード優先で検索しています。スマレジ在庫はCSV H列「在庫数」、最終変動日時はCSV J列「更新日時」です。</p>
+        <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>変動数</th><th>在庫数</th><th>理由・備考</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
+      `;
+      const closeButton=document.getElementById("closeSmaregiCauseDetailBtn");
+      if(closeButton)closeButton.onclick=()=>{detail.hidden=true;detail.innerHTML="";};
+      const saveButton=document.getElementById("saveSmaregiDifferenceReasonBtn");
+      if(saveButton)saveButton.onclick=e=>{
+        if(typeof saveSmaregiDifferenceReason==="function")saveSmaregiDifferenceReason(itemBarcode,e.currentTarget);
+      };
+      showMessage?.(`原因確認を表示しました：${itemName}`,"ok");
+      detail.scrollIntoView({behavior:"smooth",block:"start"});
+    }catch(error){
+      detail.innerHTML=`<div class="message err">原因確認データ取得エラー。\n${safeText(error.message)}</div>`;
+      showMessage?.("原因確認データ取得エラー。\n"+error.message,"err");
+    }
+  };
 
   window.renderSmaregiStockChecks=function(){
     const body=typeof el==="function" ? el("smaregiStockCheckBody") : document.getElementById("smaregiStockCheckBody");
