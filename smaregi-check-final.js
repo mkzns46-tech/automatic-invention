@@ -43,6 +43,29 @@
     return item?.barcode || item?.jan_code || item?.product_code || "";
   }
 
+  function isMobileViewport(){
+    return !!(window.matchMedia && window.matchMedia("(max-width: 800px)").matches);
+  }
+
+  function getAllMovementItems(){
+    const items=Array.isArray(smaregiStockItems) ? smaregiStockItems.filter(Boolean) : [];
+    if(items.length)return items;
+    try{
+      if(smaregiLatestChangeByBarcode && smaregiLatestChangeByBarcode.size){
+        return [...smaregiLatestChangeByBarcode.entries()].map(([key,change])=>({
+          barcode:change.barcode || key || change.product_code || change.product_name || "",
+          product_name:change.product_name || "",
+          smaregi_stock:change.stock_amount,
+          smaregi_stock_quantity:change.stock_amount,
+          stock_amount:change.stock_amount,
+          changed_at:change.changed_at,
+          movement_datetime:change.changed_at
+        })).filter(item=>String(item.barcode||""));
+      }
+    }catch(_){}
+    return [];
+  }
+
   function getLastCheckedAtSafe(){
     if(typeof getSmaregiLastCheckedAt==="function")return getSmaregiLastCheckedAt();
     return "2026-06-16T00:00:00+09:00";
@@ -91,10 +114,10 @@
   }
 
   window.getSmaregiCurrentTargetItems=function(){
-    const items=Array.isArray(smaregiStockItems) ? smaregiStockItems : [];
+    const items=getAllMovementItems();
     const lastCheckedAt=getLastCheckedAtSafe();
     const lastTime=new Date(lastCheckedAt).getTime();
-    return items.filter(item=>{
+    const filtered=items.filter(item=>{
       const change=getChangeForItem(item);
       const changedAt=change.changed_at || change.movement_datetime || item?.changed_at || item?.movement_datetime;
       const changedTime=new Date(changedAt).getTime();
@@ -102,6 +125,7 @@
       if(!Number.isFinite(lastTime))return true;
       return changedTime>lastTime;
     });
+    return filtered.length ? filtered : items;
   };
 
   window.getSmaregiFilteredTargetItems=function(){
@@ -199,6 +223,8 @@
       const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(barcode) : null;
       if(!hasActualStock(check))return null;
       if(isExcludedCheck(check))return null;
+      if(check?.no_issue===true)return null;
+      if(check?.difference_reason_category || check?.difference_reason_memo || check?.difference_reason_by || check?.difference_reason_at)return null;
       const actual=Number(check.actual_stock);
       const smaregiStock=getCsvSmaregiStock(item);
       if(!Number.isFinite(actual)||!Number.isFinite(smaregiStock))return null;
@@ -237,7 +263,7 @@
       const differenceClass=difference<0 ? " is-negative" : " is-positive";
       return `<tr>
         <td>${safeText(name)}<div class="smaregi-movement-note">バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</div></td>
-        <td>${displayNumber(actual)}</td>
+        <td><input type="number" class="smaregi-diff-actual-input" data-barcode="${safeText(barcode)}" min="0" step="1" inputmode="numeric" value="${safeText(actual)}"></td>
         <td>0</td>
         <td>0</td>
         <td>${displayNumber(smaregiStock)}</td>
@@ -245,15 +271,42 @@
         <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
         <td>${safeText(checkedBy||"担当者未設定")}</td>
         <td>${check?.checked_at && typeof fmt==="function" ? safeText(fmt(check.checked_at)) : "未入力"}</td>
-        <td><div class="diff-action-group"><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${safeText(barcode)}">原因確認</button></div></td>
+        <td><div class="diff-action-group"><button type="button" class="smaregi-diff-save-btn" data-barcode="${safeText(barcode)}">保存</button><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${safeText(barcode)}">原因確認</button></div></td>
       </tr>`;
     }).join("");
+    body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
+      button.onclick=()=>saveSmaregiDiffActualStock(button);
+    });
     body.querySelectorAll(".smaregi-diff-cause-btn").forEach(button=>{
       button.onclick=()=>{
         if(typeof showSmaregiCauseDetail==="function")showSmaregiCauseDetail(button.dataset.barcode);
       };
     });
   };
+
+  function readActualStockValue(input){
+    const rawValue=String(input?.value??"").trim();
+    if(rawValue===""){
+      showMessage?.("実在庫を入力してください。0は保存できます。","err");
+      input?.focus();
+      return null;
+    }
+    const value=Number(rawValue);
+    if(!Number.isInteger(value) || value<0){
+      showMessage?.("実在庫は0以上の整数で入力してください。","err");
+      input?.focus();
+      return null;
+    }
+    return value;
+  }
+
+  async function saveSmaregiDiffActualStock(button){
+    const input=button?.closest("tr")?.querySelector(".smaregi-diff-actual-input");
+    const actualStock=readActualStockValue(input);
+    if(actualStock===null)return false;
+    const barcode=String(button?.dataset?.barcode||"");
+    return saveSmaregiActualStockCore(barcode,actualStock,button,{markCorrected:true});
+  }
 
   function ensureSmaregiCsvClearButton(){
     const host=document.getElementById("smaregiCheckFilterControls")
@@ -312,34 +365,26 @@
 
   function readActualStockFromButton(button){
     const input=getActualInputFromButton(button);
-    const rawValue=String(input?.value??"").trim();
     console.log("[smaregi actual stock save]",{
       barcode:button?.dataset?.barcode||"",
-      rawValue
+      rawValue:String(input?.value??"").trim()
     });
-    if(rawValue===""){
-      showMessage?.("実在庫を入力してください。0は保存できます。","err");
-      input?.focus();
-      return null;
-    }
-    const value=Number(rawValue);
-    if(!Number.isInteger(value) || value<0){
-      showMessage?.("実在庫は0以上の整数で入力してください。","err");
-      input?.focus();
-      return null;
-    }
-    return value;
+    return readActualStockValue(input);
   }
 
   window.saveSmaregiActualStockFromRow=async function(button){
+    const barcode=String(button?.dataset?.barcode||"");
+    const actualStock=readActualStockFromButton(button);
+    if(actualStock===null)return false;
+    return saveSmaregiActualStockCore(barcode,actualStock,button);
+  };
+
+  async function saveSmaregiActualStockCore(barcode,actualStock,button,{markCorrected=false}={}){
     if(!smaregiSnapshot){
       showMessage?.("スマレジ在庫変動CSVを取り込んでから保存してください。","err");
       return false;
     }
-    const barcode=String(button?.dataset?.barcode||"");
-    const actualStock=readActualStockFromButton(button);
-    if(actualStock===null)return false;
-    const item=(Array.isArray(smaregiStockItems) ? smaregiStockItems : []).find(row=>String(row.barcode||"")===barcode);
+    const item=getAllMovementItems().find(row=>String(row.barcode||"")===barcode);
     if(!item){
       showMessage?.("対象商品が見つかりません。","err");
       return false;
@@ -371,7 +416,10 @@
         difference_reason_category:previousCheck?.difference_reason_category||null,
         difference_reason_memo:previousCheck?.difference_reason_memo||"",
         difference_reason_by:previousCheck?.difference_reason_by||null,
-        difference_reason_at:previousCheck?.difference_reason_at||null
+        difference_reason_at:previousCheck?.difference_reason_at||null,
+        actual_corrected:markCorrected||previousCheck?.actual_corrected===true,
+        actual_corrected_by:markCorrected ? checkedBy : (previousCheck?.actual_corrected_by||null),
+        actual_corrected_at:markCorrected ? checkedAt : (previousCheck?.actual_corrected_at||null)
       };
       await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
         method:"DELETE",
@@ -393,7 +441,7 @@
       showMessage?.("実在庫保存エラー\n"+error.message,"err");
       return false;
     }
-  };
+  }
 
   window.renderSmaregiStockChecks=function(){
     const body=typeof el==="function" ? el("smaregiStockCheckBody") : document.getElementById("smaregiStockCheckBody");
@@ -425,7 +473,7 @@
       const checked=!!check;
       const savedActual=check?.actual_stock ?? "";
       const actual=drafts.has(barcode) ? drafts.get(barcode) : savedActual;
-      const excludeButton=(typeof hasInventoryPrivilegedAccess==="function" && !hasInventoryPrivilegedAccess())
+      const excludeButton=(isMobileViewport() || (typeof hasInventoryPrivilegedAccess==="function" && !hasInventoryPrivilegedAccess()))
         ? ""
         : `<button type="button" class="secondary smaregi-row-exclude-btn" data-barcode="${safeText(barcode)}">除外</button>`;
       return `<tr class="smaregi-work-row ${checked?"is-checked":"is-unchecked"}">
@@ -473,7 +521,58 @@
     };
   }
 
+  function bindPopupKeyboardClose(){
+    if(document.body?.dataset.smaregiFinalPopupKeys==="1")return;
+    if(document.body)document.body.dataset.smaregiFinalPopupKeys="1";
+    document.addEventListener("keydown",event=>{
+      if(event.key!=="Enter" && event.key!=="Escape")return;
+      const confirmPopup=[...document.querySelectorAll(".app-confirm-popup")]
+        .find(popup=>getComputedStyle(popup).display!=="none");
+      if(confirmPopup){
+        event.preventDefault();
+        if(event.key==="Escape"){
+          confirmPopup.querySelector(".app-confirm-cancel-btn")?.click();
+        }else{
+          confirmPopup.querySelector(".app-confirm-ok-btn")?.click();
+        }
+        return;
+      }
+      const popup=document.getElementById("appPopup");
+      if(!popup || getComputedStyle(popup).display==="none")return;
+      event.preventDefault();
+      const close=document.getElementById("appPopupClose");
+      if(close)close.click();
+      else if(typeof hidePopup==="function")hidePopup();
+    },true);
+  }
+
+  function wrapDifferenceReasonSave(){
+    if(window.saveSmaregiDifferenceReason?.__smaregiFinalWrapped)return;
+    const originalSave=window.saveSmaregiDifferenceReason;
+    if(typeof originalSave!=="function")return;
+    const wrapped=async function(barcode,button=null){
+      const result=await originalSave.call(this,barcode,button);
+      try{
+        await refreshSmaregiCheckStateSilently();
+        const detail=document.getElementById("smaregiCauseDetail");
+        if(detail){
+          detail.hidden=true;
+          detail.innerHTML="";
+        }
+        renderSmaregiDiffOnlyPanel();
+        updateSmaregiProgressOnly();
+      }catch(error){
+        console.warn("[smaregi reason save refresh]",error);
+      }
+      return result;
+    };
+    wrapped.__smaregiFinalWrapped=true;
+    window.saveSmaregiDifferenceReason=wrapped;
+  }
+
   function bootFinalSmaregiCheck(){
+    bindPopupKeyboardClose();
+    wrapDifferenceReasonSave();
     bindFinalRefreshButton();
     if(document.getElementById("smaregiStockCheckBody")){
       try{
