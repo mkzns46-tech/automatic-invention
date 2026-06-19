@@ -441,6 +441,72 @@ async function importSettingsSmaregiCustomers() {
   }
 }
 
+async function readCsvFileText(file) {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  const hasUtf8Bom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
+  const utf8Text = new TextDecoder("utf-8", { fatal: false }).decode(buffer).replace(/^\ufeff/, "");
+  if (hasUtf8Bom || !utf8Text.includes("\uFFFD")) return utf8Text;
+  try {
+    return new TextDecoder("shift_jis", { fatal: false }).decode(buffer);
+  } catch (_) {
+    return utf8Text;
+  }
+}
+
+importSettingsSmaregiCustomerCsv = async function importSettingsSmaregiCustomerCsvFixed() {
+  const input = document.getElementById("smaregiCustomerCsvFile");
+  const resultBox = document.getElementById("customerImportResult");
+  const file = input?.files?.[0];
+  if (!file) {
+    showSalesPopup("CSV未選択", "スマレジ会員CSVを選択してください。", "warn");
+    return;
+  }
+  const text = await readCsvFileText(file);
+  const rows = parseSettingsCsv(text);
+  if (rows.length < 2) {
+    showSalesPopup("CSV確認", "取込できる明細がありません。", "warn");
+    return;
+  }
+  const headers = rows[0];
+  const customers = rows.slice(1).map(row => ({
+    smaregiMemberId: pickCsvValue(row, headers, ["会員ID", "スマレジ会員ID", "memberId", "member_id", "customerId", "customer_id"]),
+    smaregiMemberCode: pickCsvValue(row, headers, ["会員コード", "スマレジ会員コード", "memberCode", "member_code", "customerCode", "customer_code"]),
+    customerName: pickCsvValue(row, headers, ["顧客名", "会員名", "氏名", "name", "customerName", "customer_name"]),
+    kana: pickCsvValue(row, headers, ["カナ", "フリガナ", "kana"]),
+    organizationName: pickCsvValue(row, headers, ["団体名", "会社名", "organizationName", "organization_name", "company"]),
+    phone: pickCsvValue(row, headers, ["電話番号", "TEL", "tel", "phone"]),
+    email: pickCsvValue(row, headers, ["メール", "メールアドレス", "email"]),
+    postalCode: pickCsvValue(row, headers, ["郵便番号", "postalCode", "postal_code", "zip"]),
+    address: pickCsvValue(row, headers, ["住所", "address"]),
+    memo: "スマレジ会員CSV取込"
+  })).filter(customer => customer.customerName || customer.smaregiMemberCode || customer.smaregiMemberId);
+  if (!customers.length) {
+    showSalesPopup("CSV確認", "顧客名または会員コードを含む行がありません。", "warn");
+    return;
+  }
+  const ok = window.confirm(`${customers.length}件のスマレジ会員CSVを顧客マスターへ取り込みますか？`);
+  if (!ok) return;
+  const result = settingsCustomerStorage().upsertSmaregiCustomers(customers);
+  await window.SalesStorage?.upsertSalesRecords?.("customers", settingsCustomerStorage().readCustomers?.() || []);
+  const message = [
+    `CSV読込件数：${customers.length}件`,
+    `新規：${result.created || 0}件`,
+    `更新：${result.updated || 0}件`,
+    `スキップ：${result.skipped || 0}件`
+  ].join("\n");
+  if (resultBox) resultBox.textContent = message;
+  showSalesPopup("CSV取込完了", message, "ok");
+};
+
+importSettingsSmaregiCustomers = async function importSettingsSmaregiCustomersStopped() {
+  const resultBox = document.getElementById("customerImportResult");
+  const message = "現在はCSV運用中です。スマレジ会員CSVを選択して取り込んでください。";
+  if (resultBox) resultBox.textContent = message;
+  showSalesMessage(message, "warn");
+  showSalesPopup("API停止中", message, "warn");
+};
+
 document.addEventListener("DOMContentLoaded", async () => {
   if (typeof requireSalesAuth === "function" && !requireSalesAuth()) return;
   await window.SalesStorage?.initSalesSettings?.().catch(error => {

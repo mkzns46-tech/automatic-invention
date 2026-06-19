@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 販売管理 設定</title>
-<link rel="stylesheet" href="sales-style.css?v=20260616-settings-layout">
+<link rel="stylesheet" href="sales-style.css?v=20260619-api-stop-csv">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-storage.js"></script>
-<script src="customers-storage.js?v=20260614-settings-imports"></script>
-<script src="sales-nav.js?v=20260614-progress" defer></script>
+<script src="customers-storage.js?v=20260619-api-stop-csv"></script>
+<script src="sales-nav.js?v=20260619-api-stop-csv" defer></script>
 <script src="staff-display.js?v=20260616-staff-display-map"></script>
-<script src="settings.js?v=20260616-sales-supabase-settings" defer></script>
-<script src="sales-smaregi.js?v=20260614-settings-imports" defer></script>
+<script src="settings.js?v=20260619-api-stop-csv" defer></script>
+<script src="sales-smaregi.js?v=20260619-api-stop-csv" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -20,7 +20,7 @@
     <div>
       <div class="brand">ARICO ARCHERY</div>
       <h1>設定</h1>
-      <p class="lead">販売管理で使用するスマレジ連携データを管理します。</p>
+      <p class="lead">販売管理で使用するPDF画像、担当者表示名、CSV取込設定を管理します。</p>
     </div>
     <div class="sales-actions">
       <a class="pill" href="index.html">販売管理トップ</a>
@@ -28,7 +28,7 @@
     </div>
   </header>
 
-  <div id="salesMessage" class="message">新スマレジの商品マスター・会員データを販売管理へ反映できます。</div>
+  <div id="salesMessage" class="message">外部APIは停止中です。スマレジ関連データはCSVで確認・取込してください。</div>
 
   <section class="card sales-pdf-assets-card">
     <div class="section-title">
@@ -57,45 +57,45 @@
     </div>
   </section>
 
-    <section class="card sales-staff-display-card">
+  <section class="card sales-staff-display-card">
     <div class="section-title">
       <div>
-        <h2>??????</h2>
-        <p class="section-note">???????????????????????PDF??????????????????????????????</p>
+        <h2>担当者表示名設定</h2>
+        <p class="section-note">販売管理画面とPDFで表示する担当者名を設定します。在庫管理・イベント管理の担当者名は変更しません。</p>
       </div>
-      <div class="badge muted">????</div>
+      <div class="badge muted">販売管理用</div>
     </div>
     <div class="settings-staff-toolbar">
       <div class="settings-staff-buttons">
-        <button type="button" class="secondary" onclick="loadStaffDisplaySettings();">??????????</button>
-        <button type="button" class="primary" onclick="saveStaffDisplaySettings();">??????</button>
+        <button type="button" class="secondary" onclick="loadStaffDisplaySettings();">スタッフ一覧を再読込</button>
+        <button type="button" class="primary" onclick="saveStaffDisplaySettings();">表示名を保存</button>
       </div>
-      <div id="staffDisplayResult" class="message settings-staff-message">??????</div>
+      <div id="staffDisplayResult" class="message settings-staff-message">未読込です。</div>
     </div>
     <div class="table-wrap settings-staff-table-wrap">
       <table>
         <thead>
-          <tr><th>?????</th><th>???????</th></tr>
+          <tr><th>内部管理名</th><th>販売管理表示名</th></tr>
         </thead>
         <tbody id="staffDisplaySettingsBody">
-          <tr><td colspan="2">?????????????????</td></tr>
+          <tr><td colspan="2">スタッフ一覧を読み込んでください。</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
-<section class="card sales-smaregi-card sales-settings-combined-card">
+  <section class="card sales-smaregi-card sales-settings-combined-card">
     <div class="section-title">
       <div>
         <h2>スマレジデータ取込</h2>
         <p class="section-note">外部APIは停止中です。商品マスターと会員データはCSV運用で確認・取込してください。</p>
       </div>
-      <div class="badge muted">新スマレジ</div>
+      <div class="badge muted">CSV運用中</div>
     </div>
     <div class="settings-combined-grid">
       <div class="settings-import-panel">
         <h3>スマレジ商品マスター取込</h3>
-        <p class="section-note">商品名・バーコード・スマレジ商品ID・販売価格を取得します。</p>
+        <p class="section-note">スマレジからダウンロードした商品CSVを確認して取り込む運用にしてください。</p>
         <button type="button" id="salesSmaregiImportBtn" class="secondary" onclick="importSalesSmaregiProducts();" disabled title="現在はCSV運用中です">API停止中（CSV取込）</button>
       </div>
       <div class="settings-import-panel">
@@ -108,8 +108,8 @@
       </div>
     </div>
   </section>
-
 </main>
+
 <div id="salesPopup" class="app-popup" style="display:none;">
   <div class="app-popup-card">
     <div id="salesPopupTitle" class="app-popup-title">完了</div>

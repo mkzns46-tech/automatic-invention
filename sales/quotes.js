@@ -87,22 +87,10 @@ function quoteNo(n) {
 
 function nextQuoteNo(quotes) {
   const max = quotes.reduce((num, quote) => {
-    const match = String(quote.quoteNo || quote.quoteNumber || quote.document_no || "").match(/^Q-(\d+)$/);
+    const match = String(quote.quoteNo || "").match(/^Q-(\d+)$/);
     return Math.max(num, match ? Number(match[1]) : 0);
   }, 0);
   return quoteNo(max + 1);
-}
-
-async function nextQuoteNoSafe(localQuotes = readQuotes()) {
-  let remoteQuotes = [];
-  try {
-    remoteQuotes = window.SalesStorage?.listSalesRecords
-      ? await window.SalesStorage.listSalesRecords("quotes")
-      : await salesFetch("sales_quotes?select=document_no,data&order=created_at.desc&limit=10000");
-  } catch (error) {
-    console.warn("[quote no] remote max lookup failed", error);
-  }
-  return nextQuoteNo([...(Array.isArray(localQuotes) ? localQuotes : []), ...(Array.isArray(remoteQuotes) ? remoteQuotes : [])]);
 }
 
 function extractSlipNumber(value) {
@@ -139,28 +127,25 @@ function writeInvoices(invoices) {
   localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices));
 }
 
+async function saveInvoiceFromQuoteConversion(invoice) {
+  writeInvoices(readInvoices().some(row => row.id === invoice.id)
+    ? readInvoices().map(row => row.id === invoice.id ? invoice : row)
+    : [...readInvoices(), invoice]);
+  if (window.SalesStorage?.saveSalesRecord) {
+    await window.SalesStorage.saveSalesRecord("invoices", invoice);
+  }
+}
+
 function invoiceNo(n) {
   return "INV-" + String(n).padStart(6, "0");
 }
 
 function nextInvoiceNo(invoices) {
   const max = invoices.reduce((num, invoice) => {
-    const match = String(invoice.invoiceNo || invoice.invoiceNumber || invoice.document_no || "").match(/^INV-(\d+)$/);
+    const match = String(invoice.invoiceNo || "").match(/^INV-(\d+)$/);
     return Math.max(num, match ? Number(match[1]) : 0);
   }, 0);
   return invoiceNo(max + 1);
-}
-
-async function nextInvoiceNoSafe(localInvoices = readInvoices()) {
-  let remoteInvoices = [];
-  try {
-    remoteInvoices = window.SalesStorage?.listSalesRecords
-      ? await window.SalesStorage.listSalesRecords("invoices")
-      : await salesFetch("sales_invoices?select=document_no,data&order=created_at.desc&limit=10000");
-  } catch (error) {
-    console.warn("[invoice no] remote max lookup failed", error);
-  }
-  return nextInvoiceNo([...(Array.isArray(localInvoices) ? localInvoices : []), ...(Array.isArray(remoteInvoices) ? remoteInvoices : [])]);
 }
 
 function normalizeInvoiceStatusForQuote(status) {
@@ -863,13 +848,13 @@ async function loadStaffOptions() {
   const select = document.getElementById("quoteStaff");
   try {
     const staff = await (window.SalesStaffDisplay?.loadStaffDisplays?.() || salesFetch("staff_members?select=name,store_name&order=name.asc"));
-    select.innerHTML = '<option value="">??????</option>' + staff.map(row => {
+    select.innerHTML = '<option value="">選択してください</option>' + staff.map(row => {
       const value = window.SalesStaffDisplay?.staffOptionValue?.(row) || (row.store_name ? `${row.name} (${row.store_name})` : row.name);
       const label = window.SalesStaffDisplay?.staffOptionLabel?.(row) || value;
       return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
     }).join("");
   } catch (_) {
-    select.innerHTML = '<option value="">??????</option>';
+    select.innerHTML = '<option value="">選択してください</option>';
   }
 }
 
@@ -1023,28 +1008,24 @@ function resolveQuoteCustomer(quote) {
   }) || null;
 }
 
-function buildInvoiceFromQuote(quote, invoices, invoiceNoOverride = "") {
+function buildInvoiceFromQuote(quote, invoices) {
   const now = new Date().toISOString();
   const lines = quote.lines || quote.items || [];
   const linkedCustomer = resolveQuoteCustomer(quote) || {};
   console.log("convert quote customer fields", pickCustomerFields(quote));
   const originNumber = quote.originNumber || quote.masterNumber || quote.quoteNumber || quote.quoteNo || "";
-  const newInvoiceNo = invoiceNoOverride || nextInvoiceNo(invoices);
-  const sourceQuoteNo = quote.quoteNo || quote.quoteNumber || quote.document_no || originNumber;
+  const newInvoiceNo = nextInvoiceNo(invoices);
   const customerName = quote.customerName || quote.name || quote.customer || quote.clientName || linkedCustomer.customerName || linkedCustomer.name || "";
   const organizationName = quote.organizationName || quote.organization || quote.companyName || linkedCustomer.organizationName || linkedCustomer.organization || linkedCustomer.companyName || "";
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     invoiceNo: newInvoiceNo,
     invoiceNumber: newInvoiceNo,
-    document_no: newInvoiceNo,
-    quote_document_no: sourceQuoteNo,
     originNumber,
     masterNumber: originNumber,
-    quoteNo: sourceQuoteNo,
-    quoteNumber: sourceQuoteNo,
+    quoteNumber: quote.quoteNumber || quote.quoteNo || originNumber,
     sourceQuoteId: quote.id,
-    sourceQuoteNo: sourceQuoteNo,
+    sourceQuoteNo: quote.quoteNo || "",
     customerId: quote.customerId || linkedCustomer.id || "",
     customerCode: quote.customerCode || linkedCustomer.customerCode || "",
     smaregiCustomerId: quote.smaregiCustomerId || linkedCustomer.smaregiCustomerId || linkedCustomer.smaregiMemberId || "",
@@ -1087,35 +1068,20 @@ async function convertQuoteToInvoice(id) {
   const existing = invoices.find(invoice => invoice.sourceQuoteId === quote.id);
   if (existing) {
     if (normalizeInvoiceStatusForQuote(existing.status) === "draft") {
-      const existingInvoiceNo = existing.invoiceNo || existing.invoiceNumber || existing.document_no || "";
-      const sourceQuoteNo = quote.quoteNo || quote.quoteNumber || quote.document_no || existing.quote_document_no || "";
       const updatedInvoice = {
-        ...buildInvoiceFromQuote(quote, invoices, existingInvoiceNo),
+        ...buildInvoiceFromQuote(quote, invoices),
         id: existing.id,
-        invoiceNo: existingInvoiceNo,
-        invoiceNumber: existingInvoiceNo,
-        document_no: existingInvoiceNo,
-        quoteNo: sourceQuoteNo,
-        quoteNumber: sourceQuoteNo,
-        quote_document_no: sourceQuoteNo,
-        sourceQuoteNo: sourceQuoteNo,
+        invoiceNo: existing.invoiceNo,
+        invoiceNumber: existing.invoiceNumber || existing.invoiceNo,
         createdAt: existing.createdAt || new Date().toISOString(),
         status: existing.status || "draft",
         issuedAt: existing.issuedAt || "",
         updatedAt: new Date().toISOString()
       };
-      const existingIndex = invoices.findIndex(invoice => invoice.id === existing.id);
-      if (existingIndex >= 0) invoices[existingIndex] = updatedInvoice;
-      try {
-        await window.SalesStorage?.saveSalesRecord?.("invoices", updatedInvoice);
-        quote.status = QUOTE_STATUS_INVOICED;
-        await window.SalesStorage?.saveSalesRecord?.("quotes", quote);
-      } catch (error) {
-        showSalesPopup("請求書保存失敗", error?.message || String(error), "err");
-        return;
-      }
-      writeInvoices(invoices);
+      await saveInvoiceFromQuoteConversion(updatedInvoice);
+      quote.status = QUOTE_STATUS_INVOICED;
       writeQuotes(quotes);
+      await window.SalesStorage?.saveSalesRecord?.("quotes", quote).catch(error => console.warn("[quote] quote status save failed", error));
       renderQuoteList();
       showSalesMessage(`下書き請求書を最新の見積内容で更新しました: ${updatedInvoice.invoiceNo}`, "ok");
       location.href = `invoices.html?id=${encodeURIComponent(updatedInvoice.id)}`;
@@ -1123,26 +1089,20 @@ async function convertQuoteToInvoice(id) {
     }
     quote.status = QUOTE_STATUS_INVOICED;
     writeQuotes(quotes);
+    await window.SalesStorage?.saveSalesRecord?.("quotes", quote).catch(error => console.warn("[quote] quote status save failed", error));
     renderQuoteList();
     showSalesMessage(`作成済みの請求書を開きます: ${existing.invoiceNo}`, "warn");
     location.href = `invoices.html?id=${encodeURIComponent(existing.id)}`;
     return;
   }
-  const invoice = buildInvoiceFromQuote(quote, invoices, await nextInvoiceNoSafe(invoices));
+  const invoice = buildInvoiceFromQuote(quote, invoices);
   console.log("created invoice customer fields", pickCustomerFields(invoice));
-  invoices.push(invoice);
-  try {
-    await window.SalesStorage?.saveSalesRecord?.("invoices", invoice);
-    quote.status = QUOTE_STATUS_INVOICED;
-    await window.SalesStorage?.saveSalesRecord?.("quotes", quote);
-  } catch (error) {
-    showSalesPopup("請求書作成失敗", error?.message || String(error), "err");
-    return;
-  }
-  writeInvoices(invoices);
+  await saveInvoiceFromQuoteConversion(invoice);
   const savedInvoice = readInvoices().find(row => row.id === invoice.id);
   console.log("saved invoice customer fields", pickCustomerFields(savedInvoice || invoice));
+  quote.status = QUOTE_STATUS_INVOICED;
   writeQuotes(quotes);
+  await window.SalesStorage?.saveSalesRecord?.("quotes", quote).catch(error => console.warn("[quote] quote status save failed", error));
   renderQuoteList();
   showSalesMessage(`請求書を作成しました: ${invoice.invoiceNo}`, "ok");
   location.href = `invoices.html?id=${encodeURIComponent(invoice.id)}`;
@@ -1188,7 +1148,7 @@ async function searchProducts() {
   results.innerHTML = '<div class="message">検索中...</div>';
   try {
     const filter = encodeURIComponent(`*${query}*`);
-    const rows = await salesFetch(`products?select=barcode,name,base_stock,price,smaregi_product_id&or=(name.ilike.${filter},barcode.ilike.${filter},smaregi_product_id.ilike.${filter})&limit=100`);
+    const rows = await salesFetch(`products?select=barcode,name,base_stock,price,smaregi_product_id&or=(name.ilike.${filter},barcode.ilike.${filter},smaregi_product_id.ilike.${filter})&limit=20`);
     results.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>商品名</th><th>バーコード</th><th>販売価格</th><th>操作</th></tr></thead><tbody>${rows.map(raw => {
       const row = sanitizeProductRow(raw);
       const price = getProductPriceInfo(row);
@@ -1376,10 +1336,10 @@ function recalcTotals() {
   document.getElementById("taxText").textContent = money(totals.tax);
 }
 
-function collectQuote(quoteNoOverride = "") {
+function collectQuote() {
   const quotes = readQuotes();
   const existing = currentQuoteId ? quotes.find(q => q.id === currentQuoteId) : null;
-  const quoteNo = existing?.quoteNo || quoteNoOverride || nextQuoteNo(quotes);
+  const quoteNo = existing?.quoteNo || nextQuoteNo(quotes);
   const originNumber = existing?.originNumber || existing?.masterNumber || existing?.quoteNumber || quoteNo;
   return {
     id: currentQuoteId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
@@ -1512,21 +1472,20 @@ async function saveQuote() {
     showSalesMessage("\u898b\u7a4d\u5546\u54c1\u3092\u8ffd\u52a0\u3057\u3066\u304f\u3060\u3055\u3044\u3002", "err");
     return;
   }
-  const localQuotes = readQuotes();
-  const quote = collectQuote(currentQuoteId ? "" : await nextQuoteNoSafe(localQuotes));
+  const quote = collectQuote();
   console.log("save quote customer fields", pickCustomerFields(quote));
-  const quotes = localQuotes;
+  const quotes = readQuotes();
   const index = quotes.findIndex(q => q.id === quote.id);
   const isNewQuote = index < 0;
   if (index >= 0) quotes[index] = quote;
   else quotes.push(quote);
+  writeQuotes(quotes);
   try {
     await window.SalesStorage?.saveSalesRecord?.("quotes", quote);
   } catch (error) {
     showSalesPopup("Supabase保存失敗", error?.message || String(error), "err");
     return;
   }
-  writeQuotes(quotes);
   currentQuoteId = quote.id;
   renderQuoteList();
   updateQuoteDeleteButton(quote);
