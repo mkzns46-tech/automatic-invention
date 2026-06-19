@@ -1,4 +1,4 @@
-const MESSAGE = "外部API連携は社内承認まで停止中です。スマレジ商品取得はCSV取込で運用してください。";
+const MESSAGE = "外部API連携は社内承認まで停止中です。スマレジ商品マスターはCSV取込で運用してください。";
 
 module.exports = async function handler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");

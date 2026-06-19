@@ -1,4 +1,4 @@
-const MESSAGE = "販売管理からの products.base_stock 自動更新は停止中です。在庫変更は在庫管理側またはCSV確認運用で行ってください。";
+const MESSAGE = "products.base_stock の自動更新は停止中です。在庫変更は在庫管理側またはCSV確認運用で行ってください。";
 
 module.exports = async function handler(req, res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
