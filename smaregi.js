@@ -1478,14 +1478,16 @@ async function importSmaregiStockCsvFile(file){
     const errorCount=0;
     const snapshotId=(typeof crypto!=="undefined"&&crypto.randomUUID) ? crypto.randomUUID() : `csv-movement-${Date.now()}`;
     const now=new Date().toISOString();
+    const previousSnapshots=await sb("smaregi_stock_snapshots?select=completed_at&order=imported_at.desc&limit=1").catch(()=>[]);
+    const previousCompletedAt=Array.isArray(previousSnapshots)&&previousSnapshots[0]?.completed_at ? previousSnapshots[0].completed_at : null;
     await sb("smaregi_stock_snapshots",{
       method:"POST",
       headers:{Prefer:"return=minimal"},
       body:JSON.stringify({
         id:snapshotId,
         imported_at:now,
-        range_from:null,
-        completed_at:null
+        range_from:previousCompletedAt,
+        completed_at:previousCompletedAt
       })
     });
     for(let i=0;i<newChanges.length;i+=500){
