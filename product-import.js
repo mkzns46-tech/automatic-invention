@@ -17,6 +17,13 @@ async function upsertProducts(rows){
 
 async function importSmaregiProducts(){
   if(!requireInventoryPrivilegedAccess())return;
+  showMessage("現在はCSV運用中です。スマレジAPIには接続しません。商品マスターCSVを選択してください。","ok");
+  const csvInput=el("csvFile");
+  if(csvInput){
+    csvInput.value="";
+    csvInput.click();
+  }
+  return;
   const smaregiContext=typeof getSmaregiRequestContext==="function" ? getSmaregiRequestContext() : {};
   if(typeof confirmAppAction==="function"){
     const ok=await confirmAppAction(
@@ -32,7 +39,7 @@ async function importSmaregiProducts(){
     console.log("[Smaregi product master import] start");
     showMessage("スマレジ商品マスターを取り込み中...");
     console.log("[Smaregi product master import] context",smaregiContext);
-    const res=await fetch("/api/smaregi-products",{
+    const res=await fetch("about:blank",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(smaregiContext)
@@ -265,4 +272,23 @@ function downloadSampleCsv(){
   a.download="product_import_sample.csv";
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/* CSV operation mode: Smaregi product API is disabled. */
+function updateSmaregiProductImportControl(){
+  const button=el("importSmaregiProductsBtn");
+  if(!button)return;
+  button.disabled=false;
+  button.textContent="商品マスターCSV取込";
+  button.title="API停止中／CSV運用中：スマレジAPIには接続しません";
+}
+
+async function importSmaregiProducts(){
+  if(!requireInventoryPrivilegedAccess())return;
+  showMessage("現在はCSV運用中です。スマレジAPIには接続しません。商品マスターCSVを選択してください。","ok");
+  const input=el("csvFile");
+  if(input){
+    input.value="";
+    input.click();
+  }
 }

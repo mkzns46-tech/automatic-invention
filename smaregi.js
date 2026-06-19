@@ -532,6 +532,13 @@ async function loadLatestSmaregiSnapshot(){
 }
 
 async function syncSmaregiStockFromApi(){
+  showCsvOperationMessage("現在はCSV運用中です。スマレジAPIには接続しません。スマレジ在庫CSVを選択してください。");
+  const csvInput=el("smaregiStockCsvFile");
+  if(csvInput){
+    csvInput.value="";
+    csvInput.click();
+  }
+  return;
   if(!(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())){
     showMessage("スマレジ変動商品データ取り込みは設定画面のパスワード認証後に操作できます。","err");
     return;
@@ -551,7 +558,7 @@ async function syncSmaregiStockFromApi(){
     showMessage("スマレジデータを取り込み中...");
     const smaregiContext=typeof getSmaregiRequestContext==="function" ? getSmaregiRequestContext() : {};
     console.log("[Smaregi stock sync] context",smaregiContext);
-    const res=await fetch("/api/smaregi-sync",{
+    const res=await fetch("about:blank",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(smaregiContext)
@@ -1106,4 +1113,190 @@ function stopSmaregiAutoRefresh(){
     clearInterval(smaregiAutoRefreshTimer);
     smaregiAutoRefreshTimer=null;
   }
+}
+
+/* CSV operation mode: Smaregi stock APIs are disabled. */
+function showCsvOperationMessage(message){
+  const text=message||"現在はCSV運用中です。スマレジAPIには接続しません。";
+  showMessage(text,"ok");
+  if(typeof showPopup==="function")showPopup("API停止中／CSV運用中",text);
+}
+
+function pickSmaregiCsvValue(row,keys){
+  for(const key of keys){
+    const normalized=typeof normalizeHeader==="function" ? normalizeHeader(key) : String(key||"").toLowerCase();
+    if(row[normalized]!==undefined&&row[normalized]!==null&&String(row[normalized]).trim()!=="")return String(row[normalized]).trim();
+  }
+  return "";
+}
+
+function smaregiStockCsvToItems(text){
+  const parsed=parseCsv(text);
+  if(parsed.length<2)throw new Error("CSVにデータ行がありません。");
+  const headers=parsed[0].map(header=>typeof normalizeHeader==="function" ? normalizeHeader(header) : String(header||"").trim().toLowerCase());
+  const items=[];
+  for(let i=1;i<parsed.length;i++){
+    const row={};
+    headers.forEach((header,index)=>{row[header]=String(parsed[i][index]??"").trim();});
+    const barcode=pickSmaregiCsvValue(row,["barcode","バーコード","JAN","JANコード","商品コード","品番"]);
+    const productName=pickSmaregiCsvValue(row,["product_name","productName","name","商品名","品名"]);
+    const stockRaw=pickSmaregiCsvValue(row,["smaregi_stock","stock","在庫","現在庫","在庫数","数量"]).replace(/,/g,"");
+    if(!barcode&&!productName)continue;
+    if(!barcode)throw new Error(`${i+1}行目：バーコードまたは商品コードが空です。`);
+    const smaregiStock=Number(stockRaw||0);
+    if(!Number.isFinite(smaregiStock))throw new Error(`${i+1}行目：在庫数が数値ではありません。`);
+    items.push({
+      barcode,
+      product_name:productName,
+      smaregi_stock:smaregiStock
+    });
+  }
+  if(!items.length)throw new Error("取込対象の在庫データがありません。");
+  return items;
+}
+
+async function importSmaregiStockCsvFile(file){
+  try{
+    if(!(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())){
+      showMessage("スマレジ在庫CSV取込は管理者のみ操作できます。","err");
+      return;
+    }
+    if(!file)return;
+    showMessage("スマレジ在庫CSVを取込中...");
+    const text=decodeCsvBuffer(await file.arrayBuffer());
+    const items=smaregiStockCsvToItems(text);
+    const snapshotId=(typeof crypto!=="undefined"&&crypto.randomUUID) ? crypto.randomUUID() : `csv-${Date.now()}`;
+    const now=new Date().toISOString();
+    await sb("smaregi_stock_snapshots",{
+      method:"POST",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        id:snapshotId,
+        imported_at:now,
+        range_from:null,
+        completed_at:now
+      })
+    });
+    for(let i=0;i<items.length;i+=500){
+      await sb("smaregi_stock_items",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify(items.slice(i,i+500).map(item=>({
+          snapshot_id:snapshotId,
+          barcode:item.barcode,
+          product_name:item.product_name,
+          smaregi_stock:item.smaregi_stock
+        })))
+      });
+    }
+    await loadLatestSmaregiSnapshot();
+    showMessage(`スマレジ在庫CSVを取込ました：${items.length}件（API通信なし）`,"ok");
+  }catch(e){
+    showMessage("スマレジ在庫CSV取込エラー。\n"+e.message,"err");
+  }finally{
+    const input=el("smaregiStockCsvFile");
+    if(input)input.value="";
+  }
+}
+
+async function syncSmaregiStockFromApi(){
+  showCsvOperationMessage("現在はCSV運用中です。スマレジAPIには接続しません。スマレジ在庫CSVを選択してください。");
+  const input=el("smaregiStockCsvFile");
+  if(input){
+    input.value="";
+    input.click();
+  }
+}
+
+async function adjustEquipmentTransferSmaregiStock(){
+  return {ok:false,disabled:true,mode:"csv",message:"API停止中／CSV運用中"};
+}
+
+async function reverseEquipmentTransferSmaregiStock(){
+  return {ok:false,disabled:true,mode:"csv",message:"API停止中／CSV運用中"};
+}
+
+function showEquipmentTransferConfirmPopup({log,product,quantity,checkedBy,onOk}){
+  const popup=document.createElement("div");
+  popup.className="app-popup app-confirm-popup";
+  popup.style.display="flex";
+  popup.innerHTML=`<div class="app-popup-card">
+    <div class="app-popup-title">備品転用確認</div>
+    <div class="app-popup-body">現在はCSV運用中です。スマレジAPIには接続せず、アプリ内の備品転用確認だけを行います。
+商品名：${esc(product?.name||log?.product_name||"-")}
+バーコード：${esc(log?.barcode||product?.barcode||"-")}
+数量：${esc(quantity)}
+担当者：${esc(checkedBy)}
+
+スマレジ在庫は自動変更されません。</div>
+    <div class="app-confirm-actions">
+      <button type="button" class="secondary app-equipment-transfer-cancel-btn">キャンセル</button>
+      <button type="button" class="app-equipment-transfer-ok-btn">確認する</button>
+    </div>
+  </div>`;
+  const close=()=>{try{document.body.removeChild(popup);}catch(_){}};
+  popup.querySelector(".app-equipment-transfer-cancel-btn")?.addEventListener("click",close);
+  popup.querySelector(".app-equipment-transfer-ok-btn")?.addEventListener("click",()=>{close();onOk();});
+  popup.addEventListener("click",event=>{if(event.target===popup)close();});
+  document.body.appendChild(popup);
+}
+
+async function executeEquipmentTransferConfirmation({log,product=null,quantity,checkedBy,button}){
+  const logId=String(log?.id||"").trim();
+  let latestLog=null;
+  let productUpdated=false;
+  let currentStock=null;
+  await runWithSmaregiAutoRefreshPaused(async()=>{
+    try{
+      const latestRows=await sb(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`);
+      latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : null;
+      if(!latestLog)throw new Error(`備品転用履歴が見つかりません。inventory_logs.id=${logId}`);
+      if(isEquipmentTransferChecked(latestLog))throw new Error("この備品転用は確認済みです。");
+      const type=String(latestLog.type||"");
+      if(type!=="備品転用"&&type!=="equipment_transfer")throw new Error("備品転用の履歴ではありません。");
+      quantity=Number(latestLog.quantity||quantity||0);
+      if(!Number.isInteger(quantity)||quantity<=0)throw new Error("数量は1以上で入力してください。");
+      product=product || await fetchProductByBarcode(latestLog.barcode);
+      if(!product)throw new Error("商品が見つかりません。");
+      currentStock=Number(product.base_stock||0);
+      const nextStock=currentStock-quantity;
+      if(nextStock<0)throw new Error(`在庫不足：${product.name} / 現在庫 ${currentStock} / 備品転用数 ${quantity}`);
+      await updateProductCurrentStock(latestLog.barcode,nextStock);
+      productUpdated=true;
+      const equipment_checked_at=new Date().toISOString();
+      const patchPayload={
+        type:"equipment_transfer",
+        equipment_checked:true,
+        equipment_checked_by:checkedBy,
+        equipment_checked_at,
+        affects_smaregi:false,
+        smaregi_delta:0,
+        memo:latestLog.memo||""
+      };
+      const patchedRows=await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}&select=*`,{
+        method:"PATCH",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify(patchPayload)
+      });
+      const refreshedLog=Array.isArray(patchedRows)&&patchedRows[0] ? patchedRows[0] : null;
+      if(!refreshedLog)throw new Error(`備品転用履歴を更新できませんでした。inventory_logs.id=${logId}`);
+      const displayLog={...refreshedLog,type:"備品転用"};
+      equipmentTransferLogCache.set(logId,displayLog);
+      replaceEquipmentConfirmationDom(logId,displayLog);
+      logs=(logs||[]).some(item=>String(item.id)===String(logId))
+        ? logs.map(item=>String(item.id)===String(logId) ? displayLog : item)
+        : [displayLog,...logs];
+      showMessage(`備品転用を確認しました：${product.name} / 数量 ${quantity}（API通信なし）`,"ok");
+      showPopup("備品転用完了",`商品名：${product.name}\nバーコード：${latestLog.barcode}\n数量：${quantity}\n現在庫：${nextStock}\nスマレジ在庫：自動変更なし（CSV運用中）`);
+      renderGlobalHistory();
+      if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode,displayLog);
+      replaceEquipmentConfirmationDom(logId,displayLog);
+      if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
+    }catch(e){
+      if(productUpdated&&product&&latestLog?.barcode){
+        try{await updateProductCurrentStock(latestLog.barcode,currentStock);}catch(_){}
+      }
+      showMessage("備品転用確認エラー。\n"+e.message,"err");
+    }
+  },{button});
 }

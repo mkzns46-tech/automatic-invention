@@ -3312,8 +3312,9 @@ async function adjustBoothProductBaseStock(barcode,delta){
 }
 
 async function callBoothSmaregiStockAdjust({event,product,delta,memo}){
+  return {ok:false,disabled:true,mode:"csv",message:"API停止中／CSV運用中"};
   const context=getBoothSalesContext();
-  const response=await fetch("/api/smaregi-stock-adjust",{
+  const response=await fetch("about:blank",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({

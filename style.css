@@ -10,6 +10,13 @@
   letter-spacing:1px;
   box-shadow:0 0 0 4px var(--main-light);
 }
+
+.csv-mode-message{
+  border:1px solid #f2c48d;
+  background:#fff7ed;
+  color:#7c3d00;
+  font-weight:900;
+}
 #barcodeInput::placeholder{
   color:#2d6a4f;
   opacity:.75;

@@ -960,8 +960,9 @@ function getEquipmentTransferSmaregiContext(){
 }
 
 async function adjustEquipmentTransferSmaregiStock(product,quantity,memo){
+  return {ok:false,disabled:true,mode:"csv",message:"API停止中／CSV運用中"};
   const context=getEquipmentTransferSmaregiContext();
-  const res=await fetch("/api/smaregi-stock-adjust",{
+  const res=await fetch("about:blank",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
@@ -981,9 +982,10 @@ async function adjustEquipmentTransferSmaregiStock(product,quantity,memo){
 }
 
 async function reverseEquipmentTransferSmaregiStock(product,quantity,memo){
+  return {ok:false,disabled:true,mode:"csv",message:"API停止中／CSV運用中"};
   try{
     const context=getEquipmentTransferSmaregiContext();
-    await fetch("/api/smaregi-stock-adjust",{
+    await fetch("about:blank",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
