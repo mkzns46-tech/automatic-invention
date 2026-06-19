@@ -49,6 +49,95 @@ function settingsCustomerStorage() {
   };
 }
 
+function parseSettingsCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (quoted) {
+      if (ch === '"' && next === '"') {
+        cell += '"';
+        i += 1;
+      } else if (ch === '"') {
+        quoted = false;
+      } else {
+        cell += ch;
+      }
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (ch === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else if (ch !== "\r") {
+      cell += ch;
+    }
+  }
+  row.push(cell);
+  if (row.some(value => String(value || "").trim())) rows.push(row);
+  return rows;
+}
+
+function pickCsvValue(row, headers, names) {
+  for (const name of names) {
+    const index = headers.findIndex(header => String(header || "").trim().toLowerCase() === String(name).trim().toLowerCase());
+    if (index >= 0) return row[index] || "";
+  }
+  return "";
+}
+
+async function importSettingsSmaregiCustomerCsv() {
+  const input = document.getElementById("smaregiCustomerCsvFile");
+  const resultBox = document.getElementById("customerImportResult");
+  const file = input?.files?.[0];
+  if (!file) {
+    showSalesPopup("CSV未選択", "スマレジ会員CSVを選択してください。", "warn");
+    return;
+  }
+  const text = await file.text();
+  const rows = parseSettingsCsv(text);
+  if (rows.length < 2) {
+    showSalesPopup("CSV確認", "取込できる明細がありません。", "warn");
+    return;
+  }
+  const headers = rows[0];
+  const customers = rows.slice(1).map(row => ({
+    smaregiMemberId: pickCsvValue(row, headers, ["会員ID", "memberId", "member_id", "customerId", "customer_id"]),
+    smaregiMemberCode: pickCsvValue(row, headers, ["会員コード", "memberCode", "member_code", "customerCode", "customer_code"]),
+    customerName: pickCsvValue(row, headers, ["顧客名", "会員名", "氏名", "name", "customerName", "customer_name"]),
+    kana: pickCsvValue(row, headers, ["カナ", "フリガナ", "kana"]),
+    organizationName: pickCsvValue(row, headers, ["団体名", "会社名", "organizationName", "organization_name", "company"]),
+    phone: pickCsvValue(row, headers, ["電話番号", "TEL", "tel", "phone"]),
+    email: pickCsvValue(row, headers, ["メール", "メールアドレス", "email"]),
+    postalCode: pickCsvValue(row, headers, ["郵便番号", "postalCode", "postal_code", "zip"]),
+    address: pickCsvValue(row, headers, ["住所", "address"]),
+    memo: "スマレジ会員CSV取込"
+  })).filter(customer => customer.customerName || customer.smaregiMemberCode || customer.smaregiMemberId);
+  if (!customers.length) {
+    showSalesPopup("CSV確認", "顧客名または会員コードを含む行がありません。", "warn");
+    return;
+  }
+  const ok = window.confirm(`${customers.length}件のスマレジ会員CSVを顧客マスターへ取り込みますか？`);
+  if (!ok) return;
+  const result = settingsCustomerStorage().upsertSmaregiCustomers(customers);
+  await window.SalesStorage?.upsertSalesRecords?.("customers", settingsCustomerStorage().readCustomers?.() || []);
+  const message = [
+    `CSV読込件数：${customers.length}件`,
+    `新規：${result.created || 0}件`,
+    `更新：${result.updated || 0}件`,
+    `スキップ：${result.skipped || 0}件`
+  ].join("\n");
+  if (resultBox) resultBox.textContent = message;
+  showSalesPopup("CSV取込完了", message, "ok");
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
     "&": "&amp;",
@@ -251,59 +340,19 @@ function clearPdfAssetSettings() {
 }
 
 async function migrateLocalSalesDataToSupabase() {
-  const confirmed = confirm("会社PCのlocalStorageに残っている販売管理データをSupabaseへ救出します。既存localStorageは削除しません。同じ伝票番号・顧客コードがSupabaseにある場合は、会社PCのlocalStorage内容で上書き更新します。実行しますか？");
+  const confirmed = confirm("localStorageの販売管理データをSupabaseへ移行します。既存localStorageは削除しません。実行しますか？");
   if (!confirmed) return;
-  const resultBox = document.getElementById("salesMigrationResult");
-  const button = document.getElementById("salesMigrationButton");
-  if (button) button.disabled = true;
-  if (resultBox) {
-    resultBox.textContent = "販売管理データをSupabaseへ救出しています。";
-    resultBox.className = "message warn";
-  }
-  showSalesMessage("販売管理データをSupabaseへ救出しています。", "warn");
+  showSalesMessage("販売管理データをSupabaseへ移行しています。", "warn");
   try {
-    const result = await window.SalesStorage?.migrateAllLocalSalesData?.({ force: true });
-    const message = formatMigrationResult(result);
-    if (resultBox) {
-      resultBox.textContent = message;
-      resultBox.className = "message ok";
-    }
-    showSalesPopup("救出完了", message, "ok");
-    showSalesMessage(message, "ok");
+    const result = await window.SalesStorage?.migrateAllLocalSalesData?.();
+    showSalesPopup("移行完了", "localStorageからSupabaseへの移行処理が完了しました。", "ok");
+    showSalesMessage("Supabase移行が完了しました。", "ok");
     console.log("[sales migration result]", result);
   } catch (error) {
     const message = error?.message || String(error);
-    if (resultBox) {
-      resultBox.textContent = message;
-      resultBox.className = "message err";
-    }
     showSalesPopup("移行失敗", message, "err");
     showSalesMessage(message, "err");
-  } finally {
-    if (button) button.disabled = false;
   }
-}
-
-function formatMigrationResult(result) {
-  const labels = {
-    customers: "顧客",
-    quotes: "見積",
-    invoices: "請求",
-    payments: "入金",
-    deliveries: "納品",
-    receipts: "領収",
-    settings: "ロゴ・印鑑・担当者表示名・販売管理設定"
-  };
-  const lines = ["localStorageからSupabaseへの救出が完了しました。"];
-  Object.keys(labels).forEach(key => {
-    const stats = result?.[key];
-    if (!stats) return;
-    lines.push(`${labels[key]}：localStorage ${stats.localCount || 0}件 / 新規 ${stats.inserted || 0}件 / 更新 ${stats.updated || 0}件 / スキップ ${stats.skipped || 0}件 / エラー ${stats.errors || 0}件`);
-    if (Array.isArray(stats.errorMessages) && stats.errorMessages.length) {
-      lines.push(`  エラー例：${stats.errorMessages.join(" / ")}`);
-    }
-  });
-  return lines.join("\n");
 }
 
 function ensureMigrationButton() {
@@ -315,15 +364,14 @@ function ensureMigrationButton() {
   section.innerHTML = `
     <div class="section-title">
       <div>
-        <h2>Supabase救出</h2>
-        <p class="section-note">会社PCのlocalStorageに残っている販売管理データをSupabaseへ保存します。同じ伝票番号・顧客コードは会社PCの内容で更新します。</p>
+        <h2>Supabase移行</h2>
+        <p class="section-note">会社PCのlocalStorageに残っている販売管理データをSupabaseへ移行します。既存データは削除しません。</p>
       </div>
       <div class="badge muted">管理者</div>
     </div>
     <div class="sales-actions">
-      <button type="button" id="salesMigrationButton" class="primary" onclick="migrateLocalSalesDataToSupabase();">localStorageからSupabaseへ救出</button>
+      <button type="button" id="salesMigrationButton" class="primary" onclick="migrateLocalSalesDataToSupabase();">localStorageからSupabaseへ移行</button>
     </div>
-    <div id="salesMigrationResult" class="message">未実行です。</div>
   `;
   firstCard.insertAdjacentElement("beforebegin", section);
 }
@@ -331,6 +379,11 @@ function ensureMigrationButton() {
 async function importSettingsSmaregiCustomers() {
   const button = document.getElementById("customerSmaregiImportBtn");
   const resultBox = document.getElementById("customerImportResult");
+  const stoppedMessage = "外部API連携は停止中です。スマレジ会員データはCSVで取り込んでください。";
+  if (resultBox) resultBox.textContent = stoppedMessage;
+  showSalesMessage(stoppedMessage, "warn");
+  showSalesPopup("API停止中", stoppedMessage, "warn");
+  return;
   if (button) button.disabled = true;
   if (resultBox) {
     resultBox.textContent = "スマレジ会員データを取り込んでいます。";

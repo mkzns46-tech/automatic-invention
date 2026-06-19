@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO ARCHERY 請求書</title>
-<link rel="stylesheet" href="sales-style.css?v=20260617-invoice-completed-visible">
+<link rel="stylesheet" href="sales-style.css?v=20260615-pdf-button-ui">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
-<script src="sales-storage.js?v=20260617-number-quota-fix"></script>
+<script src="sales-storage.js?v=20260616-sales-all-supabase"></script>
 <script src="staff-display.js?v=20260616-staff-display-map"></script>
 <script src="customers-storage.js?v=20260614-html-repair"></script>
 <script src="sales-pdf-format.js?v=20260615-unified-pdf"></script>
 <script src="invoice-pdf.js?v=20260614-exchange-pdf-restore"></script>
-<script src="invoices.js?v=20260617-completed-dom-debug" defer></script>
+<script src="invoices.js?v=20260616-sales-supabase-invoices" defer></script>
 </head>
 <body>
 <main class="sales-wrap">
@@ -143,6 +143,7 @@
       <button type="button" class="primary" id="saveInvoiceBtn" onclick="saveInvoice();">保存</button>
       <button type="button" class="primary invoice-issue-button" id="issueInvoiceBtn" onclick="issueInvoice();">請求書確定</button>
         <button type="button" class="secondary" id="retryStockDeductionBtn" onclick="retryCurrentInvoiceStockDeduction();" hidden>売上登録再実行</button>
+      <button type="button" class="secondary" id="invoiceSmaregiCsvBtn" onclick="downloadCurrentInvoiceSmaregiManualCsv();">スマレジ手動登録用CSV</button>
       <button type="button" class="secondary" id="invoicePdfBtn" onclick="outputCurrentInvoicePdf();" disabled title="請求書確定後にPDF出力できます">PDF出力</button>
       <button type="button" class="danger" id="cancelInvoiceBtn" onclick="cancelInvoice();">キャンセル</button>
     </div>

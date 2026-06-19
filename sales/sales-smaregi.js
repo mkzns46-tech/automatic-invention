@@ -110,6 +110,10 @@ function formatSalesImportError(error) {
 async function importSalesSmaregiProducts() {
   const button = document.getElementById("salesSmaregiImportBtn");
   const oldText = button?.textContent;
+  const message = "外部API連携は停止中です。スマレジ商品マスターはCSVで取り込んでください。";
+  showSalesMessage(message, "warn");
+  if (typeof showSalesPopup === "function") showSalesPopup("API停止中", message, "warn");
+  return;
   try {
     if (button) {
       button.disabled = true;

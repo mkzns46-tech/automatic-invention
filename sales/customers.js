@@ -336,6 +336,10 @@ function matchesCustomerFilters(customer) {
 
 async function importSmaregiCustomers() {
   const button = document.getElementById("customerSmaregiImportBtn");
+  const stoppedMessage = "外部API連携は停止中です。スマレジ会員データはCSVで取り込んでください。";
+  showCustomerMessage(stoppedMessage, "warn");
+  showSalesPopup("API停止中", stoppedMessage, "warn");
+  return;
   if (button) button.disabled = true;
   showCustomerMessage("スマレジ会員データを取り込んでいます。");
   try {

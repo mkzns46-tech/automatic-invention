@@ -19,6 +19,7 @@ const SMAREGI_SALE_STATUS_PENDING = "pending";
 const SMAREGI_SALE_STATUS_SUCCESS = "success";
 const SMAREGI_SALE_STATUS_FAILED = "failed";
 const SMAREGI_SALE_STATUS_SKIPPED = "skipped";
+const EXTERNAL_API_CSV_MODE_MESSAGE = "API停止中／CSVで手動処理";
 
 let currentInvoiceId = null;
 let currentInvoiceLines = [];
@@ -27,7 +28,7 @@ let invoiceListStatusFilter = "";
 let invoiceListDateFrom = "";
 let invoiceListDateTo = "";
 let invoiceListCollapsed = false;
-let invoiceShowCompleted = true;
+let invoiceShowCompleted = false;
 
 function readInvoices() {
   if (window.SalesStorage?.readCachedSalesCollection) {
@@ -475,8 +476,7 @@ function isSmaregiSaleTarget(invoice) {
 }
 
 function canRetryStockDeduction(invoice) {
-  const status = normalizeSmaregiSaleStatus(invoice?.smaregiSaleStatus);
-  return Boolean(invoice?.id && isSmaregiSaleTarget(invoice) && status === SMAREGI_SALE_STATUS_FAILED);
+  return false;
 }
 
 function canOutputInvoicePdf(invoice) {
@@ -556,7 +556,6 @@ function canCancelInvoice(invoice) {
   if (!invoice) return false;
   const status = normalizeInvoiceStatus(invoice.status);
   if (status === INVOICE_STATUS_CANCELLED || status === INVOICE_STATUS_DRAFT || status === INVOICE_STATUS_PAID || status === INVOICE_STATUS_NO_PAYMENT_REQUIRED) return false;
-  if (normalizeSmaregiSaleStatus(invoice.smaregiSaleStatus) !== SMAREGI_SALE_STATUS_SUCCESS) return false;
   if (invoiceHasPaidRecord(invoice)) return false;
   if (invoiceHasBlockedDelivery(invoice)) return false;
   if (invoiceHasIssuedReceipt(invoice)) return false;
@@ -803,6 +802,79 @@ function buildSmaregiSaleLines(invoice) {
   }).filter(line => line.quantity > 0 && (line.productId || line.barcode || line.productCode || line.manualProduct || line.name));
 }
 
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsvFile(filename, rows) {
+  const csv = "\ufeff" + rows.map(row => row.map(csvCell).join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildSmaregiManualCsvRows(invoice) {
+  const rows = [[
+    "請求書番号",
+    "顧客名",
+    "団体名",
+    "商品名",
+    "商品コード",
+    "JAN/バーコード",
+    "数量",
+    "税込単価",
+    "値引率",
+    "値引額",
+    "金額",
+    "取引区分",
+    "備考"
+  ]];
+  getInvoiceRawLines(invoice).forEach(line => {
+    const normalizedLine = recalcInvoiceLine({ ...line, transactionType: invoice.transactionType });
+    rows.push([
+      invoice.invoiceNo || "",
+      invoice.customerName || "",
+      invoice.organizationName || "",
+      normalizedLine.name || line.name || "",
+      line.productCode || line.code || "",
+      line.barcode || line.productCode || "",
+      normalizedLine.qty || normalizedLine.quantity || 0,
+      normalizedLine.unitPrice || normalizedLine.price || 0,
+      normalizedLine.discountRate || 0,
+      normalizedLine.discountAmount || 0,
+      normalizedLine.amount || 0,
+      invoice.transactionType || "",
+      [line.memo, line.note, invoice.memo].filter(Boolean).join(" / ")
+    ]);
+  });
+  return rows;
+}
+
+function downloadInvoiceSmaregiManualCsv(id) {
+  const invoice = readInvoices().find(row => row.id === id);
+  if (!invoice) {
+    showSalesMessage("請求書を選択してください。", "warn");
+    return;
+  }
+  const safeNo = String(invoice.invoiceNo || "invoice").replace(/[\\/:*?"<>|]/g, "");
+  downloadCsvFile(`${safeNo}-smaregi-manual.csv`, buildSmaregiManualCsvRows(invoice));
+}
+
+function downloadCurrentInvoiceSmaregiManualCsv() {
+  if (!currentInvoiceId) {
+    showSalesMessage("請求書を選択してください。", "warn");
+    return;
+  }
+  downloadInvoiceSmaregiManualCsv(currentInvoiceId);
+}
+
 async function readStockApiJson(response) {
   const text = await response.text().catch(() => "");
   console.log("[Sales stock decrement API response]", {
@@ -888,6 +960,23 @@ async function applyInvoiceCancel(invoice, reason) {
   next.cancelReason = reason || "";
   next.cancelRequestedAt = now;
 
+  next.smaregiCancelStatus = SMAREGI_SALE_STATUS_SKIPPED;
+  next.smaregiCancelError = EXTERNAL_API_CSV_MODE_MESSAGE;
+  next.smaregiCancelTransactionId = "";
+  next.smaregiCanceledAt = "";
+  next.smaregiCancelLines = [];
+  next.stockRestoreStatus = "skipped";
+  next.stockRestoreError = EXTERNAL_API_CSV_MODE_MESSAGE;
+  next.stockRestoreLines = [];
+  next.stockRestoredAt = "";
+  next.status = INVOICE_STATUS_CANCELLED;
+  next.cancelStatus = "success";
+  next.cancelError = "";
+  next.cancelledAt = now;
+  next.canceledAt = now;
+  next.updatedAt = new Date().toISOString();
+  return next;
+
   const saleSucceeded = normalizeSmaregiSaleStatus(next.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS;
   if (!saleSucceeded) {
     next.cancelStatus = "failed";
@@ -925,6 +1014,16 @@ async function applyInvoiceCancel(invoice, reason) {
 
 async function applyInvoiceStockDeduction(invoice) {
   const next = { ...invoice };
+  const csvModeSaleLines = isSmaregiSaleTarget(next) ? buildSmaregiSaleLines(next) : [];
+  next.smaregiSaleStatus = SMAREGI_SALE_STATUS_SKIPPED;
+  next.smaregiSaleRegisteredAt = "";
+  next.smaregiSaleError = EXTERNAL_API_CSV_MODE_MESSAGE;
+  next.smaregiTransactionId = "";
+  next.smaregiSaleLines = csvModeSaleLines.map(line => ({ ...line }));
+  next.stockBaseStockSyncStatus = "skipped";
+  next.stockBaseStockSyncError = EXTERNAL_API_CSV_MODE_MESSAGE;
+  next.stockBaseStockSyncLines = [];
+  return next;
   if (normalizeSmaregiSaleStatus(next.smaregiSaleStatus) === SMAREGI_SALE_STATUS_SUCCESS) return next;
   if (!isSmaregiSaleTarget(next)) {
     next.smaregiSaleStatus = SMAREGI_SALE_STATUS_SKIPPED;
@@ -1258,8 +1357,7 @@ function bindInvoiceListControls() {
   }
   const showCompleted = document.getElementById("invoiceShowCompleted");
   if (showCompleted) {
-    showCompleted.checked = true;
-    invoiceShowCompleted = true;
+    invoiceShowCompleted = showCompleted.checked;
     showCompleted.addEventListener("change", () => {
       invoiceShowCompleted = showCompleted.checked;
       renderInvoiceList();
@@ -1290,32 +1388,8 @@ function setInvoiceListCollapsed(collapsed) {
   const panel = document.getElementById("invoiceCompletedListPanel");
   const button = document.getElementById("invoiceListToggle");
   if (listPanel) listPanel.hidden = invoiceListCollapsed;
-  setCompletedInvoicePanelVisibility();
+  if (panel) panel.hidden = invoiceListCollapsed || !invoiceShowCompleted;
   if (button) button.textContent = invoiceListCollapsed ? "一覧を開く" : "一覧を閉じる";
-}
-
-function setCompletedInvoicePanelVisibility() {
-  const panel = document.getElementById("invoiceCompletedListPanel");
-  if (!panel) return;
-  const shouldShow = !invoiceListCollapsed && invoiceShowCompleted;
-  panel.hidden = !shouldShow;
-  if (shouldShow) {
-    panel.removeAttribute("hidden");
-    panel.classList.add("invoice-completed-visible");
-    panel.style.display = "";
-  } else {
-    panel.classList.remove("invoice-completed-visible");
-  }
-}
-
-function renderInvoiceRowsSafely(rows, emptyMessage) {
-  if (!rows.length) return emptyMessage;
-  try {
-    return rows.map(renderInvoiceListRow).join("");
-  } catch (error) {
-    console.error("[invoice render rows failed]", error, rows);
-    return `<tr><td colspan="9">請求書一覧の描画でエラーが発生しました。Consoleを確認してください。</td></tr>`;
-  }
 }
 
 function renderInvoiceList() {
@@ -1329,24 +1403,7 @@ function renderInvoiceList() {
     return completedStatuses.has(status);
   });
   const activeInvoices = invoices.filter(invoice => !completedStatuses.has(normalizeInvoiceStatus(invoice.status)));
-  console.log("[invoice debug]", {
-    invoices: invoices?.length,
-    activeInvoices: activeInvoices?.length,
-    completedInvoices: completedInvoices?.length,
-    showCompleted: invoiceShowCompleted
-  });
-  console.log("[invoice render]", {
-    invoices
-  });
-  const completedContainer = document.getElementById("invoiceCompletedListPanel");
-  console.log("[completed invoices render]", {
-    completedInvoicesLength: completedInvoices.length,
-    invoiceShowCompleted,
-    completedContainer,
-    completedContainerHidden: completedContainer?.hidden,
-    completedContainerDisplay: completedContainer ? getComputedStyle(completedContainer).display : null
-  });
-  console.log("[invoice list counts]", {
+  console.log("invoice list counts", {
     stored: allInvoices.length,
     filtered: invoices.length,
     active: activeInvoices.length,
@@ -1355,13 +1412,14 @@ function renderInvoiceList() {
   });
   const count = document.getElementById("invoiceListCount");
   if (count) count.textContent = invoiceListSearchText || invoiceListStatusFilter || invoiceListDateFrom || invoiceListDateTo
-    ? `対応 ${activeInvoices.length}件 / 完了 ${completedInvoices.length}件 / 全${invoices.length}件`
-    : `対応 ${activeInvoices.length}件 / 完了 ${completedInvoices.length}件 / 全${invoices.length}件`;
-  body.innerHTML = renderInvoiceRowsSafely(activeInvoices, '<tr><td colspan="9">対応が必要な請求書はありません。</td></tr>');
+    ? `入金待ち ${activeInvoices.length}件 / 全${invoices.length}件`
+    : `入金待ち ${activeInvoices.length}件`;
+  body.innerHTML = activeInvoices.length ? activeInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="9">対応が必要な請求書はありません。</td></tr>';
   if (completedBody) {
-    completedBody.innerHTML = renderInvoiceRowsSafely(completedInvoices, '<tr><td colspan="9">完了済み・キャンセル済みの請求書はありません。</td></tr>');
+    completedBody.innerHTML = completedInvoices.length ? completedInvoices.map(renderInvoiceListRow).join("") : '<tr><td colspan="9">完了済み・キャンセル済みの請求書はありません。</td></tr>';
   }
-  setCompletedInvoicePanelVisibility();
+  const completedPanel = document.getElementById("invoiceCompletedListPanel");
+  if (completedPanel) completedPanel.hidden = invoiceListCollapsed || !invoiceShowCompleted;
 }
 
 function renderInvoiceListRow(invoice) {
@@ -1385,8 +1443,6 @@ function renderInvoiceListRow(invoice) {
     </td>
   </tr>`;
 }
-
-window.renderInvoices = renderInvoiceList;
 
 function printSelectedInvoices() {
   const ids = Array.from(document.querySelectorAll(".invoice-pdf-check:checked")).map(input => input.value);

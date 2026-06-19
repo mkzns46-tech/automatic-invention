@@ -7,11 +7,11 @@
 <link rel="stylesheet" href="sales-style.css?v=20260616-settings-layout">
 <script src="sales-auth.js"></script>
 <script>requireSalesAuth();</script>
-<script src="sales-storage.js?v=20260617-number-quota-fix"></script>
+<script src="sales-storage.js"></script>
 <script src="customers-storage.js?v=20260614-settings-imports"></script>
 <script src="sales-nav.js?v=20260614-progress" defer></script>
 <script src="staff-display.js?v=20260616-staff-display-map"></script>
-<script src="settings.js?v=20260617-rescue-local-overwrite" defer></script>
+<script src="settings.js?v=20260616-sales-supabase-settings" defer></script>
 <script src="sales-smaregi.js?v=20260614-settings-imports" defer></script>
 </head>
 <body>
@@ -88,7 +88,7 @@
     <div class="section-title">
       <div>
         <h2>スマレジデータ取込</h2>
-        <p class="section-note">新スマレジの商品マスターと会員データを販売管理へ取り込みます。</p>
+        <p class="section-note">外部APIは停止中です。商品マスターと会員データはCSV運用で確認・取込してください。</p>
       </div>
       <div class="badge muted">新スマレジ</div>
     </div>
@@ -96,12 +96,14 @@
       <div class="settings-import-panel">
         <h3>スマレジ商品マスター取込</h3>
         <p class="section-note">商品名・バーコード・スマレジ商品ID・販売価格を取得します。</p>
-        <button type="button" id="salesSmaregiImportBtn" class="primary" onclick="importSalesSmaregiProducts();">商品マスター取込</button>
+        <button type="button" id="salesSmaregiImportBtn" class="secondary" onclick="importSalesSmaregiProducts();">API停止中（CSV取込）</button>
       </div>
       <div class="settings-import-panel">
         <h3>スマレジ会員データ取込</h3>
-        <p class="section-note">スマレジ会員データを販売管理の顧客マスターへ取り込みます。</p>
-        <button type="button" id="customerSmaregiImportBtn" class="primary" onclick="importSettingsSmaregiCustomers();">会員データ取込</button>
+        <p class="section-note">スマレジからダウンロードした会員CSVを確認して、販売管理の顧客マスターへ取り込みます。</p>
+        <input type="file" id="smaregiCustomerCsvFile" accept=".csv,text/csv">
+        <button type="button" class="primary" onclick="importSettingsSmaregiCustomerCsv();">会員CSVを確認して取込</button>
+        <button type="button" id="customerSmaregiImportBtn" class="secondary" onclick="importSettingsSmaregiCustomers();">API停止中（CSV取込）</button>
         <div id="customerImportResult" class="message">未取込です。</div>
       </div>
     </div>

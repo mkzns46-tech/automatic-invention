@@ -71,4 +71,21 @@ function renderSalesHeaderLanguage(current) {
   actions.appendChild(lang);
 }
 
-document.addEventListener("DOMContentLoaded", renderSalesSidebar);
+function renderSalesCsvModeBanner() {
+  if (document.body.classList.contains("sales-login-page")) return;
+  if (document.querySelector(".sales-csv-mode-banner")) return;
+  const target = document.querySelector(".sales-header") || document.querySelector("main") || document.body;
+  const banner = document.createElement("div");
+  banner.className = "sales-csv-mode-banner";
+  banner.textContent = "API停止中／CSV運用中：スマレジ等の外部サービスへ自動登録・取得・更新は行いません。";
+  if (target.classList?.contains("sales-header")) {
+    target.insertAdjacentElement("afterend", banner);
+  } else {
+    target.prepend(banner);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  renderSalesSidebar();
+  renderSalesCsvModeBanner();
+});
