@@ -1321,6 +1321,9 @@ function normalizeSmaregiMovementDate(value){
 }
 
 function smaregiMovementKey(row){
+  const identity=String(row.barcode||row.product_code||row.product_name||"").trim();
+  return [identity,String(row.changed_at||"").trim()].join("|");
+/*
   return [
     String(row.barcode||""),
     String(row.changed_at||""),
@@ -1329,6 +1332,7 @@ function smaregiMovementKey(row){
     String(row.stock_amount||""),
     String(row.memo||"")
   ].join("|");
+*/
 }
 
 function smaregiMovementCsvToChanges(text){
@@ -1379,6 +1383,59 @@ function latestSmaregiChangesByBarcode(changes){
   return map;
 }
 
+function smaregiMovementCsvToChanges(text){
+  const parsed=parseCsv(text);
+  if(parsed.length<2)throw new Error("CSVにデータ行がありません。");
+  const headers=parsed[0].map(header=>typeof normalizeHeader==="function" ? normalizeHeader(header) : String(header||"").trim().toLowerCase());
+  const changes=[];
+  for(let i=1;i<parsed.length;i++){
+    const row={};
+    headers.forEach((header,index)=>{row[header]=String(parsed[i][index]??"").trim();});
+    const barcode=pickSmaregiCsvValue(row,["barcode","バーコード","JAN","JANコード"]);
+    const productCode=pickSmaregiCsvValue(row,["product_code","productcode","商品コード","品番","code"]);
+    const productName=pickSmaregiCsvValue(row,["product_name","productName","name","商品名","品名"]);
+    const changedAt=normalizeSmaregiMovementDate(pickSmaregiCsvValue(row,["changed_at","changedAt","movement_datetime","movementdatetime","日時","処理日時","変動日時","更新日時","日付"]));
+    const stockDivision=pickSmaregiCsvValue(row,["stock_division","stockDivision","movement_type","movementtype","区分","変動区分","処理区分","理由","変動理由"]);
+    const amountRaw=pickSmaregiCsvValue(row,["amount","movement_quantity","movementquantity","変動数","数量","増減数","移動数"]).replace(/,/g,"");
+    const stockRaw=pickSmaregiCsvValue(row,["stock_amount","stockAmount","quantity_after","quantityafter","在庫数","処理後在庫","現在庫","変動後在庫"]).replace(/,/g,"");
+    const memo=pickSmaregiCsvValue(row,["memo","備考","メモ","理由メモ","コメント"]);
+    const productIdentity=String(barcode||productCode||productName||"").trim();
+    if(!productIdentity)continue;
+    const amount=Number(amountRaw||0);
+    const stockAmount=Number(stockRaw||0);
+    if(!Number.isFinite(amount))throw new Error(`${i+1}行目：変動数が数値ではありません。`);
+    if(!Number.isFinite(stockAmount))throw new Error(`${i+1}行目：処理後在庫が数値ではありません。`);
+    changes.push({
+      barcode:productIdentity,
+      product_code:productCode,
+      product_name:productName,
+      changed_at:changedAt,
+      stock_division:stockDivision,
+      amount,
+      stock_amount:stockAmount,
+      memo
+    });
+  }
+  if(!changes.length)throw new Error("取込対象の在庫変動データがありません。");
+  return changes;
+}
+
+function dedupeSmaregiMovementChanges(changes,existingKeys=new Set()){
+  const seen=new Set();
+  const unique=[];
+  const duplicates=[];
+  (changes||[]).forEach(change=>{
+    const key=smaregiMovementKey(change);
+    if(existingKeys.has(key)||seen.has(key)){
+      duplicates.push(change);
+      return;
+    }
+    seen.add(key);
+    unique.push(change);
+  });
+  return {unique,duplicates};
+}
+
 async function importSmaregiStockCsvFile(file){
   try{
     if(!(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())){
@@ -1391,13 +1448,9 @@ async function importSmaregiStockCsvFile(file){
     const changes=smaregiMovementCsvToChanges(text);
     const existing=await sbAll("smaregi_stock_changes?select=barcode,changed_at,stock_division,amount,stock_amount,memo",1000,50000).catch(()=>[]);
     const existingKeys=new Set((existing||[]).map(smaregiMovementKey));
-    const newKeys=new Set();
-    const newChanges=changes.filter(change=>{
-      const key=smaregiMovementKey(change);
-      if(existingKeys.has(key)||newKeys.has(key))return false;
-      newKeys.add(key);
-      return true;
-    });
+    const deduped=dedupeSmaregiMovementChanges(changes,existingKeys);
+    const newChanges=deduped.unique;
+    const duplicateCount=deduped.duplicates.length;
     const snapshotId=(typeof crypto!=="undefined"&&crypto.randomUUID) ? crypto.randomUUID() : `csv-movement-${Date.now()}`;
     const now=new Date().toISOString();
     await sb("smaregi_stock_snapshots",{
@@ -1425,7 +1478,8 @@ async function importSmaregiStockCsvFile(file){
         })))
       });
     }
-    const latestMap=latestSmaregiChangesByBarcode(changes);
+    const uniqueDisplayChanges=dedupeSmaregiMovementChanges(changes,new Set()).unique;
+    const latestMap=latestSmaregiChangesByBarcode(uniqueDisplayChanges);
     const latestItems=[...latestMap.values()].map(change=>({
       snapshot_id:snapshotId,
       barcode:change.barcode,
@@ -1440,6 +1494,9 @@ async function importSmaregiStockCsvFile(file){
       });
     }
     await loadLatestSmaregiSnapshot();
+    showMessage(`\u30b9\u30de\u30ec\u30b8\u5728\u5eab\u5909\u52d5CSV\u3092\u53d6\u8fbc\u307e\u3057\u305f\uff1a\u53d6\u8fbc ${changes.length}\u4ef6 / \u65b0\u898f ${newChanges.length}\u4ef6 / \u91cd\u8907\u9664\u5916 ${duplicateCount}\u4ef6\uff08API\u901a\u4fe1\u306a\u3057\uff09`,"ok");
+    if(typeof showPopup==="function")showPopup("\u30b9\u30de\u30ec\u30b8\u5728\u5eab\u5909\u52d5CSV\u53d6\u8fbc\u5b8c\u4e86",`\u53d6\u8fbc\u4ef6\u6570\uff1a${changes.length}\u4ef6\n\u65b0\u898f\u4ef6\u6570\uff1a${newChanges.length}\u4ef6\n\u91cd\u8907\u9664\u5916\u4ef6\u6570\uff1a${duplicateCount}\u4ef6`);
+    return;
     showMessage(`スマレジ在庫変動CSVを取込ました：代表商品 ${latestItems.length}件 / 新規変動 ${newChanges.length}件（API通信なし）`,"ok");
   }catch(e){
     showMessage("スマレジ在庫変動CSV取込エラー。\n"+e.message,"err");
