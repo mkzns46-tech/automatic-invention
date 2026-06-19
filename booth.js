@@ -4779,6 +4779,8 @@ function validateBoothSalesForm(){
 }
 
 async function importBoothSalesDraft(){
+  boothShowError("API停止中／CSV運用中","スマレジAPIから販売データは取得しません。イベント販売データはCSV取込で反映してください。");
+  return;
   const form=validateBoothSalesForm();
   if(!form)return;
   const {event,fromDate,toDate,staff,register}=form;
@@ -4808,7 +4810,7 @@ async function importBoothSalesDraft(){
       return;
     }
 
-    const response=await fetch("/api/smaregi-event-sales",{
+    const response=await fetch("about:blank",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({

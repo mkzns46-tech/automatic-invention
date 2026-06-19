@@ -328,7 +328,7 @@ function renderSmaregiStockChecks(){
     lastGroup=group;
     return `${heading}<tr class="smaregi-product-row">
       <td><span class="smaregi-status${statusClass}">${status}</span></td>
-      <td class="smaregi-product-name-cell">${esc(item.product_name||"")}</td>
+      <td class="smaregi-product-name-cell"><strong>${esc(item.product_name||"")}</strong>${getSmaregiMovementSummaryHtml(item)}</td>
       <td><input type="number" class="smaregi-row-actual-input" data-barcode="${esc(item.barcode)}" min="0" step="1" inputmode="numeric" value="${excluded ? "" : (check?.actual_stock??"")}" placeholder="手入力" ${excluded?"disabled":""}/></td>
       <td><button type="button" class="smaregi-row-save-btn" data-barcode="${esc(item.barcode)}" ${excluded?"disabled":""}>${check&&!excluded?"更新":"保存"}</button></td>
       <td class="smaregi-row-actions">
@@ -503,7 +503,7 @@ async function markSmaregiDifferenceNoIssue(barcode,button=null){
 
 async function loadLatestSmaregiSnapshot(){
   try{
-    showMessage("スマレジ在庫スナップショットを取得中...");
+    showMessage("スマレジ在庫変動データを取得中...");
     const snapshots=await sb("smaregi_stock_snapshots?select=*&order=imported_at.desc&limit=1");
     smaregiSnapshot=Array.isArray(snapshots)&&snapshots.length ? snapshots[0] : null;
     const resetInput=el("resetSmaregiCompletedAtInput");
@@ -524,15 +524,15 @@ async function loadLatestSmaregiSnapshot(){
 
     renderSmaregiStockChecks();
     showMessage(smaregiSnapshot
-      ? `スマレジ在庫を取得しました：${smaregiStockItems.length}件`
-      : "スマレジ在庫スナップショットはまだありません。スマレジデータ取り込みを実行してください。",smaregiSnapshot?"ok":"");
+      ? `スマレジ在庫変動データを取得しました：${smaregiStockItems.length}件`
+      : "スマレジ在庫変動データはまだありません。在庫変動CSVを取り込んでください。",smaregiSnapshot?"ok":"");
   }catch(e){
-    showMessage("スマレジ在庫取得エラー。\n追加SQLを実行済みか確認してください。\n"+e.message,"err");
+    showMessage("スマレジ在庫変動データ取得エラー。\n追加SQLを実行済みか確認してください。\n"+e.message,"err");
   }
 }
 
 async function syncSmaregiStockFromApi(){
-  showCsvOperationMessage("現在はCSV運用中です。スマレジAPIには接続しません。スマレジ在庫CSVを選択してください。");
+  showCsvOperationMessage("現在はCSV運用中です。スマレジAPIには接続しません。スマレジ在庫変動CSVを選択してください。");
   const csvInput=el("smaregiStockCsvFile");
   if(csvInput){
     csvInput.value="";
@@ -1151,18 +1151,18 @@ function smaregiStockCsvToItems(text){
       smaregi_stock:smaregiStock
     });
   }
-  if(!items.length)throw new Error("取込対象の在庫データがありません。");
+  if(!items.length)throw new Error("取込対象の在庫変動データがありません。");
   return items;
 }
 
 async function importSmaregiStockCsvFile(file){
   try{
     if(!(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())){
-      showMessage("スマレジ在庫CSV取込は管理者のみ操作できます。","err");
+      showMessage("スマレジ在庫変動CSV取込は管理者のみ操作できます。","err");
       return;
     }
     if(!file)return;
-    showMessage("スマレジ在庫CSVを取込中...");
+    showMessage("スマレジ在庫変動CSVを取込中...");
     const text=decodeCsvBuffer(await file.arrayBuffer());
     const items=smaregiStockCsvToItems(text);
     const snapshotId=(typeof crypto!=="undefined"&&crypto.randomUUID) ? crypto.randomUUID() : `csv-${Date.now()}`;
@@ -1190,9 +1190,9 @@ async function importSmaregiStockCsvFile(file){
       });
     }
     await loadLatestSmaregiSnapshot();
-    showMessage(`スマレジ在庫CSVを取込ました：${items.length}件（API通信なし）`,"ok");
+    showMessage(`スマレジ在庫変動CSVを取込ました：${items.length}件（API通信なし）`,"ok");
   }catch(e){
-    showMessage("スマレジ在庫CSV取込エラー。\n"+e.message,"err");
+    showMessage("スマレジ在庫変動CSV取込エラー。\n"+e.message,"err");
   }finally{
     const input=el("smaregiStockCsvFile");
     if(input)input.value="";
@@ -1200,7 +1200,7 @@ async function importSmaregiStockCsvFile(file){
 }
 
 async function syncSmaregiStockFromApi(){
-  showCsvOperationMessage("現在はCSV運用中です。スマレジAPIには接続しません。スマレジ在庫CSVを選択してください。");
+  showCsvOperationMessage("現在はCSV運用中です。スマレジAPIには接続しません。スマレジ在庫変動CSVを選択してください。");
   const input=el("smaregiStockCsvFile");
   if(input){
     input.value="";
@@ -1299,4 +1299,203 @@ async function executeEquipmentTransferConfirmation({log,product=null,quantity,c
       showMessage("備品転用確認エラー。\n"+e.message,"err");
     }
   },{button});
+}
+
+/* CSV operation mode: Smaregi stock movement import. */
+let smaregiLatestChangeByBarcode=new Map();
+
+function normalizeSmaregiMovementDate(value){
+  const text=String(value||"").trim();
+  if(!text)return new Date().toISOString();
+  const normalized=text
+    .replace(/\//g,"-")
+    .replace(" ","T")
+    .replace(/年|月/g,"-")
+    .replace(/日/g,"")
+    .replace(/時/g,":")
+    .replace(/分/g,":")
+    .replace(/秒/g,"");
+  const date=new Date(normalized);
+  if(Number.isNaN(date.getTime()))return new Date().toISOString();
+  return date.toISOString();
+}
+
+function smaregiMovementKey(row){
+  return [
+    String(row.barcode||""),
+    String(row.changed_at||""),
+    String(row.stock_division||""),
+    String(row.amount||""),
+    String(row.stock_amount||""),
+    String(row.memo||"")
+  ].join("|");
+}
+
+function smaregiMovementCsvToChanges(text){
+  const parsed=parseCsv(text);
+  if(parsed.length<2)throw new Error("CSVにデータ行がありません。");
+  const headers=parsed[0].map(header=>typeof normalizeHeader==="function" ? normalizeHeader(header) : String(header||"").trim().toLowerCase());
+  const changes=[];
+  for(let i=1;i<parsed.length;i++){
+    const row={};
+    headers.forEach((header,index)=>{row[header]=String(parsed[i][index]??"").trim();});
+    const barcode=pickSmaregiCsvValue(row,["barcode","バーコード","JAN","JANコード","商品コード","品番","product_code","productcode"]);
+    const productName=pickSmaregiCsvValue(row,["product_name","productName","name","商品名","品名"]);
+    const changedAt=normalizeSmaregiMovementDate(pickSmaregiCsvValue(row,["changed_at","changedAt","movement_datetime","movementdatetime","日時","処理日時","変動日時","更新日時","日付"]));
+    const stockDivision=pickSmaregiCsvValue(row,["stock_division","stockDivision","movement_type","movementtype","区分","変動区分","処理区分","理由","変動理由"]);
+    const amountRaw=pickSmaregiCsvValue(row,["amount","movement_quantity","movementquantity","変動数","数量","増減数","移動数"]).replace(/,/g,"");
+    const stockRaw=pickSmaregiCsvValue(row,["stock_amount","stockAmount","quantity_after","quantityafter","在庫数","処理後在庫","現在庫","変動後在庫"]).replace(/,/g,"");
+    const memo=pickSmaregiCsvValue(row,["memo","備考","メモ","理由メモ","コメント"]);
+    if(!barcode&&!productName)continue;
+    if(!barcode)throw new Error(`${i+1}行目：バーコードまたは商品コードが空です。`);
+    const amount=Number(amountRaw||0);
+    const stockAmount=Number(stockRaw||0);
+    if(!Number.isFinite(amount))throw new Error(`${i+1}行目：変動数が数値ではありません。`);
+    if(!Number.isFinite(stockAmount))throw new Error(`${i+1}行目：処理後在庫が数値ではありません。`);
+    changes.push({
+      barcode,
+      product_name:productName,
+      changed_at:changedAt,
+      stock_division:stockDivision,
+      amount,
+      stock_amount:stockAmount,
+      memo
+    });
+  }
+  if(!changes.length)throw new Error("取込対象の在庫変動データがありません。");
+  return changes;
+}
+
+function latestSmaregiChangesByBarcode(changes){
+  const map=new Map();
+  (changes||[]).forEach(change=>{
+    const barcode=String(change.barcode||"").trim();
+    if(!barcode)return;
+    const current=map.get(barcode);
+    if(!current||new Date(change.changed_at||0)>new Date(current.changed_at||0)){
+      map.set(barcode,change);
+    }
+  });
+  return map;
+}
+
+async function importSmaregiStockCsvFile(file){
+  try{
+    if(!(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())){
+      showMessage("スマレジ在庫変動CSV取込は管理者のみ操作できます。","err");
+      return;
+    }
+    if(!file)return;
+    showMessage("スマレジ在庫変動CSVを取込中...");
+    const text=decodeCsvBuffer(await file.arrayBuffer());
+    const changes=smaregiMovementCsvToChanges(text);
+    const existing=await sbAll("smaregi_stock_changes?select=barcode,changed_at,stock_division,amount,stock_amount,memo",1000,50000).catch(()=>[]);
+    const existingKeys=new Set((existing||[]).map(smaregiMovementKey));
+    const newKeys=new Set();
+    const newChanges=changes.filter(change=>{
+      const key=smaregiMovementKey(change);
+      if(existingKeys.has(key)||newKeys.has(key))return false;
+      newKeys.add(key);
+      return true;
+    });
+    const snapshotId=(typeof crypto!=="undefined"&&crypto.randomUUID) ? crypto.randomUUID() : `csv-movement-${Date.now()}`;
+    const now=new Date().toISOString();
+    await sb("smaregi_stock_snapshots",{
+      method:"POST",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        id:snapshotId,
+        imported_at:now,
+        range_from:null,
+        completed_at:null
+      })
+    });
+    for(let i=0;i<newChanges.length;i+=500){
+      await sb("smaregi_stock_changes",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify(newChanges.slice(i,i+500).map(change=>({
+          snapshot_id:snapshotId,
+          barcode:change.barcode,
+          changed_at:change.changed_at,
+          stock_division:change.stock_division,
+          amount:change.amount,
+          stock_amount:change.stock_amount,
+          memo:change.memo
+        })))
+      });
+    }
+    const latestMap=latestSmaregiChangesByBarcode(changes);
+    const latestItems=[...latestMap.values()].map(change=>({
+      snapshot_id:snapshotId,
+      barcode:change.barcode,
+      product_name:change.product_name,
+      smaregi_stock:change.stock_amount
+    }));
+    for(let i=0;i<latestItems.length;i+=500){
+      await sb("smaregi_stock_items",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify(latestItems.slice(i,i+500))
+      });
+    }
+    await loadLatestSmaregiSnapshot();
+    showMessage(`スマレジ在庫変動CSVを取込ました：代表商品 ${latestItems.length}件 / 新規変動 ${newChanges.length}件（API通信なし）`,"ok");
+  }catch(e){
+    showMessage("スマレジ在庫変動CSV取込エラー。\n"+e.message,"err");
+  }finally{
+    const input=el("smaregiStockCsvFile");
+    if(input)input.value="";
+  }
+}
+
+async function loadLatestSmaregiSnapshot(){
+  try{
+    showMessage("スマレジ在庫変動データを取得中...");
+    const snapshots=await sb("smaregi_stock_snapshots?select=*&order=imported_at.desc&limit=1");
+    smaregiSnapshot=Array.isArray(snapshots)&&snapshots.length ? snapshots[0] : null;
+    const resetInput=el("resetSmaregiCompletedAtInput");
+    if(resetInput)resetInput.value=smaregiSnapshot?.completed_at ? formatDateTimeLocal(smaregiSnapshot.completed_at) : "";
+    smaregiStockItems=[];
+    smaregiStockChecks=[];
+    smaregiLatestChangeByBarcode=new Map();
+    if(smaregiSnapshot){
+      const snapshotId=encodeURIComponent(smaregiSnapshot.id);
+      smaregiStockItems=await sbAll(`smaregi_stock_items?select=*&snapshot_id=eq.${snapshotId}&order=product_name.asc`,1000,20000);
+      smaregiStockChecks=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=eq.${snapshotId}&order=checked_at.desc`,1000,20000);
+      const latestChanges=await sbAll(`smaregi_stock_changes?select=*&snapshot_id=eq.${snapshotId}&order=changed_at.desc`,1000,50000).catch(()=>[]);
+      smaregiLatestChangeByBarcode=latestSmaregiChangesByBarcode(latestChanges);
+      await fetchProductsByBarcodes(smaregiStockItems.map(item=>item.barcode));
+      await loadSmaregiEventInventoryCache(smaregiStockItems.map(item=>item.barcode));
+    }else{
+      smaregiCurrentEventStockByBarcode=new Map();
+      smaregiEventStorageStockByBarcode=new Map();
+    }
+    renderSmaregiStockChecks();
+    showMessage(smaregiSnapshot
+      ? `スマレジ在庫変動データを取得しました：${smaregiStockItems.length}件`
+      : "スマレジ在庫変動データはまだありません。在庫変動CSVを取り込んでください。",smaregiSnapshot?"ok":"");
+  }catch(e){
+    showMessage("スマレジ在庫変動データ取得エラー。\n"+e.message,"err");
+  }
+}
+
+function getSmaregiMovementSummaryHtml(item){
+  const change=smaregiLatestChangeByBarcode.get(String(item.barcode||""));
+  if(!change)return `<div class="smaregi-movement-note">最終変動：CSV内に変動履歴なし</div>`;
+  return `<div class="smaregi-movement-note">
+    <span>最終変動：${esc(fmt(change.changed_at))}</span>
+    <span>変動数：${Number(change.amount||0)}</span>
+    <span>理由：${esc(change.stock_division||"-")}</span>
+    <span>備考：${esc(change.memo||"")}</span>
+  </div>`;
+}
+
+async function syncSmaregiStockFromApi(){
+  showCsvOperationMessage("現在はCSV運用中です。スマレジAPIには接続しません。スマレジ在庫変動CSVを選択してください。");
+  const input=el("smaregiStockCsvFile");
+  if(input){
+    input.value="";
+    input.click();
+  }
 }

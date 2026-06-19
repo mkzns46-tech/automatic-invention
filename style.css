@@ -17,6 +17,33 @@
   color:#7c3d00;
   font-weight:900;
 }
+
+.smaregi-movement-note{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:6px;
+  color:#315f4a;
+  font-size:12px;
+  line-height:1.45;
+}
+
+.smaregi-movement-note span{
+  display:inline-flex;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#eef8f1;
+  border:1px solid #c9e4d2;
+}
+
+.smaregi-last-check-divider td{
+  background:#dbeafe !important;
+  color:#1e3a8a !important;
+  border-top:3px solid #2563eb !important;
+  border-bottom:3px solid #2563eb !important;
+  font-weight:900;
+  text-align:center;
+}
 #barcodeInput::placeholder{
   color:#2d6a4f;
   opacity:.75;

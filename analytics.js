@@ -65,7 +65,7 @@ async function showSmaregiCauseDetail(barcode){
     const allAppLogs=await loadProductHistoryByBarcode(barcode);
     let smaregiChanges=[];
     try{
-      smaregiChanges=await sbAll(`smaregi_stock_changes?select=*&snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}&order=changed_at.desc`,1000,10000);
+      smaregiChanges=await sbAll(`smaregi_stock_changes?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=changed_at.desc`,1000,10000);
     }catch(_){
       smaregiChanges=[];
     }
@@ -349,4 +349,25 @@ async function exportSmaregiReasonSummaryCsv(){
   }catch(e){
     showMessage("差異原因集計CSV出力エラー。\n"+e.message,"err");
   }
+}
+
+/* CSV operation mode: show the previous check close in Smaregi movement history. */
+function buildSmaregiChangeRows(smaregiChanges,appLogs){
+  const completedAt=smaregiSnapshot?.completed_at ? new Date(smaregiSnapshot.completed_at).getTime() : null;
+  let dividerInserted=false;
+  const rows=[];
+  (smaregiChanges||[]).forEach(change=>{
+    const changeTime=new Date(change.changed_at).getTime();
+    if(!dividerInserted&&Number.isFinite(completedAt)&&Number.isFinite(changeTime)&&changeTime<=completedAt){
+      dividerInserted=true;
+      rows.push(`<tr class="smaregi-last-check-divider"><td colspan="5">前回チェック締め：${esc(fmt(smaregiSnapshot.completed_at))}（ここまで前回確認済み）</td></tr>`);
+    }
+    const suspicious=!hasAppLogAfterSmaregiChange(change,appLogs);
+    const online=looksLikeOnlineShipment(change,smaregiChanges);
+    rows.push(`<tr class="${suspicious?"smaregi-suspicious-row":(online?"smaregi-online-row":"")}"><td>${fmt(change.changed_at)}</td><td>${esc(change.stock_division||"")}</td><td>${Number(change.amount||0)}</td><td>${Number(change.stock_amount||0)}</td><td>${esc(change.memo||"")}${suspicious?'<div class="smaregi-warning">要確認：このスマレジ変動後のシート履歴が見つかりません。</div>':""}${online?'<div class="smaregi-online-note">オンライン注文の発送候補：取り置き解除の在庫増と売上の在庫減が近接しています。</div>':""}</td></tr>`);
+  });
+  if(!dividerInserted&&Number.isFinite(completedAt)){
+    rows.push(`<tr class="smaregi-last-check-divider"><td colspan="5">前回チェック締め：${esc(fmt(smaregiSnapshot.completed_at))}</td></tr>`);
+  }
+  return rows.join("");
 }
