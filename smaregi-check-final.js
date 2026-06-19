@@ -543,24 +543,37 @@
   }
 
   function renderCauseAppLogRows(logs,barcode){
+    const lastCheckTime=getLastCheckTimeValue();
+    const lastCheckLabel=typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe();
+    let dividerInserted=false;
+    const rows=[];
     if(!logs.length){
-      return `<tr><td colspan="6">バーコード ${safeText(barcode||"未設定")} の前回チェック以降の履歴はありません。</td></tr>`;
+      rows.push(`<tr><td colspan="6">バーコード ${safeText(barcode||"未設定")} の在庫管理側履歴はありません。</td></tr>`);
     }
-    return logs.map(log=>{
+    logs.forEach(log=>{
+      const logTime=new Date(log.created_at).getTime();
+      if(!dividerInserted && Number.isFinite(logTime) && logTime<=lastCheckTime){
+        dividerInserted=true;
+        rows.push(`<tr class="smaregi-last-check-divider"><td colspan="6">前回チェック締め：${safeText(lastCheckLabel)}</td></tr>`);
+      }
       const type=INVENTORY_TYPE_LABELS[String(log.type||"").trim()] || log.type || "";
       const qty=log.quantity ?? log.qty ?? log.amount ?? "";
       const staff=log.staff || log.staff_name || log.created_by || "";
       const memo=log.memo || log.note || "";
       const after=log.after_stock ?? log.stock_after ?? log.base_stock_after ?? "";
-      return `<tr>
+      rows.push(`<tr>
         <td>${safeText(log.created_at && typeof fmt==="function" ? fmt(log.created_at) : log.created_at || "")}</td>
         <td>${safeText(type)}</td>
         <td>${safeText(qty)}</td>
         <td>${safeText(staff)}</td>
         <td>${safeText(memo)}</td>
         <td>${safeText(after===""?"-":after)}</td>
-      </tr>`;
-    }).join("");
+      </tr>`);
+    });
+    if(!dividerInserted && Number.isFinite(lastCheckTime)){
+      rows.push(`<tr class="smaregi-last-check-divider"><td colspan="6">前回チェック締め：${safeText(lastCheckLabel)}</td></tr>`);
+    }
+    return rows.join("");
   }
 
   function renderCauseSmaregiRows(changes,barcode){
@@ -610,10 +623,7 @@
         loadInventoryLogsForCause(itemBarcode,itemName),
         loadSmaregiChangesForCause(itemBarcode,itemName)
       ]);
-      const appLogs=allAppLogs.filter(log=>{
-        const time=new Date(log.created_at).getTime();
-        return Number.isFinite(time) ? time>=lastCheckTime : true;
-      });
+      const appLogs=allAppLogs;
       const smaregiChanges=allSmaregiChanges;
       const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(itemBarcode) : null;
       const smaregiStock=getCsvSmaregiStock(item);
@@ -644,7 +654,7 @@
         </div>
         <p class="section-note">原因記入者：${safeText(check?.difference_reason_by||"未記入")} / 原因記入日時：${safeText(check?.difference_reason_at&&typeof fmt==="function" ? fmt(check.difference_reason_at) : check?.difference_reason_at||"未記入")}</p>
         <h3>在庫管理側の履歴</h3>
-        <p class="section-note">バーコード ${safeText(itemBarcode||"未設定")} の前回チェック以降の履歴を表示します。</p>
+        <p class="section-note">バーコード ${safeText(itemBarcode||"未設定")} の在庫管理側履歴を表示します。前回チェック締め位置を青い区切りで表示します。</p>
         <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>数量</th><th>担当者</th><th>備考</th><th>処理後在庫</th></tr></thead><tbody>${renderCauseAppLogRows(appLogs,itemBarcode)}</tbody></table></div>
         <h3>スマレジ側の在庫変動履歴</h3>
         <p class="section-note">CSV取込済みの smaregi_stock_changes を、バーコード優先で検索しています。スマレジ在庫はCSV H列「在庫数」、最終変動日時はCSV J列「更新日時」です。</p>
