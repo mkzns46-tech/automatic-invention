@@ -1065,10 +1065,16 @@ async function applyInvoiceStockDeduction(invoice) {
 }
 
 function deliveryNo(n) {
+  if (window.SalesNumbering?.buildDocumentNo) {
+    return window.SalesNumbering.buildDocumentNo("delivery", today(), n);
+  }
   return "DEL-" + String(n).padStart(6, "0");
 }
 
-function nextDeliveryNo(deliveries) {
+function nextDeliveryNo(deliveries, dateValue = today()) {
+  if (window.SalesNumbering?.nextDocumentNo) {
+    return window.SalesNumbering.nextDocumentNo("delivery", deliveries, dateValue);
+  }
   const max = deliveries.reduce((num, delivery) => {
     const match = String(delivery.deliveryNo || "").match(/^DEL-(\d+)$/);
     return Math.max(num, match ? Number(match[1]) : 0);
@@ -1081,7 +1087,7 @@ function buildDeliveryFromInvoice(invoice, deliveries) {
   const now = new Date().toISOString();
   const originNumber = invoice.originNumber || invoice.masterNumber || invoice.quoteNumber || invoice.sourceQuoteNo || "";
   const customerView = getInvoiceCustomerView(invoice);
-  const newDeliveryNo = nextDeliveryNo(deliveries);
+  const newDeliveryNo = nextDeliveryNo(deliveries, today());
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
     deliveryNo: newDeliveryNo,

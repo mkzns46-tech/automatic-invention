@@ -82,10 +82,16 @@ function escapeHtml(value) {
 }
 
 function quoteNo(n) {
+  if (window.SalesNumbering?.buildDocumentNo) {
+    return window.SalesNumbering.buildDocumentNo("quote", today(), n);
+  }
   return "Q-" + String(n).padStart(6, "0");
 }
 
-function nextQuoteNo(quotes) {
+function nextQuoteNo(quotes, dateValue = today()) {
+  if (window.SalesNumbering?.nextDocumentNo) {
+    return window.SalesNumbering.nextDocumentNo("quote", quotes, dateValue);
+  }
   const max = quotes.reduce((num, quote) => {
     const match = String(quote.quoteNo || "").match(/^Q-(\d+)$/);
     return Math.max(num, match ? Number(match[1]) : 0);
@@ -137,10 +143,16 @@ async function saveInvoiceFromQuoteConversion(invoice) {
 }
 
 function invoiceNo(n) {
+  if (window.SalesNumbering?.buildDocumentNo) {
+    return window.SalesNumbering.buildDocumentNo("invoice", today(), n);
+  }
   return "INV-" + String(n).padStart(6, "0");
 }
 
-function nextInvoiceNo(invoices) {
+function nextInvoiceNo(invoices, dateValue = today()) {
+  if (window.SalesNumbering?.nextDocumentNo) {
+    return window.SalesNumbering.nextDocumentNo("invoice", invoices, dateValue);
+  }
   const max = invoices.reduce((num, invoice) => {
     const match = String(invoice.invoiceNo || "").match(/^INV-(\d+)$/);
     return Math.max(num, match ? Number(match[1]) : 0);
@@ -363,28 +375,32 @@ function quoteStatusBadge(status) {
   return `<span class="status-badge ${type}">${escapeHtml(value)}</span>`;
 }
 
-function quoteHasInvoice(quote, invoices = readInvoices()) {
+function findInvoiceForQuote(quote, invoices = readInvoices()) {
+  const convertedInvoiceId = String(quote?.convertedInvoiceId || quote?.invoiceId || "").trim();
+  if (convertedInvoiceId) {
+    const invoice = invoices.find(row => String(row?.id || "").trim() === convertedInvoiceId);
+    if (invoice) return invoice;
+  }
   const quoteId = String(quote?.id || "").trim();
-  const quoteNo = String(quote?.quoteNo || quote?.quoteNumber || "").trim();
-  const origin = String(quote?.originNumber || quote?.masterNumber || quoteNo || "").trim();
-  return invoices.some(invoice => {
+  if (!quoteId) return null;
+  return invoices.find(invoice => {
     const values = [
       invoice.sourceQuoteId,
       invoice.quoteId,
-      invoice.originQuoteId,
-      invoice.sourceQuoteNo,
-      invoice.quoteNo,
-      invoice.quoteNumber,
-      invoice.originNumber,
-      invoice.masterNumber
+      invoice.originQuoteId
     ].map(value => String(value || "").trim()).filter(Boolean);
-    return values.includes(quoteId) || values.includes(quoteNo) || values.includes(origin);
-  });
+    return values.includes(quoteId);
+  }) || null;
+}
+
+function quoteHasInvoice(quote, invoices = readInvoices()) {
+  return Boolean(findInvoiceForQuote(quote, invoices));
 }
 
 function isQuoteCompletedForList(quote, invoices = readInvoices()) {
   const status = normalizeQuoteStatus(quote?.status);
-  return status !== QUOTE_STATUS_DRAFT || quoteHasInvoice(quote, invoices);
+  if (status === QUOTE_STATUS_CANCELLED) return true;
+  return quoteHasInvoice(quote, invoices);
 }
 
 function isQuoteEditable(quoteOrStatus) {
@@ -864,6 +880,18 @@ function renderQuoteList() {
   const allQuotes = readQuotes().sort(sortNewestFirst);
   const quotes = allQuotes.filter(matchesQuoteListFilters);
   const invoices = readInvoices();
+  const orphanConvertedQuotes = quotes.filter(quote => {
+    const status = normalizeQuoteStatus(quote?.status);
+    return (status === QUOTE_STATUS_INVOICED || status === QUOTE_STATUS_INVOICE_ISSUED) && !quoteHasInvoice(quote, invoices);
+  });
+  if (orphanConvertedQuotes.length) {
+    console.warn("[quote invoice linkage] converted quotes without invoice", orphanConvertedQuotes.map(quote => ({
+      id: quote.id,
+      quoteNo: quote.quoteNo,
+      convertedInvoiceId: quote.convertedInvoiceId || "",
+      status: quote.status
+    })));
+  }
   const activeQuotes = quotes.filter(quote => !isQuoteCompletedForList(quote, invoices));
   const completedQuotes = quotes.filter(quote => isQuoteCompletedForList(quote, invoices));
   const count = document.getElementById("quoteListCount");
@@ -880,11 +908,12 @@ function renderQuoteList() {
 
 function renderQuoteListRow(q) {
   const status = normalizeQuoteStatus(q.status);
+  const linkedInvoice = findInvoiceForQuote(q);
   const deleteButton = canDeleteQuote(q)
     ? `<button type="button" class="danger" onclick="deleteQuote('${q.id}')">&#21066;&#38500;</button>`
     : "";
-  const convertButton = status === QUOTE_STATUS_DRAFT || status === QUOTE_STATUS_INVOICED
-    ? `<button type="button" class="secondary next-step-button" onclick="convertQuoteToInvoice('${q.id}')">&#35531;&#27714;&#26360;&#12408;&#22793;&#25563;</button>`
+  const convertButton = linkedInvoice || status === QUOTE_STATUS_DRAFT || status === QUOTE_STATUS_INVOICED
+    ? `<button type="button" class="secondary next-step-button" onclick="convertQuoteToInvoice('${q.id}')">${linkedInvoice ? "請求書確認" : "&#35531;&#27714;&#26360;&#12408;&#22793;&#25563;"}</button>`
     : "";
   return `<tr data-quote-id="${escapeHtml(q.id || "")}">
     <td><input type="checkbox" class="quote-pdf-check pdf-select-checkbox" value="${escapeHtml(q.id || "")}"></td>
@@ -1014,7 +1043,8 @@ function buildInvoiceFromQuote(quote, invoices) {
   const linkedCustomer = resolveQuoteCustomer(quote) || {};
   console.log("convert quote customer fields", pickCustomerFields(quote));
   const originNumber = quote.originNumber || quote.masterNumber || quote.quoteNumber || quote.quoteNo || "";
-  const newInvoiceNo = nextInvoiceNo(invoices);
+  const invoiceDate = today();
+  const newInvoiceNo = nextInvoiceNo(invoices, invoiceDate);
   const customerName = quote.customerName || quote.name || quote.customer || quote.clientName || linkedCustomer.customerName || linkedCustomer.name || "";
   const organizationName = quote.organizationName || quote.organization || quote.companyName || linkedCustomer.organizationName || linkedCustomer.organization || linkedCustomer.companyName || "";
   return {
@@ -1024,6 +1054,8 @@ function buildInvoiceFromQuote(quote, invoices) {
     originNumber,
     masterNumber: originNumber,
     quoteNumber: quote.quoteNumber || quote.quoteNo || originNumber,
+    quoteId: quote.id,
+    originQuoteId: quote.id,
     sourceQuoteId: quote.id,
     sourceQuoteNo: quote.quoteNo || "",
     customerId: quote.customerId || linkedCustomer.id || "",
@@ -1040,8 +1072,8 @@ function buildInvoiceFromQuote(quote, invoices) {
     phone: quote.phone || linkedCustomer.phone || "",
     email: quote.email || linkedCustomer.email || "",
     subject: quote.subject || "",
-    invoiceDate: today(),
-    dueDate: datePlusDays(today(), 14),
+    invoiceDate,
+    dueDate: datePlusDays(invoiceDate, 14),
     staff: quote.staff || "",
     memo: quote.slipMemo || quote.memo || quote.customerMemo || linkedCustomer.memo || "",
     slipMemo: quote.slipMemo || quote.memo || quote.customerMemo || "",
@@ -1057,6 +1089,19 @@ function buildInvoiceFromQuote(quote, invoices) {
   };
 }
 
+async function markQuoteConverted(quote, invoice, quotes) {
+  quote.status = QUOTE_STATUS_INVOICED;
+  quote.convertedInvoiceId = invoice.id || "";
+  quote.invoiceId = invoice.id || "";
+  quote.convertedInvoiceNo = invoice.invoiceNo || invoice.invoiceNumber || "";
+  quote.convertedAt = quote.convertedAt || new Date().toISOString();
+  quote.updatedAt = new Date().toISOString();
+  writeQuotes(quotes);
+  if (window.SalesStorage?.saveSalesRecord) {
+    await window.SalesStorage.saveSalesRecord("quotes", quote);
+  }
+}
+
 async function convertQuoteToInvoice(id) {
   const quotes = readQuotes();
   const quote = quotes.find(q => q.id === id);
@@ -1065,7 +1110,7 @@ async function convertQuoteToInvoice(id) {
     return;
   }
   const invoices = readInvoices();
-  const existing = invoices.find(invoice => invoice.sourceQuoteId === quote.id);
+  const existing = findInvoiceForQuote(quote, invoices);
   if (existing) {
     if (normalizeInvoiceStatusForQuote(existing.status) === "draft") {
       const updatedInvoice = {
@@ -1075,21 +1120,21 @@ async function convertQuoteToInvoice(id) {
         invoiceNumber: existing.invoiceNumber || existing.invoiceNo,
         createdAt: existing.createdAt || new Date().toISOString(),
         status: existing.status || "draft",
+        quoteId: quote.id,
+        originQuoteId: quote.id,
+        sourceQuoteId: quote.id,
+        sourceQuoteNo: quote.quoteNo || "",
         issuedAt: existing.issuedAt || "",
         updatedAt: new Date().toISOString()
       };
       await saveInvoiceFromQuoteConversion(updatedInvoice);
-      quote.status = QUOTE_STATUS_INVOICED;
-      writeQuotes(quotes);
-      await window.SalesStorage?.saveSalesRecord?.("quotes", quote).catch(error => console.warn("[quote] quote status save failed", error));
+      await markQuoteConverted(quote, updatedInvoice, quotes);
       renderQuoteList();
       showSalesMessage(`下書き請求書を最新の見積内容で更新しました: ${updatedInvoice.invoiceNo}`, "ok");
       location.href = `invoices.html?id=${encodeURIComponent(updatedInvoice.id)}`;
       return;
     }
-    quote.status = QUOTE_STATUS_INVOICED;
-    writeQuotes(quotes);
-    await window.SalesStorage?.saveSalesRecord?.("quotes", quote).catch(error => console.warn("[quote] quote status save failed", error));
+    await markQuoteConverted(quote, existing, quotes);
     renderQuoteList();
     showSalesMessage(`作成済みの請求書を開きます: ${existing.invoiceNo}`, "warn");
     location.href = `invoices.html?id=${encodeURIComponent(existing.id)}`;
@@ -1099,10 +1144,12 @@ async function convertQuoteToInvoice(id) {
   console.log("created invoice customer fields", pickCustomerFields(invoice));
   await saveInvoiceFromQuoteConversion(invoice);
   const savedInvoice = readInvoices().find(row => row.id === invoice.id);
+  if (!savedInvoice) {
+    showSalesMessage("請求書の保存確認に失敗しました。見積は未変換のままです。", "err");
+    return;
+  }
   console.log("saved invoice customer fields", pickCustomerFields(savedInvoice || invoice));
-  quote.status = QUOTE_STATUS_INVOICED;
-  writeQuotes(quotes);
-  await window.SalesStorage?.saveSalesRecord?.("quotes", quote).catch(error => console.warn("[quote] quote status save failed", error));
+  await markQuoteConverted(quote, savedInvoice, quotes);
   renderQuoteList();
   showSalesMessage(`請求書を作成しました: ${invoice.invoiceNo}`, "ok");
   location.href = `invoices.html?id=${encodeURIComponent(invoice.id)}`;
@@ -1339,7 +1386,8 @@ function recalcTotals() {
 function collectQuote() {
   const quotes = readQuotes();
   const existing = currentQuoteId ? quotes.find(q => q.id === currentQuoteId) : null;
-  const quoteNo = existing?.quoteNo || nextQuoteNo(quotes);
+  const quoteDate = document.getElementById("quoteDate")?.value || today();
+  const quoteNo = existing?.quoteNo || nextQuoteNo(quotes, quoteDate);
   const originNumber = existing?.originNumber || existing?.masterNumber || existing?.quoteNumber || quoteNo;
   return {
     id: currentQuoteId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),

@@ -131,10 +131,16 @@ function matchesDateRange(values, from, to) {
 }
 
 function receiptNo(n) {
+  if (window.SalesNumbering?.buildDocumentNo) {
+    return window.SalesNumbering.buildDocumentNo("receipt", today(), n);
+  }
   return "REC-" + String(n).padStart(6, "0");
 }
 
-function nextReceiptNo(receipts) {
+function nextReceiptNo(receipts, dateValue = today()) {
+  if (window.SalesNumbering?.nextDocumentNo) {
+    return window.SalesNumbering.nextDocumentNo("receipt", receipts, dateValue);
+  }
   const max = receipts.reduce((num, receipt) => {
     const match = String(receipt.receiptNo || "").match(/^REC-(\d+)$/);
     return Math.max(num, match ? Number(match[1]) : 0);
@@ -440,7 +446,8 @@ function matchesReceiptTargetFilters(row) {
 function buildReceiptFromInvoice(invoice, receipts) {
   const payment = getLatestActivePayment(invoice) || {};
   const now = new Date().toISOString();
-  const newReceiptNo = nextReceiptNo(receipts);
+  const receiptDate = payment.paymentDate || normalizeDateOnly(payment.createdAt) || today();
+  const newReceiptNo = nextReceiptNo(receipts, receiptDate);
   const originNumber = invoice.originNumber || invoice.masterNumber || invoice.quoteNumber || invoice.sourceQuoteNo || "";
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
@@ -457,7 +464,7 @@ function buildReceiptFromInvoice(invoice, receipts) {
     reasonMemo: "",
     customerName: invoice.customerName || "",
     subject: invoice.subject || "",
-    paymentDate: payment.paymentDate || normalizeDateOnly(payment.createdAt),
+    paymentDate: receiptDate,
     amount: getReceiptDisplayAmount(invoice),
     method: "振込",
     payerName: payment.payerName || "",
