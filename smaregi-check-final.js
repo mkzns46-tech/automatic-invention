@@ -171,6 +171,20 @@
     return Number.isFinite(number) ? String(number) : emptyLabel;
   }
 
+  function formatSignedDisplay(value){
+    const number=Number(value);
+    if(!Number.isFinite(number))return "-";
+    if(number>0)return `+${number}`;
+    return String(number);
+  }
+
+  function signedClass(value){
+    const number=Number(value);
+    if(number<0)return "is-negative";
+    if(number>0)return "is-positive";
+    return "";
+  }
+
   function getChangeDateValue(change){
     return change?.changed_at || change?.movement_datetime || change?.updated_at_from_csv || change?.updated_at || "";
   }
@@ -652,22 +666,22 @@
         delta=before!==null && after!==null ? after-before : 0;
       }
       if(before===null && after!==null && Number.isFinite(delta))before=after-delta;
-      derivedStockMap.set(log,{before,after});
+      derivedStockMap.set(log,{before,after,delta});
       if(before!==null)runningStock=before;
     });
     const renderLog=(log)=>{
       const type=INVENTORY_TYPE_LABELS[String(log.type||"").trim()] || log.type || "";
-      const qty=log.quantity ?? log.qty ?? log.amount ?? "";
       const staff=log.staff || log.staff_name || log.created_by || "";
       const memo=log.memo || log.note || "";
       const stock=derivedStockMap.get(log)||{};
       const before=stock.before ?? "";
       const after=stock.after ?? "";
+      const delta=stock.delta ?? (log.quantity ?? log.qty ?? log.amount ?? "");
       return `<tr>
         <td>${safeText(log.created_at && typeof fmt==="function" ? fmt(log.created_at) : log.created_at || "")}</td>
         <td>${safeText(type)}</td>
         <td>${safeText(before===""?"-":before)}</td>
-        <td class="${Number(qty)<0 ? "is-negative" : (Number(qty)>0 ? "is-positive" : "")}">${safeText(qty)}</td>
+        <td class="${signedClass(delta)}">${safeText(formatSignedDisplay(delta))}</td>
         <td>${safeText(after===""?"-":after)}</td>
         <td>${safeText(memo||"-")}</td>
         <td>${safeText(staff||"-")}</td>
@@ -706,7 +720,7 @@
         <td>${safeText(changedAt && typeof fmt==="function" ? fmt(changedAt) : changedAt || "")}</td>
         <td>${safeText(change.stock_division || change.movement_type || "")}</td>
         <td>${safeText(beforeStock===null?"-":beforeStock)}</td>
-        <td class="${Number(qty)<0 ? "is-negative" : (Number(qty)>0 ? "is-positive" : "")}">${safeText(qty===null?"-":qty)}</td>
+        <td class="${signedClass(qty)}">${safeText(qty===null?"-":formatSignedDisplay(qty))}</td>
         <td>${safeText(afterStock===null?"-":afterStock)}</td>
         <td>${safeText(memo)}</td>
         <td>${safeText(staff)}</td>
@@ -1083,6 +1097,86 @@
       .smaregi-difference.is-zero{
         color:#334155;
       }
+      .history-qty-negative,
+      .is-negative{
+        color:#dc2626;
+        font-weight:700;
+      }
+      .history-qty-positive,
+      .is-positive{
+        color:#15803d;
+        font-weight:700;
+      }
+      .equipment-action-group{
+        display:flex;
+        align-items:center;
+        justify-content:flex-start;
+        gap:8px;
+        flex-wrap:wrap;
+      }
+      .equipment-status-badge{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:64px;
+        height:28px;
+        padding:0 10px;
+        border-radius:8px;
+        font-size:13px;
+        font-weight:800;
+        line-height:1;
+        white-space:nowrap;
+      }
+      .equipment-status-badge.is-unchecked{
+        color:#8a5a00;
+        background:#fff3cd;
+      }
+      .equipment-status-badge.is-checked,
+      .equipment-confirmed{
+        color:#166534;
+        background:#dcfce7;
+      }
+      .equipment-confirm-btn,
+      .equipment-cancel-btn,
+      .memo-edit-btn{
+        box-sizing:border-box;
+        min-width:96px;
+        max-width:120px;
+        height:38px;
+        padding:0 14px;
+        border-radius:8px;
+        font-size:14px;
+        font-weight:800;
+        line-height:1;
+        white-space:nowrap;
+      }
+      .equipment-confirm-btn{
+        border:1px solid #2f9d62;
+        background:#2f9d62;
+        color:#fff;
+      }
+      .equipment-cancel-btn{
+        border:1px solid #c2410c;
+        background:#fff;
+        color:#b91c1c;
+      }
+      .memo-edit-btn{
+        border:1px solid #2f9d62;
+        background:#fff;
+        color:#0f5132;
+      }
+      .product-history-identity{
+        display:grid;
+        gap:3px;
+        line-height:1.35;
+      }
+      .product-history-identity strong{
+        font-size:14px;
+      }
+      .product-history-identity small{
+        color:#64748b;
+        font-size:12px;
+      }
       @media (max-width:800px){
         .smaregi-cause-header{
           grid-template-columns:1fr;
@@ -1106,6 +1200,11 @@
         }
         .smaregi-cause-history-card .table-wrap{
           max-height:520px;
+        }
+        .equipment-action-group,
+        .equipment-confirm-btn,
+        .equipment-cancel-btn{
+          display:none !important;
         }
       }
     `;
@@ -1158,11 +1257,26 @@
     if(rawLogId)setEquipmentCache(rawLogId,log);
     const hasAccess=typeof hasInventoryPrivilegedAccess==="function" && hasInventoryPrivilegedAccess();
     const checked=typeof isEquipmentTransferChecked==="function" ? isEquipmentTransferChecked(log) : (log?.equipment_checked===true || !!log?.equipment_checked_at);
-    if(!hasAccess)return checked ? '<span class="equipment-confirmed">確認済</span>' : "";
-    if(checked){
-      return `<div class="equipment-action-group"><span class="equipment-confirmed">確認済</span><button type="button" class="secondary equipment-cancel-btn" data-log-id="${safeText(rawLogId)}">備品転用キャンセル</button></div>`;
-    }
-    return `<button type="button" class="secondary equipment-confirm-btn" data-log-id="${safeText(rawLogId)}">確認</button>`;
+    if(checked)return '<span class="equipment-status-badge is-checked">確認済</span>';
+    if(!hasAccess)return '<span class="equipment-status-badge is-unchecked">未確認</span>';
+    return `<div class="equipment-action-group">
+      <span class="equipment-status-badge is-unchecked">未確認</span>
+      <button type="button" class="equipment-confirm-btn" data-log-id="${safeText(rawLogId)}">確認</button>
+      <button type="button" class="equipment-cancel-btn" data-log-id="${safeText(rawLogId)}">キャンセル</button>
+    </div>`;
+  };
+
+  window.replaceEquipmentConfirmationDom=function(logId,log){
+    const checkedHtml='<span class="equipment-status-badge is-checked">確認済</span>';
+    document.querySelectorAll(".equipment-check-cell").forEach(cell=>{
+      if(String(cell.dataset.logId||"")===String(logId))cell.innerHTML=checkedHtml;
+    });
+    document.querySelectorAll(".equipment-confirm-btn,.equipment-cancel-btn").forEach(button=>{
+      if(String(button.dataset.logId||"")!==String(logId))return;
+      const cell=button.closest("td");
+      if(cell)cell.innerHTML=`<div class="equipment-check-cell" data-log-id="${safeText(logId)}">${checkedHtml}</div>`;
+    });
+    if(log)setEquipmentCache(logId,log);
   };
 
   window.executeEquipmentTransferConfirmation=async function({log,product=null,quantity,checkedBy,button}){

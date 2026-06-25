@@ -1,45 +1,86 @@
-/* ARICO inventory app: product-code display for history tables. */
-function getHistoryProductCode(barcode,product=null){
-  const p=product||gp(barcode);
-  return String(p?.product_code||p?.productCode||p?.code||"").trim();
-}
+/* ARICO inventory app: compact history rows without product-code display. */
 
 function buildHistoryProductCell(barcode,productName=""){
-  const p=gp(barcode);
-  const name=String(p?.name||productName||"商品名なし");
-  const productCode=getHistoryProductCode(barcode,p)||"商品コードなし";
+  const product=gp(barcode);
+  const name=String(product?.name||productName||"商品名なし");
   const barcodeLabel=String(barcode||"バーコードなし");
   return `<div class="product-history-identity">
     <strong>${esc(name)}</strong>
-    <small>商品コード：${esc(productCode)}<br>バーコード：${esc(barcodeLabel)}</small>
+    <small>バーコード：${esc(barcodeLabel)}</small>
   </div>`;
 }
 
-function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode){
-  const p=gp(barcode);
-  let running=Number(p?.base_stock||0);
+function isHistoryDecreaseType(type){
+  const text=String(type||"").trim();
+  return isInventoryOutType(text)
+    || text==="出荷"
+    || text==="売上"
+    || text==="備品転用"
+    || text==="イベント持出"
+    || text==="棚卸減算"
+    || text==="stock_out"
+    || text==="equipment_transfer"
+    || text==="event_pick";
+}
 
+function isHistoryIncreaseType(type){
+  const text=String(type||"").trim();
+  return isInventoryInType(text)
+    || text==="入荷"
+    || text==="仕入"
+    || text==="備品転用キャンセル"
+    || text==="イベント戻し"
+    || text==="stock_in"
+    || text==="equipment_transfer_cancel"
+    || text==="event_return";
+}
+
+function getHistorySignedDelta(type,quantity){
+  const value=Number(quantity||0);
+  if(!Number.isFinite(value))return 0;
+  if(isHistoryDecreaseType(type))return value<0 ? value : -Math.abs(value);
+  if(isHistoryIncreaseType(type))return Math.abs(value);
+  return value;
+}
+
+function formatHistorySignedQuantity(value){
+  const number=Number(value||0);
+  if(!Number.isFinite(number)||number===0)return "";
+  return number>0 ? `+${number}` : String(number);
+}
+
+function historyQuantityClass(value){
+  const number=Number(value||0);
+  if(number<0)return "history-qty-negative";
+  if(number>0)return "history-qty-positive";
+  return "";
+}
+
+function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode){
+  const product=gp(barcode);
+  let running=Number(product?.base_stock||0);
   const allDesc=allLogsForBarcode.slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
   const rowsByKey=new Map();
 
   for(const log of allDesc){
-    const q=Number(log.quantity||0);
+    const rawQuantity=Number(log.quantity||0);
+    const delta=getHistorySignedDelta(log.type,rawQuantity);
     let beforeStock="";
     let afterStock=running;
     let inQty="";
     let outQty="";
 
-    if(isInventoryInType(log.type)){
-      beforeStock=running-q;
-      inQty=q;
-      running-=q;
-    }else if(isInventoryOutType(log.type)){
-      beforeStock=running+q;
-      outQty=q;
-      running+=q;
-    }else if(log.type==="在庫修正"){
+    if(delta>0){
+      beforeStock=running-delta;
+      inQty=formatHistorySignedQuantity(delta);
+      running-=delta;
+    }else if(delta<0){
+      beforeStock=running-delta;
+      outQty=formatHistorySignedQuantity(delta);
+      running-=delta;
+    }else if(String(log.type||"").trim()==="在庫修正" || String(log.type||"").trim()==="蝨ｨ蠎ｫ菫ｮ豁｣"){
       beforeStock="-";
-      afterStock=q;
+      afterStock=rawQuantity;
     }
 
     const key=String(log.id||log.created_at+log.type+log.quantity+log.memo);
@@ -48,53 +89,54 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
 
   return selectedLogs.map(log=>{
     const key=String(log.id||log.created_at+log.type+log.quantity+log.memo);
-    const r=rowsByKey.get(key);
-    if(!r)return "";
+    const row=rowsByKey.get(key);
+    if(!row)return "";
     return `<tr>
-      <td>${fmt(r.log.created_at)}</td>
-      <td>${esc(inventoryTypeLabel(r.log.type))}</td>
-      <td>${esc(r.log.staff)}</td>
-      <td>${buildHistoryProductCell(barcode,r.log.product_name||"")}</td>
-      <td>${r.beforeStock}</td>
-      <td>${r.inQty}</td>
-      <td>${r.outQty}</td>
-      <td>${r.afterStock}</td>
-      <td>${memoCellHtml(r.log)}</td>
-      <td>${equipmentCheckHtml(r.log)}</td>
+      <td>${fmt(row.log.created_at)}</td>
+      <td>${esc(inventoryTypeLabel(row.log.type))}</td>
+      <td>${esc(row.log.staff||"-")}</td>
+      <td>${buildHistoryProductCell(barcode,row.log.product_name||"")}</td>
+      <td>${row.beforeStock}</td>
+      <td class="${historyQuantityClass(row.inQty)}">${row.inQty}</td>
+      <td class="${historyQuantityClass(row.outQty)}">${row.outQty}</td>
+      <td>${row.afterStock}</td>
+      <td>${memoCellHtml(row.log)}</td>
+      <td>${equipmentCheckHtml(row.log)}</td>
     </tr>`;
   }).join("");
 }
 
 function buildGlobalHistoryRows(sourceLogs=logs){
   return sourceLogs.map(log=>{
-    const q=Number(log.quantity||0);
+    const rawQuantity=Number(log.quantity||0);
+    const delta=getHistorySignedDelta(log.type,rawQuantity);
     let beforeStock="";
     let afterStock="";
     let inQty="";
     let outQty="";
     const current=Number(gp(log.barcode)?.base_stock||0);
 
-    if(isInventoryInType(log.type)){
-      beforeStock=current-q;
+    if(delta>0){
+      beforeStock=current-delta;
       afterStock=current;
-      inQty=q;
-    }else if(isInventoryOutType(log.type)){
-      beforeStock=current+q;
+      inQty=formatHistorySignedQuantity(delta);
+    }else if(delta<0){
+      beforeStock=current-delta;
       afterStock=current;
-      outQty=q;
-    }else if(log.type==="在庫修正"){
+      outQty=formatHistorySignedQuantity(delta);
+    }else if(String(log.type||"").trim()==="在庫修正" || String(log.type||"").trim()==="蝨ｨ蠎ｫ菫ｮ豁｣"){
       beforeStock="-";
-      afterStock=q;
+      afterStock=rawQuantity;
     }
 
     return `<tr>
       <td>${fmt(log.created_at)}</td>
       <td>${esc(inventoryTypeLabel(log.type))}</td>
-      <td>${esc(log.staff)}</td>
+      <td>${esc(log.staff||"-")}</td>
       <td>${buildHistoryProductCell(log.barcode,log.product_name||"")}</td>
       <td>${beforeStock}</td>
-      <td>${inQty}</td>
-      <td>${outQty}</td>
+      <td class="${historyQuantityClass(inQty)}">${inQty}</td>
+      <td class="${historyQuantityClass(outQty)}">${outQty}</td>
       <td>${afterStock}</td>
       <td>${memoCellHtml(log)}</td>
       <td>${equipmentCheckHtml(log)}</td>
