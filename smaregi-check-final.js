@@ -112,6 +112,10 @@
     return "tokyo";
   }
 
+  function getInventoryStoreLabelSafe(){
+    return getInventoryStoreCodeSafe()==="aichi" ? "アイチ店" : "東京店";
+  }
+
   function pickNumericField(source,names){
     if(!source)return null;
     for(const name of names){
@@ -639,10 +643,13 @@
       let before=parseStockNumber(log.before_stock ?? log.stock_before ?? log.base_stock_before);
       if(after===null && runningStock!==null)after=runningStock;
       let delta=qty;
-      if(typeValue==="蜃ｺ闕ｷ" || typeValue==="蛯吝刀霆｢逕ｨ" || typeValue==="stock_out" || typeValue==="equipment_transfer" || typeValue==="event_pick"){
+      if(typeValue==="出荷" || typeValue==="備品転用" || typeValue==="蜃ｺ闕ｷ" || typeValue==="蛯吝刀霆｢逕ｨ" || typeValue==="stock_out" || typeValue==="equipment_transfer" || typeValue==="event_pick"){
         delta=qty>0 ? -qty : qty;
-      }else if(typeValue==="蜈･闕ｷ" || typeValue==="stock_in" || typeValue==="event_return" || typeValue==="equipment_transfer_cancel" || typeValue==="備品転用キャンセル"){
+      }else if(typeValue==="入荷" || typeValue==="蜈･闕ｷ" || typeValue==="stock_in" || typeValue==="event_return" || typeValue==="equipment_transfer_cancel" || typeValue==="備品転用キャンセル"){
         delta=Math.abs(qty);
+      }else if(typeValue==="在庫修正" || typeValue==="蝨ｨ蠎ｫ菫ｮ豁｣" || typeValue==="stock_adjustment"){
+        if(after===null && rawQty!==null)after=qty;
+        delta=before!==null && after!==null ? after-before : 0;
       }
       if(before===null && after!==null && Number.isFinite(delta))before=after-delta;
       derivedStockMap.set(log,{before,after});
@@ -660,10 +667,10 @@
         <td>${safeText(log.created_at && typeof fmt==="function" ? fmt(log.created_at) : log.created_at || "")}</td>
         <td>${safeText(type)}</td>
         <td>${safeText(before===""?"-":before)}</td>
-        <td>${safeText(qty)}</td>
-        <td>${safeText(staff)}</td>
-        <td>${safeText(memo)}</td>
+        <td class="${Number(qty)<0 ? "is-negative" : (Number(qty)>0 ? "is-positive" : "")}">${safeText(qty)}</td>
         <td>${safeText(after===""?"-":after)}</td>
+        <td>${safeText(memo||"-")}</td>
+        <td>${safeText(staff||"-")}</td>
       </tr>`;
     };
     rows.push(...newestLogs.map(renderLog));
@@ -675,7 +682,7 @@
   }
   function renderCauseSmaregiRows(changes,barcode){
     if(!changes.length){
-      return `<tr><td colspan="6">バーコード ${safeText(barcode||"未設定")} のCSV取込済み履歴はありません。</td></tr>`;
+      return `<tr><td colspan="7">バーコード ${safeText(barcode||"未設定")} のCSV取込済み履歴はありません。</td></tr>`;
     }
     const lastCheckTime=getLastCheckTimeValue();
     const rows=[];
@@ -689,22 +696,25 @@
     });
     const renderChange=(change)=>{
       const changedAt=getChangeDateValue(change);
-      const displayStocks=getStoreDisplayStocks(change);
-      const fallbackStock=parseStockNumber(change.stock_amount ?? change.smaregi_stock_quantity);
-      const tokyo=displayStocks.tokyo!==null ? displayStocks.tokyo : (getInventoryStoreCodeSafe()==="tokyo" ? fallbackStock : null);
-      const aichi=displayStocks.aichi!==null ? displayStocks.aichi : (getInventoryStoreCodeSafe()==="aichi" ? fallbackStock : null);
+      const storeCode=getInventoryStoreCodeSafe();
+      const afterStock=getStoreStockValue(change,storeCode,true);
+      const qty=parseStockNumber(change.amount ?? change.movement_quantity);
+      const beforeStock=afterStock===null || qty===null ? null : afterStock-qty;
+      const staff=change.staff_name || change.staff || change.operator_name || change.created_by || "-";
+      const memo=change.memo || change.movement_reason || change.reason || "-";
       return `<tr>
         <td>${safeText(changedAt && typeof fmt==="function" ? fmt(changedAt) : changedAt || "")}</td>
         <td>${safeText(change.stock_division || change.movement_type || "")}</td>
-        <td>${safeText(change.amount ?? change.movement_quantity ?? "")}</td>
-        <td>${safeText(tokyo===null?"-":tokyo)}</td>
-        <td>${safeText(aichi===null?"-":aichi)}</td>
-        <td>${safeText(change.memo || change.movement_reason || "")}</td>
+        <td>${safeText(beforeStock===null?"-":beforeStock)}</td>
+        <td class="${Number(qty)<0 ? "is-negative" : (Number(qty)>0 ? "is-positive" : "")}">${safeText(qty===null?"-":qty)}</td>
+        <td>${safeText(afterStock===null?"-":afterStock)}</td>
+        <td>${safeText(memo)}</td>
+        <td>${safeText(staff)}</td>
       </tr>`;
     };
     rows.push(...newestChanges.map(renderChange));
     if(Number.isFinite(lastCheckTime)){
-      rows.push(`<tr class="smaregi-last-check-divider"><td colspan="6">前回チェック締め：${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}</td></tr>`);
+      rows.push(`<tr class="smaregi-last-check-divider"><td colspan="7">前回チェック締め：${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}</td></tr>`);
     }
     rows.push(...olderChanges.slice(0,5).map(renderChange));
     return rows.join("");
@@ -731,20 +741,43 @@
       const appLogs=allAppLogs;
       const smaregiChanges=allSmaregiChanges;
       const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(itemBarcode) : null;
-      const smaregiStock=getCsvSmaregiStock(item);
+      const targetStockInfo=getTargetSmaregiStock(item);
+      const smaregiStock=targetStockInfo.compare;
+      const smaregiRawStock=targetStockInfo.raw;
+      const storeLabel=getInventoryStoreLabelSafe();
       const actual=check?.actual_stock ?? "";
       const difference=actual===""||actual===null||actual===undefined||smaregiStock===null ? "-" : Number(actual)-Number(smaregiStock);
       detail.innerHTML=`
-        <div class="section-title"><h3>差異原因確認</h3><button type="button" id="closeSmaregiCauseDetailBtn" class="secondary">閉じる</button></div>
-        <div class="smaregi-detail-summary">
-          <div><strong>商品名</strong><span>${safeText(itemName)}</span></div>
-          <div><strong>バーコード</strong><span>${safeText(itemBarcode||"バーコードなし")}</span></div>
-          <div><strong>スマレジ在庫</strong><span>${safeText(smaregiStock===null?"未取得":smaregiStock)}</span></div>
-          <div><strong>実在庫</strong><span>${safeText(actual===""?"未入力":actual)}</span></div>
-          <div><strong>差異</strong><span class="smaregi-difference${Number(difference)<0 ? " is-negative" : (Number(difference)>0 ? " is-positive" : "")}">${safeText(difference)}</span></div>
-          <div><strong>担当者</strong><span>${safeText(check?.checked_by||"担当者未設定")}</span></div>
-          <div><strong>チェック日時</strong><span>${safeText(check?.checked_at&&typeof fmt==="function" ? fmt(check.checked_at) : check?.checked_at||"未入力")}</span></div>
+        <div class="smaregi-cause-shell">
+        <div class="smaregi-cause-header">
+          <button type="button" id="closeSmaregiCauseDetailBtn" class="secondary">← 差異一覧に戻る</button>
+          <div class="smaregi-cause-title">
+            <div><strong>バーコード：</strong>${safeText(itemBarcode||"バーコードなし")}</div>
+            <div><strong>商品名：</strong>${safeText(itemName)}</div>
+          </div>
+          <div class="smaregi-cause-store-badge">店舗：${safeText(storeLabel)}</div>
         </div>
+        <div class="smaregi-cause-summary-row">
+          <div class="smaregi-cause-summary-card">
+            <strong>実在庫（アプリ）</strong>
+            <span class="is-app-stock">${safeText(actual===""?"未入力":actual)}</span>
+          </div>
+          <div class="smaregi-cause-summary-operator">−</div>
+          <div class="smaregi-cause-summary-card">
+            <strong>スマレジ在庫（${safeText(storeLabel)}）</strong>
+            <span class="is-smaregi-stock">${safeText(smaregiRawStock===null?"未取得":smaregiStock)}</span>
+          </div>
+          <div class="smaregi-cause-summary-operator">=</div>
+          <div class="smaregi-cause-summary-card is-difference-card">
+            <strong>差異</strong>
+            <span class="smaregi-difference${Number(difference)<0 ? " is-negative" : (Number(difference)>0 ? " is-positive" : " is-zero")}">${safeText(difference)}</span>
+          </div>
+          <div class="smaregi-cause-summary-card">
+            <strong>前回チェック締め日時</strong>
+            <span>${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}</span>
+          </div>
+        </div>
+        <div class="smaregi-cause-guide">在庫管理側の履歴とスマレジ側の在庫変動履歴を比較して、差異の原因を確認してください。</div>
         <div class="smaregi-reason-form">
           <label>原因カテゴリ
             <select id="smaregiDifferenceReasonCategory">
@@ -761,14 +794,16 @@
         <div class="smaregi-cause-history-grid">
           <section class="smaregi-cause-history-card">
             <h3>在庫管理側の履歴</h3>
-            <p class="section-note">バーコード ${safeText(itemBarcode||"未設定")} の在庫管理側履歴を表示します。前回チェック締め位置を青い区切りで表示します。</p>
-            <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>処理前在庫</th><th>数量</th><th>担当者</th><th>備考</th><th>処理後在庫</th></tr></thead><tbody>${renderCauseAppLogRows(appLogs,itemBarcode)}</tbody></table></div>
+            <p class="section-note">アプリで記録された在庫の増減履歴です。</p>
+            <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>処理前在庫</th><th>数量</th><th>処理後在庫</th><th>備考</th><th>担当者</th></tr></thead><tbody>${renderCauseAppLogRows(appLogs,itemBarcode)}</tbody></table></div>
           </section>
           <section class="smaregi-cause-history-card">
             <h3>スマレジ側の在庫変動履歴</h3>
-            <p class="section-note">CSV取込済みの smaregi_stock_changes を、バーコード優先で検索しています。スマレジ在庫はCSV H列「在庫数」、最終変動日時はCSV J列「更新日時」です。</p>
-            <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>変動数</th><th>東京店舗在庫</th><th>アイチ店舗在庫</th><th>理由・備考</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
+            <p class="section-note">CSV取込済みのスマレジ在庫変動履歴です。</p>
+            <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>処理前在庫</th><th>数量</th><th>処理後在庫</th><th>備考</th><th>担当者</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
           </section>
+        </div>
+        <div class="smaregi-cause-footnote">スマレジ側の「処理前在庫」は、CSVの「変動数」と「対象店舗在庫」から計算しています。処理前在庫 = 処理後在庫 − 変動数</div>
         </div>
       `;
       const closeButton=document.getElementById("closeSmaregiCauseDetailBtn");
@@ -895,6 +930,83 @@
     const style=document.createElement("style");
     style.id="smaregiCauseHistoryLayoutStyle";
     style.textContent=`
+      .smaregi-cause-shell{
+        padding:2px 0 4px;
+      }
+      .smaregi-cause-header{
+        display:grid;
+        grid-template-columns:auto minmax(0,1fr) auto;
+        gap:16px;
+        align-items:center;
+        margin-bottom:14px;
+      }
+      .smaregi-cause-title{
+        display:grid;
+        gap:4px;
+        font-size:15px;
+        color:#12352c;
+      }
+      .smaregi-cause-store-badge{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:84px;
+        padding:7px 12px;
+        border-radius:10px;
+        background:#dbeafe;
+        color:#1d4ed8;
+        font-weight:700;
+      }
+      .smaregi-cause-summary-row{
+        display:grid;
+        grid-template-columns:minmax(0,1.4fr) auto minmax(0,1.4fr) auto minmax(120px,.8fr) minmax(220px,1.2fr);
+        gap:8px;
+        align-items:stretch;
+        margin-bottom:14px;
+      }
+      .smaregi-cause-summary-card{
+        min-height:72px;
+        border:1px solid #c7eadb;
+        border-radius:8px;
+        background:linear-gradient(180deg,#f8fffb,#f3fbf7);
+        padding:10px 12px;
+        display:flex;
+        flex-direction:column;
+        justify-content:center;
+        gap:5px;
+        text-align:center;
+      }
+      .smaregi-cause-summary-card strong{
+        font-size:13px;
+        color:#12352c;
+      }
+      .smaregi-cause-summary-card span{
+        font-size:22px;
+        font-weight:800;
+      }
+      .smaregi-cause-summary-card .is-app-stock{
+        color:#15803d;
+      }
+      .smaregi-cause-summary-card .is-smaregi-stock{
+        color:#2563eb;
+      }
+      .smaregi-cause-summary-operator{
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:24px;
+        font-weight:800;
+        color:#334155;
+      }
+      .smaregi-cause-guide{
+        border:1px solid #93c5fd;
+        background:#eff6ff;
+        color:#1d4ed8;
+        border-radius:8px;
+        padding:10px 14px;
+        margin:10px 0 16px;
+        font-weight:700;
+      }
       .smaregi-cause-history-grid{
         display:grid;
         grid-template-columns:minmax(0,1fr) minmax(0,1fr);
@@ -903,26 +1015,97 @@
       }
       .smaregi-cause-history-card{
         min-width:0;
+        border:1px solid #cfe7dc;
+        border-radius:8px;
+        background:#fff;
+        padding:12px;
+        height:560px;
+        display:flex;
+        flex-direction:column;
+        box-sizing:border-box;
+        overflow:hidden;
+      }
+      .smaregi-cause-history-card h3{
+        margin:0 0 4px;
+        font-size:18px;
+        color:#0f5132;
+      }
+      .smaregi-cause-history-card:nth-child(2) h3{
+        color:#1d4ed8;
       }
       .smaregi-cause-history-card .table-wrap{
-        max-height:520px;
+        flex:1;
+        min-height:0;
         overflow:auto;
+        border:1px solid #e5e7eb;
+        border-radius:8px;
       }
       .smaregi-cause-history-card table{
-        min-width:640px;
+        min-width:760px;
+        width:100%;
+        border-collapse:separate;
+        border-spacing:0;
+      }
+      .smaregi-cause-history-card thead th{
+        position:sticky;
+        top:0;
+        z-index:1;
+        background:#e8f7ee;
+      }
+      .smaregi-cause-history-card:nth-child(2) thead th{
+        background:#eaf2ff;
+      }
+      .smaregi-cause-history-card td,
+      .smaregi-cause-history-card th{
+        white-space:nowrap;
+      }
+      .smaregi-cause-history-card td:nth-child(6){
+        white-space:normal;
+        min-width:130px;
+      }
+      .smaregi-last-check-divider td{
+        background:#eaf2ff !important;
+        color:#1d4ed8;
+        border-top:2px solid #2563eb;
+        border-bottom:2px solid #2563eb;
+        text-align:center;
+        font-weight:800;
+      }
+      .smaregi-cause-footnote{
+        margin-top:14px;
+        border:1px solid #f3d18a;
+        background:#fff8e6;
+        color:#6b4e00;
+        border-radius:8px;
+        padding:10px 14px;
+        font-size:13px;
+      }
+      .smaregi-difference.is-zero{
+        color:#334155;
       }
       @media (max-width:800px){
+        .smaregi-cause-header{
+          grid-template-columns:1fr;
+        }
+        .smaregi-cause-summary-row{
+          grid-template-columns:1fr;
+        }
+        .smaregi-cause-summary-operator{
+          min-height:20px;
+        }
         .smaregi-cause-history-grid{
           display:block;
         }
         .smaregi-cause-history-card{
           margin-top:14px;
+          height:auto;
+          min-height:0;
         }
         .smaregi-cause-history-card:first-child{
           margin-top:0;
         }
         .smaregi-cause-history-card .table-wrap{
-          max-height:none;
+          max-height:520px;
         }
       }
     `;
