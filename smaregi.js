@@ -1322,7 +1322,10 @@ function normalizeSmaregiMovementDate(value){
 
 function smaregiMovementKey(row){
   const identity=String(row.barcode||row.product_code||row.product_name||"").trim();
-  return [identity,String(row.changed_at||"").trim()].join("|");
+  const changedAt=String(row.changed_at||row.movement_datetime||row.updated_at_from_csv||"").trim();
+  const amount=String(row.amount??row.movement_quantity??"").trim();
+  const storeStock=String(row.stock_amount??row.smaregi_stock_quantity??row.tokyo_stock??row.aichi_stock??"").trim();
+  return [identity,changedAt,amount,storeStock].join("|");
 /*
   return [
     String(row.barcode||""),
@@ -1351,6 +1354,7 @@ function buildSmaregiCsvChangeId(change){
     identity,
     String(change.changed_at||"").trim(),
     String(change.amount||"").trim(),
+    String(change.stock_amount??change.smaregi_stock_quantity??change.tokyo_stock??change.aichi_stock??"").trim(),
     String(change.stock_division||"").trim(),
     String(change.memo||"").trim()
   ].join("|");

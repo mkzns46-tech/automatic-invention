@@ -773,6 +773,8 @@ async function registerBarcode(barcode){
     if(type==="備品転用")newStock=currentStock;
     if(type==="在庫修正")newStock=qty;
     if(isEventPick&&eventPickSource!=="storage")newStock=currentStock-qty;
+    const isEquipmentTransferType=String(type||"")==="\u5099\u54c1\u8ee2\u7528" || String(type||"").includes("\u86ef\u541d\u5200");
+    if(isEquipmentTransferType)newStock=currentStock-qty;
 
     if(((type==="出荷"&&eventPickSource!=="storage")||(isEventPick&&eventPickSource!=="storage"))&&newStock<0){
       showMessage(`在庫不足：${p.name} / 現在庫 ${currentStock} / ${type}数 ${qty}`,"err");
@@ -804,6 +806,8 @@ async function registerBarcode(barcode){
       ? [memo,`持ち出し元：${getEventPickSourceLabel(eventPickSource)}`].filter(Boolean).join(" / ")
       : memo;
 
+    const logQuantity=isEquipmentTransferType ? -Math.abs(qty) : qty;
+
     const insertedLog=await sb("inventory_logs",{
       method:"POST",
       headers:{Prefer:"return=representation"},
@@ -812,7 +816,7 @@ async function registerBarcode(barcode){
         staff,
         barcode,
         product_name:p.name,
-        quantity:qty,
+        quantity:logQuantity,
         memo:inventoryMemo
       })
     });
@@ -828,7 +832,7 @@ async function registerBarcode(barcode){
       staff,
       barcode,
       product_name:p.name,
-      quantity:qty,
+      quantity:logQuantity,
       memo:inventoryMemo
     });
 

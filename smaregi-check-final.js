@@ -1,4 +1,4 @@
-(function(){
+﻿(function(){
   "use strict";
 
   function safeText(value){
@@ -95,21 +95,70 @@
     return hasActualStock(check) || isExcludedCheck(check);
   }
 
-  function getCsvSmaregiStock(item){
-    const change=getChangeForItem(item);
-    const candidates=[
-      item?.smaregi_stock,
-      item?.smaregi_stock_quantity,
-      item?.stock_amount,
-      change?.stock_amount,
-      change?.smaregi_stock_quantity
-    ];
-    for(const candidate of candidates){
-      if(candidate===null || candidate===undefined || String(candidate).trim()==="")continue;
-      const number=Number(String(candidate).replace(/,/g,""));
-      if(Number.isFinite(number))return number;
+  function parseStockNumber(value){
+    if(value===null || value===undefined || String(value).trim()==="")return null;
+    const number=Number(String(value).replace(/,/g,""));
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function getInventoryStoreCodeSafe(){
+    const raw=(typeof getInventoryCurrentStoreCode==="function" ? getInventoryCurrentStoreCode() : "")
+      || (typeof getSmaregiCurrentStoreCode==="function" ? getSmaregiCurrentStoreCode() : "")
+      || window.currentStoreCode
+      || window.inventoryCurrentStoreCode
+      || "tokyo";
+    const value=String(raw||"").toLowerCase();
+    if(value.includes("aichi") || value.includes("愛知") || value.includes("アイチ"))return "aichi";
+    return "tokyo";
+  }
+
+  function pickNumericField(source,names){
+    if(!source)return null;
+    for(const name of names){
+      const value=parseStockNumber(source[name]);
+      if(value!==null)return value;
     }
     return null;
+  }
+
+  function getStoreStockValue(source,storeCode,allowGeneric=false){
+    if(!source)return null;
+    const tokyoFields=[
+      "tokyo_stock","tokyo_store_stock","tokyo_stock_amount","tokyo_quantity",
+      "stock_tokyo","store_tokyo_stock","tokyo_inventory","tokyo",
+      "東京店舗在庫","東京在庫","東京店在庫"
+    ];
+    const aichiFields=[
+      "aichi_stock","aichi_store_stock","aichi_stock_amount","aichi_quantity",
+      "stock_aichi","store_aichi_stock","aichi_inventory","aichi",
+      "愛知店舗在庫","アイチ店舗在庫","愛知在庫","アイチ在庫","愛知店在庫"
+    ];
+    const specific=pickNumericField(source,storeCode==="aichi" ? aichiFields : tokyoFields);
+    if(specific!==null)return specific;
+    if(!allowGeneric)return null;
+    return pickNumericField(source,[
+      "stock_amount","smaregi_stock","smaregi_stock_quantity","stock_quantity",
+      "quantity_after","store_stock","在庫数"
+    ]);
+  }
+
+  function getTargetSmaregiStock(item){
+    const change=getChangeForItem(item);
+    const storeCode=getInventoryStoreCodeSafe();
+    const raw=getStoreStockValue(item,storeCode,true) ?? getStoreStockValue(change,storeCode,true);
+    if(raw===null)return {raw:null,compare:null,storeCode};
+    return {raw,compare:Math.max(0,raw),storeCode};
+  }
+
+  function getStoreDisplayStocks(source){
+    return {
+      tokyo:getStoreStockValue(source,"tokyo",false),
+      aichi:getStoreStockValue(source,"aichi",false)
+    };
+  }
+
+  function getCsvSmaregiStock(item){
+    return getTargetSmaregiStock(item).compare;
   }
 
   function displayNumber(value,emptyLabel="未入力"){
@@ -492,6 +541,24 @@
     });
   }
 
+  function smaregiHistoryDedupeKey(row){
+    const identity=String(row?.barcode||row?.product_code||row?.product_name||"").trim();
+    const changedAt=String(getChangeDateValue(row)||"").trim();
+    const amount=String(row?.amount??row?.movement_quantity??"").trim();
+    const stock=String(row?.stock_amount??row?.smaregi_stock_quantity??row?.tokyo_stock??row?.aichi_stock??"").trim();
+    return [identity,changedAt,amount,stock].join("|");
+  }
+
+  function dedupeSmaregiHistoryRows(rows){
+    const seen=new Set();
+    return (rows||[]).filter(row=>{
+      const key=smaregiHistoryDedupeKey(row);
+      if(seen.has(key))return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
   async function loadInventoryLogsForCause(barcode,productName){
     const results=[];
     try{
@@ -539,7 +606,7 @@
         console.warn("[cause smaregi_stock_changes by product name]",error);
       }
     }
-    return mergeRowsById(results).sort((a,b)=>new Date(getChangeDateValue(b)||0)-new Date(getChangeDateValue(a)||0));
+    return dedupeSmaregiHistoryRows(mergeRowsById(results)).sort((a,b)=>new Date(getChangeDateValue(b)||0)-new Date(getChangeDateValue(a)||0));
   }
 
   function renderCauseAppLogRows(logs,barcode){
@@ -547,7 +614,7 @@
     const lastCheckLabel=typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe();
     const rows=[];
     if(!logs.length){
-      rows.push(`<tr><td colspan="6">バーコード ${safeText(barcode||"未設定")} の在庫管理側履歴はありません。</td></tr>`);
+      rows.push(`<tr><td colspan="7">バーコード ${safeText(barcode||"未設定")} の在庫管理側履歴はありません。</td></tr>`);
     }
     const newestLogs=[];
     const olderLogs=[];
@@ -556,15 +623,43 @@
       if(Number.isFinite(logTime) && logTime<=lastCheckTime)olderLogs.push(log);
       else newestLogs.push(log);
     });
+    const sortedLogs=[...logs].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
+    let runningStock=null;
+    try{
+      const product=typeof gp==="function" ? gp(barcode) : null;
+      const current=parseStockNumber(product?.base_stock);
+      if(current!==null)runningStock=current;
+    }catch(_){}
+    const derivedStockMap=new Map();
+    sortedLogs.forEach(log=>{
+      const typeValue=String(log.type||"").trim();
+      const rawQty=parseStockNumber(log.quantity ?? log.qty ?? log.amount);
+      const qty=rawQty===null ? 0 : rawQty;
+      let after=parseStockNumber(log.after_stock ?? log.stock_after ?? log.base_stock_after);
+      let before=parseStockNumber(log.before_stock ?? log.stock_before ?? log.base_stock_before);
+      if(after===null && runningStock!==null)after=runningStock;
+      let delta=qty;
+      if(typeValue==="蜃ｺ闕ｷ" || typeValue==="蛯吝刀霆｢逕ｨ" || typeValue==="stock_out" || typeValue==="equipment_transfer" || typeValue==="event_pick"){
+        delta=qty>0 ? -qty : qty;
+      }else if(typeValue==="蜈･闕ｷ" || typeValue==="stock_in" || typeValue==="event_return" || typeValue==="equipment_transfer_cancel" || typeValue==="備品転用キャンセル"){
+        delta=Math.abs(qty);
+      }
+      if(before===null && after!==null && Number.isFinite(delta))before=after-delta;
+      derivedStockMap.set(log,{before,after});
+      if(before!==null)runningStock=before;
+    });
     const renderLog=(log)=>{
       const type=INVENTORY_TYPE_LABELS[String(log.type||"").trim()] || log.type || "";
       const qty=log.quantity ?? log.qty ?? log.amount ?? "";
       const staff=log.staff || log.staff_name || log.created_by || "";
       const memo=log.memo || log.note || "";
-      const after=log.after_stock ?? log.stock_after ?? log.base_stock_after ?? "";
+      const stock=derivedStockMap.get(log)||{};
+      const before=stock.before ?? "";
+      const after=stock.after ?? "";
       return `<tr>
         <td>${safeText(log.created_at && typeof fmt==="function" ? fmt(log.created_at) : log.created_at || "")}</td>
         <td>${safeText(type)}</td>
+        <td>${safeText(before===""?"-":before)}</td>
         <td>${safeText(qty)}</td>
         <td>${safeText(staff)}</td>
         <td>${safeText(memo)}</td>
@@ -573,15 +668,14 @@
     };
     rows.push(...newestLogs.map(renderLog));
     if(Number.isFinite(lastCheckTime)){
-      rows.push(`<tr class="smaregi-last-check-divider"><td colspan="6">前回チェック締め：${safeText(lastCheckLabel)}</td></tr>`);
+      rows.push(`<tr class="smaregi-last-check-divider"><td colspan="7">前回チェック締め：${safeText(lastCheckLabel)}</td></tr>`);
     }
     rows.push(...olderLogs.slice(0,5).map(renderLog));
     return rows.join("");
   }
-
   function renderCauseSmaregiRows(changes,barcode){
     if(!changes.length){
-      return `<tr><td colspan="5">バーコード ${safeText(barcode||"未設定")} のCSV取込済み履歴はありません。</td></tr>`;
+      return `<tr><td colspan="6">バーコード ${safeText(barcode||"未設定")} のCSV取込済み履歴はありません。</td></tr>`;
     }
     const lastCheckTime=getLastCheckTimeValue();
     const rows=[];
@@ -595,22 +689,26 @@
     });
     const renderChange=(change)=>{
       const changedAt=getChangeDateValue(change);
+      const displayStocks=getStoreDisplayStocks(change);
+      const fallbackStock=parseStockNumber(change.stock_amount ?? change.smaregi_stock_quantity);
+      const tokyo=displayStocks.tokyo!==null ? displayStocks.tokyo : (getInventoryStoreCodeSafe()==="tokyo" ? fallbackStock : null);
+      const aichi=displayStocks.aichi!==null ? displayStocks.aichi : (getInventoryStoreCodeSafe()==="aichi" ? fallbackStock : null);
       return `<tr>
         <td>${safeText(changedAt && typeof fmt==="function" ? fmt(changedAt) : changedAt || "")}</td>
         <td>${safeText(change.stock_division || change.movement_type || "")}</td>
         <td>${safeText(change.amount ?? change.movement_quantity ?? "")}</td>
-        <td>${safeText(change.stock_amount ?? change.smaregi_stock_quantity ?? "")}</td>
+        <td>${safeText(tokyo===null?"-":tokyo)}</td>
+        <td>${safeText(aichi===null?"-":aichi)}</td>
         <td>${safeText(change.memo || change.movement_reason || "")}</td>
       </tr>`;
     };
     rows.push(...newestChanges.map(renderChange));
     if(Number.isFinite(lastCheckTime)){
-      rows.push(`<tr class="smaregi-last-check-divider"><td colspan="5">前回チェック締め：${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}</td></tr>`);
+      rows.push(`<tr class="smaregi-last-check-divider"><td colspan="6">前回チェック締め：${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}</td></tr>`);
     }
     rows.push(...olderChanges.slice(0,5).map(renderChange));
     return rows.join("");
   }
-
   window.showSmaregiCauseDetail=async function(barcode){
     if(typeof isSmaregiManager==="function" && !isSmaregiManager()){
       showMessage?.("原因確認は分析画面のパスワード認証後に操作できます。","err");
@@ -664,12 +762,12 @@
           <section class="smaregi-cause-history-card">
             <h3>在庫管理側の履歴</h3>
             <p class="section-note">バーコード ${safeText(itemBarcode||"未設定")} の在庫管理側履歴を表示します。前回チェック締め位置を青い区切りで表示します。</p>
-            <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>数量</th><th>担当者</th><th>備考</th><th>処理後在庫</th></tr></thead><tbody>${renderCauseAppLogRows(appLogs,itemBarcode)}</tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>処理前在庫</th><th>数量</th><th>担当者</th><th>備考</th><th>処理後在庫</th></tr></thead><tbody>${renderCauseAppLogRows(appLogs,itemBarcode)}</tbody></table></div>
           </section>
           <section class="smaregi-cause-history-card">
             <h3>スマレジ側の在庫変動履歴</h3>
             <p class="section-note">CSV取込済みの smaregi_stock_changes を、バーコード優先で検索しています。スマレジ在庫はCSV H列「在庫数」、最終変動日時はCSV J列「更新日時」です。</p>
-            <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>変動数</th><th>在庫数</th><th>理由・備考</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>変動数</th><th>東京店舗在庫</th><th>アイチ店舗在庫</th><th>理由・備考</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
           </section>
         </div>
       `;
@@ -835,6 +933,8 @@
     equipment_transfer:"備品転用",
     event_pick:"イベント持出",
     event_return:"イベント戻し",
+    equipment_transfer_cancel:"備品転用キャンセル",
+    "備品転用キャンセル":"備品転用キャンセル",
     stock_adjustment:"在庫修正",
     stock_in:"入荷",
     stock_out:"出荷"
@@ -850,6 +950,156 @@
       });
     });
   }
+
+  function isEquipmentTransferTypeValue(value){
+    const text=String(value||"").trim();
+    return text==="備品転用" || text==="equipment_transfer" || text.includes("蛯吝刀");
+  }
+
+  function isEquipmentMobileView(){
+    return typeof isMobileViewport==="function" ? isMobileViewport() : window.matchMedia("(max-width: 800px)").matches;
+  }
+
+  function getEquipmentCache(logId){
+    try{return equipmentTransferLogCache.get(String(logId))||null;}catch(_){return null;}
+  }
+
+  function setEquipmentCache(logId,log){
+    try{equipmentTransferLogCache.set(String(logId),log);}catch(_){}
+  }
+
+  window.equipmentCheckHtml=function(log){
+    if(!isEquipmentTransferTypeValue(log?.type))return "";
+    if(isEquipmentMobileView())return "";
+    const rawLogId=String(log?.id||log?.log_id||"");
+    if(rawLogId)setEquipmentCache(rawLogId,log);
+    const hasAccess=typeof hasInventoryPrivilegedAccess==="function" && hasInventoryPrivilegedAccess();
+    const checked=typeof isEquipmentTransferChecked==="function" ? isEquipmentTransferChecked(log) : (log?.equipment_checked===true || !!log?.equipment_checked_at);
+    if(!hasAccess)return checked ? '<span class="equipment-confirmed">確認済</span>' : "";
+    if(checked){
+      return `<div class="equipment-action-group"><span class="equipment-confirmed">確認済</span><button type="button" class="secondary equipment-cancel-btn" data-log-id="${safeText(rawLogId)}">備品転用キャンセル</button></div>`;
+    }
+    return `<button type="button" class="secondary equipment-confirm-btn" data-log-id="${safeText(rawLogId)}">確認</button>`;
+  };
+
+  window.executeEquipmentTransferConfirmation=async function({log,product=null,quantity,checkedBy,button}){
+    try{
+      const logId=String(log?.id||"");
+      const latestRows=logId ? await sbAll(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`,1,10000) : [];
+      const latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : log;
+      if(!latestLog)throw new Error("備品転用履歴が見つかりません。");
+      if(!isEquipmentTransferTypeValue(latestLog.type))throw new Error("備品転用の履歴ではありません。");
+      const alreadyChecked=typeof isEquipmentTransferChecked==="function" ? isEquipmentTransferChecked(latestLog) : (latestLog.equipment_checked===true || !!latestLog.equipment_checked_at);
+      if(alreadyChecked)throw new Error("この備品転用は確認済みです。");
+      const rawQty=Number(latestLog.quantity ?? quantity ?? 1);
+      const absQty=Math.abs(Number.isFinite(rawQty) && rawQty!==0 ? rawQty : 1);
+      product=product || await fetchProductByBarcode(latestLog.barcode);
+      if(!product)throw new Error("商品が見つかりません。");
+      let nextStock=Number(product.base_stock||0);
+      if(rawQty>0){
+        nextStock=nextStock-absQty;
+        await updateProductCurrentStock(latestLog.barcode,nextStock);
+      }
+      const checkedAt=new Date().toISOString();
+      const patch={equipment_checked:true,equipment_checked_at:checkedAt,equipment_checked_by:checkedBy||""};
+      const refreshed=await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify(patch)
+      });
+      const refreshedLog=Array.isArray(refreshed)&&refreshed[0] ? refreshed[0] : {...latestLog,...patch};
+      setEquipmentCache(logId,refreshedLog);
+      if(typeof replaceEquipmentConfirmationDom==="function")replaceEquipmentConfirmationDom(logId,refreshedLog);
+      showMessage?.(`備品転用を確認しました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
+      showPopup?.("備品転用確認完了",`商品名：${product.name||latestLog.product_name||""}\nバーコード：${latestLog.barcode}\n数量：${absQty}\n現在庫：${nextStock}`);
+      return true;
+    }catch(error){
+      if(button)button.disabled=false;
+      showMessage?.("備品転用確認エラー\n"+error.message,"err");
+      return false;
+    }
+  };
+
+  window.confirmEquipmentTransfer=async function(logId,button){
+    if(isEquipmentMobileView())return;
+    if(typeof hasInventoryPrivilegedAccess==="function" && !hasInventoryPrivilegedAccess()){
+      showMessage?.("備品転用確認は管理者認証後に実行できます。","err");
+      return;
+    }
+    const log=getEquipmentCache(logId);
+    if(!log){
+      showMessage?.("備品転用履歴IDが見つかりません。再読み込みしてください。","err");
+      return;
+    }
+    const checkedBy=typeof getSmaregiCheckerName==="function" ? getSmaregiCheckerName() : "";
+    if(!checkedBy){
+      showMessage?.("担当者を選択してください。","err");
+      return;
+    }
+    button.disabled=true;
+    await window.executeEquipmentTransferConfirmation({log,quantity:Math.abs(Number(log.quantity||1)),checkedBy,button});
+  };
+
+  window.cancelEquipmentTransfer=async function(logId,button){
+    if(isEquipmentMobileView())return;
+    if(typeof hasInventoryPrivilegedAccess==="function" && !hasInventoryPrivilegedAccess()){
+      showMessage?.("備品転用キャンセルは管理者認証後に実行できます。","err");
+      return;
+    }
+    const ok=confirm("備品転用をキャンセルし、アプリ在庫を戻します。実行しますか？");
+    if(!ok)return;
+    try{
+      button.disabled=true;
+      const latestRows=await sbAll(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`,1,10000);
+      const latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : getEquipmentCache(logId);
+      if(!latestLog)throw new Error("備品転用履歴が見つかりません。");
+      if(!isEquipmentTransferTypeValue(latestLog.type))throw new Error("備品転用の履歴ではありません。");
+      const duplicate=await sbAll(`inventory_logs?select=id&type=eq.${encodeURIComponent("備品転用キャンセル")}&barcode=eq.${encodeURIComponent(latestLog.barcode)}&memo=ilike.*${encodeURIComponent(logId)}*&limit=1`,1,10000).catch(()=>[]);
+      if(Array.isArray(duplicate)&&duplicate.length)throw new Error("この備品転用はすでにキャンセル済みです。");
+      const product=await fetchProductByBarcode(latestLog.barcode);
+      if(!product)throw new Error("商品が見つかりません。");
+      const absQty=Math.abs(Number(latestLog.quantity||1))||1;
+      const nextStock=Number(product.base_stock||0)+absQty;
+      await updateProductCurrentStock(latestLog.barcode,nextStock);
+      const staff=typeof getSmaregiCheckerName==="function" ? getSmaregiCheckerName() : "";
+      const inserted=await sb("inventory_logs",{
+        method:"POST",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify({
+          type:"備品転用キャンセル",
+          staff,
+          barcode:latestLog.barcode,
+          product_name:latestLog.product_name||product.name||"",
+          quantity:absQty,
+          memo:`備品転用キャンセル 元履歴:${logId}`
+        })
+      });
+      const cancelLog=Array.isArray(inserted)&&inserted[0] ? inserted[0] : null;
+      try{if(Array.isArray(logs)&&cancelLog)logs.unshift(cancelLog);}catch(_){}
+      showMessage?.(`備品転用をキャンセルしました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
+      showPopup?.("備品転用キャンセル完了",`商品名：${product.name||latestLog.product_name||""}\nバーコード：${latestLog.barcode}\n戻し数量：${absQty}\n現在庫：${nextStock}`);
+      if(typeof renderGlobalHistory==="function")renderGlobalHistory();
+      if(typeof selectedBarcode!=="undefined" && selectedBarcode && typeof showProductHistoryForBarcode==="function")showProductHistoryForBarcode(selectedBarcode);
+      return true;
+    }catch(error){
+      if(button)button.disabled=false;
+      showMessage?.("備品転用キャンセルエラー\n"+error.message,"err");
+      return false;
+    }
+  };
+
+  window.bindEquipmentConfirmButtons=function(){
+    document.querySelectorAll(".equipment-confirm-btn").forEach(button=>{
+      if(button.dataset.finalBound==="1")return;
+      button.dataset.finalBound="1";
+      button.onclick=()=>window.confirmEquipmentTransfer(button.dataset.logId,button);
+    });
+    document.querySelectorAll(".equipment-cancel-btn").forEach(button=>{
+      if(button.dataset.finalBound==="1")return;
+      button.dataset.finalBound="1";
+      button.onclick=()=>window.cancelEquipmentTransfer(button.dataset.logId,button);
+    });
+  };
 
   function wrapDifferenceReasonSave(){
     if(window.saveSmaregiDifferenceReason?.__smaregiFinalWrapped)return;
@@ -881,8 +1131,12 @@
     wrapDifferenceReasonSave();
     bindFinalRefreshButton();
     applyInventoryTypeDisplayLabels();
+    if(typeof bindEquipmentConfirmButtons==="function")bindEquipmentConfirmButtons();
     if(!window.__smaregiFinalTypeLabelTimer){
-      window.__smaregiFinalTypeLabelTimer=setInterval(applyInventoryTypeDisplayLabels,1000);
+      window.__smaregiFinalTypeLabelTimer=setInterval(()=>{
+        applyInventoryTypeDisplayLabels();
+        if(typeof bindEquipmentConfirmButtons==="function")bindEquipmentConfirmButtons();
+      },1000);
     }
     if(document.getElementById("smaregiStockCheckBody")){
       try{
