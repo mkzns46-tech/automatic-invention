@@ -651,16 +651,18 @@
     const derivedStockMap=new Map();
     sortedLogs.forEach(log=>{
       const typeValue=String(log.type||"").trim();
+      const memoValue=String(log.memo||log.note||"");
+      const isEquipmentCancelLog=memoValue.includes("備品転用キャンセル");
       const rawQty=parseStockNumber(log.quantity ?? log.qty ?? log.amount);
       const qty=rawQty===null ? 0 : rawQty;
       let after=parseStockNumber(log.after_stock ?? log.stock_after ?? log.base_stock_after);
       let before=parseStockNumber(log.before_stock ?? log.stock_before ?? log.base_stock_before);
       if(after===null && runningStock!==null)after=runningStock;
       let delta=qty;
-      if(typeValue==="出荷" || typeValue==="備品転用" || typeValue==="蜃ｺ闕ｷ" || typeValue==="蛯吝刀霆｢逕ｨ" || typeValue==="stock_out" || typeValue==="equipment_transfer" || typeValue==="event_pick"){
-        delta=qty>0 ? -qty : qty;
-      }else if(typeValue==="入荷" || typeValue==="蜈･闕ｷ" || typeValue==="stock_in" || typeValue==="event_return" || typeValue==="equipment_transfer_cancel" || typeValue==="備品転用キャンセル"){
+      if(isEquipmentCancelLog || typeValue==="入荷" || typeValue==="蜈･闕ｷ" || typeValue==="stock_in" || typeValue==="event_return" || typeValue==="equipment_transfer_cancel" || typeValue==="備品転用キャンセル"){
         delta=Math.abs(qty);
+      }else if(typeValue==="出荷" || typeValue==="備品転用" || typeValue==="蜃ｺ闕ｷ" || typeValue==="蛯吝刀霆｢逕ｨ" || typeValue==="stock_out" || typeValue==="equipment_transfer" || typeValue==="event_pick"){
+        delta=qty>0 ? -qty : qty;
       }else if(typeValue==="在庫修正" || typeValue==="蝨ｨ蠎ｫ菫ｮ豁｣" || typeValue==="stock_adjustment"){
         if(after===null && rawQty!==null)after=qty;
         delta=before!==null && after!==null ? after-before : 0;
@@ -670,7 +672,9 @@
       if(before!==null)runningStock=before;
     });
     const renderLog=(log)=>{
-      const type=INVENTORY_TYPE_LABELS[String(log.type||"").trim()] || log.type || "";
+      const type=String(log.memo||log.note||"").includes("備品転用キャンセル")
+        ? "備品転用キャンセル"
+        : (INVENTORY_TYPE_LABELS[String(log.type||"").trim()] || log.type || "");
       const staff=log.staff || log.staff_name || log.created_by || "";
       const memo=log.memo || log.note || "";
       const stock=derivedStockMap.get(log)||{};
@@ -1075,7 +1079,49 @@
       }
       .smaregi-cause-history-card td:nth-child(6){
         white-space:normal;
+        width:150px;
+        max-width:170px;
         min-width:130px;
+        word-break:break-word;
+        overflow-wrap:anywhere;
+      }
+      .smaregi-cause-history-card td:nth-child(6){
+        display:-webkit-box;
+        -webkit-line-clamp:3;
+        -webkit-box-orient:vertical;
+        overflow:hidden;
+      }
+      #historyBody td:nth-child(9),
+      #recentRegistrationHistoryBody td:nth-child(9),
+      #selectedHistoryBody td:nth-child(9){
+        width:170px;
+        max-width:190px;
+        min-width:140px;
+        white-space:normal;
+        word-break:break-word;
+        overflow-wrap:anywhere;
+        vertical-align:middle;
+      }
+      #historyBody .memo-cell,
+      #recentRegistrationHistoryBody .memo-cell,
+      #selectedHistoryBody .memo-cell{
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        align-items:center;
+        gap:8px;
+        max-width:190px;
+      }
+      #historyBody .memo-text,
+      #recentRegistrationHistoryBody .memo-text,
+      #selectedHistoryBody .memo-text{
+        display:-webkit-box;
+        -webkit-line-clamp:3;
+        -webkit-box-orient:vertical;
+        overflow:hidden;
+        white-space:normal;
+        word-break:break-word;
+        overflow-wrap:anywhere;
+        line-height:1.35;
       }
       .smaregi-last-check-divider td{
         background:#eaf2ff !important;
@@ -1201,6 +1247,24 @@
         .smaregi-cause-history-card .table-wrap{
           max-height:520px;
         }
+        #historyBody td:nth-child(9),
+        #recentRegistrationHistoryBody td:nth-child(9),
+        #selectedHistoryBody td:nth-child(9){
+          width:110px;
+          max-width:130px;
+          min-width:90px;
+        }
+        #historyBody .memo-cell,
+        #recentRegistrationHistoryBody .memo-cell,
+        #selectedHistoryBody .memo-cell{
+          max-width:130px;
+        }
+        #historyBody .memo-text,
+        #recentRegistrationHistoryBody .memo-text,
+        #selectedHistoryBody .memo-text,
+        .smaregi-cause-history-card td:nth-child(6){
+          -webkit-line-clamp:1;
+        }
         .equipment-action-group,
         .equipment-confirm-btn,
         .equipment-cancel-btn{
@@ -1230,6 +1294,27 @@
         const text=String(cell.textContent||"").trim();
         if(INVENTORY_TYPE_LABELS[text])cell.textContent=INVENTORY_TYPE_LABELS[text];
       });
+      body.querySelectorAll("tr").forEach(row=>{
+        const cells=row.querySelectorAll("td");
+        const typeCell=cells[1];
+        const memoCell=cells[8];
+        const typeText=String(typeCell?.textContent||"").trim();
+        const memoText=String(memoCell?.textContent||"").trim();
+        if(typeCell && memoText.includes("備品転用キャンセル") && (typeText==="備品転用" || typeText==="equipment_transfer")){
+          typeCell.textContent="備品転用キャンセル";
+        }
+      });
+    });
+  }
+
+  function applyMemoOverflowTitles(){
+    document.querySelectorAll("#historyBody .memo-text,#recentRegistrationHistoryBody .memo-text,#selectedHistoryBody .memo-text").forEach(node=>{
+      const text=String(node.textContent||"").trim();
+      if(text)node.title=text;
+    });
+    document.querySelectorAll(".smaregi-cause-history-card tbody tr td:nth-child(6)").forEach(node=>{
+      const text=String(node.textContent||"").trim();
+      if(text)node.title=text;
     });
   }
 
@@ -1351,7 +1436,7 @@
       const latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : getEquipmentCache(logId);
       if(!latestLog)throw new Error("備品転用履歴が見つかりません。");
       if(!isEquipmentTransferTypeValue(latestLog.type))throw new Error("備品転用の履歴ではありません。");
-      const duplicate=await sbAll(`inventory_logs?select=id&type=eq.${encodeURIComponent("備品転用キャンセル")}&barcode=eq.${encodeURIComponent(latestLog.barcode)}&memo=ilike.*${encodeURIComponent(logId)}*&limit=1`,1,10000).catch(()=>[]);
+      const duplicate=await sbAll(`inventory_logs?select=id&barcode=eq.${encodeURIComponent(latestLog.barcode)}&memo=ilike.*${encodeURIComponent(logId)}*&limit=1`,1,10000).catch(()=>[]);
       if(Array.isArray(duplicate)&&duplicate.length)throw new Error("この備品転用はすでにキャンセル済みです。");
       const product=await fetchProductByBarcode(latestLog.barcode);
       if(!product)throw new Error("商品が見つかりません。");
@@ -1363,7 +1448,7 @@
         method:"POST",
         headers:{Prefer:"return=representation"},
         body:JSON.stringify({
-          type:"備品転用キャンセル",
+          type:"equipment_transfer",
           staff,
           barcode:latestLog.barcode,
           product_name:latestLog.product_name||product.name||"",
@@ -1428,10 +1513,12 @@
     wrapDifferenceReasonSave();
     bindFinalRefreshButton();
     applyInventoryTypeDisplayLabels();
+    applyMemoOverflowTitles();
     if(typeof bindEquipmentConfirmButtons==="function")bindEquipmentConfirmButtons();
     if(!window.__smaregiFinalTypeLabelTimer){
       window.__smaregiFinalTypeLabelTimer=setInterval(()=>{
         applyInventoryTypeDisplayLabels();
+        applyMemoOverflowTitles();
         if(typeof bindEquipmentConfirmButtons==="function")bindEquipmentConfirmButtons();
       },1000);
     }
