@@ -5,6 +5,72 @@ function updateSmaregiProductImportControl(){
   if(!button)return;
   button.disabled=false;
   button.textContent="スマレジ商品マスター取込";
+  ensureProductMasterImportNotice();
+}
+
+function ensureProductMasterImportNotice(){
+  const button=el("importSmaregiProductsBtn");
+  const card=el("productImportCard");
+  if(!button||!card||el("productMasterImportNotice"))return;
+  const notice=document.createElement("div");
+  notice.id="productMasterImportNotice";
+  notice.className="product-master-import-notice";
+  notice.innerHTML=`
+    <style>
+      .product-master-import-notice{
+        margin:12px 0;
+        padding:14px 16px;
+        border:1px solid #9cc9e8;
+        border-radius:10px;
+        background:#eef8ff;
+        color:#12405f;
+        line-height:1.65;
+        font-size:14px;
+      }
+      .product-master-import-notice strong{
+        display:block;
+        margin-bottom:8px;
+        color:#0d3552;
+        font-size:15px;
+      }
+      .product-master-import-notice-grid{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:10px 18px;
+      }
+      .product-master-import-notice p{
+        margin:0 0 4px;
+        font-weight:700;
+      }
+      .product-master-import-notice ul{
+        margin:0;
+        padding-left:1.2em;
+      }
+      @media (max-width:800px){
+        .product-master-import-notice{
+          font-size:13px;
+          padding:12px;
+        }
+        .product-master-import-notice-grid{
+          grid-template-columns:1fr;
+        }
+      }
+    </style>
+    <strong>ℹ️ 【商品マスターCSV取込について】</strong>
+    <div class="product-master-import-notice-grid">
+      <div><p>■ 取込対象</p><ul><li>バーコード</li><li>商品名</li></ul></div>
+      <div><p>■ 新規商品の扱い</p><ul><li>新規商品は登録されます</li><li>初期アプリ在庫は「0」で登録されます</li></ul></div>
+      <div><p>■ 既存商品の扱い</p><ul><li>バーコードが一致する商品は商品名のみ更新します</li><li>アプリ在庫は変更しません</li></ul></div>
+      <div><p>■ 更新しない項目</p><ul><li>アプリ在庫</li><li>棚番</li><li>価格</li><li>部門</li><li>商品区分</li><li>イベント在庫</li><li>棚卸履歴</li><li>原因確認履歴</li></ul></div>
+    </div>
+    <p style="margin:10px 0 0;font-weight:700;">■ 注意</p>
+    <ul>
+      <li>CSV内の在庫数は使用しません。</li>
+      <li>在庫数の更新は「スマレジ在庫変動CSV取込」で行います。</li>
+      <li>商品マスターCSVは商品情報を管理するための機能です。</li>
+    </ul>
+  `;
+  button.insertAdjacentElement("beforebegin",notice);
 }
 
 async function upsertProducts(rows){
@@ -209,16 +275,11 @@ function csvToRows(text){
 
     const barcode=String(getCsvValue(raw,["barcode","バーコード","jan","jancode","janコード","品番"])).trim();
     const name=String(getCsvValue(raw,["name","商品名","productname","product_name","品名"])).trim();
-    const stockRaw=String(getCsvValue(raw,["base_stock","basestock","現在庫","現在在庫","在庫","原在庫","stock","quantity","数量"])).replace(/,/g,"").trim();
-    const location=String(getCsvValue(raw,["location","棚番","ロケーション","場所"])).trim();
 
     if(!barcode&&!name)continue;
     if(!barcode||!name)throw new Error(`${i+1}行目：バーコードまたは商品名が空です。`);
 
-    const base_stock=Number(stockRaw||0);
-    if(!Number.isFinite(base_stock))throw new Error(`${i+1}行目：在庫数が数字ではありません。`);
-
-    rows.push({barcode,name,base_stock,location});
+    rows.push({barcode,name});
   }
 
   if(!rows.length)throw new Error("取り込み対象データがありません。");
@@ -244,11 +305,14 @@ async function importCsvFile(file){
       if(current){
         existingRows.push({
           barcode:row.barcode,
-          name:row.name,
-          location:row.location
+          name:row.name
         });
       }else{
-        newRows.push(row);
+        newRows.push({
+          barcode:row.barcode,
+          name:row.name,
+          base_stock:0
+        });
       }
     });
 
@@ -263,9 +327,8 @@ async function importCsvFile(file){
       const old=gp(r.barcode);
       if(old){
         old.name=r.name;
-        old.location=r.location;
       }else{
-        products.push(r);
+        products.push({...r,base_stock:0});
       }
     }
 
@@ -282,7 +345,7 @@ async function importCsvFile(file){
 
 
 function downloadSampleCsv(){
-  const csv="\uFEFFbarcode,name,base_stock,location\n4901234567890,サンプル商品A,10,A-01\n4909876543210,サンプル商品B,5,B-01\n";
+  const csv="\uFEFFbarcode,name\n4901234567890,サンプル商品A\n4909876543210,サンプル商品B\n";
   const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
@@ -298,6 +361,7 @@ function updateSmaregiProductImportControl(){
   button.disabled=false;
   button.textContent="商品マスターCSV取込";
   button.title="API停止中／CSV運用中：スマレジAPIには接続しません";
+  ensureProductMasterImportNotice();
 }
 
 async function importSmaregiProducts(){
