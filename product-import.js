@@ -235,9 +235,27 @@ async function importCsvFile(file){
     const text=decodeCsvBuffer(buffer);
 
     const rows=csvToRows(text);
+    await fetchProductsByBarcodes(rows.map(row=>row.barcode));
 
-    for(let i=0;i<rows.length;i+=500){
-      await upsertProducts(rows.slice(i,i+500));
+    const existingRows=[];
+    const newRows=[];
+    rows.forEach(row=>{
+      const current=gp(row.barcode);
+      if(current){
+        existingRows.push({
+          barcode:row.barcode,
+          name:row.name,
+          location:row.location
+        });
+      }else{
+        newRows.push(row);
+      }
+    });
+
+    for(const payloadRows of [existingRows,newRows]){
+      for(let i=0;i<payloadRows.length;i+=500){
+        await upsertProducts(payloadRows.slice(i,i+500));
+      }
     }
 
     // 取り込み後、キャッシュを更新
@@ -245,14 +263,13 @@ async function importCsvFile(file){
       const old=gp(r.barcode);
       if(old){
         old.name=r.name;
-        old.base_stock=r.base_stock;
         old.location=r.location;
       }else{
         products.push(r);
       }
     }
 
-    showMessage(`CSV取り込み完了：${rows.length}件の商品を登録・更新しました。履歴表示は商品マスター名を優先します。`,"ok");
+    showMessage(`CSV取り込み完了：${rows.length}件の商品を登録・更新しました。既存商品の在庫数は変更していません。`,"ok");
     render();
   }catch(e){
     showMessage("CSV取り込みエラー。\n"+e.message,"err");
