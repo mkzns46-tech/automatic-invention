@@ -1769,9 +1769,9 @@ td small{margin-top:4px;color:#527161}
 /* ===== v100 final PC difference action override ===== */
 .smaregi-diff-table th:last-child,
 .smaregi-diff-table td:last-child{
-  width:110px !important;
-  min-width:110px !important;
-  max-width:110px !important;
+  width:132px !important;
+  min-width:132px !important;
+  max-width:132px !important;
 }
 .diff-action-group{
   display:flex !important;
@@ -1787,6 +1787,11 @@ td small{margin-top:4px;color:#527161}
   font-size:12px !important;
   border-radius:10px !important;
   white-space:nowrap !important;
+}
+.diff-action-group .smaregi-no-issue-btn{
+  border-color:#16a34a !important;
+  color:#166534 !important;
+  background:#f0fdf4 !important;
 }
 
 /* ===== screen routing: inventory / smaregi / analytics / settings ===== */
@@ -2180,9 +2185,9 @@ body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden])
 /* ===== v99 difference action column ===== */
 .smaregi-diff-table th:last-child,
 .smaregi-diff-table td:last-child{
-  width:110px !important;
-  min-width:110px !important;
-  max-width:110px !important;
+  width:132px !important;
+  min-width:132px !important;
+  max-width:132px !important;
   vertical-align:middle !important;
 }
 .diff-action-group{
@@ -3237,9 +3242,9 @@ header h1{
 /* ===== v101 final difference action override ===== */
 .smaregi-diff-table th:last-child,
 .smaregi-diff-table td:last-child{
-  width:110px !important;
-  min-width:110px !important;
-  max-width:110px !important;
+  width:132px !important;
+  min-width:132px !important;
+  max-width:132px !important;
 }
 .diff-action-group{
   display:flex !important;

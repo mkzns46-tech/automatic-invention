@@ -339,17 +339,89 @@
     }).filter(Boolean);
   }
 
+  function readNoIssueReason(){
+    const reason=prompt("問題なしとして登録する理由・メモを入力してください。", "確認済み");
+    if(reason===null)return null;
+    return String(reason||"").trim();
+  }
+
+  async function markSmaregiDifferenceNoIssue(barcode,button=null){
+    if(!smaregiSnapshot){
+      showMessage?.("スマレジ在庫変動CSVを取り込んでから登録してください。","err");
+      return false;
+    }
+    const item=getAllMovementItems().find(row=>String(row.barcode||"")===String(barcode));
+    const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(barcode) : null;
+    if(!item||!check){
+      showMessage?.("問題なし登録する差異データが見つかりません。","err");
+      return false;
+    }
+    const checkedBy=typeof getSmaregiCheckerName==="function" ? getSmaregiCheckerName() : "";
+    if(!checkedBy){
+      showMessage?.("担当者を選択してください。","err");
+      const checker=document.getElementById("smaregiCheckerName");
+      checker?.focus();
+      return false;
+    }
+    const noIssueReason=readNoIssueReason();
+    if(noIssueReason===null)return false;
+    const actual=Number(check.actual_stock);
+    const smaregiStock=getCsvSmaregiStock(item);
+    const difference=Number.isFinite(actual)&&Number.isFinite(smaregiStock) ? actual-smaregiStock : check.difference;
+    const ok=confirm([
+      "この差異を今回の棚卸では「問題なし」として登録します。",
+      "",
+      `商品：${getItemName(item)||barcode}`,
+      `バーコード：${barcode}`,
+      `スマレジ在庫：${Number.isFinite(smaregiStock)?smaregiStock:"-"}`,
+      `実在庫：${Number.isFinite(actual)?actual:"-"}`,
+      `差異：${Number.isFinite(difference)?difference:"-"}`,
+      "",
+      "登録後、この商品は差異一覧・原因確認集計・差異件数から外れます。"
+    ].join("\n"));
+    if(!ok)return false;
+    try{
+      if(button)button.disabled=true;
+      const noIssueAt=new Date().toISOString();
+      const payload={
+        no_issue:true,
+        no_issue_by:checkedBy,
+        no_issue_at:noIssueAt,
+        no_issue_reason:noIssueReason,
+        difference:Number.isFinite(difference) ? difference : check.difference,
+        actual_stock:Number.isFinite(actual) ? actual : check.actual_stock,
+        excluded:false
+      };
+      const savedRows=await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify(payload)
+      });
+      const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : {...check,...payload};
+      smaregiStockChecks=smaregiStockChecks.filter(row=>String(row.barcode)!==String(barcode));
+      smaregiStockChecks.push({...savedRow,snapshot_id:smaregiSnapshot.id,barcode});
+      renderSmaregiDiffOnlyPanel();
+      renderSmaregiStockChecks();
+      updateSmaregiProgressOnly();
+      if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();
+      if(typeof loadSmaregiDifferenceRanking==="function")loadSmaregiDifferenceRanking();
+      if(typeof loadSmaregiReasonSummary==="function")loadSmaregiReasonSummary();
+      showMessage?.(`問題なしとして登録しました：${getItemName(item)||barcode}`,"ok");
+      return true;
+    }catch(error){
+      if(button)button.disabled=false;
+      showMessage?.("問題なし登録エラー\n"+error.message,"err");
+      return false;
+    }
+  }
+
+  window.markSmaregiDifferenceNoIssue=markSmaregiDifferenceNoIssue;
+
   window.renderSmaregiDiffOnlyPanel=function(){
     const panel=typeof el==="function" ? el("smaregiDiffOnlyPanel") : document.getElementById("smaregiDiffOnlyPanel");
     const body=typeof el==="function" ? el("smaregiDiffOnlyBody") : document.getElementById("smaregiDiffOnlyBody");
     const summary=typeof el==="function" ? el("smaregiDiffSummary") : document.getElementById("smaregiDiffSummary");
     if(!panel||!body)return;
-    if(typeof isSmaregiManager==="function" && !isSmaregiManager()){
-      panel.hidden=true;
-      body.innerHTML="";
-      if(summary)summary.textContent="";
-      return;
-    }
     const stats=getSmaregiStats();
     const rows=getDiffRows();
     if(summary)summary.textContent=`差異：${rows.length}件 / チェック済み：${stats.completed||0}件 / 未チェック：${stats.unchecked||0}件 / 除外：${stats.excluded||0}件`;
@@ -377,7 +449,7 @@
         <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
         <td>${safeText(checkedBy||"担当者未設定")}</td>
         <td>${check?.checked_at && typeof fmt==="function" ? safeText(fmt(check.checked_at)) : "未入力"}</td>
-        <td><div class="diff-action-group"><button type="button" class="smaregi-diff-save-btn" data-barcode="${safeText(barcode)}">保存</button><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${safeText(barcode)}">原因確認</button></div></td>
+        <td><div class="diff-action-group"><button type="button" class="smaregi-diff-save-btn" data-barcode="${safeText(barcode)}">保存</button><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${safeText(barcode)}">原因確認</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${safeText(barcode)}">問題なし</button></div></td>
       </tr>`;
     }).join("");
     body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
@@ -387,6 +459,9 @@
       button.onclick=()=>{
         if(typeof showSmaregiCauseDetail==="function")showSmaregiCauseDetail(button.dataset.barcode);
       };
+    });
+    body.querySelectorAll(".smaregi-no-issue-btn").forEach(button=>{
+      button.onclick=()=>markSmaregiDifferenceNoIssue(button.dataset.barcode,button);
     });
   };
 
