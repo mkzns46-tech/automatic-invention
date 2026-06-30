@@ -1,36 +1,41 @@
-﻿(function(){
+(function(){
   const STATUSES = ["未手配", "手配済", "入荷待ち", "一部入荷", "入荷済", "完了", "キャンセル"];
   const STATUS_CLASS = { "未手配":"status-open", "手配済":"status-ordered", "入荷待ち":"status-waiting", "一部入荷":"status-partial", "入荷済":"status-arrived", "完了":"status-done", "キャンセル":"status-cancel" };
   let rows = [];
   let view = "active";
   document.addEventListener("DOMContentLoaded", init);
-  function init(){ rows = BackorderStorage.load(); setupFilters(); bindEvents(); render(); }
+  function init(){
+    rows = BackorderStorage.load();
+    setupFilters();
+    bindEvents();
+    render();
+  }
   function bindEvents(){
-    document.getElementById("makeshopCsvInput").addEventListener("change", event => importCsv(event, BackorderCsv.parseMakeShop, "MakeShop"));
-    document.getElementById("smaregiCsvInput").addEventListener("change", event => importCsv(event, BackorderCsv.parseSmaregi, "スマレジ"));
+    document.getElementById("makeshopCsv").addEventListener("change", event => importCsv(event, BackorderCsv.parseMakeShop, "MakeShop"));
+    document.getElementById("smaregiCsv").addEventListener("change", event => importCsv(event, BackorderCsv.parseSmaregi, "スマレジ"));
     document.getElementById("manualForm").addEventListener("submit", saveManual);
+    document.getElementById("activeTab").addEventListener("click", () => setView("active"));
+    document.getElementById("completedTab").addEventListener("click", () => setView("completed"));
     document.getElementById("exportCsvBtn").addEventListener("click", exportVisible);
-    document.querySelectorAll(".tab").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
-    ["filterOrderNumber","filterCustomerName","filterProductName","filterStatus","filterSupplier","filterStaff","filterCompletedDate"].forEach(id => {
+    ["filterOrderNo","filterCustomer","filterProduct","filterStatus","filterSupplier","filterStaff","filterCompletedDate"].forEach(id => {
       document.getElementById(id).addEventListener("input", render);
       document.getElementById(id).addEventListener("change", render);
     });
   }
-  function setupFilters(){ document.getElementById("filterStatus").innerHTML = `<option value="">すべて</option>${STATUSES.map(s => `<option>${s}</option>`).join("")}`; }
+  function setupFilters(){
+    document.getElementById("filterStatus").innerHTML = `<option value="">すべて</option>${STATUSES.map(s => `<option>${s}</option>`).join("")}`;
+  }
   async function importCsv(event, parser, label){
     const file = event.target.files && event.target.files[0];
     if (!file) return;
     try {
-      const text = await BackorderCsv.readFileText(file);
-      const parsed = parser(text);
-      const result = BackorderStorage.mergeNewRows(rows, parsed.rows);
+      const incoming = parser(await file.text()).map(row => BackorderStorage.normalize(row));
+      const result = BackorderStorage.mergeNewRows(rows, incoming);
       rows = result.rows;
-      const warningText = parsed.warnings && parsed.warnings.length ? `\n注意: ${parsed.warnings.join(" / ")}` : "";
-      showMessage(`${label} CSVを取り込みました。\n抽出: ${parsed.rows.length}件 / 新規登録: ${result.added}件 / 重複スキップ: ${result.skipped}件${warningText}`, parsed.warnings && parsed.warnings.length ? "warn" : "ok");
-      document.getElementById("importSummary").textContent = `${label} ヘッダー: ${parsed.headers.join(" / ")}`;
+      showMessage(`${label} CSVを取り込みました。\n抽出: ${incoming.length}件 / 新規登録: ${result.added}件 / 重複スキップ: ${result.skipped}件`, "ok");
       event.target.value = "";
       render();
-    } catch(error) {
+    } catch (error) {
       console.error(error);
       showMessage(`${label} CSV取込に失敗しました。CSV形式を確認してください。`, "err");
     }
@@ -38,7 +43,12 @@
   function saveManual(event){
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-    const row = BackorderStorage.normalize({ ...data, source: data.source || "手動", orderQty: BackorderStorage.toNumber(data.orderQty, 1), duplicateKey: ["manual", data.orderNumber, data.productCode, data.productName, data.variation, Date.now()].join("|") });
+    const row = BackorderStorage.normalize({
+      ...data,
+      source: data.source || "手動",
+      orderQty: BackorderStorage.toNumber(data.orderQty, 1),
+      duplicateKey: ["manual", data.orderNo, data.productCode, data.productName, data.variation, Date.now()].join("|")
+    });
     rows = [...rows, BackorderStorage.addHistory(row, "手動登録", "手動フォームから登録")];
     BackorderStorage.save(rows);
     event.currentTarget.reset();
@@ -46,69 +56,114 @@
     showMessage("手動登録しました。", "ok");
     render();
   }
-  function setView(next){ view = next; document.querySelectorAll(".tab").forEach(button => button.classList.toggle("active", button.dataset.view === view)); document.body.classList.toggle("view-completed", view === "completed"); render(); }
-  function visibleRows(){
-    const filters = { orderNumber: value("filterOrderNumber"), customerName: value("filterCustomerName"), productName: value("filterProductName"), status: value("filterStatus"), supplier: value("filterSupplier"), staff: value("filterStaff"), completedDate: value("filterCompletedDate") };
+  function setView(next){
+    view = next;
+    document.getElementById("activeTab").classList.toggle("active", view === "active");
+    document.getElementById("completedTab").classList.toggle("active", view === "completed");
+    document.body.classList.toggle("show-completed", view === "completed");
+    render();
+  }
+  function getVisibleRows(){
+    const filters = {
+      orderNo: getValue("filterOrderNo"),
+      customer: getValue("filterCustomer"),
+      product: getValue("filterProduct"),
+      status: getValue("filterStatus"),
+      supplier: getValue("filterSupplier"),
+      staff: getValue("filterStaff"),
+      completedDate: getValue("filterCompletedDate")
+    };
     return rows.filter(row => {
-      if (view === "active" && (row.status === "完了" || row.status === "キャンセル")) return false;
+      if (view === "active" && row.status === "完了") return false;
       if (view === "completed" && row.status !== "完了") return false;
-      if (view === "canceled" && row.status !== "キャンセル") return false;
-      if (filters.orderNumber && !includes(row.orderNumber, filters.orderNumber)) return false;
-      if (filters.customerName && !includes(row.customerName, filters.customerName)) return false;
-      if (filters.productName && !includes(row.productName, filters.productName)) return false;
+      if (filters.orderNo && !includes(row.orderNo, filters.orderNo)) return false;
+      if (filters.customer && !includes(row.customerName, filters.customer)) return false;
+      if (filters.product && !includes(row.productName, filters.product)) return false;
       if (filters.status && row.status !== filters.status) return false;
       if (filters.supplier && !includes(row.supplier, filters.supplier)) return false;
       if (filters.staff && !includes(row.staff, filters.staff)) return false;
       if (view === "completed" && filters.completedDate && row.completedDate !== filters.completedDate) return false;
       return true;
-    }).sort((a,b) => String(b.orderDate || b.createdAt).localeCompare(String(a.orderDate || a.createdAt)));
+    }).sort((a, b) => String(b.orderDate || b.createdAt).localeCompare(String(a.orderDate || a.createdAt)));
   }
   function render(){
-    const visible = visibleRows();
-    document.getElementById("boardTitle").textContent = view === "completed" ? "完了一覧" : view === "canceled" ? "キャンセル一覧" : "未完了手配一覧";
+    const visible = getVisibleRows();
+    document.getElementById("boardTitle").textContent = view === "active" ? "未完了手配一覧" : "完了一覧";
     document.getElementById("boardCount").textContent = `${visible.length}件`;
     document.getElementById("boardBody").innerHTML = visible.map(renderRow).join("");
   }
   function renderRow(row){
     const statusOptions = STATUSES.map(status => `<option ${row.status === status ? "selected" : ""}>${status}</option>`).join("");
     const history = (row.history || []).slice(-5).reverse().map(item => `${formatDateTime(item.at)} ${escapeHtml(item.action)} ${escapeHtml(item.detail || "")}`).join("<br>");
-    return `<tr>${readTd("注文日", row.orderDate)}${readTd("注文番号 / 取引番号", row.orderNumber)}${readTd("注文者", row.customerName)}${readTd("注文元", row.source)}${readTd("商品名", row.productName)}${readTd("バリエーション", row.variation)}${readTd("商品コード", row.productCode)}${readTd("JANコード", row.janCode)}<td data-label="注文数量"><input type="number" min="0" step="1" value="${row.orderQty}" onchange="BackorderApp.update('${row.id}','orderQty',this.value)"></td><td data-label="入荷数量"><input type="number" min="0" step="1" value="${row.receivedQty}" onchange="BackorderApp.update('${row.id}','receivedQty',this.value)"></td><td data-label="残数量"><span class="readonly-cell number-cell">${row.remainingQty}</span></td><td data-label="ステータス"><select onchange="BackorderApp.update('${row.id}','status',this.value)">${statusOptions}</select><span class="status-pill ${STATUS_CLASS[row.status] || "status-open"}">${escapeHtml(row.status)}</span></td>${inputTd("発注先", row.id, "supplier", row.supplier)}${inputTd("担当者", row.id, "staff", row.staff)}${dateTd("入荷予定日", row.id, "expectedArrivalDate", row.expectedArrivalDate)}${dateTd("入荷日", row.id, "arrivalDate", row.arrivalDate)}${dateTd("完了日", row.id, "completedDate", row.completedDate)}${textTd("キャンセル理由", row.id, "cancelReason", row.cancelReason)}${textTd("メモ", row.id, "memo", row.memo)}<td data-label="履歴"><div class="history-cell">${history || "履歴なし"}</div></td></tr>`;
+    return `<tr>
+      ${readTd("注文日", row.orderDate)}
+      ${readTd("注文番号 / 取引番号", row.orderNo)}
+      ${readTd("注文者", row.customerName)}
+      ${readTd("注文元", row.source)}
+      ${readTd("商品名", row.productName)}
+      ${readTd("バリエーション", row.variation)}
+      ${readTd("商品コード", row.productCode)}
+      ${readTd("JANコード", row.janCode)}
+      <td data-label="注文数量"><input type="number" min="0" step="1" value="${row.orderQty}" onchange="BackorderApp.update('${row.id}','orderQty',this.value)"></td>
+      <td data-label="入荷数量"><input type="number" min="0" step="1" value="${row.receivedQty}" onchange="BackorderApp.update('${row.id}','receivedQty',this.value)"></td>
+      <td data-label="残数量"><span class="readonly-cell number-cell">${row.remainingQty}</span></td>
+      <td data-label="ステータス"><select onchange="BackorderApp.update('${row.id}','status',this.value)">${statusOptions}</select><span class="status-pill ${STATUS_CLASS[row.status] || "status-open"}">${escapeHtml(row.status)}</span></td>
+      ${inputTd("発注先", row.id, "supplier", row.supplier)}
+      ${inputTd("担当者", row.id, "staff", row.staff)}
+      ${dateTd("入荷予定日", row.id, "expectedArrivalDate", row.expectedArrivalDate)}
+      ${dateTd("入荷日", row.id, "arrivalDate", row.arrivalDate)}
+      ${dateTd("完了日", row.id, "completedDate", row.completedDate)}
+      ${textTd("キャンセル理由", row.id, "cancelReason", row.cancelReason)}
+      ${textTd("メモ", row.id, "memo", row.memo)}
+      <td data-label="履歴"><div class="history-cell">${history || "履歴なし"}</div></td>
+    </tr>`;
   }
-  function update(id, key, rawValue){
+  function update(id, key, value){
     rows = rows.map(row => {
       if (row.id !== id) return row;
       const before = row[key];
-      let next = { ...row, [key]: rawValue };
-      if (key === "orderQty" || key === "receivedQty") next[key] = BackorderStorage.toNumber(rawValue, 0);
+      let next = { ...row, [key]: value };
+      if (key === "orderQty" || key === "receivedQty") next[key] = BackorderStorage.toNumber(value, 0);
       next = BackorderStorage.normalize(next);
       if (key === "receivedQty") {
-        if (next.receivedQty > 0 && next.remainingQty > 0 && next.status !== "完了" && next.status !== "キャンセル") next.status = "一部入荷";
-        if (next.orderQty > 0 && next.remainingQty === 0 && next.status !== "完了" && next.status !== "キャンセル") next.status = "入荷済";
+        if (next.remainingQty > 0 && next.receivedQty > 0 && next.status !== "完了") next.status = "一部入荷";
+        if (next.remainingQty === 0 && next.orderQty > 0 && next.status !== "完了") next.status = "入荷済";
         if (next.receivedQty > 0 && !next.arrivalDate) next.arrivalDate = today();
       }
       if (key === "status") {
-        if (rawValue === "完了" && !next.completedDate) next.completedDate = today();
-        if (rawValue === "手配済" && !next.arrangementDate) next.arrangementDate = today();
+        if (value === "完了" && !next.completedDate) next.completedDate = today();
+        if (value === "手配済" && !next.arrangementDate) next.arrangementDate = today();
       }
-      return BackorderStorage.addHistory(next, labelFor(key), `${display(before)} -> ${display(next[key])}`);
+      return BackorderStorage.addHistory(next, labelFor(key), `${displayValue(before)} -> ${displayValue(next[key])}`);
     });
     BackorderStorage.save(rows);
     render();
   }
-  function exportVisible(){ const blob = new Blob([`\uFEFF${BackorderCsv.toCsv(visibleRows())}`], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `backorder-${view}-${today()}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
-  function readTd(label, text){ return `<td data-label="${label}"><span class="readonly-cell">${escapeHtml(text)}</span></td>`; }
-  function inputTd(label, id, key, text){ return `<td data-label="${label}"><input value="${escapeAttr(text)}" onchange="BackorderApp.update('${id}','${key}',this.value)"></td>`; }
-  function dateTd(label, id, key, text){ return `<td data-label="${label}"><input type="date" value="${escapeAttr(text)}" onchange="BackorderApp.update('${id}','${key}',this.value)"></td>`; }
-  function textTd(label, id, key, text){ return `<td data-label="${label}"><textarea onchange="BackorderApp.update('${id}','${key}',this.value)">${escapeHtml(text)}</textarea></td>`; }
-  function value(id){ return document.getElementById(id).value.trim(); }
-  function includes(text, query){ return String(text || "").toLowerCase().includes(String(query || "").toLowerCase()); }
+  function exportVisible(){
+    const blob = new Blob([`\uFEFF${BackorderCsv.toCsv(getVisibleRows())}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `backorder-${view}-${today()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+  function readTd(label, value){ return `<td data-label="${label}"><span class="readonly-cell">${escapeHtml(value)}</span></td>`; }
+  function inputTd(label, id, key, value){ return `<td data-label="${label}"><input value="${escapeAttr(value)}" onchange="BackorderApp.update('${id}','${key}',this.value)"></td>`; }
+  function dateTd(label, id, key, value){ return `<td data-label="${label}"><input type="date" value="${escapeAttr(value)}" onchange="BackorderApp.update('${id}','${key}',this.value)"></td>`; }
+  function textTd(label, id, key, value){ return `<td data-label="${label}"><textarea onchange="BackorderApp.update('${id}','${key}',this.value)">${escapeHtml(value)}</textarea></td>`; }
+  function getValue(id){ return document.getElementById(id).value.trim(); }
+  function includes(value, query){ return String(value || "").toLowerCase().includes(String(query || "").toLowerCase()); }
   function today(){ return new Date().toISOString().slice(0, 10); }
   function showMessage(text, type){ const box = document.getElementById("message"); box.textContent = text; box.className = `message ${type || ""}`; }
-  function escapeHtml(value){ return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+  function escapeHtml(value){ return String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c])); }
   function escapeAttr(value){ return escapeHtml(value); }
-  function display(value){ return value === "" || value == null ? "空欄" : value; }
+  function displayValue(value){ return value === "" || value == null ? "空欄" : value; }
   function formatDateTime(value){ return String(value || "").replace("T", " ").slice(0, 16); }
-  function labelFor(key){ return ({ orderQty:"注文数量変更", receivedQty:"入荷数量変更", status:"ステータス変更", supplier:"発注先変更", staff:"担当者変更", expectedArrivalDate:"入荷予定日変更", arrivalDate:"入荷日変更", completedDate:"完了日変更", cancelReason:"キャンセル理由変更", memo:"メモ変更" })[key] || "更新"; }
+  function labelFor(key){
+    return ({ orderQty:"注文数量変更", receivedQty:"入荷数量変更", status:"ステータス変更", supplier:"発注先変更", staff:"担当者変更", expectedArrivalDate:"入荷予定日変更", arrivalDate:"入荷日変更", completedDate:"完了日変更", cancelReason:"キャンセル理由変更", memo:"メモ変更" })[key] || "更新";
+  }
   window.BackorderApp = { update };
 })();
-
