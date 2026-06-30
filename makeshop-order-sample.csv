@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARICO PORTAL</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+body{background:#eef7f1}.wrap{max-width:1200px;margin:38px auto;padding:0 16px}.card{background:#fff;border:1px solid #cfe6d7;border-radius:22px;padding:28px;box-shadow:0 18px 44px rgba(27,67,50,.10)}.topbar{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:28px}.brand{font-weight:900;color:#1b6b4a;letter-spacing:.04em}.topbar h1{margin:4px 0 0;font-size:34px;line-height:1.15;color:#10251b}.top-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.pill{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:10px 18px;border:1px solid #cfe6d7;border-radius:999px;background:#f7fcf9;color:#0f3d2d;font-weight:900;text-decoration:none}.pill.active{background:#2d6a4f;border-color:#2d6a4f;color:#fff}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.box{min-height:170px;display:flex;flex-direction:column;justify-content:flex-start;border:1px solid #cfe6d7;border-radius:18px;background:#fbfffc;padding:26px;text-decoration:none;color:#10251b;box-shadow:0 10px 28px rgba(27,67,50,.04)}.box h3{margin:0 0 14px;font-size:24px;color:#073b2d}.box p{margin:0;color:#456b59;font-weight:800;line-height:1.6}.box.disabled{opacity:.58}@media(max-width:900px){.wrap{margin:14px auto}.card{padding:20px}.topbar{display:block}.top-actions{justify-content:flex-start;margin-top:16px}.grid{grid-template-columns:1fr}.box{min-height:130px}.topbar h1{font-size:30px}}
+</style>
+<script src="../auth.js"></script>
+<script>
+const ARICO_PORTAL_LOGIN_KEY = "arico_portal_login";
+const ARICO_INVENTORY_URL = "https://automatic-invention-eight.vercel.app/";
+if (typeof checkAuthOrRedirect === "function") checkAuthOrRedirect("../index.html");
+function aricoLogout(){ clearAuthSession(); sessionStorage.removeItem(ARICO_PORTAL_LOGIN_KEY); location.href = "https://arico-portal.vercel.app/index.html"; }
+function openInventory(){ location.href = ARICO_INVENTORY_URL; }
+function openBackorder(){ location.href = "/backorder/backorder.html"; }
+</script>
+</head>
+<body>
+<main class="wrap"><section class="card">
+<div class="topbar"><div><div class="brand">ARICO TOKYO</div><h1>시스템 입구</h1></div><div class="top-actions"><a class="pill" href="portal.html">日本語</a><a class="pill active" href="portal_ko.html">한국어</a><a class="pill" href="#" onclick="aricoLogout(); return false;">로그아웃</a></div></div>
+<div class="grid">
+  <a class="box" href="https://automatic-invention-eight.vercel.app/"><h3>재고 확인 앱</h3><p>재고 관리・재고 조사・스마레지 연동</p></a>
+  <a class="box" href="/backorder/backorder.html"><h3>取り寄せ管理</h3><p>MakeShop・スマレジCSV取込／取寄せ・手配管理</p></a>
+  <a class="box disabled" href="#" onclick="alert('렌탈 림 관리는 현재 준비 중입니다.'); return false;"><h3>렌탈 림 관리</h3><p>준비 중</p></a>
+  <a class="box disabled" href="#" onclick="alert('출하 전 검품은 현재 준비 중입니다.'); return false;"><h3>출하 전 검품</h3><p>준비 중</p></a>
+</div>
+</section></main>
+</body>
+</html>
