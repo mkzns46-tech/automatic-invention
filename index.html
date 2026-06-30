@@ -1,74 +1,291 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARICO PORTAL</title>
-<link rel="stylesheet" href="style.css">
-<script src="auth.js"></script>
-<script>
-const ARICO_PORTAL_LOGIN_KEY = "arico_portal_login";
-const ARICO_PORTAL_HOME_URL = "https://automatic-invention-eight.vercel.app/portal/portal.html";
+<!doctype html><html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><title>ARICO ARCHERY 在庫管理</title><link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=1"/><link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png?v=1"/><meta name="theme-color" content="#2d6a4f"/><link rel="stylesheet" href="./style.css"/></head><body><div class="app">
+<header><div class="header-brand"><button type="button" id="inventoryMenuToggleBtn" class="inventory-menu-toggle" aria-label="メニューを開く" aria-expanded="false">☰</button><h1>ARICO ARCHERY 在庫管理</h1></div><div class="header-actions"><button id="reloadBtn">再読み込み</button></div></header><div class="language-bar"><button type="button" id="langJaBtn">日本語</button><button type="button" id="langKoBtn">한국어</button></div>
+<div id="smaregiContextBar" class="smaregi-context-bar" aria-label="スマレジ接続先切替"></div>
+<div class="inventory-app-layout">
+<aside class="inventory-sidebar">
+  <nav id="inventoryAppMenu" class="inventory-app-menu" aria-label="販売用在庫管理メニュー"></nav>
+</aside>
+<button type="button" id="inventoryMenuOverlay" class="inventory-menu-overlay" aria-label="メニューを閉じる"></button>
+<main class="grid">
+<section class="card scanner" id="inventoryRegistrationCard" data-inventory-screen="inventory"><div class="section-title compact-title"><div><h2>在庫変動登録</h2><p class="section-note">持ち出し・入荷・在庫修正・備品転用を記録します</p></div></div><div class="row"><label>区分<select id="type"><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option><option value="event_pick">イベントピック</option></select></label><label id="eventPickEventLabel" hidden>イベント名 <span class="required">必須</span><select id="eventPickEventSelect"><option value="">イベントを選択</option></select></label><label>担当者 <span class="required">必須</span><select id="staff"><option value="">担当者を選択</option></select><div id="staffPicker" class="staff-picker"></div></label><label>数量 <span class="required">必須</span><input id="qty" type="number" min="1" step="1" placeholder="数量" required/></label></div><label><span id="memoLabelText">備考（自由入力・連続スキャン中は保持）</span><span id="equipmentMemoRequired" class="required equipment-memo-required" hidden>備品転用時は理由入力必須</span><input id="memo" placeholder="例：棚卸差異、サンプル使用、不良返品など"/></label><div class="button-row"><button id="startCameraBtn">カメラ読取</button><div class="camera-zoom-row">
+  <label>カメラズーム
+    <input id="cameraZoomRange" type="range" min="1" max="3" step="0.1" value="1.5">
+    <span id="cameraZoomValue">1.5x</span>
+  </label>
+</div>
+<button id="stopCameraBtn" class="secondary">停止</button></div><div class="camera-area">
+  <video id="video" muted playsinline></video>
+  <div id="cameraGuideOverlay" class="camera-guide-overlay">
+    <div class="camera-guide-box">
+      <div class="camera-guide-line"></div>
+    </div>
+    <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
+  </div>
+</div><div id="qr-reader"></div><form id="manualForm"><label class="product-name-search-label">商品名検索<input id="inventoryProductNameSearchInput" autocomplete="off" placeholder="商品名の一部を入力"/></label><div id="inventoryProductSearchResults" class="product-search-results"></div><label>バーコード入力<input id="barcodeInput" autocomplete="off" placeholder="バーコードをスキャン、または手入力"/></label><div id="scanProductInfo" class="message"></div><button type="submit">登録</button></form><div id="message" class="message">起動中...</div></section>
+<section class="card wide" id="recentRegistrationHistoryCard" data-inventory-screen="inventory">
+  <h2>最近の登録履歴</h2>
+  <p class="section-note">直近10件の在庫変動を表示します。</p>
+  <div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="recentRegistrationHistoryBody"></tbody></table></div>
+</section>
+<section class="card pc-only-section staff-admin-section" id="staffSettingsCard" data-inventory-screen="settings" hidden>
+  <div class="section-title">
+    <h2>担当者管理</h2><p class="section-note">担当者の追加・編集・削除を行います。スマホ側の担当者プルダウンにも反映されます</p>
+    <div id="staffCountBadge" class="badge">担当者：0人</div>
+  </div>
 
-function buildPortalHomeUrl(){
-  const params = new URLSearchParams();
-  params.set("auth_token", localStorage.getItem("arico_auth_token") || "");
-  params.set("auth_user", localStorage.getItem("arico_auth_user") || "");
-  params.set("auth_expires", localStorage.getItem("arico_auth_expires") || "");
-  return ARICO_PORTAL_HOME_URL + "?" + params.toString();
-}
+  <form id="staffForm">
+    <label>担当者名
+      <input id="staffNameInput" placeholder="例：田中" />
+    </label>
+    <label>所属店舗 <span class="required">必須</span>
+      <select id="staffStoreInput">
+        <option value="">店舗を選択</option>
+        <option value="tokyo">東京</option>
+        <option value="aichi">愛知</option>
+        <option value="nagano">長野</option>
+      </select>
+    </label>
+    <button type="submit">担当者を追加</button>
+  </form>
 
-function setLang(lang){
-  sessionStorage.setItem("arico_lang", lang);
-  if(lang === "ko"){
-    location.href = "index_ko.html";
-  }
-}
+  <div class="table-wrap small-table">
+    <table>
+      <thead>
+        <tr>
+          <th>担当者名</th>
+          <th>所属店舗</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="staffListBody"></tbody>
+    </table>
+  </div>
+</section>
 
-function login(){
-  const id = document.getElementById("id").value.trim();
-  const pass = document.getElementById("pass").value.trim();
+<section class="card csv-admin-section" id="productImportCard" data-inventory-screen="settings" hidden><h2>データ取り込み</h2><p class="section-note">商品データとスマレジ変動商品データを取り込みます</p>
+<button type="button" id="importSmaregiProductsBtn">商品マスターCSV取込</button>
+<button type="button" id="syncSmaregiStockBtn">スマレジ在庫変動CSV取込</button>
+<input type="file" id="smaregiStockCsvFile" accept=".csv,text/csv" hidden>
+<div class="message csv-mode-message">API停止中／CSV運用中：スマレジAPIへは接続しません。商品マスター・在庫変動データはCSVで取り込んでください。</div>
+<div id="productImportMessage" class="message"></div>
+<details class="csv-admin-details">
+  <summary>管理者向け機能</summary>
+  <p class="section-note">例外対応用のCSV取り込みです。通常はスマレジ商品マスター取込を使用してください。</p>
+  <div class="button-row"><label class="file-button">⬆ CSV追加・更新<input type="file" id="csvFile" accept=".csv,text/csv"/></label><button id="downloadSampleCsvBtn" class="secondary">サンプルCSVをダウンロード</button></div>
+</details></section>
+<section class="card event-register-settings-card" id="eventRegisterSettingsCard" data-inventory-screen="settings" hidden>
+  <div class="section-title">
+    <div>
+      <h2>イベント販売用レジ設定</h2>
+      <p class="section-note">販売取り込み対象にするイベントレジを店舗ごとに設定します。未設定の場合、販売取り込みは実行できません。</p>
+    </div>
+  </div>
+  <form id="eventRegisterSettingsForm" class="event-register-settings-form">
+    <div class="event-register-settings-grid">
+      <fieldset>
+        <legend>東京イベントレジ</legend>
+        <label>レジ名<input id="tokyoEventRegisterName" placeholder="東京イベントレジ"></label>
+        <label>register_id<input id="tokyoEventRegisterId" placeholder="後で登録"></label>
+        <label>terminal_id<input id="tokyoEventTerminalId" placeholder="後で登録"></label>
+      </fieldset>
+      <fieldset>
+        <legend>愛知イベントレジ</legend>
+        <label>レジ名<input id="aichiEventRegisterName" placeholder="愛知イベントレジ"></label>
+        <label>register_id<input id="aichiEventRegisterId" placeholder="後で登録"></label>
+        <label>terminal_id<input id="aichiEventTerminalId" placeholder="後で登録"></label>
+      </fieldset>
+    </div>
+    <button type="submit">イベントレジ設定を保存</button>
+  </form>
+  <div id="eventRegisterSettingsMessage" class="message"></div>
+</section>
+<section id="smaregiAccuracyPanel" class="card smaregi-accuracy-card" data-inventory-screen="analytics" hidden>
+  <div class="section-title">
+    <div>
+      <h2>棚卸精度</h2>
+      <p class="section-note">今月の差異率と前月比を確認します。</p>
+    </div>
+    <div id="smaregiAccuracyBadge" class="badge muted">今月</div>
+  </div>
+  <div id="smaregiAccuracyMessage" class="message">棚卸精度を集計中...</div>
+  <div class="smaregi-accuracy-compact">
+    <div class="smaregi-accuracy-main">
+      <span>棚卸精度</span>
+      <strong id="smaregiAccuracyPercent">-</strong>
+      <div class="smaregi-accuracy-bar"><div id="smaregiAccuracyFill" style="width:0%"></div></div>
+    </div>
+    <div class="smaregi-accuracy-metric"><span>差異率</span><strong id="smaregiDifferenceRate">0%</strong></div>
+    <div class="smaregi-accuracy-metric"><span>前月比</span><strong id="smaregiAccuracyChange">-</strong></div>
+  </div>
+  <div class="smaregi-accuracy-trend">
+    <h3>棚卸精度 月次推移</h3>
+    <div id="smaregiAccuracyMonthlyTrend" class="inventory-accuracy-month-scroll">
+      <div class="smaregi-empty">月次データを集計中...</div>
+    </div>
+  </div>
+</section>
+<section id="smaregiDifferenceRankingPanel" class="card smaregi-difference-ranking-card" data-inventory-screen="analytics" hidden>
+  <div class="section-title">
+    <div>
+      <h2>差異ランキング</h2>
+      <p class="section-note">指定期間内で差異が多い商品を確認します。</p>
+    </div>
+  </div>
+  <div class="smaregi-ranking-filter date-filter-row">
+    <label>開始日<input id="smaregiRankingFromDate" type="date"/></label>
+    <label>終了日<input id="smaregiRankingToDate" type="date"/></label>
+    <button type="button" id="aggregateSmaregiDifferenceRankingBtn">検索・反映</button>
+  </div>
+  <div id="smaregiDifferenceRankingMessage" class="message">差異ランキングを集計中...</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>順位</th><th>商品コード</th><th>商品名</th><th>差異回数</th><th>差異数量</th><th>主な原因</th></tr></thead>
+      <tbody id="smaregiDifferenceRankingBody"></tbody>
+    </table>
+  </div>
+</section>
+<section id="smaregiCompletionPanel" class="card wide smaregi-completion-analysis-card" data-inventory-screen="analytics" hidden>
+  <div class="section-title">
+    <div>
+      <h2>スマレジ変動商品チェック完了</h2>
+      <p class="section-note">管理者認証済みの場合のみ、チェック完了と完了解除を操作できます。</p>
+    </div>
+  </div>
+  <div class="smaregi-toolbar smaregi-action-grid">
+    <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
+  </div>
+  <div class="smaregi-reset-panel">
+    <label>チェック完了解除日時<input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
+    <button type="button" id="resetSmaregiCompletionBtn" class="secondary">チェック完了解除（管理者のみ）</button>
+  </div>
+</section>
 
-  if(id === "arico" && pass === "0201"){
-    createAuthSession(id);
-    localStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
-    sessionStorage.setItem(ARICO_PORTAL_LOGIN_KEY, "ok");
-    location.href = buildPortalHomeUrl();
-  }else{
-    document.getElementById("error").innerText = "繝ｦ繝ｼ繧ｶ繝ｼID縺ｾ縺溘・繝代せ繝ｯ繝ｼ繝峨′驕輔＞縺ｾ縺吶・;
-  }
-}
 
-window.onload = function(){
-  localStorage.removeItem(ARICO_PORTAL_LOGIN_KEY);
-  document.getElementById("id").focus();
-};
-</script>
-</head>
-<body>
-<main class="wrap login-wrap">
-  <section class="card login-card">
-    <div class="topbar login-topbar">
+<section class="mobile-force-history card wide pc-only-section" id="globalHistoryCard" data-inventory-screen="history" hidden><h2>全体履歴</h2><div class="history-filter-grid"><label>区分検索<select id="historyTypeFilter"><option value="">すべて</option><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option><option value="event_pick">イベントピック</option><option value="event_close_return">イベント締め棚戻し</option><option value="gacha_pick">ガチャピック</option><option value="gacha_return">ガチャ戻り</option></select></label><label>商品名検索<input id="historyProductFilter" placeholder="商品名キーワード"/></label><label>担当者検索<input id="historyStaffFilter" placeholder="担当者キーワード"/></label><label>備考検索<input id="historyMemoFilter" placeholder="備考キーワード"/></label></div><div class="button-row"><button id="allDataCsvBtn" class="secondary">全履歴CSV</button><button id="clearFilterBtn" class="secondary">検索をクリア</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
+<section class="card wide mobile-history-section" id="productHistoryCard" data-inventory-screen="history" hidden><div class="section-title"><h2>商品別履歴</h2></div><div id="productHistoryContent"><div id="historyRangeBadge" class="badge muted">商品を選択してください</div><div class="history-search-box"><label>商品履歴検索<input id="productHistoryBarcodeInput" placeholder="バーコードを入力またはスキャン" />
+<label class="product-name-search-label">商品名検索
+  <input id="productNameSearchInput" placeholder="商品名の一部を入力" />
+</label>
+<div id="productSearchResults" class="product-search-results"></div></label></div><div class="history-camera-row"><button type="button" id="historyCameraBtn">カメラ読取</button></div><div class="button-row"><button id="productHistoryCsvBtn" type="button">商品履歴CSV</button>
+<button id="showAllSelectedHistoryBtn" class="secondary">全履歴を表示</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="selectedHistoryBody"></tbody></table></div></div></section>
+<section class="card wide smaregi-stock-check-section" id="smaregiStockCheckCard" data-inventory-screen="smaregi" hidden>
+  <div class="section-title">
+    <div>
+      <h2>スマレジ変動商品チェック</h2>
+      <p class="section-note">スマレジ在庫変動CSVを取り込み、変動があった商品を確認します。</p>
+    </div>
+    <div id="smaregiSnapshotBadge" class="badge muted">スマレジ変動CSV未取込</div>
+  </div>
+  <div class="smaregi-progress-row">
+    <div class="smaregi-header-staff">
+      <div class="smaregi-header-label">チェック担当者</div>
+      <label><select id="smaregiCheckerName"><option value="">担当者を選択</option></select><div id="smaregiCheckerNamePicker" class="staff-picker"></div></label>
+    </div>
+    <div id="smaregiProgressBadge" class="badge muted">チェック済み：0 / 0</div>
+  </div>
+  <div class="smaregi-toolbar smaregi-action-grid">
+    <button type="button" id="refreshSmaregiChecksBtn" class="secondary">最新状態に更新</button>
+    <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
+  </div>
+  <div id="smaregiMessage" class="message"></div>
+  <div class="table-wrap">
+    <table class="smaregi-check-table">
+      <thead><tr><th>商品情報</th><th>実在庫入力</th><th>保存</th><th>除外</th></tr></thead>
+      <tbody id="smaregiStockCheckBody"></tbody>
+    </table>
+  </div>
+  </section>
+  <section id="smaregiDiffOnlyPanel" class="card wide smaregi-diff-panel smaregi-work-card" data-inventory-screen="analytics" hidden>
+    <div class="section-title">
       <div>
-        <div class="brand">ARICO TOKYO</div>
-        <h1>繧ｷ繧ｹ繝・Β蜈･蜿｣</h1>
-        <p class="lead">讌ｭ蜍吶す繧ｹ繝・Β縺ｫ蜈･繧九◆繧√・繝ｭ繧ｰ繧､繝ｳ逕ｻ髱｢縺ｧ縺吶・/p>
+        <h2>差異一覧</h2>
+        <p class="section-note">差異の確認、原因確認、問題なし処理、修正保存、CSV出力を行います。</p>
       </div>
-      <div class="top-actions">
-        <a class="pill active" href="index.html">譌･譛ｬ隱・/a>
-        <a class="pill" href="index_ko.html">﨑懋ｵｭ・ｴ</a>
-        <a class="pill" href="https://automatic-invention-eight.vercel.app/sales/sales-login.html">販売管理</a>
+      <div id="smaregiDiffSummary" class="badge muted">差異：0件</div>
+    </div>
+    <div class="smaregi-date-filter date-filter-row">
+      <label>差異CSV 開始日<input id="smaregiDiffCsvFromDate" type="date"/></label>
+      <label>終了日<input id="smaregiDiffCsvToDate" type="date"/></label>
+      <button type="button" id="exportSmaregiDiffCardCsvBtn" class="secondary">差異CSV出力</button>
+    </div>
+    <div class="table-wrap">
+      <table class="smaregi-check-table smaregi-diff-table">
+        <thead><tr><th>商品名</th><th>実在庫</th><th>今回イベント在庫</th><th>イベント保管在庫</th><th>比較用在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th></tr></thead>
+        <tbody id="smaregiDiffOnlyBody"></tbody>
+      </table>
+    </div>
+    <div id="smaregiCauseDetail" class="smaregi-cause-detail" hidden></div>
+  </section>
+  <section id="smaregiReasonSummaryPanel" class="card wide smaregi-diff-panel smaregi-work-card" data-inventory-screen="analytics" hidden>
+    <div class="section-title">
+      <div>
+        <h2>原因集計</h2>
+        <p class="section-note">指定期間内の原因別ランキングを表示し、改善対象を確認します。</p>
       </div>
     </div>
-
-    <label>繝ｦ繝ｼ繧ｶ繝ｼID
-      <input id="id" autocomplete="username" placeholder="繝ｦ繝ｼ繧ｶ繝ｼID">
-    </label>
-    <label>繝代せ繝ｯ繝ｼ繝・      <input id="pass" type="password" autocomplete="current-password" placeholder="繝代せ繝ｯ繝ｼ繝・ onkeydown="if(event.key==='Enter')login();">
-    </label>
-    <button type="button" onclick="login();">繝ｭ繧ｰ繧､繝ｳ</button>
-    <div id="error" class="error"></div>
+    <div class="smaregi-date-filter date-filter-row">
+      <label>原因集計 開始日<input id="smaregiReasonFromDate" type="date"/></label>
+      <label>終了日<input id="smaregiReasonToDate" type="date"/></label>
+      <button type="button" id="aggregateSmaregiReasonSummaryBtn">集計</button>
+      <button type="button" id="exportSmaregiReasonSummaryCsvBtn" class="secondary">集計CSV出力</button>
+    </div>
+    <div id="smaregiReasonSummaryMessage" class="message"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>原因集計ランキング</th><th>件数</th><th>差異数量合計</th></tr></thead>
+        <tbody id="smaregiReasonSummaryBody"></tbody>
+      </table>
+    </div>
+  </section>
+  <section id="boothManagementPanel" class="card wide booth-management-card" data-inventory-screen="booth" hidden>
+    <div class="section-title">
+      <div>
+        <h2>イベント管理</h2>
+        <p class="section-note">イベント作成とイベント一覧を管理します。持ち出しはイベント内在庫として記録し、スマレジ在庫は変更しません。</p>
+      </div>
+      <div class="badge muted">イベント販売</div>
+    </div>
+    <div id="boothMessage" class="message"></div>
+    <div id="boothManagementRoot" class="booth-management-root"></div>
+  </section>
+  <section id="boothAnalyticsPanel" class="card wide booth-analytics-card" data-inventory-screen="booth-analytics" hidden>
+    <div class="section-title">
+      <div>
+        <h2>イベント分析</h2>
+        <p class="section-note">イベント管理の実装後にデータ連携します。現在は表示枠のみです。</p>
+      </div>
+      <div class="badge muted">準備中</div>
+    </div>
+    <div class="booth-analytics-placeholder-grid">
+      <div>イベント販売履歴</div>
+      <div>売れている商品ランキング</div>
+      <div>売れていない商品ランキング</div>
+      <div>次回持ち出し推奨数</div>
+      <div>適正在庫目安</div>
+    </div>
   </section>
 </main>
+</div>
+<footer>© ARICO ARCHERY 在庫管理</footer></div>
+<script src="./auth.js" defer></script>
+<script src="./core.js" defer></script>
+<script src="./inventory.js" defer></script>
+<script src="./history.js" defer></script>
+<script src="./history-product-code.js" defer></script>
+<script src="./product-import.js" defer></script>
+<script src="./smaregi.js" defer></script>
+<script src="./analytics.js" defer></script>
+<script src="./smaregi-check-state.js" defer></script>
+<script src="./booth.js" defer></script>
+<script src="./app.js" defer></script>
+<script src="./smaregi-check-final.js" defer></script>
+
+<div id="appPopup" class="app-popup" style="display:none;">
+  <div class="app-popup-card">
+    <div id="appPopupTitle" class="app-popup-title">完了</div>
+    <div id="appPopupBody" class="app-popup-body"></div>
+    <button type="button" id="appPopupClose">OK</button>
+  </div>
+</div>
 </body>
 </html>
