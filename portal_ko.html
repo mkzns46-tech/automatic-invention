@@ -11,7 +11,7 @@ body{background:#eef7f1}.wrap{max-width:1200px;margin:38px auto;padding:0 16px}.
 <script src="./auth.js"></script>
 <script>
 const ARICO_PORTAL_LOGIN_KEY = "arico_portal_login";
-const ARICO_INVENTORY_URL = "https://automatic-invention-eight.vercel.app/";
+const ARICO_INVENTORY_URL = "/inventory.html";
 if (typeof checkAuthOrRedirect === "function") checkAuthOrRedirect("./index.html");
 function aricoLogout(){ clearAuthSession(); sessionStorage.removeItem(ARICO_PORTAL_LOGIN_KEY); location.href = "https://arico-portal.vercel.app/index.html"; }
 function openInventory(){ location.href = ARICO_INVENTORY_URL; }
@@ -22,7 +22,7 @@ function openBackorder(){ location.href = "/backorder/backorder.html"; }
 <main class="wrap"><section class="card">
 <div class="topbar"><div><div class="brand">ARICO TOKYO</div><h1>시스템 입구</h1></div><div class="top-actions"><a class="pill" href="portal.html">日本語</a><a class="pill active" href="portal_ko.html">한국어</a><a class="pill" href="#" onclick="aricoLogout(); return false;">로그아웃</a></div></div>
 <div class="grid">
-  <a class="box" href="https://automatic-invention-eight.vercel.app/"><h3>재고 확인 앱</h3><p>재고 관리・재고 조사・스마레지 연동</p></a>
+  <a class="box" href="/inventory.html"><h3>재고 확인 앱</h3><p>재고 관리・재고 조사・스마레지 연동</p></a>
   <a class="box" href="/backorder/backorder.html"><h3>取り寄せ管理</h3><p>MakeShop・スマレジCSV取込／取寄せ・手配管理</p></a>
   <a class="box disabled" href="#" onclick="alert('렌탈 림 관리는 현재 준비 중입니다.'); return false;"><h3>렌탈 림 관리</h3><p>준비 중</p></a>
   <a class="box disabled" href="#" onclick="alert('출하 전 검품은 현재 준비 중입니다.'); return false;"><h3>출하 전 검품</h3><p>준비 중</p></a>
