@@ -1,169 +1,32 @@
-(function(){
-  const STATUSES = ["未手配", "手配済", "入荷待ち", "一部入荷", "入荷済", "完了", "キャンセル"];
-  const STATUS_CLASS = { "未手配":"status-open", "手配済":"status-ordered", "入荷待ち":"status-waiting", "一部入荷":"status-partial", "入荷済":"status-arrived", "完了":"status-done", "キャンセル":"status-cancel" };
-  let rows = [];
-  let view = "active";
-  document.addEventListener("DOMContentLoaded", init);
-  function init(){
-    rows = BackorderStorage.load();
-    setupFilters();
-    bindEvents();
-    render();
-  }
-  function bindEvents(){
-    document.getElementById("makeshopCsv").addEventListener("change", event => importCsv(event, BackorderCsv.parseMakeShop, "MakeShop"));
-    document.getElementById("smaregiCsv").addEventListener("change", event => importCsv(event, BackorderCsv.parseSmaregi, "スマレジ"));
-    document.getElementById("manualForm").addEventListener("submit", saveManual);
-    document.getElementById("activeTab").addEventListener("click", () => setView("active"));
-    document.getElementById("completedTab").addEventListener("click", () => setView("completed"));
-    document.getElementById("exportCsvBtn").addEventListener("click", exportVisible);
-    ["filterOrderNo","filterCustomer","filterProduct","filterStatus","filterSupplier","filterStaff","filterCompletedDate"].forEach(id => {
-      document.getElementById(id).addEventListener("input", render);
-      document.getElementById(id).addEventListener("change", render);
-    });
-  }
-  function setupFilters(){
-    document.getElementById("filterStatus").innerHTML = `<option value="">すべて</option>${STATUSES.map(s => `<option>${s}</option>`).join("")}`;
-  }
-  async function importCsv(event, parser, label){
-    const file = event.target.files && event.target.files[0];
-    if (!file) return;
-    try {
-      const incoming = parser(await file.text()).map(row => BackorderStorage.normalize(row));
-      const result = BackorderStorage.mergeNewRows(rows, incoming);
-      rows = result.rows;
-      showMessage(`${label} CSVを取り込みました。\n抽出: ${incoming.length}件 / 新規登録: ${result.added}件 / 重複スキップ: ${result.skipped}件`, "ok");
-      event.target.value = "";
-      render();
-    } catch (error) {
-      console.error(error);
-      showMessage(`${label} CSV取込に失敗しました。CSV形式を確認してください。`, "err");
-    }
-  }
-  function saveManual(event){
-    event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-    const row = BackorderStorage.normalize({
-      ...data,
-      source: data.source || "手動",
-      orderQty: BackorderStorage.toNumber(data.orderQty, 1),
-      duplicateKey: ["manual", data.orderNo, data.productCode, data.productName, data.variation, Date.now()].join("|")
-    });
-    rows = [...rows, BackorderStorage.addHistory(row, "手動登録", "手動フォームから登録")];
-    BackorderStorage.save(rows);
-    event.currentTarget.reset();
-    event.currentTarget.orderQty.value = "1";
-    showMessage("手動登録しました。", "ok");
-    render();
-  }
-  function setView(next){
-    view = next;
-    document.getElementById("activeTab").classList.toggle("active", view === "active");
-    document.getElementById("completedTab").classList.toggle("active", view === "completed");
-    document.body.classList.toggle("show-completed", view === "completed");
-    render();
-  }
-  function getVisibleRows(){
-    const filters = {
-      orderNo: getValue("filterOrderNo"),
-      customer: getValue("filterCustomer"),
-      product: getValue("filterProduct"),
-      status: getValue("filterStatus"),
-      supplier: getValue("filterSupplier"),
-      staff: getValue("filterStaff"),
-      completedDate: getValue("filterCompletedDate")
-    };
-    return rows.filter(row => {
-      if (view === "active" && row.status === "完了") return false;
-      if (view === "completed" && row.status !== "完了") return false;
-      if (filters.orderNo && !includes(row.orderNo, filters.orderNo)) return false;
-      if (filters.customer && !includes(row.customerName, filters.customer)) return false;
-      if (filters.product && !includes(row.productName, filters.product)) return false;
-      if (filters.status && row.status !== filters.status) return false;
-      if (filters.supplier && !includes(row.supplier, filters.supplier)) return false;
-      if (filters.staff && !includes(row.staff, filters.staff)) return false;
-      if (view === "completed" && filters.completedDate && row.completedDate !== filters.completedDate) return false;
-      return true;
-    }).sort((a, b) => String(b.orderDate || b.createdAt).localeCompare(String(a.orderDate || a.createdAt)));
-  }
-  function render(){
-    const visible = getVisibleRows();
-    document.getElementById("boardTitle").textContent = view === "active" ? "未完了手配一覧" : "完了一覧";
-    document.getElementById("boardCount").textContent = `${visible.length}件`;
-    document.getElementById("boardBody").innerHTML = visible.map(renderRow).join("");
-  }
-  function renderRow(row){
-    const statusOptions = STATUSES.map(status => `<option ${row.status === status ? "selected" : ""}>${status}</option>`).join("");
-    const history = (row.history || []).slice(-5).reverse().map(item => `${formatDateTime(item.at)} ${escapeHtml(item.action)} ${escapeHtml(item.detail || "")}`).join("<br>");
-    return `<tr>
-      ${readTd("注文日", row.orderDate)}
-      ${readTd("注文番号 / 取引番号", row.orderNo)}
-      ${readTd("注文者", row.customerName)}
-      ${readTd("注文元", row.source)}
-      ${readTd("商品名", row.productName)}
-      ${readTd("バリエーション", row.variation)}
-      ${readTd("商品コード", row.productCode)}
-      ${readTd("JANコード", row.janCode)}
-      <td data-label="注文数量"><input type="number" min="0" step="1" value="${row.orderQty}" onchange="BackorderApp.update('${row.id}','orderQty',this.value)"></td>
-      <td data-label="入荷数量"><input type="number" min="0" step="1" value="${row.receivedQty}" onchange="BackorderApp.update('${row.id}','receivedQty',this.value)"></td>
-      <td data-label="残数量"><span class="readonly-cell number-cell">${row.remainingQty}</span></td>
-      <td data-label="ステータス"><select onchange="BackorderApp.update('${row.id}','status',this.value)">${statusOptions}</select><span class="status-pill ${STATUS_CLASS[row.status] || "status-open"}">${escapeHtml(row.status)}</span></td>
-      ${inputTd("発注先", row.id, "supplier", row.supplier)}
-      ${inputTd("担当者", row.id, "staff", row.staff)}
-      ${dateTd("入荷予定日", row.id, "expectedArrivalDate", row.expectedArrivalDate)}
-      ${dateTd("入荷日", row.id, "arrivalDate", row.arrivalDate)}
-      ${dateTd("完了日", row.id, "completedDate", row.completedDate)}
-      ${textTd("キャンセル理由", row.id, "cancelReason", row.cancelReason)}
-      ${textTd("メモ", row.id, "memo", row.memo)}
-      <td data-label="履歴"><div class="history-cell">${history || "履歴なし"}</div></td>
-    </tr>`;
-  }
-  function update(id, key, value){
-    rows = rows.map(row => {
-      if (row.id !== id) return row;
-      const before = row[key];
-      let next = { ...row, [key]: value };
-      if (key === "orderQty" || key === "receivedQty") next[key] = BackorderStorage.toNumber(value, 0);
-      next = BackorderStorage.normalize(next);
-      if (key === "receivedQty") {
-        if (next.remainingQty > 0 && next.receivedQty > 0 && next.status !== "完了") next.status = "一部入荷";
-        if (next.remainingQty === 0 && next.orderQty > 0 && next.status !== "完了") next.status = "入荷済";
-        if (next.receivedQty > 0 && !next.arrivalDate) next.arrivalDate = today();
-      }
-      if (key === "status") {
-        if (value === "完了" && !next.completedDate) next.completedDate = today();
-        if (value === "手配済" && !next.arrangementDate) next.arrangementDate = today();
-      }
-      return BackorderStorage.addHistory(next, labelFor(key), `${displayValue(before)} -> ${displayValue(next[key])}`);
-    });
-    BackorderStorage.save(rows);
-    render();
-  }
-  function exportVisible(){
-    const blob = new Blob([`\uFEFF${BackorderCsv.toCsv(getVisibleRows())}`], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `backorder-${view}-${today()}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-  function readTd(label, value){ return `<td data-label="${label}"><span class="readonly-cell">${escapeHtml(value)}</span></td>`; }
-  function inputTd(label, id, key, value){ return `<td data-label="${label}"><input value="${escapeAttr(value)}" onchange="BackorderApp.update('${id}','${key}',this.value)"></td>`; }
-  function dateTd(label, id, key, value){ return `<td data-label="${label}"><input type="date" value="${escapeAttr(value)}" onchange="BackorderApp.update('${id}','${key}',this.value)"></td>`; }
-  function textTd(label, id, key, value){ return `<td data-label="${label}"><textarea onchange="BackorderApp.update('${id}','${key}',this.value)">${escapeHtml(value)}</textarea></td>`; }
-  function getValue(id){ return document.getElementById(id).value.trim(); }
-  function includes(value, query){ return String(value || "").toLowerCase().includes(String(query || "").toLowerCase()); }
-  function today(){ return new Date().toISOString().slice(0, 10); }
-  function showMessage(text, type){ const box = document.getElementById("message"); box.textContent = text; box.className = `message ${type || ""}`; }
-  function escapeHtml(value){ return String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c])); }
-  function escapeAttr(value){ return escapeHtml(value); }
-  function displayValue(value){ return value === "" || value == null ? "空欄" : value; }
-  function formatDateTime(value){ return String(value || "").replace("T", " ").slice(0, 16); }
-  function labelFor(key){
-    return ({ orderQty:"注文数量変更", receivedQty:"入荷数量変更", status:"ステータス変更", supplier:"発注先変更", staff:"担当者変更", expectedArrivalDate:"入荷予定日変更", arrivalDate:"入荷日変更", completedDate:"完了日変更", cancelReason:"キャンセル理由変更", memo:"メモ変更" })[key] || "更新";
-  }
-  window.BackorderApp = { update };
-})();
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ARICO PORTAL</title>
+<link rel="stylesheet" href="./style.css">
+<style>
+body{background:#eef7f1}.wrap{max-width:1200px;margin:38px auto;padding:0 16px}.card{background:#fff;border:1px solid #cfe6d7;border-radius:22px;padding:28px;box-shadow:0 18px 44px rgba(27,67,50,.10)}.topbar{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:28px}.brand{font-weight:900;color:#1b6b4a;letter-spacing:.04em}.topbar h1{margin:4px 0 0;font-size:34px;line-height:1.15;color:#10251b}.top-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.pill{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:10px 18px;border:1px solid #cfe6d7;border-radius:999px;background:#f7fcf9;color:#0f3d2d;font-weight:900;text-decoration:none}.pill.active{background:#2d6a4f;border-color:#2d6a4f;color:#fff}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.box{min-height:170px;display:flex;flex-direction:column;justify-content:flex-start;border:1px solid #cfe6d7;border-radius:18px;background:#fbfffc;padding:26px;text-decoration:none;color:#10251b;box-shadow:0 10px 28px rgba(27,67,50,.04)}.box h3{margin:0 0 14px;font-size:24px;color:#073b2d}.box p{margin:0;color:#456b59;font-weight:800;line-height:1.6}.box.disabled{opacity:.58}@media(max-width:900px){.wrap{margin:14px auto}.card{padding:20px}.topbar{display:block}.top-actions{justify-content:flex-start;margin-top:16px}.grid{grid-template-columns:1fr}.box{min-height:130px}.topbar h1{font-size:30px}}
+</style>
+<script src="./auth.js"></script>
+<script>
+const ARICO_PORTAL_LOGIN_KEY = "arico_portal_login";
+const ARICO_INVENTORY_URL = "https://automatic-invention-eight.vercel.app/";
+if (typeof checkAuthOrRedirect === "function") checkAuthOrRedirect("./index.html");
+function aricoLogout(){ clearAuthSession(); sessionStorage.removeItem(ARICO_PORTAL_LOGIN_KEY); location.href = "https://arico-portal.vercel.app/index.html"; }
+function openInventory(){ location.href = ARICO_INVENTORY_URL; }
+function openBackorder(){ location.href = "/backorder/backorder.html"; }
+</script>
+</head>
+<body>
+<main class="wrap"><section class="card">
+<div class="topbar"><div><div class="brand">ARICO TOKYO</div><h1>システム入口</h1></div><div class="top-actions"><a class="pill active" href="portal.html">日本語</a><a class="pill" href="portal_ko.html">한국어</a><a class="pill" href="#" onclick="aricoLogout(); return false;">ログアウト</a></div></div>
+<div class="grid">
+  <a class="box" href="https://automatic-invention-eight.vercel.app/"><h3>在庫確認アプリ</h3><p>在庫管理・棚卸・スマレジ連携</p></a>
+  <a class="box" href="/backorder/backorder.html"><h3>取り寄せ管理</h3><p>MakeShop・スマレジCSV取込／取寄せ・手配管理</p></a>
+  <a class="box disabled" href="#" onclick="alert('レンタルリム管理は現在作成中です。'); return false;"><h3>レンタルリム管理</h3><p>作成中</p></a>
+  <a class="box disabled" href="#" onclick="alert('出荷前検品は現在作成中です。'); return false;"><h3>出荷前検品</h3><p>作成中</p></a>
+</div>
+</section></main>
+</body>
+</html>
