@@ -83,7 +83,6 @@
       productId:item.product_id||"",
       name:item.product_name||"",
       count:Number(item.count_qty||0),
-      appStock:Number(item.app_stock||0),
       staff:item.staff||"",
       updatedAt:item.counted_at||item.created_at||"",
       memo:item.memo||"",
@@ -386,9 +385,16 @@
   async function findProductsByName(keyword){
     keyword=String(keyword||"").trim();
     if(!keyword)return [];
-    const rows=await sbAll(`products?select=*&name=ilike.*${encodeURIComponent(keyword)}*&order=name.asc`,1000,30).catch(()=>[]);
-    rows.forEach(row=>{if(row&&row.barcode&&!gp(row.barcode))products.push(row);});
-    return rows||[];
+    if(typeof searchProductsByName==="function"){
+      return await searchProductsByName(keyword);
+    }
+    const q=encodeURIComponent(`*${keyword}*`);
+    const rows=await sb(`products?select=*&name=ilike.${q}&order=name.asc&limit=80`).catch(()=>[]);
+    if(Array.isArray(rows)){
+      rows.forEach(row=>{if(row&&row.barcode&&!gp(row.barcode))products.push(row);});
+      return rows;
+    }
+    return [];
   }
 
   async function findProductByCode(code){
@@ -402,21 +408,21 @@
     return product;
   }
 
-  function showProduct(product){
+  function showProduct(product,resetQty=false){
     if(!product)return;
-    document.getElementById("appInventoryCountQty").value="1";
+    if(resetQty)document.getElementById("appInventoryCountQty").value="1";
     setMessage(
       "appInventoryCountProductInfo",
-      `商品名：${product.name||""}\n商品コード：${product.barcode||""}\nバーコード：${product.barcode||""}\n現在のアプリ在庫：${Number(product.base_stock||0)}`,
+      `商品名：${product.name||""}\n商品コード：${product.barcode||""}\nバーコード：${product.barcode||""}`,
       "ok"
     );
   }
 
-  async function previewBarcode(){
+  async function previewBarcode(resetQty=false){
     const code=String(document.getElementById("appInventoryCountBarcode")?.value||"").trim();
     if(!code){
       if(selectedProduct){
-        showProduct(selectedProduct);
+        showProduct(selectedProduct,resetQty);
         return selectedProduct;
       }
       setMessage("appInventoryCountProductInfo",currentSession()?.status===STATUS_ACTIVE?"商品をスキャンまたは検索してください。":"棚卸開始後、商品をスキャンまたは検索してください。");
@@ -428,7 +434,8 @@
       setMessage("appInventoryCountProductInfo",`未登録バーコード・商品コード：${code}\nバーコードがない商品は商品名検索から選択してください。`,"err");
       return null;
     }
-    showProduct(product);
+    selectedProduct=product;
+    showProduct(product,resetQty);
     return product;
   }
 
@@ -472,7 +479,6 @@
           product_id:String(product.smaregi_product_id||""),
           product_name:product.name||"",
           count_qty:qty,
-          app_stock:Number(product.base_stock||0),
           staff,
           memo:"",
           counted_at:nowIso(),
@@ -502,7 +508,7 @@
       name:findIndex(["商品名","productname","product_name","name","品名"]),
       color:findIndex(["カラー","color"]),
       size:findIndex(["サイズ","size"]),
-      stock:findIndex(["在庫数","stock","stock_quantity","quantity","在庫"]),
+      stock:findIndex(["在庫数","在庫","stock","stock_quantity","quantity"]),
       headers
     };
   }
@@ -546,18 +552,23 @@
     const byBarcode=new Map();
     const byNameDetail=new Map();
     rows.forEach(row=>{
-      if(row.productCode)byProductCode.set(normalizeKey(row.productCode),row);
-      if(row.productId)byProductId.set(normalizeKey(row.productId),row);
-      if(row.barcode)byBarcode.set(normalizeKey(row.barcode),row);
+      const productCodeKey=normalizeKey(row.productCode);
+      const productIdKey=normalizeKey(row.productId);
+      const barcodeKey=normalizeKey(row.barcode);
+      if(productCodeKey&&!byProductCode.has(productCodeKey))byProductCode.set(productCodeKey,row);
+      if(productIdKey&&!byProductId.has(productIdKey))byProductId.set(productIdKey,row);
+      if(barcodeKey&&!byBarcode.has(barcodeKey))byBarcode.set(barcodeKey,row);
       const detail=normalizeTextKey(`${row.name}${row.color}${row.size}`);
-      if(detail)byNameDetail.set(detail,row);
-      if(row.name)byNameDetail.set(normalizeTextKey(row.name),row);
+      if(detail&&!byNameDetail.has(detail))byNameDetail.set(detail,row);
+      const nameKey=normalizeTextKey(row.name);
+      if(nameKey&&!byNameDetail.has(nameKey))byNameDetail.set(nameKey,row);
     });
     return {byProductCode,byProductId,byBarcode,byNameDetail};
   }
 
   function findCsvRowForCount(counted,indexes){
-    return indexes.byProductCode.get(normalizeKey(counted.productCode||counted.barcode))
+    return indexes.byProductCode.get(normalizeKey(counted.productCode))
+      || indexes.byProductCode.get(normalizeKey(counted.barcode))
       || indexes.byProductId.get(normalizeKey(counted.productId))
       || indexes.byBarcode.get(normalizeKey(counted.barcode))
       || indexes.byNameDetail.get(normalizeTextKey(counted.name))
@@ -691,11 +702,6 @@
       try{
         if(Array.isArray(logs))logs.unshift(savedLog||{created_at:nowIso(),type:"在庫修正",staff,barcode:product.barcode,product_name:row.name,quantity:diff,memo});
       }catch(_){}
-      await sb(`inventory_count_items?id=eq.${encodeURIComponent(row.id)}`,{
-        method:"PATCH",
-        headers:{Prefer:"return=minimal"},
-        body:JSON.stringify({app_stock:after})
-      }).catch(()=>{});
       state.diffs=state.diffs.filter(item=>String(item.id)!==String(row.id));
       await loadItems();
       renderAll();
@@ -717,13 +723,26 @@
     }
     const rows=await findProductsByName(keyword);
     searchResultCache=rows.slice(0,20);
-    host.innerHTML=searchResultCache.length ? searchResultCache.map((row,index)=>`<button type="button" class="product-search-result" data-index="${safe(index)}"><strong>${safe(row.name)}</strong><small>バーコード：${safe(row.barcode||"なし")} / 現在庫：${Number(row.base_stock||0)}</small></button>`).join("") : '<div class="product-search-empty">該当商品がありません。</div>';
-    host.querySelectorAll(".product-search-result").forEach(button=>{
-      button.onclick=()=>{
-        selectedProduct=searchResultCache[Number(button.dataset.index)]||null;
-        document.getElementById("appInventoryCountBarcode").value=selectedProduct?.barcode||"";
+    host.innerHTML=searchResultCache.length ? searchResultCache.map((row,index)=>`
+      <div class="product-search-item" data-index="${safe(index)}">
+        <div>
+          <strong>${safe(row.name)}</strong>
+          <span>バーコード：${safe(row.barcode||"なし")} / 棚番：${safe(row.location||"")}</span>
+        </div>
+        <button type="button">選択</button>
+      </div>
+    `).join("") : '<div class="product-search-item"><strong>該当商品なし</strong><span>別のキーワードで検索してください</span></div>';
+    host.classList.add("is-active");
+    host.querySelectorAll(".product-search-item[data-index]").forEach(item=>{
+      item.onclick=()=>{
+        selectedProduct=searchResultCache[Number(item.dataset.index)]||null;
+        const barcodeInput=document.getElementById("appInventoryCountBarcode");
+        const searchInput=document.getElementById("appInventoryCountSearch");
+        if(barcodeInput)barcodeInput.value=selectedProduct?.barcode||"";
+        if(searchInput)searchInput.value="";
+        host.classList.remove("is-active");
         host.innerHTML="";
-        if(selectedProduct)showProduct(selectedProduct);
+        if(selectedProduct)showProduct(selectedProduct,true);
         document.getElementById("appInventoryCountQty")?.focus();
       };
     });
@@ -742,7 +761,7 @@
     if(!code||isDuplicateScan(code))return;
     const input=document.getElementById("appInventoryCountBarcode");
     if(input)input.value=code;
-    const product=await previewBarcode();
+    const product=await previewBarcode(true);
     if(product){
       document.getElementById("appInventoryCountQty")?.focus();
       setMessage("appInventoryCameraMessage","読み取りました。数量を確認してEnterまたは登録を押してください。","ok");
