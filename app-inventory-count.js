@@ -13,10 +13,7 @@
     sessions:[],
     items:[],
     currentSessionId:"",
-    csvRows:[],
-    csvHeaderInfo:null,
     diffs:[],
-    unmatched:[],
     duplicateGroups:[]
   };
 
@@ -46,17 +43,6 @@
     return String(value??"").trim().toLowerCase().replace(/\s/g,"");
   }
 
-  function normalizeTextKey(value){
-    return String(value??"").trim().toLowerCase().replace(/\s+/g,"");
-  }
-
-  function numberValue(value){
-    const text=String(value??"").replace(/,/g,"").trim();
-    if(text==="")return null;
-    const number=Number(text);
-    return Number.isFinite(number) ? number : null;
-  }
-
   function formatDate(value){
     if(!value)return "";
     return typeof fmt==="function" ? fmt(value) : new Date(value).toLocaleString("ja-JP");
@@ -83,6 +69,7 @@
       productId:item.product_id||"",
       name:item.product_name||"",
       count:Number(item.count_qty||0),
+      beforeStock:Number(item.before_stock||0),
       staff:item.staff||"",
       updatedAt:item.counted_at||item.created_at||"",
       memo:item.memo||"",
@@ -271,8 +258,8 @@
     const summary=document.getElementById("appInventoryDiffSummary");
     if(summary){
       const duplicateText=state.duplicateGroups.length ? ` / 要確認 ${state.duplicateGroups.length}商品` : "";
-      const unmatchedText=state.unmatched.length ? ` / CSV該当なし ${state.unmatched.length}件` : "";
-      summary.textContent=state.csvRows.length ? `差異 ${state.diffs.length}件${duplicateText}${unmatchedText}` : "未比較";
+      const compared=currentSession()?.status===STATUS_COMPARED||state.diffs.length;
+      summary.textContent=compared ? `差異 ${state.diffs.length}件${duplicateText}` : "未比較";
     }
     if(!body)return;
     body.innerHTML=state.diffs.length ? state.diffs.map(row=>`
@@ -281,7 +268,7 @@
         <td>${safe(row.productCode)}</td>
         <td>${safe(row.barcode)}</td>
         <td>${safe(row.count)}</td>
-        <td>${safe(row.smaregiStock)}</td>
+        <td>${safe(row.beforeStock)}</td>
         <td><strong class="${row.diff<0?"stock-minus":"stock-plus"}">${safe(row.diff)}</strong></td>
         <td><button type="button" class="app-count-update-btn" data-id="${safe(row.id)}">更新</button></td>
       </tr>`).join("") : '<tr><td colspan="7" class="app-count-empty">差異のある商品はありません。</td></tr>';
@@ -341,10 +328,7 @@
       const session=Array.isArray(inserted) ? inserted[0] : inserted;
       state.currentSessionId=session.id;
       localStorage.setItem(CURRENT_SESSION_KEY,state.currentSessionId);
-      state.csvRows=[];
-      state.csvHeaderInfo=null;
       state.diffs=[];
-      state.unmatched=[];
       state.duplicateGroups=[];
       await refreshRemote();
       clearScanForm("棚卸を開始しました。商品をスキャンまたは検索してください。","ok");
@@ -361,7 +345,7 @@
       return;
     }
     if(session.status!==STATUS_ACTIVE){
-      setMessage("appInventoryCountCsvInfo","このセッションは棚卸終了済みです。CSVを読み込んで比較してください。","ok");
+      setMessage("appInventoryCountCsvInfo","このセッションは棚卸終了済みです。差異比較を実行できます。","ok");
       return;
     }
     if(!state.items.length){
@@ -375,7 +359,7 @@
         body:JSON.stringify({status:STATUS_FINISHED,finished_at:nowIso(),memo:document.getElementById("appInventorySessionMemo")?.value||session.memo||""})
       });
       await refreshRemote();
-      setMessage("appInventoryCountCsvInfo","棚卸を終了しました。スマレジ在庫一覧CSVを読み込んでください。","ok");
+      setMessage("appInventoryCountCsvInfo","棚卸を終了しました。差異比較を押すと、カウント数と棚卸前在庫を比較します。","ok");
       renderAll();
     }catch(error){
       setRemoteError(error);
@@ -479,16 +463,14 @@
           product_id:String(product.smaregi_product_id||""),
           product_name:product.name||"",
           count_qty:qty,
+          before_stock:Number(product.base_stock||0),
           staff,
           memo:"",
           counted_at:nowIso(),
           adopted:false
         })
       });
-      state.csvRows=[];
-      state.csvHeaderInfo=null;
       state.diffs=[];
-      state.unmatched=[];
       state.duplicateGroups=[];
       await loadItems();
       renderAll();
@@ -498,100 +480,7 @@
     }
   }
 
-  function headersToMap(headers){
-    const normalized=headers.map(normalizeKey);
-    const findIndex=aliases=>aliases.map(normalizeKey).map(key=>normalized.indexOf(key)).find(idx=>idx>=0) ?? -1;
-    return {
-      productId:findIndex(["商品ID","productid","product_id","id"]),
-      productCode:findIndex(["商品コード","productcode","product_code","code"]),
-      barcode:findIndex(["バーコード","JAN","JANコード","jancode","jan_code"]),
-      name:findIndex(["商品名","productname","product_name","name","品名"]),
-      color:findIndex(["カラー","color"]),
-      size:findIndex(["サイズ","size"]),
-      stock:findIndex(["在庫数","在庫","stock","stock_quantity","quantity"]),
-      headers
-    };
-  }
-
-  function parseSmaregiInventoryCsv(text){
-    const parsed=typeof parseCsv==="function" ? parseCsv(text) : [];
-    if(parsed.length<2)throw new Error("CSVにデータ行がありません。");
-    const headers=parsed[0].map(value=>String(value||"").trim());
-    const map=headersToMap(headers);
-    const required=[];
-    if(map.productCode<0)required.push("商品コード");
-    if(map.name<0)required.push("商品名");
-    if(map.stock<0)required.push("在庫数");
-    if(required.length)throw new Error(`必要なヘッダーが不足しています：${required.join("、")}`);
-    const rows=[];
-    for(let i=1;i<parsed.length;i+=1){
-      const row=parsed[i];
-      const productCode=String(row[map.productCode]??"").trim();
-      const productId=map.productId>=0 ? String(row[map.productId]??"").trim() : "";
-      const barcode=map.barcode>=0 ? String(row[map.barcode]??"").trim() : "";
-      const name=String(row[map.name]??"").trim();
-      const color=map.color>=0 ? String(row[map.color]??"").trim() : "";
-      const size=map.size>=0 ? String(row[map.size]??"").trim() : "";
-      const stock=numberValue(row[map.stock]);
-      if(!productCode&&!productId&&!barcode&&!name)continue;
-      rows.push({productCode,productId,barcode,name,color,size,stock:Number(stock||0),raw:row});
-    }
-    const used=new Set([map.productId,map.productCode,map.barcode,map.name,map.color,map.size,map.stock].filter(idx=>idx>=0).map(idx=>headers[idx]));
-    state.csvHeaderInfo={
-      headers,
-      used:[...used],
-      unused:headers.filter(header=>!used.has(header)),
-      missing:[map.barcode<0?"バーコード(JAN)":null].filter(Boolean)
-    };
-    return rows;
-  }
-
-  function makeCsvIndexes(rows){
-    const byProductCode=new Map();
-    const byProductId=new Map();
-    const byBarcode=new Map();
-    const byNameDetail=new Map();
-    rows.forEach(row=>{
-      const productCodeKey=normalizeKey(row.productCode);
-      const productIdKey=normalizeKey(row.productId);
-      const barcodeKey=normalizeKey(row.barcode);
-      if(productCodeKey&&!byProductCode.has(productCodeKey))byProductCode.set(productCodeKey,row);
-      if(productIdKey&&!byProductId.has(productIdKey))byProductId.set(productIdKey,row);
-      if(barcodeKey&&!byBarcode.has(barcodeKey))byBarcode.set(barcodeKey,row);
-      const detail=normalizeTextKey(`${row.name}${row.color}${row.size}`);
-      if(detail&&!byNameDetail.has(detail))byNameDetail.set(detail,row);
-      const nameKey=normalizeTextKey(row.name);
-      if(nameKey&&!byNameDetail.has(nameKey))byNameDetail.set(nameKey,row);
-    });
-    return {byProductCode,byProductId,byBarcode,byNameDetail};
-  }
-
-  function findCsvRowForCount(counted,indexes){
-    return indexes.byProductCode.get(normalizeKey(counted.productCode))
-      || indexes.byProductCode.get(normalizeKey(counted.barcode))
-      || indexes.byProductId.get(normalizeKey(counted.productId))
-      || indexes.byBarcode.get(normalizeKey(counted.barcode))
-      || indexes.byNameDetail.get(normalizeTextKey(counted.name))
-      || null;
-  }
-
-  async function loadSmaregiInventoryCsv(file){
-    if(!file)return;
-    try{
-      const buffer=await file.arrayBuffer();
-      const text=typeof decodeCsvBuffer==="function" ? decodeCsvBuffer(buffer) : new TextDecoder("utf-8").decode(buffer);
-      state.csvRows=parseSmaregiInventoryCsv(text);
-      state.diffs=[];
-      state.unmatched=[];
-      state.duplicateGroups=[];
-      setMessage("appInventoryCountCsvInfo",`CSV読込完了：${state.csvRows.length}行 / 利用列：${state.csvHeaderInfo.used.join("、")}`,"ok");
-      renderDiffRows();
-    }catch(error){
-      setMessage("appInventoryCountCsvInfo","CSV読込エラー\n"+error.message,"err");
-    }
-  }
-
-  async function compareCountedWithCsv(){
+  async function compareCountedWithAppStock(){
     const session=currentSession();
     if(!session){
       setMessage("appInventoryCountCsvInfo","比較するセッションを選択してください。","err");
@@ -613,26 +502,14 @@
       renderAll();
       return;
     }
-    if(!state.csvRows.length){
-      setMessage("appInventoryCountCsvInfo","スマレジ在庫一覧CSVを読み込んでください。","err");
-      return;
-    }
-    const indexes=makeCsvIndexes(state.csvRows);
     state.diffs=[];
-    state.unmatched=[];
     compareRows.forEach(counted=>{
-      const csvRow=findCsvRowForCount(counted,indexes);
-      if(!csvRow){
-        state.unmatched.push(counted);
-        return;
-      }
-      const diff=Number(counted.count)-Number(csvRow.stock);
+      const beforeStock=Number(counted.beforeStock||0);
+      const diff=Number(counted.count)-beforeStock;
       if(diff===0)return;
       state.diffs.push({
         ...counted,
-        productCode:csvRow.productCode||counted.productCode||counted.barcode,
-        productId:csvRow.productId||counted.productId||"",
-        smaregiStock:Number(csvRow.stock||0),
+        beforeStock,
         diff
       });
     });
@@ -642,7 +519,7 @@
       body:JSON.stringify({status:STATUS_COMPARED,compared_at:nowIso()})
     }).catch(()=>{});
     await loadSessions();
-    setMessage("appInventoryCountCsvInfo",`比較完了：差異 ${state.diffs.length}件 / CSV該当なし ${state.unmatched.length}件。未カウント商品とCSVだけの商品は対象外です。`,"ok");
+    setMessage("appInventoryCountCsvInfo",`比較完了：差異 ${state.diffs.length}件。カウント数と棚卸前在庫だけを比較しています。`,"ok");
     renderAll();
   }
 
@@ -660,10 +537,9 @@
       })));
       await loadItems();
       state.diffs=[];
-      state.unmatched=[];
       state.duplicateGroups=[];
       renderAll();
-      setMessage("appInventoryCountCsvInfo","採用するカウントを保存しました。CSV比較を再実行してください。","ok");
+      setMessage("appInventoryCountCsvInfo","採用するカウントを保存しました。差異比較を再実行してください。","ok");
     }catch(error){
       if(button)button.disabled=false;
       setRemoteError(error);
@@ -692,7 +568,7 @@
     try{
       if(button)button.disabled=true;
       await updateProductCurrentStock(product.barcode,after);
-      const memo=`アプリ内棚卸 / セッション:${session?.name||""} / 更新前:${before} / 更新後:${after} / スマレジ在庫:${row.smaregiStock} / 商品コード:${row.productCode}`;
+      const memo=`アプリ内棚卸 / セッション:${session?.name||""} / 棚卸前在庫:${row.beforeStock} / 更新前:${before} / 更新後:${after} / 商品コード:${row.productCode}`;
       const inserted=await sb("inventory_logs",{
         method:"POST",
         headers:{Prefer:"return=representation"},
@@ -850,8 +726,7 @@
     document.getElementById("startAppInventoryCountBtn")?.addEventListener("click",startCount);
     document.getElementById("finishAppInventoryCountBtn")?.addEventListener("click",finishCount);
     document.getElementById("saveAppInventoryCountBtn")?.addEventListener("click",saveCount);
-    document.getElementById("compareAppInventoryCountBtn")?.addEventListener("click",compareCountedWithCsv);
-    document.getElementById("appInventoryCountCsvFile")?.addEventListener("change",event=>loadSmaregiInventoryCsv(event.target.files&&event.target.files[0]));
+    document.getElementById("compareAppInventoryCountBtn")?.addEventListener("click",compareCountedWithAppStock);
     document.getElementById("appInventoryCameraBtn")?.addEventListener("click",startAppInventoryCamera);
     document.getElementById("appInventoryCloseCameraBtn")?.addEventListener("click",()=>stopAppInventoryCamera(true));
     document.getElementById("appInventoryCountBarcode")?.addEventListener("input",()=>previewBarcode());
@@ -871,10 +746,7 @@
     document.getElementById("appInventorySessionSelect")?.addEventListener("change",async event=>{
       state.currentSessionId=event.target.value||"";
       localStorage.setItem(CURRENT_SESSION_KEY,state.currentSessionId);
-      state.csvRows=[];
-      state.csvHeaderInfo=null;
       state.diffs=[];
-      state.unmatched=[];
       state.duplicateGroups=[];
       const session=currentSession();
       const nameInput=document.getElementById("appInventorySessionName");
@@ -887,10 +759,6 @@
     window.addEventListener("beforeunload",()=>stopAppInventoryCamera(false));
     renderAppInventoryCount();
   }
-
-  window.getAppInventoryCountCsvHeaderReport=function(){
-    return state.csvHeaderInfo;
-  };
 
   window.addEventListener("DOMContentLoaded",bindAppInventoryCountEvents);
 })();

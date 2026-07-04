@@ -268,7 +268,7 @@
     <div class="section-title">
       <div>
         <h2>アプリ内棚卸</h2>
-        <p class="section-note">スキャン・検索でカウントした商品だけを、スマレジ在庫一覧CSVと比較します。</p>
+        <p class="section-note">スキャン・検索でカウントした商品だけを、棚卸前のアプリ在庫と比較します。</p>
       </div>
       <div id="appInventoryCountStatus" class="badge muted">未開始</div>
     </div>
@@ -308,12 +308,11 @@
         <div id="appInventoryCountProductInfo" class="message">棚卸開始後、商品をスキャンまたは検索してください。</div>
       </section>
       <section class="app-count-block">
-        <h3>スマレジ在庫一覧CSV比較</h3>
+        <h3>棚卸前アプリ在庫比較</h3>
         <div class="button-row">
-          <label class="file-button">CSV読込<input type="file" id="appInventoryCountCsvFile" accept=".csv,text/csv"></label>
           <button type="button" id="compareAppInventoryCountBtn" class="secondary">差異比較</button>
         </div>
-        <div id="appInventoryCountCsvInfo" class="message">棚卸終了後、スマレジ在庫一覧CSVを読み込んでください。</div>
+        <div id="appInventoryCountCsvInfo" class="message">棚卸終了後、カウント数と棚卸前在庫を比較できます。</div>
       </section>
     </div>
     <section class="app-count-block">
@@ -347,7 +346,7 @@
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table app-count-diff-table">
-          <thead><tr><th>商品名</th><th>商品コード</th><th>バーコード</th><th>カウント数</th><th>スマレジ在庫</th><th>差異</th><th>更新</th></tr></thead>
+          <thead><tr><th>商品名</th><th>商品コード</th><th>バーコード</th><th>カウント数</th><th>棚卸前在庫</th><th>差異</th><th>更新</th></tr></thead>
           <tbody id="appInventoryDiffBody"></tbody>
         </table>
       </div>

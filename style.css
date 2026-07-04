@@ -317,7 +317,7 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   .app-count-table td:nth-child(6)::before{content:"保存日時";}
   .app-count-table td:nth-child(7)::before{content:"重複";}
 
-  .app-count-diff-table td:nth-child(5)::before{content:"スマレジ在庫";}
+  .app-count-diff-table td:nth-child(5)::before{content:"棚卸前在庫";}
   .app-count-diff-table td:nth-child(6)::before{content:"差異";}
   .app-count-diff-table td:nth-child(7)::before{content:"更新";}
 
