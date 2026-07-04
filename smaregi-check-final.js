@@ -330,13 +330,55 @@
       if(isExcludedCheck(check))return null;
       if(check?.no_issue===true)return null;
       if(check?.difference_reason_category || check?.difference_reason_memo || check?.difference_reason_by || check?.difference_reason_at)return null;
-      const actual=Number(check.actual_stock);
+      const breakdown=typeof getSmaregiInventoryBreakdown==="function"
+        ? getSmaregiInventoryBreakdown(item,check)
+        : null;
+      const actual=Number(breakdown?.actualStock ?? check.actual_stock);
+      const currentEventStock=Number(breakdown?.currentEventStock ?? 0);
+      const eventStorageStock=Number(breakdown?.eventStorageStock ?? 0);
+      const comparisonStock=Number(breakdown?.comparisonStock ?? actual);
       const smaregiStock=getCsvSmaregiStock(item);
-      if(!Number.isFinite(actual)||!Number.isFinite(smaregiStock))return null;
-      const difference=actual-smaregiStock;
+      if(!Number.isFinite(actual)||!Number.isFinite(smaregiStock)||!Number.isFinite(comparisonStock))return null;
+      const difference=comparisonStock-smaregiStock;
       if(difference===0)return null;
-      return {item,check,actual,smaregiStock,difference};
+      return {item,check,actual,currentEventStock,eventStorageStock,comparisonStock,smaregiStock,difference};
     }).filter(Boolean);
+  }
+
+  function hasInventoryAdminAccessSafe(){
+    return typeof hasInventoryPrivilegedAccess==="function" && hasInventoryPrivilegedAccess();
+  }
+
+  function getDiffRowActionsHtml(barcode,{includeExclude=false,includeEquipment=true}={}){
+    return `<div class="diff-action-group">
+      <button type="button" class="smaregi-diff-save-btn" data-barcode="${safeText(barcode)}">保存</button>
+      <button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${safeText(barcode)}">原因確認</button>
+      <button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${safeText(barcode)}">問題なし</button>
+      ${includeEquipment?`<button type="button" class="secondary smaregi-diff-equipment-btn" data-barcode="${safeText(barcode)}">備品転用</button>`:""}
+      ${includeExclude?`<button type="button" class="secondary smaregi-diff-exclude-btn" data-barcode="${safeText(barcode)}">除外</button>`:""}
+    </div>`;
+  }
+
+  function prepareEquipmentTransferFromDiff(barcode){
+    const item=getAllMovementItems().find(row=>String(row.barcode||"")===String(barcode));
+    if(typeof showInventoryScreen==="function")showInventoryScreen("inventory");
+    const typeSelect=document.getElementById("type");
+    if(typeSelect){
+      const equipmentOption=[...typeSelect.options].find(option=>option.value==="備品転用" || option.textContent==="備品転用");
+      if(equipmentOption)typeSelect.value=equipmentOption.value;
+      typeSelect.dispatchEvent(new Event("change",{bubbles:true}));
+    }
+    const barcodeInput=document.getElementById("barcodeInput");
+    if(barcodeInput){
+      barcodeInput.value=barcode;
+      barcodeInput.dispatchEvent(new Event("input",{bubbles:true}));
+      barcodeInput.focus();
+    }
+    const qtyInput=document.getElementById("qty");
+    if(qtyInput && !String(qtyInput.value||"").trim())qtyInput.value="1";
+    const memoInput=document.getElementById("memo");
+    if(memoInput && !String(memoInput.value||"").trim())memoInput.value=`棚卸差異から備品転用 ${getItemName(item)||barcode}`;
+    showMessage?.("備品転用登録に移動しました。数量・担当者・備考を確認して登録してください。","ok");
   }
 
   function readNoIssueReason(){
@@ -434,22 +476,41 @@
       body.innerHTML='<tr><td colspan="10" class="smaregi-empty">差異のある商品はありません。</td></tr>';
       return;
     }
-    body.innerHTML=rows.map(({item,check,actual,smaregiStock,difference})=>{
+    body.innerHTML=rows.map(({item,check,actual,currentEventStock,eventStorageStock,comparisonStock,smaregiStock,difference})=>{
       const barcode=String(item?.barcode||"");
       const name=getItemName(item)||"商品名未設定";
       const checkedBy=typeof getSmaregiDisplayCheckedBy==="function" ? getSmaregiDisplayCheckedBy(check) : (check?.checked_by||"");
       const differenceClass=difference<0 ? " is-negative" : " is-positive";
-      return `<tr>
-        <td>${safeText(name)}<div class="smaregi-movement-note">バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</div></td>
-        <td><input type="number" class="smaregi-diff-actual-input" data-barcode="${safeText(barcode)}" min="0" step="1" inputmode="numeric" value="${safeText(actual)}"></td>
-        <td>0</td>
-        <td>0</td>
-        <td>${displayNumber(smaregiStock)}</td>
+      const checkedAt=check?.checked_at && typeof fmt==="function" ? safeText(fmt(check.checked_at)) : "未入力";
+      const showExclude=hasInventoryAdminAccessSafe();
+      return `<tr class="smaregi-diff-row">
+        <td class="smaregi-diff-product-cell">
+          <div class="smaregi-diff-pc-product">${safeText(name)}<div class="smaregi-movement-note">バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</div></div>
+          <div class="smaregi-diff-mobile-card">
+            <strong class="smaregi-diff-mobile-name">${safeText(name)}</strong>
+            <div class="smaregi-diff-mobile-barcode">バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</div>
+            <div class="smaregi-diff-mobile-values">
+              <label>実在庫<input type="number" class="smaregi-diff-actual-input smaregi-diff-mobile-actual-input" data-barcode="${safeText(barcode)}" min="0" step="1" inputmode="numeric" value="${safeText(actual)}"></label>
+              <div><span>スマレジ在庫</span><strong>${displayNumber(smaregiStock)}</strong></div>
+              <div><span>通常棚</span><strong>${displayNumber(actual)}</strong></div>
+              <div><span>イベント保管</span><strong>${displayNumber(eventStorageStock)}</strong></div>
+              <div><span>今回イベント</span><strong>${displayNumber(currentEventStock)}</strong></div>
+              <div><span>比較用在庫</span><strong>${displayNumber(comparisonStock)}</strong></div>
+              <div class="smaregi-diff-mobile-difference"><span>差異</span><strong class="smaregi-difference${differenceClass}">${difference}</strong></div>
+              <div><span>最終更新日時</span><strong>${checkedAt}</strong></div>
+            </div>
+            ${getDiffRowActionsHtml(barcode,{includeExclude:showExclude,includeEquipment:true})}
+          </div>
+        </td>
+        <td><input type="number" class="smaregi-diff-actual-input smaregi-diff-pc-actual-input" data-barcode="${safeText(barcode)}" min="0" step="1" inputmode="numeric" value="${safeText(actual)}"></td>
+        <td>${displayNumber(currentEventStock)}</td>
+        <td>${displayNumber(eventStorageStock)}</td>
+        <td>${displayNumber(comparisonStock)}</td>
         <td>${displayNumber(smaregiStock)}</td>
         <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
         <td>${safeText(checkedBy||"担当者未設定")}</td>
-        <td>${check?.checked_at && typeof fmt==="function" ? safeText(fmt(check.checked_at)) : "未入力"}</td>
-        <td><div class="diff-action-group"><button type="button" class="smaregi-diff-save-btn" data-barcode="${safeText(barcode)}">保存</button><button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${safeText(barcode)}">原因確認</button><button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${safeText(barcode)}">問題なし</button></div></td>
+        <td>${checkedAt}</td>
+        <td>${getDiffRowActionsHtml(barcode,{includeExclude:showExclude,includeEquipment:true})}</td>
       </tr>`;
     }).join("");
     body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
@@ -462,6 +523,18 @@
     });
     body.querySelectorAll(".smaregi-no-issue-btn").forEach(button=>{
       button.onclick=()=>markSmaregiDifferenceNoIssue(button.dataset.barcode,button);
+    });
+    body.querySelectorAll(".smaregi-diff-equipment-btn").forEach(button=>{
+      button.onclick=()=>prepareEquipmentTransferFromDiff(button.dataset.barcode);
+    });
+    body.querySelectorAll(".smaregi-diff-exclude-btn").forEach(button=>{
+      button.onclick=()=>{
+        if(!hasInventoryAdminAccessSafe()){
+          showMessage?.("除外は管理者認証後に実行できます。","err");
+          return;
+        }
+        if(typeof excludeSmaregiStockItem==="function")excludeSmaregiStockItem(button.dataset.barcode,button);
+      };
     });
   };
 
@@ -482,7 +555,10 @@
   }
 
   async function saveSmaregiDiffActualStock(button){
-    const input=button?.closest("tr")?.querySelector(".smaregi-diff-actual-input");
+    const mobileCard=button?.closest(".smaregi-diff-mobile-card");
+    const input=mobileCard?.querySelector(".smaregi-diff-mobile-actual-input")
+      || button?.closest("tr")?.querySelector(".smaregi-diff-pc-actual-input")
+      || button?.closest("tr")?.querySelector(".smaregi-diff-actual-input");
     const actualStock=readActualStockValue(input);
     if(actualStock===null)return false;
     const barcode=String(button?.dataset?.barcode||"");
@@ -1439,6 +1515,74 @@
     if(log)setEquipmentCache(logId,log);
   };
 
+  async function markEquipmentTransferChecked(latestLog,checkedBy){
+    const logId=String(latestLog?.id||"");
+    if(!logId)throw new Error("備品転用履歴IDが見つかりません。");
+    const checkedAt=new Date().toISOString();
+    const patch={equipment_checked:true,equipment_checked_at:checkedAt,equipment_checked_by:checkedBy||""};
+    const refreshed=await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify(patch)
+    });
+    const refreshedLog=Array.isArray(refreshed)&&refreshed[0] ? refreshed[0] : {...latestLog,...patch};
+    setEquipmentCache(logId,refreshedLog);
+    if(typeof replaceEquipmentConfirmationDom==="function")replaceEquipmentConfirmationDom(logId,refreshedLog);
+    return refreshedLog;
+  }
+
+  async function applyEquipmentCancelToCurrentSmaregiCheck(barcode,quantity,checkedBy){
+    if(!smaregiSnapshot)return false;
+    const item=getAllMovementItems().find(row=>String(row.barcode||"")===String(barcode));
+    const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(barcode) : null;
+    if(!item||!hasActualStock(check))return false;
+    const actualStock=Number(check.actual_stock);
+    if(!Number.isFinite(actualStock))return false;
+    const checkedAt=new Date().toISOString();
+    const nextActualStock=actualStock+Math.abs(Number(quantity||1)||1);
+    const eventBreakdown=typeof getSmaregiInventoryBreakdown==="function"
+      ? getSmaregiInventoryBreakdown(item,{...check,actual_stock:nextActualStock})
+      : null;
+    const comparisonStock=Number(eventBreakdown?.comparisonStock ?? nextActualStock);
+    const smaregiStock=getCsvSmaregiStock(item);
+    const payload={
+      actual_stock:nextActualStock,
+      difference:Number.isFinite(comparisonStock)&&Number.isFinite(smaregiStock) ? comparisonStock-smaregiStock : nextActualStock-smaregiStock,
+      checked_by:checkedBy||check.checked_by||"",
+      checked_at:checkedAt,
+      excluded:false,
+      no_issue:check.no_issue===true,
+      no_issue_by:check.no_issue_by||null,
+      no_issue_at:check.no_issue_at||null,
+      no_issue_reason:check.no_issue_reason||"",
+      difference_reason_category:check.difference_reason_category||null,
+      difference_reason_memo:check.difference_reason_memo||"",
+      difference_reason_by:check.difference_reason_by||null,
+      difference_reason_at:check.difference_reason_at||null,
+      actual_corrected:true,
+      actual_corrected_by:checkedBy||check.actual_corrected_by||null,
+      actual_corrected_at:checkedAt
+    };
+    const savedRows=await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify(payload)
+    });
+    const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : {...check,...payload};
+    smaregiStockChecks=smaregiStockChecks.filter(row=>String(row.barcode)!==String(barcode));
+    smaregiStockChecks.push({...savedRow,snapshot_id:smaregiSnapshot.id,barcode});
+    return true;
+  }
+
+  function refreshSmaregiAnalysisAfterEquipmentChange(){
+    try{renderSmaregiStockChecks();}catch(_){}
+    try{renderSmaregiDiffOnlyPanel();}catch(_){}
+    try{updateSmaregiProgressOnly();}catch(_){}
+    try{if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();}catch(_){}
+    try{if(typeof loadSmaregiDifferenceRanking==="function")loadSmaregiDifferenceRanking();}catch(_){}
+    try{if(typeof loadSmaregiReasonSummary==="function")loadSmaregiReasonSummary();}catch(_){}
+  }
+
   window.executeEquipmentTransferConfirmation=async function({log,product=null,quantity,checkedBy,button}){
     try{
       const logId=String(log?.id||"");
@@ -1457,16 +1601,7 @@
         nextStock=nextStock-absQty;
         await updateProductCurrentStock(latestLog.barcode,nextStock);
       }
-      const checkedAt=new Date().toISOString();
-      const patch={equipment_checked:true,equipment_checked_at:checkedAt,equipment_checked_by:checkedBy||""};
-      const refreshed=await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
-        method:"PATCH",
-        headers:{Prefer:"return=representation"},
-        body:JSON.stringify(patch)
-      });
-      const refreshedLog=Array.isArray(refreshed)&&refreshed[0] ? refreshed[0] : {...latestLog,...patch};
-      setEquipmentCache(logId,refreshedLog);
-      if(typeof replaceEquipmentConfirmationDom==="function")replaceEquipmentConfirmationDom(logId,refreshedLog);
+      const refreshedLog=await markEquipmentTransferChecked(latestLog,checkedBy);
       showMessage?.(`備品転用を確認しました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
       showPopup?.("備品転用確認完了",`商品名：${product.name||latestLog.product_name||""}\nバーコード：${latestLog.barcode}\n数量：${absQty}\n現在庫：${nextStock}`);
       return true;
@@ -1532,11 +1667,19 @@
         })
       });
       const cancelLog=Array.isArray(inserted)&&inserted[0] ? inserted[0] : null;
+      const checkedLog=await markEquipmentTransferChecked(latestLog,staff);
+      await applyEquipmentCancelToCurrentSmaregiCheck(latestLog.barcode,absQty,staff);
       try{if(Array.isArray(logs)&&cancelLog)logs.unshift(cancelLog);}catch(_){}
+      try{
+        if(Array.isArray(logs)){
+          logs=logs.map(row=>String(row.id)===String(logId) ? {...row,...checkedLog} : row);
+        }
+      }catch(_){}
       showMessage?.(`備品転用をキャンセルしました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
       showPopup?.("備品転用キャンセル完了",`商品名：${product.name||latestLog.product_name||""}\nバーコード：${latestLog.barcode}\n戻し数量：${absQty}\n現在庫：${nextStock}`);
       if(typeof renderGlobalHistory==="function")renderGlobalHistory();
       if(typeof selectedBarcode!=="undefined" && selectedBarcode && typeof showProductHistoryForBarcode==="function")showProductHistoryForBarcode(selectedBarcode);
+      refreshSmaregiAnalysisAfterEquipmentChange();
       return true;
     }catch(error){
       if(button)button.disabled=false;

@@ -5334,3 +5334,137 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     display:none !important;
   }
 }
+
+/* Final mobile difference list cards. */
+.smaregi-diff-mobile-card{
+  display:none;
+}
+
+@media(max-width:800px){
+  body[data-inventory-screen="analytics"] #smaregiDiffOnlyPanel:not([hidden]),
+  #smaregiDiffOnlyPanel:not([hidden]){
+    display:block !important;
+  }
+  #smaregiDiffOnlyPanel .table-wrap{
+    overflow:visible !important;
+    max-height:none !important;
+    border:0 !important;
+    border-radius:0 !important;
+  }
+  .smaregi-diff-table,
+  .smaregi-diff-table thead,
+  .smaregi-diff-table tbody,
+  .smaregi-diff-table tr,
+  .smaregi-diff-table td{
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    box-sizing:border-box !important;
+  }
+  .smaregi-diff-table{
+    table-layout:auto !important;
+    min-width:0 !important;
+    border-collapse:separate !important;
+    border-spacing:0 !important;
+  }
+  .smaregi-diff-table thead{
+    display:none !important;
+  }
+  .smaregi-diff-table tr.smaregi-diff-row{
+    margin:10px 0 !important;
+    padding:0 !important;
+    border:1px solid #bfdcc9 !important;
+    border-radius:12px !important;
+    background:#f8fcf9 !important;
+    overflow:hidden !important;
+  }
+  .smaregi-diff-table tr.smaregi-diff-row td{
+    border:0 !important;
+    padding:0 !important;
+    white-space:normal !important;
+    text-align:left !important;
+  }
+  .smaregi-diff-table tr.smaregi-diff-row td:not(:first-child){
+    display:none !important;
+  }
+  .smaregi-diff-pc-product{
+    display:none !important;
+  }
+  .smaregi-diff-mobile-card{
+    display:grid !important;
+    gap:10px;
+    padding:12px;
+  }
+  .smaregi-diff-mobile-name{
+    display:block;
+    color:#113b2b;
+    font-size:16px;
+    line-height:1.35;
+    overflow-wrap:anywhere;
+  }
+  .smaregi-diff-mobile-barcode{
+    color:#315f4d;
+    font-size:12px;
+    line-height:1.35;
+    overflow-wrap:anywhere;
+  }
+  .smaregi-diff-mobile-values{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:7px;
+  }
+  .smaregi-diff-mobile-values label,
+  .smaregi-diff-mobile-values div{
+    display:grid !important;
+    grid-template-columns:112px minmax(0,1fr);
+    gap:8px;
+    align-items:center;
+    margin:0 !important;
+    padding:8px 10px;
+    border:1px solid #dcebe1;
+    border-radius:9px;
+    background:#fff;
+    color:#315f4d;
+    font-size:13px;
+    font-weight:800;
+  }
+  .smaregi-diff-mobile-values span{
+    color:#315f4d;
+    font-size:13px;
+  }
+  .smaregi-diff-mobile-values strong{
+    color:#10251b;
+    font-size:15px;
+    text-align:right;
+    overflow-wrap:anywhere;
+  }
+  .smaregi-diff-mobile-values input{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    height:40px !important;
+    min-height:40px !important;
+    padding:6px 10px !important;
+    font-size:16px !important;
+    text-align:right;
+  }
+  .smaregi-diff-mobile-difference{
+    border-color:#f3b2b2 !important;
+    background:#fff7f7 !important;
+  }
+  .smaregi-diff-mobile-card .diff-action-group{
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    gap:8px !important;
+  }
+  .smaregi-diff-mobile-card .diff-action-group button{
+    width:100% !important;
+    min-width:0 !important;
+    min-height:44px !important;
+    margin:0 !important;
+    padding:10px 12px !important;
+    font-size:15px !important;
+    border-radius:10px !important;
+  }
+}
