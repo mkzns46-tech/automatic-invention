@@ -1047,7 +1047,9 @@ async function exportSmaregiCheckCsv(differenceOnly=false){
   }
   try{
     const rows=differenceOnly ? await smaregiHistoricalDifferenceCsvRows() : smaregiCsvRows(false);
-    downloadCsvFile(differenceOnly?"smaregi_stock_difference_only.csv":"smaregi_stock_check_all.csv",rows);
+    const today=new Date();
+    const ymd=`${today.getFullYear()}${String(today.getMonth()+1).padStart(2,"0")}${String(today.getDate()).padStart(2,"0")}`;
+    downloadCsvFile(differenceOnly?`差異一覧${ymd}.csv`:"smaregi_stock_check_all.csv",rows);
     showMessage(`${differenceOnly?"差異のみ":"全体"}CSVを出力しました：${rows.length-1}件`,"ok");
   }catch(e){
     showMessage("差異CSV出力エラー。\n"+e.message,"err");
