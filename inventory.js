@@ -27,6 +27,7 @@ function render(){
   renderRecentRegistrationHistory();
   renderGlobalHistory();
   renderSelectedProductHistory();
+  if(typeof renderAppInventoryCount==="function")renderAppInventoryCount();
   if(typeof applyLang==='function')setTimeout(applyLang,0);
 }
 

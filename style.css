@@ -11,6 +11,212 @@
   box-shadow:0 0 0 4px var(--main-light);
 }
 
+body[data-inventory-screen="app-inventory-count"] .grid > [data-inventory-screen="app-inventory-count"]:not([hidden]){
+  display:block !important;
+  visibility:visible !important;
+  height:auto !important;
+}
+
+body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
+  grid-template-columns:1fr;
+}
+
+.app-inventory-count-card{
+  display:block;
+}
+
+.app-count-toolbar{
+  display:grid;
+  grid-template-columns:minmax(220px,1fr) auto auto;
+  gap:12px;
+  align-items:end;
+  margin:14px 0 18px;
+}
+
+.app-count-workflow{
+  display:grid;
+  grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);
+  gap:16px;
+}
+
+.app-count-block{
+  display:grid;
+  gap:12px;
+  min-width:0;
+  margin-top:16px;
+  padding-top:16px;
+  border-top:1px solid #d9e7dd;
+}
+
+.app-count-block:first-child,
+.app-count-workflow .app-count-block{
+  margin-top:0;
+}
+
+.app-count-block h3{
+  margin:0;
+  color:#113b2b;
+  font-size:18px;
+}
+
+.app-count-input-grid{
+  display:grid;
+  grid-template-columns:minmax(180px,1.1fr) minmax(180px,1fr) 130px auto;
+  gap:10px;
+  align-items:end;
+}
+
+.app-count-input-grid label,
+.app-count-toolbar label{
+  min-width:0;
+}
+
+.app-count-input-grid input,
+.app-count-toolbar select{
+  width:100%;
+}
+
+.product-search-results{
+  display:grid;
+  gap:8px;
+}
+
+.product-search-result{
+  display:grid;
+  gap:4px;
+  width:100%;
+  padding:10px 12px;
+  border:1px solid #cfe1d6;
+  border-radius:8px;
+  background:#fff;
+  color:#123d2c;
+  text-align:left;
+  cursor:pointer;
+}
+
+.product-search-result:hover{
+  border-color:#2f7656;
+  background:#f5fbf7;
+}
+
+.product-search-result small,
+.product-search-empty{
+  color:#587566;
+  font-size:12px;
+}
+
+.app-count-table-wrap{
+  max-height:360px;
+  overflow:auto;
+}
+
+.app-count-table{
+  min-width:760px;
+}
+
+.app-count-table th,
+.app-count-table td{
+  vertical-align:middle;
+}
+
+.app-count-update-btn{
+  min-width:88px;
+}
+
+.app-count-empty{
+  color:#587566;
+  text-align:center;
+}
+
+@media (max-width:800px){
+  body[data-inventory-screen="app-inventory-count"]{
+    overflow-x:hidden;
+  }
+
+  .app-count-toolbar,
+  .app-count-workflow,
+  .app-count-input-grid{
+    grid-template-columns:1fr;
+  }
+
+  .app-count-toolbar button,
+  .app-count-input-grid button,
+  .app-count-workflow .button-row,
+  .app-count-workflow .button-row button,
+  .app-count-workflow .file-button{
+    width:100%;
+  }
+
+  .app-count-table-wrap{
+    max-height:none;
+    overflow-x:hidden;
+  }
+
+  .app-count-table{
+    min-width:0;
+    width:100%;
+  }
+
+  .app-count-table thead{
+    display:none;
+  }
+
+  .app-count-table,
+  .app-count-table tbody,
+  .app-count-table tr,
+  .app-count-table td{
+    display:block;
+  }
+
+  .app-count-table tr{
+    margin:0 0 12px;
+    padding:12px;
+    border:1px solid #d8e7de;
+    border-radius:8px;
+    background:#fff;
+  }
+
+  .app-count-table td{
+    display:grid;
+    grid-template-columns:118px minmax(0,1fr);
+    gap:8px;
+    padding:7px 0;
+    border:0;
+    overflow-wrap:anywhere;
+  }
+
+  .app-count-table td::before{
+    color:#557466;
+    font-size:12px;
+    font-weight:800;
+  }
+
+  .app-count-table td:nth-child(1)::before{content:"商品名";}
+  .app-count-table td:nth-child(2)::before{content:"商品コード";}
+  .app-count-table td:nth-child(3)::before{content:"バーコード";}
+  .app-count-table td:nth-child(4)::before{content:"カウント数";}
+  .app-count-table td:nth-child(5)::before{content:"アプリ在庫";}
+  .app-count-table td:nth-child(6)::before{content:"保存日時";}
+
+  .app-count-diff-table td:nth-child(5)::before{content:"スマレジ在庫";}
+  .app-count-diff-table td:nth-child(6)::before{content:"差異";}
+  .app-count-diff-table td:nth-child(7)::before{content:"更新";}
+
+  .app-count-diff-table td:nth-child(7){
+    grid-template-columns:1fr;
+  }
+
+  .app-count-diff-table td:nth-child(7)::before{
+    content:"";
+    display:none;
+  }
+
+  .app-count-diff-table button{
+    width:100%;
+    min-height:44px;
+  }
+}
+
 .csv-mode-message{
   border:1px solid #f2c48d;
   background:#fff7ed;

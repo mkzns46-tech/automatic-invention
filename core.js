@@ -32,6 +32,7 @@ const INVENTORY_APP_MENU_SECTIONS=[
     {key:"settings",label:"設定",action:"settings"}
   ]}
 ];
+INVENTORY_APP_MENU_SECTIONS[1]?.items?.unshift({key:"app-inventory-count",label:"アプリ内棚卸",action:"app-inventory-count"});
 const INVENTORY_APP_MENU_FOOTER_ITEMS=[
   {key:"admin-auth",label:"管理者認証",action:"admin-auth"},
   {key:"portal",label:"トップへ戻る",action:"portal"},
@@ -331,6 +332,11 @@ function renderInventoryAppMenu(){
   if(inventoryButton)inventoryButton.addEventListener("click",showInventoryRegistration);
   const historyButton=menu.querySelector('[data-menu-action="history"]');
   if(historyButton)historyButton.addEventListener("click",showInventoryHistory);
+  const appInventoryCountButton=menu.querySelector('[data-menu-action="app-inventory-count"]');
+  if(appInventoryCountButton)appInventoryCountButton.addEventListener("click",()=>{
+    showInventoryScreen("app-inventory-count","app-inventory-count");
+    if(typeof renderAppInventoryCount==="function")renderAppInventoryCount();
+  });
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
   if(boothButton)boothButton.addEventListener("click",()=>{
     if(typeof showBoothManagement==="function")showBoothManagement();
