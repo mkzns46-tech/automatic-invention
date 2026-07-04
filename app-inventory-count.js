@@ -2,17 +2,22 @@
 (function(){
   "use strict";
 
-  const STORAGE_KEY="arico_app_inventory_count_sessions_v1";
-  const LEGACY_KEY="arico_app_inventory_count_v1";
+  const CURRENT_SESSION_KEY="arico_app_inventory_count_current_session_id";
   const SCAN_COOLDOWN_MS=1300;
+  const STATUS_NOT_STARTED="未開始";
+  const STATUS_ACTIVE="棚卸中";
+  const STATUS_FINISHED="棚卸終了";
+  const STATUS_COMPARED="比較済み";
 
   const state={
     sessions:[],
+    items:[],
     currentSessionId:"",
     csvRows:[],
     csvHeaderInfo:null,
     diffs:[],
-    unmatched:[]
+    unmatched:[],
+    duplicateGroups:[]
   };
 
   let appCountCameraStream=null;
@@ -37,10 +42,6 @@
     return new Date().toISOString();
   }
 
-  function makeId(){
-    return `session_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
-  }
-
   function normalizeKey(value){
     return String(value??"").trim().toLowerCase().replace(/\s/g,"");
   }
@@ -56,6 +57,11 @@
     return Number.isFinite(number) ? number : null;
   }
 
+  function formatDate(value){
+    if(!value)return "";
+    return typeof fmt==="function" ? fmt(value) : new Date(value).toLocaleString("ja-JP");
+  }
+
   function getStaffValue(){
     return String(document.getElementById("appInventoryCountStaff")?.value||"").trim();
   }
@@ -64,60 +70,25 @@
     return state.sessions.find(session=>session.id===state.currentSessionId)||null;
   }
 
-  function countedMap(session=currentSession()){
-    return new Map((session?.items||[]).map(row=>[String(row.barcode||row.productCode||row.name),row]));
+  function itemKey(item){
+    return normalizeKey(item.product_code||item.barcode||item.product_name);
   }
 
-  function setCountedMap(map,session=currentSession()){
-    if(!session)return;
-    session.items=[...map.values()];
-  }
-
-  function migrateLegacySession(){
-    if(localStorage.getItem(STORAGE_KEY))return null;
-    try{
-      const legacy=JSON.parse(localStorage.getItem(LEGACY_KEY)||"{}");
-      const counted=Array.isArray(legacy.counted) ? legacy.counted : [];
-      if(!counted.length&&!legacy.startedAt)return null;
-      return {
-        id:makeId(),
-        name:"移行済み棚卸",
-        staff:legacy.staff||"",
-        memo:"",
-        status:legacy.active?"棚卸中":(legacy.finishedAt?"棚卸終了":"未開始"),
-        startedAt:legacy.startedAt||nowIso(),
-        finishedAt:legacy.finishedAt||null,
-        comparedAt:null,
-        items:counted
-      };
-    }catch(_){
-      return null;
-    }
-  }
-
-  function saveState(){
-    localStorage.setItem(STORAGE_KEY,JSON.stringify({
-      currentSessionId:state.currentSessionId,
-      sessions:state.sessions
-    }));
-  }
-
-  function loadState(){
-    try{
-      const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}");
-      state.sessions=Array.isArray(saved.sessions) ? saved.sessions : [];
-      state.currentSessionId=saved.currentSessionId||"";
-      const migrated=migrateLegacySession();
-      if(migrated){
-        state.sessions=[migrated];
-        state.currentSessionId=migrated.id;
-        saveState();
-      }
-      if(!currentSession()&&state.sessions[0])state.currentSessionId=state.sessions[0].id;
-    }catch(_){
-      state.sessions=[];
-      state.currentSessionId="";
-    }
+  function itemDisplay(item){
+    return {
+      id:item.id,
+      key:itemKey(item),
+      barcode:item.barcode||"",
+      productCode:item.product_code||item.barcode||"",
+      productId:item.product_id||"",
+      name:item.product_name||"",
+      count:Number(item.count_qty||0),
+      appStock:Number(item.app_stock||0),
+      staff:item.staff||"",
+      updatedAt:item.counted_at||item.created_at||"",
+      memo:item.memo||"",
+      adopted:!!item.adopted
+    };
   }
 
   function setMessage(id,text,type=""){
@@ -127,9 +98,97 @@
     node.className=`message${type?` ${type}`:""}`;
   }
 
-  function formatDate(value){
-    if(!value)return "";
-    return typeof fmt==="function" ? fmt(value) : new Date(value).toLocaleString("ja-JP");
+  function setRemoteError(error){
+    setMessage(
+      "appInventoryCountProductInfo",
+      "アプリ内棚卸の共有テーブルに接続できません。SQLを先に実行してください。\n"+(error?.message||error),
+      "err"
+    );
+  }
+
+  async function loadSessions(){
+    try{
+      const rows=await sbAll("inventory_count_sessions?select=*&order=started_at.desc",1000,5000);
+      state.sessions=Array.isArray(rows) ? rows : [];
+      const saved=localStorage.getItem(CURRENT_SESSION_KEY)||"";
+      state.currentSessionId=state.sessions.some(row=>row.id===saved) ? saved : (state.sessions[0]?.id||"");
+      if(state.currentSessionId)localStorage.setItem(CURRENT_SESSION_KEY,state.currentSessionId);
+    }catch(error){
+      state.sessions=[];
+      state.currentSessionId="";
+      setRemoteError(error);
+    }
+  }
+
+  async function loadItems(){
+    const session=currentSession();
+    if(!session){
+      state.items=[];
+      return;
+    }
+    try{
+      const rows=await sbAll(`inventory_count_items?select=*&session_id=eq.${encodeURIComponent(session.id)}&order=counted_at.desc`,1000,10000);
+      state.items=Array.isArray(rows) ? rows : [];
+    }catch(error){
+      state.items=[];
+      setRemoteError(error);
+    }
+  }
+
+  async function refreshRemote(){
+    await loadSessions();
+    await loadItems();
+  }
+
+  function duplicateKeySet(){
+    const grouped=new Map();
+    state.items.map(itemDisplay).forEach(row=>{
+      if(!row.key)return;
+      if(!grouped.has(row.key))grouped.set(row.key,[]);
+      grouped.get(row.key).push(row);
+    });
+    const keys=new Set();
+    grouped.forEach((rows,key)=>{
+      if(rows.length>1)keys.add(key);
+    });
+    return keys;
+  }
+
+  function duplicateGroups(){
+    const grouped=new Map();
+    state.items.map(itemDisplay).forEach(row=>{
+      if(!row.key)return;
+      if(!grouped.has(row.key))grouped.set(row.key,[]);
+      grouped.get(row.key).push(row);
+    });
+    return [...grouped.entries()]
+      .filter(([,rows])=>rows.length>1)
+      .map(([key,rows])=>({key,rows}));
+  }
+
+  function compareItems(){
+    const groups=duplicateGroups();
+    const duplicateKeys=new Set(groups.map(group=>group.key));
+    const adoptedByKey=new Map();
+    groups.forEach(group=>{
+      const adopted=group.rows.find(row=>row.adopted);
+      if(adopted)adoptedByKey.set(group.key,adopted);
+    });
+    const rows=[];
+    const seen=new Set();
+    state.items.map(itemDisplay).forEach(row=>{
+      if(!row.key||seen.has(row.key))return;
+      if(duplicateKeys.has(row.key)){
+        const adopted=adoptedByKey.get(row.key);
+        if(!adopted)return;
+        rows.push(adopted);
+      }else{
+        rows.push(row);
+      }
+      seen.add(row.key);
+    });
+    state.duplicateGroups=groups.filter(group=>!adoptedByKey.has(group.key));
+    return rows;
   }
 
   function renderStaffSelect(){
@@ -148,9 +207,7 @@
     const select=document.getElementById("appInventorySessionSelect");
     if(select){
       select.innerHTML='<option value="">セッションを選択</option>'+state.sessions
-        .slice()
-        .sort((a,b)=>String(b.startedAt||"").localeCompare(String(a.startedAt||"")))
-        .map(row=>`<option value="${safe(row.id)}">${safe(row.name)}（${safe(row.status)} / ${safe(row.items?.length||0)}件）</option>`)
+        .map(row=>`<option value="${safe(row.id)}">${safe(row.name)}（${safe(row.status)}）</option>`)
         .join("");
       select.value=state.currentSessionId||"";
     }
@@ -159,44 +216,64 @@
     if(nameInput&&!nameInput.value&&session)nameInput.value=session.name||"";
     if(memoInput&&session)memoInput.value=session.memo||"";
     const currentName=document.getElementById("appInventoryCurrentSessionName");
-    if(currentName){
-      currentName.textContent=session ? `${session.name} / ${session.status}` : "セッション未選択";
-    }
+    if(currentName)currentName.textContent=session ? `${session.name} / ${session.status}` : "セッション未選択";
   }
 
   function renderStatus(){
     const session=currentSession();
     const badge=document.getElementById("appInventoryCountStatus");
     if(!badge)return;
-    badge.className=`badge ${session?.status==="棚卸中"?"":"muted"}`;
-    if(!session)badge.textContent="未開始";
-    else badge.textContent=`${session.status} ${session.items?.length||0}件`;
+    badge.className=`badge ${session?.status===STATUS_ACTIVE?"":"muted"}`;
+    badge.textContent=session ? `${session.status} ${state.items.length}件` : STATUS_NOT_STARTED;
   }
 
   function renderCountedRows(){
-    const session=currentSession();
     const body=document.getElementById("appInventoryCountBody");
     const summary=document.getElementById("appInventoryCountSummary");
-    const rows=(session?.items||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),"ja"));
+    const dupKeys=duplicateKeySet();
+    const rows=state.items.map(itemDisplay).sort((a,b)=>String(a.name).localeCompare(String(b.name),"ja"));
     if(summary)summary.textContent=`${rows.length}件`;
     if(!body)return;
     body.innerHTML=rows.length ? rows.map(row=>`
-      <tr>
+      <tr class="${dupKeys.has(row.key)?"app-count-duplicate-row":""}">
         <td>${safe(row.name)}</td>
-        <td>${safe(row.productCode||row.barcode)}</td>
+        <td>${safe(row.productCode)}</td>
         <td>${safe(row.barcode)}</td>
         <td>${safe(row.count)}</td>
-        <td>${safe(row.appStock)}</td>
+        <td>${safe(row.staff)}</td>
         <td>${safe(formatDate(row.updatedAt))}</td>
-      </tr>`).join("") : '<tr><td colspan="6" class="app-count-empty">カウント済み商品はありません。</td></tr>';
+        <td>${dupKeys.has(row.key)?'<span class="app-count-duplicate-badge">重複あり</span>':(row.adopted?'<span class="badge muted">採用</span>':"")}</td>
+      </tr>`).join("") : '<tr><td colspan="7" class="app-count-empty">カウント済み商品はありません。</td></tr>';
+  }
+
+  function renderDuplicateRows(){
+    const host=document.getElementById("appInventoryDuplicateBody");
+    const summary=document.getElementById("appInventoryDuplicateSummary");
+    const groups=duplicateGroups();
+    if(summary)summary.textContent=groups.length ? `要確認 ${groups.length}商品` : "重複なし";
+    if(!host)return;
+    host.innerHTML=groups.length ? groups.map(group=>group.rows.map(row=>`
+      <tr>
+        <td>${safe(row.name)}</td>
+        <td>${safe(row.productCode)}</td>
+        <td>${safe(row.barcode)}</td>
+        <td>${safe(row.count)}</td>
+        <td>${safe(row.staff)}</td>
+        <td>${safe(formatDate(row.updatedAt))}</td>
+        <td><button type="button" class="app-count-adopt-btn" data-id="${safe(row.id)}">${row.adopted?"採用中":"この数を採用"}</button></td>
+      </tr>`).join("")).join("") : '<tr><td colspan="7" class="app-count-empty">重複カウントはありません。</td></tr>';
+    host.querySelectorAll(".app-count-adopt-btn").forEach(button=>{
+      button.onclick=()=>adoptDuplicateItem(button.dataset.id,button);
+    });
   }
 
   function renderDiffRows(){
     const body=document.getElementById("appInventoryDiffBody");
     const summary=document.getElementById("appInventoryDiffSummary");
     if(summary){
+      const duplicateText=state.duplicateGroups.length ? ` / 要確認 ${state.duplicateGroups.length}商品` : "";
       const unmatchedText=state.unmatched.length ? ` / CSV該当なし ${state.unmatched.length}件` : "";
-      summary.textContent=state.csvRows.length ? `差異 ${state.diffs.length}件${unmatchedText}` : "未比較";
+      summary.textContent=state.csvRows.length ? `差異 ${state.diffs.length}件${duplicateText}${unmatchedText}` : "未比較";
     }
     if(!body)return;
     body.innerHTML=state.diffs.length ? state.diffs.map(row=>`
@@ -207,26 +284,31 @@
         <td>${safe(row.count)}</td>
         <td>${safe(row.smaregiStock)}</td>
         <td><strong class="${row.diff<0?"stock-minus":"stock-plus"}">${safe(row.diff)}</strong></td>
-        <td><button type="button" class="app-count-update-btn" data-key="${safe(row.key)}">更新</button></td>
-      </tr>`).join("") : '<tr><td colspan="7" class="app-count-empty">差異のあるカウント済み商品はありません。</td></tr>';
+        <td><button type="button" class="app-count-update-btn" data-id="${safe(row.id)}">更新</button></td>
+      </tr>`).join("") : '<tr><td colspan="7" class="app-count-empty">差異のある商品はありません。</td></tr>';
     body.querySelectorAll(".app-count-update-btn").forEach(button=>{
-      button.onclick=()=>updateCountedProductStock(button.dataset.key,button);
+      button.onclick=()=>updateCountedProductStock(button.dataset.id,button);
     });
   }
 
-  window.renderAppInventoryCount=function(){
-    loadState();
+  function renderAll(){
     renderStaffSelect();
     renderSessionControls();
     renderStatus();
     renderCountedRows();
+    renderDuplicateRows();
     renderDiffRows();
+  }
+
+  window.renderAppInventoryCount=async function(){
+    await refreshRemote();
+    renderAll();
   };
 
   function requireSession(){
     const session=currentSession();
-    if(!session||session.status!=="棚卸中"){
-      setMessage("appInventoryCountProductInfo","棚卸中のセッションを開始してから登録してください。","err");
+    if(!session||session.status!==STATUS_ACTIVE){
+      setMessage("appInventoryCountProductInfo","棚卸中のセッションを選択してから登録してください。","err");
       return false;
     }
     return true;
@@ -242,7 +324,7 @@
     return `${y}/${m}/${d} ${hh}:${mm} 棚卸`;
   }
 
-  function startCount(){
+  async function startCount(){
     const staff=getStaffValue();
     const name=String(document.getElementById("appInventorySessionName")?.value||"").trim()||defaultSessionName();
     const memo=String(document.getElementById("appInventorySessionMemo")?.value||"").trim();
@@ -251,55 +333,54 @@
       document.getElementById("appInventoryCountStaff")?.focus();
       return;
     }
-    const running=state.sessions.find(session=>session.status==="棚卸中");
-    if(running&&!confirm(`棚卸中のセッション「${running.name}」があります。新しいセッションを開始しますか？`))return;
-    if(running){
-      running.status="棚卸終了";
-      running.finishedAt=running.finishedAt||nowIso();
+    try{
+      const inserted=await sb("inventory_count_sessions",{
+        method:"POST",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify({name,staff,memo,status:STATUS_ACTIVE,started_at:nowIso()})
+      });
+      const session=Array.isArray(inserted) ? inserted[0] : inserted;
+      state.currentSessionId=session.id;
+      localStorage.setItem(CURRENT_SESSION_KEY,state.currentSessionId);
+      state.csvRows=[];
+      state.csvHeaderInfo=null;
+      state.diffs=[];
+      state.unmatched=[];
+      state.duplicateGroups=[];
+      await refreshRemote();
+      clearScanForm("棚卸を開始しました。商品をスキャンまたは検索してください。","ok");
+      renderAll();
+    }catch(error){
+      setRemoteError(error);
     }
-    const session={
-      id:makeId(),
-      name,
-      staff,
-      memo,
-      status:"棚卸中",
-      startedAt:nowIso(),
-      finishedAt:null,
-      comparedAt:null,
-      items:[]
-    };
-    state.sessions.unshift(session);
-    state.currentSessionId=session.id;
-    state.csvRows=[];
-    state.csvHeaderInfo=null;
-    state.diffs=[];
-    state.unmatched=[];
-    saveState();
-    clearScanForm("棚卸を開始しました。商品をスキャンまたは検索してください。","ok");
-    renderAppInventoryCount();
   }
 
-  function finishCount(){
+  async function finishCount(){
     const session=currentSession();
     if(!session){
       setMessage("appInventoryCountProductInfo","終了するセッションがありません。","err");
       return;
     }
-    if(session.status!=="棚卸中"){
+    if(session.status!==STATUS_ACTIVE){
       setMessage("appInventoryCountCsvInfo","このセッションは棚卸終了済みです。CSVを読み込んで比較してください。","ok");
       return;
     }
-    if(!session.items.length){
+    if(!state.items.length){
       setMessage("appInventoryCountProductInfo","カウント済み商品がありません。","err");
       return;
     }
-    session.status="棚卸終了";
-    session.finishedAt=nowIso();
-    session.staff=getStaffValue()||session.staff;
-    session.memo=String(document.getElementById("appInventorySessionMemo")?.value||"").trim();
-    saveState();
-    setMessage("appInventoryCountCsvInfo","棚卸を終了しました。スマレジ在庫一覧CSVを読み込んでください。","ok");
-    renderAppInventoryCount();
+    try{
+      await sb(`inventory_count_sessions?id=eq.${encodeURIComponent(session.id)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({status:STATUS_FINISHED,finished_at:nowIso(),memo:document.getElementById("appInventorySessionMemo")?.value||session.memo||""})
+      });
+      await refreshRemote();
+      setMessage("appInventoryCountCsvInfo","棚卸を終了しました。スマレジ在庫一覧CSVを読み込んでください。","ok");
+      renderAll();
+    }catch(error){
+      setRemoteError(error);
+    }
   }
 
   async function findProductsByName(keyword){
@@ -338,7 +419,7 @@
         showProduct(selectedProduct);
         return selectedProduct;
       }
-      setMessage("appInventoryCountProductInfo",currentSession()?.status==="棚卸中"?"商品をスキャンまたは検索してください。":"棚卸開始後、商品をスキャンまたは検索してください。");
+      setMessage("appInventoryCountProductInfo",currentSession()?.status===STATUS_ACTIVE?"商品をスキャンまたは検索してください。":"棚卸開始後、商品をスキャンまたは検索してください。");
       return null;
     }
     selectedProduct=null;
@@ -369,36 +450,46 @@
     if(!requireSession())return;
     const product=selectedProduct||await previewBarcode();
     if(!product)return;
+    const staff=getStaffValue();
+    if(!staff){
+      setMessage("appInventoryCountProductInfo","担当者を選択してください。","err");
+      return;
+    }
     const qty=Number(document.getElementById("appInventoryCountQty")?.value||0);
     if(!Number.isInteger(qty)||qty<0){
       setMessage("appInventoryCountProductInfo","カウント数は0以上の整数で入力してください。","err");
       return;
     }
     const session=currentSession();
-    const map=countedMap(session);
-    const barcode=String(product.barcode||"");
-    const key=barcode||String(product.name||"");
-    const row={
-      key,
-      sessionId:session.id,
-      barcode,
-      productCode:barcode,
-      productId:String(product.smaregi_product_id||""),
-      name:product.name||"",
-      count:qty,
-      appStock:Number(product.base_stock||0),
-      updatedAt:nowIso()
-    };
-    map.set(key,row);
-    setCountedMap(map,session);
-    state.diffs=[];
-    state.unmatched=[];
-    saveState();
-    renderSessionControls();
-    renderStatus();
-    renderCountedRows();
-    renderDiffRows();
-    clearScanForm(`登録しました：${row.name} / ${qty}`);
+    try{
+      await sb("inventory_count_items",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({
+          session_id:session.id,
+          product_code:String(product.barcode||""),
+          barcode:String(product.barcode||""),
+          product_id:String(product.smaregi_product_id||""),
+          product_name:product.name||"",
+          count_qty:qty,
+          app_stock:Number(product.base_stock||0),
+          staff,
+          memo:"",
+          counted_at:nowIso(),
+          adopted:false
+        })
+      });
+      state.csvRows=[];
+      state.csvHeaderInfo=null;
+      state.diffs=[];
+      state.unmatched=[];
+      state.duplicateGroups=[];
+      await loadItems();
+      renderAll();
+      clearScanForm(`登録しました：${product.name||""} / ${qty}`);
+    }catch(error){
+      setRemoteError(error);
+    }
   }
 
   function headersToMap(headers){
@@ -481,6 +572,7 @@
       state.csvRows=parseSmaregiInventoryCsv(text);
       state.diffs=[];
       state.unmatched=[];
+      state.duplicateGroups=[];
       setMessage("appInventoryCountCsvInfo",`CSV読込完了：${state.csvRows.length}行 / 利用列：${state.csvHeaderInfo.used.join("、")}`,"ok");
       renderDiffRows();
     }catch(error){
@@ -488,18 +580,26 @@
     }
   }
 
-  function compareCountedWithCsv(){
+  async function compareCountedWithCsv(){
     const session=currentSession();
     if(!session){
       setMessage("appInventoryCountCsvInfo","比較するセッションを選択してください。","err");
       return;
     }
-    if(session.status==="棚卸中"){
+    if(session.status===STATUS_ACTIVE){
       setMessage("appInventoryCountCsvInfo","棚卸終了後に比較してください。","err");
       return;
     }
-    if(!session.items.length){
-      setMessage("appInventoryCountCsvInfo","カウント済み商品がありません。","err");
+    await loadItems();
+    const compareRows=compareItems();
+    if(!compareRows.length){
+      setMessage("appInventoryCountCsvInfo","比較できるカウント済み商品がありません。重複がある場合は採用するカウントを選んでください。","err");
+      renderAll();
+      return;
+    }
+    if(state.duplicateGroups.length){
+      setMessage("appInventoryCountCsvInfo",`重複カウントが ${state.duplicateGroups.length} 商品あります。採用するカウントを選んでから再度比較してください。`,"err");
+      renderAll();
       return;
     }
     if(!state.csvRows.length){
@@ -509,7 +609,7 @@
     const indexes=makeCsvIndexes(state.csvRows);
     state.diffs=[];
     state.unmatched=[];
-    session.items.forEach(counted=>{
+    compareRows.forEach(counted=>{
       const csvRow=findCsvRowForCount(counted,indexes);
       if(!csvRow){
         state.unmatched.push(counted);
@@ -525,20 +625,45 @@
         diff
       });
     });
-    session.status="比較済み";
-    session.comparedAt=nowIso();
-    saveState();
+    await sb(`inventory_count_sessions?id=eq.${encodeURIComponent(session.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({status:STATUS_COMPARED,compared_at:nowIso()})
+    }).catch(()=>{});
+    await loadSessions();
     setMessage("appInventoryCountCsvInfo",`比較完了：差異 ${state.diffs.length}件 / CSV該当なし ${state.unmatched.length}件。未カウント商品とCSVだけの商品は対象外です。`,"ok");
-    renderSessionControls();
-    renderStatus();
-    renderDiffRows();
+    renderAll();
   }
 
-  async function updateCountedProductStock(key,button){
-    const row=state.diffs.find(item=>String(item.key)===String(key));
+  async function adoptDuplicateItem(itemId,button){
+    const row=state.items.find(item=>String(item.id)===String(itemId));
+    if(!row)return;
+    const key=itemKey(row);
+    const same=state.items.filter(item=>itemKey(item)===key);
+    try{
+      if(button)button.disabled=true;
+      await Promise.all(same.map(item=>sb(`inventory_count_items?id=eq.${encodeURIComponent(item.id)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({adopted:String(item.id)===String(itemId)})
+      })));
+      await loadItems();
+      state.diffs=[];
+      state.unmatched=[];
+      state.duplicateGroups=[];
+      renderAll();
+      setMessage("appInventoryCountCsvInfo","採用するカウントを保存しました。CSV比較を再実行してください。","ok");
+    }catch(error){
+      if(button)button.disabled=false;
+      setRemoteError(error);
+    }
+  }
+
+  async function updateCountedProductStock(itemId,button){
+    const row=state.diffs.find(item=>String(item.id)===String(itemId));
     if(!row)return;
     const session=currentSession();
-    const staff=getStaffValue()||session?.staff;
+    const staff=getStaffValue()||row.staff||session?.staff;
     if(!staff){
       setMessage("appInventoryCountCsvInfo","担当者を選択してください。","err");
       return;
@@ -560,35 +685,20 @@
       const inserted=await sb("inventory_logs",{
         method:"POST",
         headers:{Prefer:"return=representation"},
-        body:JSON.stringify({
-          type:"在庫修正",
-          staff,
-          barcode:product.barcode,
-          product_name:row.name,
-          quantity:diff,
-          memo
-        })
+        body:JSON.stringify({type:"在庫修正",staff,barcode:product.barcode,product_name:row.name,quantity:diff,memo})
       });
       const savedLog=Array.isArray(inserted)&&inserted[0] ? inserted[0] : null;
       try{
-        if(Array.isArray(logs))logs.unshift(savedLog||{
-          created_at:nowIso(),
-          type:"在庫修正",
-          staff,
-          barcode:product.barcode,
-          product_name:row.name,
-          quantity:diff,
-          memo
-        });
+        if(Array.isArray(logs))logs.unshift(savedLog||{created_at:nowIso(),type:"在庫修正",staff,barcode:product.barcode,product_name:row.name,quantity:diff,memo});
       }catch(_){}
-      const map=countedMap(session);
-      const counted=map.get(row.key);
-      if(counted)counted.appStock=after;
-      setCountedMap(map,session);
-      state.diffs=state.diffs.filter(item=>String(item.key)!==String(row.key));
-      saveState();
-      renderCountedRows();
-      renderDiffRows();
+      await sb(`inventory_count_items?id=eq.${encodeURIComponent(row.id)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({app_stock:after})
+      }).catch(()=>{});
+      state.diffs=state.diffs.filter(item=>String(item.id)!==String(row.id));
+      await loadItems();
+      renderAll();
       if(typeof renderGlobalHistory==="function")renderGlobalHistory();
       setMessage("appInventoryCountCsvInfo",`更新完了：${row.name} / ${before} → ${after}`,"ok");
     }catch(error){
@@ -609,7 +719,7 @@
     searchResultCache=rows.slice(0,20);
     host.innerHTML=searchResultCache.length ? searchResultCache.map((row,index)=>`<button type="button" class="product-search-result" data-index="${safe(index)}"><strong>${safe(row.name)}</strong><small>バーコード：${safe(row.barcode||"なし")} / 現在庫：${Number(row.base_stock||0)}</small></button>`).join("") : '<div class="product-search-empty">該当商品がありません。</div>';
     host.querySelectorAll(".product-search-result").forEach(button=>{
-      button.onclick=async ()=>{
+      button.onclick=()=>{
         selectedProduct=searchResultCache[Number(button.dataset.index)]||null;
         document.getElementById("appInventoryCountBarcode").value=selectedProduct?.barcode||"";
         host.innerHTML="";
@@ -627,7 +737,7 @@
     return false;
   }
 
-  async function handleScannedCode(code){
+  async function handleAppInventoryScannedCode(code){
     code=String(code||"").trim();
     if(!code||isDuplicateScan(code))return;
     const input=document.getElementById("appInventoryCountBarcode");
@@ -646,56 +756,53 @@
     const video=document.getElementById("appInventoryCountVideo");
     const area=document.getElementById("appInventoryCameraArea");
     if(!video||!navigator.mediaDevices?.getUserMedia){
-      setMessage("appInventoryCameraMessage","この端末ではカメラを起動できません。","err");
+      setMessage("appInventoryCameraMessage","この端末ではカメラを起動できません。HTTPS接続とカメラ許可を確認してください。","err");
       return;
     }
     try{
       await stopAppInventoryCamera(false);
       area.hidden=false;
       video.style.display="block";
-      setMessage("appInventoryCameraMessage","カメラ起動中です。赤線にバーコードを合わせてください。","ok");
-      if(typeof ensureZXing==="function"){
-        await ensureZXing().catch(()=>false);
+      setMessage("appInventoryCameraMessage","カメラを起動しています。許可ダイアログが出たら許可してください。","ok");
+      await ensureZXing();
+      if(!window.ZXing)throw new Error("バーコード読取ライブラリを読み込めませんでした。");
+      if(!appCountZXingReader){
+        const hints=new Map();
+        const formats=[
+          ZXing.BarcodeFormat.EAN_13,
+          ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.UPC_A,
+          ZXing.BarcodeFormat.UPC_E,
+          ZXing.BarcodeFormat.CODE_128,
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.ITF
+        ];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,formats);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+        appCountZXingReader=new ZXing.BrowserMultiFormatReader(hints,50);
       }
-      if(window.ZXing){
-        if(!appCountZXingReader){
-          const hints=new ZXing.Map();
-          const formats=[
-            ZXing.BarcodeFormat.EAN_13,
-            ZXing.BarcodeFormat.EAN_8,
-            ZXing.BarcodeFormat.UPC_A,
-            ZXing.BarcodeFormat.UPC_E,
-            ZXing.BarcodeFormat.CODE_128,
-            ZXing.BarcodeFormat.CODE_39,
-            ZXing.BarcodeFormat.ITF
-          ];
-          hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,formats);
-          hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
-          appCountZXingReader=new ZXing.BrowserMultiFormatReader(hints,50);
-        }
-        appCountZXingRunning=true;
-        await appCountZXingReader.decodeFromConstraints(
-          {video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}},
-          video,
-          (result)=>{
-            if(result&&appCountZXingRunning)handleScannedCode(result.text||String(result));
+      appCountZXingRunning=true;
+      await appCountZXingReader.decodeFromConstraints(
+        {video:{
+          facingMode:{ideal:"environment"},
+          width:{ideal:2560},
+          height:{ideal:1440},
+          focusMode:{ideal:"continuous"},
+          exposureMode:{ideal:"continuous"}
+        }},
+        video,
+        async(result)=>{
+          if(result&&appCountZXingRunning){
+            await handleAppInventoryScannedCode(result.getText ? result.getText() : result.text);
           }
-        );
-        return;
-      }
-      if("BarcodeDetector"in window){
-        appCountDetector=new BarcodeDetector({formats:["ean_13","ean_8","code_128","code_39","itf","upc_a","upc_e"]});
-        appCountCameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}});
-        video.srcObject=appCountCameraStream;
-        await video.play();
-        appCountScanning=true;
-        requestAnimationFrame(scanLoop);
-        return;
-      }
-      throw new Error("バーコード読取に対応していないブラウザです。");
+        }
+      );
+      if(typeof tryImproveCameraTrack==="function")tryImproveCameraTrack(video);
+      if(typeof improveCameraTrack==="function")improveCameraTrack(video);
+      setMessage("appInventoryCameraMessage","カメラ読取中です。赤線にバーコードを横向きで合わせてください。","ok");
     }catch(error){
       await stopAppInventoryCamera(false);
-      setMessage("appInventoryCameraMessage","カメラ起動エラー\n"+error.message,"err");
+      setMessage("appInventoryCameraMessage","カメラ起動エラー\nHTTPS接続、ブラウザのカメラ許可、別アプリでカメラを使用していないか確認してください。\n"+error.message,"err");
     }
   }
 
@@ -720,16 +827,6 @@
     if(showMessage)setMessage("appInventoryCameraMessage","カメラを終了しました。","ok");
   }
 
-  async function scanLoop(){
-    if(!appCountScanning||!appCountDetector)return;
-    try{
-      const video=document.getElementById("appInventoryCountVideo");
-      const codes=video ? await appCountDetector.detect(video) : [];
-      if(codes&&codes[0])await handleScannedCode(codes[0].rawValue);
-    }catch(_){}
-    if(appCountScanning)requestAnimationFrame(scanLoop);
-  }
-
   function bindAppInventoryCountEvents(){
     document.getElementById("startAppInventoryCountBtn")?.addEventListener("click",startCount);
     document.getElementById("finishAppInventoryCountBtn")?.addEventListener("click",finishCount);
@@ -752,29 +849,21 @@
       }
     });
     document.getElementById("appInventoryCountSearch")?.addEventListener("input",handleSearchInput);
-    document.getElementById("appInventoryCountStaff")?.addEventListener("change",event=>{
-      const session=currentSession();
-      if(session)session.staff=event.target.value||"";
-      saveState();
-    });
-    document.getElementById("appInventorySessionMemo")?.addEventListener("change",event=>{
-      const session=currentSession();
-      if(session)session.memo=event.target.value||"";
-      saveState();
-    });
-    document.getElementById("appInventorySessionSelect")?.addEventListener("change",event=>{
+    document.getElementById("appInventorySessionSelect")?.addEventListener("change",async event=>{
       state.currentSessionId=event.target.value||"";
+      localStorage.setItem(CURRENT_SESSION_KEY,state.currentSessionId);
       state.csvRows=[];
       state.csvHeaderInfo=null;
       state.diffs=[];
       state.unmatched=[];
+      state.duplicateGroups=[];
       const session=currentSession();
       const nameInput=document.getElementById("appInventorySessionName");
       const memoInput=document.getElementById("appInventorySessionMemo");
       if(nameInput)nameInput.value=session?.name||"";
       if(memoInput)memoInput.value=session?.memo||"";
-      saveState();
-      renderAppInventoryCount();
+      await loadItems();
+      renderAll();
     });
     window.addEventListener("beforeunload",()=>stopAppInventoryCamera(false));
     renderAppInventoryCount();

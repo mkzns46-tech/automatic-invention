@@ -323,8 +323,20 @@
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table">
-          <thead><tr><th>商品名</th><th>商品コード</th><th>バーコード</th><th>カウント数</th><th>アプリ在庫</th><th>保存日時</th></tr></thead>
+          <thead><tr><th>商品名</th><th>商品コード</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>重複</th></tr></thead>
           <tbody id="appInventoryCountBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="app-count-block">
+      <div class="section-title">
+        <h3>重複確認</h3>
+        <div id="appInventoryDuplicateSummary" class="badge muted">重複なし</div>
+      </div>
+      <div class="table-wrap app-count-table-wrap">
+        <table class="app-count-table app-count-duplicate-table">
+          <thead><tr><th>商品名</th><th>商品コード</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>採用</th></tr></thead>
+          <tbody id="appInventoryDuplicateBody"></tbody>
         </table>
       </div>
     </section>

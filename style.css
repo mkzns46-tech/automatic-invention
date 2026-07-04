@@ -210,6 +210,25 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   text-align:center;
 }
 
+.app-count-duplicate-row{
+  background:#fff8e6;
+}
+
+.app-count-duplicate-badge{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  background:#f59e0b;
+  color:#fff;
+  padding:4px 8px;
+  font-size:12px;
+  font-weight:900;
+}
+
+.app-count-adopt-btn{
+  min-width:108px;
+}
+
 @media (max-width:800px){
   body[data-inventory-screen="app-inventory-count"]{
     overflow-x:hidden;
@@ -294,23 +313,31 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   .app-count-table td:nth-child(2)::before{content:"商品コード";}
   .app-count-table td:nth-child(3)::before{content:"バーコード";}
   .app-count-table td:nth-child(4)::before{content:"カウント数";}
-  .app-count-table td:nth-child(5)::before{content:"アプリ在庫";}
+  .app-count-table td:nth-child(5)::before{content:"担当者";}
   .app-count-table td:nth-child(6)::before{content:"保存日時";}
+  .app-count-table td:nth-child(7)::before{content:"重複";}
 
   .app-count-diff-table td:nth-child(5)::before{content:"スマレジ在庫";}
   .app-count-diff-table td:nth-child(6)::before{content:"差異";}
   .app-count-diff-table td:nth-child(7)::before{content:"更新";}
 
-  .app-count-diff-table td:nth-child(7){
+  .app-count-duplicate-table td:nth-child(5)::before{content:"担当者";}
+  .app-count-duplicate-table td:nth-child(6)::before{content:"保存日時";}
+  .app-count-duplicate-table td:nth-child(7)::before{content:"採用";}
+
+  .app-count-diff-table td:nth-child(7),
+  .app-count-duplicate-table td:nth-child(7){
     grid-template-columns:1fr;
   }
 
-  .app-count-diff-table td:nth-child(7)::before{
+  .app-count-diff-table td:nth-child(7)::before,
+  .app-count-duplicate-table td:nth-child(7)::before{
     content:"";
     display:none;
   }
 
-  .app-count-diff-table button{
+  .app-count-diff-table button,
+  .app-count-duplicate-table button{
     width:100%;
     min-height:44px;
   }
