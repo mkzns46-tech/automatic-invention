@@ -1482,6 +1482,8 @@
     try{return equipmentTransferLogCache.get(String(logId))||null;}catch(_){return null;}
   }
 
+  const equipmentCancelBusyLogIds=new Set();
+
   function setEquipmentCache(logId,log){
     try{equipmentTransferLogCache.set(String(logId),log);}catch(_){}
   }
@@ -1551,10 +1553,10 @@
       checked_by:checkedBy||check.checked_by||"",
       checked_at:checkedAt,
       excluded:false,
-      no_issue:check.no_issue===true,
-      no_issue_by:check.no_issue_by||null,
-      no_issue_at:check.no_issue_at||null,
-      no_issue_reason:check.no_issue_reason||"",
+      no_issue:true,
+      no_issue_by:checkedBy||check.no_issue_by||null,
+      no_issue_at:checkedAt,
+      no_issue_reason:check.no_issue_reason||"備品転用キャンセル確認済み",
       difference_reason_category:check.difference_reason_category||null,
       difference_reason_memo:check.difference_reason_memo||"",
       difference_reason_by:check.difference_reason_by||null,
@@ -1638,22 +1640,40 @@
       showMessage?.("備品転用キャンセルは管理者認証後に実行できます。","err");
       return;
     }
+    logId=String(logId||"");
+    if(!logId){
+      showMessage?.("備品転用履歴IDが見つかりません。再読み込みしてください。","err");
+      return;
+    }
+    if(equipmentCancelBusyLogIds.has(logId)){
+      showMessage?.("この備品転用キャンセルは処理中です。完了までお待ちください。","err");
+      return;
+    }
     const ok=confirm("備品転用をキャンセルし、アプリ在庫を戻します。実行しますか？");
     if(!ok)return;
+    let checkedLog=null;
     try{
+      equipmentCancelBusyLogIds.add(logId);
       button.disabled=true;
+      button.dataset.cancelBusy="1";
       const latestRows=await sbAll(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`,1,10000);
       const latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : getEquipmentCache(logId);
       if(!latestLog)throw new Error("備品転用履歴が見つかりません。");
       if(!isEquipmentTransferTypeValue(latestLog.type))throw new Error("備品転用の履歴ではありません。");
+      const alreadyChecked=typeof isEquipmentTransferChecked==="function" ? isEquipmentTransferChecked(latestLog) : (latestLog.equipment_checked===true || !!latestLog.equipment_checked_at);
+      if(alreadyChecked)throw new Error("この備品転用はすでに確認終了済みです。再キャンセルはできません。");
       const duplicate=await sbAll(`inventory_logs?select=id&barcode=eq.${encodeURIComponent(latestLog.barcode)}&memo=ilike.*${encodeURIComponent(logId)}*&limit=1`,1,10000).catch(()=>[]);
       if(Array.isArray(duplicate)&&duplicate.length)throw new Error("この備品転用はすでにキャンセル済みです。");
       const product=await fetchProductByBarcode(latestLog.barcode);
       if(!product)throw new Error("商品が見つかりません。");
       const absQty=Math.abs(Number(latestLog.quantity||1))||1;
       const nextStock=Number(product.base_stock||0)+absQty;
-      await updateProductCurrentStock(latestLog.barcode,nextStock);
       const staff=typeof getSmaregiCheckerName==="function" ? getSmaregiCheckerName() : "";
+      if(!staff){
+        throw new Error("担当者を選択してください。");
+      }
+      checkedLog=await markEquipmentTransferChecked(latestLog,staff);
+      await updateProductCurrentStock(latestLog.barcode,nextStock);
       const inserted=await sb("inventory_logs",{
         method:"POST",
         headers:{Prefer:"return=representation"},
@@ -1667,7 +1687,6 @@
         })
       });
       const cancelLog=Array.isArray(inserted)&&inserted[0] ? inserted[0] : null;
-      const checkedLog=await markEquipmentTransferChecked(latestLog,staff);
       await applyEquipmentCancelToCurrentSmaregiCheck(latestLog.barcode,absQty,staff);
       try{if(Array.isArray(logs)&&cancelLog)logs.unshift(cancelLog);}catch(_){}
       try{
@@ -1682,9 +1701,14 @@
       refreshSmaregiAnalysisAfterEquipmentChange();
       return true;
     }catch(error){
-      if(button)button.disabled=false;
+      if(button){
+        button.disabled=false;
+        delete button.dataset.cancelBusy;
+      }
       showMessage?.("備品転用キャンセルエラー\n"+error.message,"err");
       return false;
+    }finally{
+      equipmentCancelBusyLogIds.delete(logId);
     }
   };
 
