@@ -1471,7 +1471,17 @@
 
   function isEquipmentTransferTypeValue(value){
     const text=String(value||"").trim();
+    if(text==="equipment_transfer_cancel" || text==="備品転用キャンセル")return false;
     return text==="備品転用" || text==="equipment_transfer" || text.includes("蛯吝刀");
+  }
+
+  function isEquipmentCancelLog(log){
+    const type=String(log?.type||"").trim();
+    const memo=String(log?.memo||log?.note||"");
+    return type==="equipment_transfer_cancel"
+      || type==="備品転用キャンセル"
+      || memo.includes("備品転用キャンセル")
+      || memo.includes("元履歴:");
   }
 
   function isEquipmentMobileView(){
@@ -1489,6 +1499,7 @@
   }
 
   window.equipmentCheckHtml=function(log){
+    if(isEquipmentCancelLog(log))return '<span class="equipment-status-badge is-checked">キャンセル済</span>';
     if(!isEquipmentTransferTypeValue(log?.type))return "";
     if(isEquipmentMobileView())return "";
     const rawLogId=String(log?.id||log?.log_id||"");
@@ -1678,12 +1689,15 @@
         method:"POST",
         headers:{Prefer:"return=representation"},
         body:JSON.stringify({
-          type:"equipment_transfer",
+          type:"equipment_transfer_cancel",
           staff,
           barcode:latestLog.barcode,
           product_name:latestLog.product_name||product.name||"",
           quantity:absQty,
-          memo:`備品転用キャンセル 元履歴:${logId}`
+          memo:`備品転用キャンセル 元履歴:${logId}`,
+          equipment_checked:true,
+          equipment_checked_by:staff,
+          equipment_checked_at:new Date().toISOString()
         })
       });
       const cancelLog=Array.isArray(inserted)&&inserted[0] ? inserted[0] : null;
