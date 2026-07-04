@@ -1689,7 +1689,7 @@
         method:"POST",
         headers:{Prefer:"return=representation"},
         body:JSON.stringify({
-          type:"equipment_transfer_cancel",
+          type:"equipment_transfer",
           staff,
           barcode:latestLog.barcode,
           product_name:latestLog.product_name||product.name||"",
