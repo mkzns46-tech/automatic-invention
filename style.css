@@ -27,10 +27,39 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
 
 .app-count-toolbar{
   display:grid;
-  grid-template-columns:minmax(220px,1fr) auto auto;
+  grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) minmax(180px,1fr) auto auto;
   gap:12px;
   align-items:end;
   margin:14px 0 18px;
+}
+
+.app-count-session-bar{
+  display:grid;
+  grid-template-columns:minmax(220px,.45fr) minmax(0,1fr);
+  gap:12px;
+  align-items:end;
+  margin:12px 0;
+}
+
+.app-count-current-session{
+  display:grid;
+  gap:4px;
+  min-height:48px;
+  padding:10px 12px;
+  border:1px solid #d9e7dd;
+  border-radius:8px;
+  background:#f8fcf9;
+}
+
+.app-count-current-session span{
+  color:#587566;
+  font-size:12px;
+  font-weight:800;
+}
+
+.app-count-current-session strong{
+  color:#113b2b;
+  overflow-wrap:anywhere;
 }
 
 .app-count-workflow{
@@ -61,9 +90,62 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
 
 .app-count-input-grid{
   display:grid;
-  grid-template-columns:minmax(180px,1.1fr) minmax(180px,1fr) 130px auto;
+  grid-template-columns:minmax(260px,1.2fr) minmax(180px,1fr) 130px auto;
   gap:10px;
   align-items:end;
+}
+
+.app-count-scan-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  align-items:center;
+}
+
+.app-count-scan-row input,
+.app-count-scan-row button{
+  margin-top:0;
+}
+
+.app-count-camera-btn{
+  width:auto;
+  min-width:108px;
+  white-space:nowrap;
+}
+
+.app-count-camera-area{
+  position:relative;
+  display:grid;
+  gap:10px;
+  overflow:hidden;
+  border:1px solid #bfdcc9;
+  border-radius:12px;
+  background:#0b1410;
+  padding:10px;
+}
+
+.app-count-camera-area[hidden]{
+  display:none !important;
+}
+
+.app-count-camera-area video{
+  display:block;
+  width:100%;
+  max-height:360px;
+  margin:0;
+  border-radius:8px;
+  object-fit:cover;
+  background:#000;
+}
+
+.app-count-camera-area .camera-guide-overlay{
+  pointer-events:none;
+}
+
+.app-count-camera-area #appInventoryCloseCameraBtn{
+  position:relative;
+  z-index:2;
+  margin-top:0;
 }
 
 .app-count-input-grid label,
@@ -134,9 +216,21 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   }
 
   .app-count-toolbar,
+  .app-count-session-bar,
   .app-count-workflow,
   .app-count-input-grid{
     grid-template-columns:1fr;
+  }
+
+  .app-count-scan-row{
+    grid-template-columns:minmax(0,1fr) 112px;
+  }
+
+  .app-count-camera-btn{
+    width:112px;
+    min-width:112px;
+    padding-left:8px;
+    padding-right:8px;
   }
 
   .app-count-toolbar button,
@@ -145,6 +239,11 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   .app-count-workflow .button-row button,
   .app-count-workflow .file-button{
     width:100%;
+  }
+
+  .app-count-scan-row .app-count-camera-btn{
+    width:112px;
+    min-width:112px;
   }
 
   .app-count-table-wrap{

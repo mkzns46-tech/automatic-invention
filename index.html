@@ -272,8 +272,17 @@
       </div>
       <div id="appInventoryCountStatus" class="badge muted">未開始</div>
     </div>
+    <div class="app-count-session-bar">
+      <label>セッション切替<select id="appInventorySessionSelect"><option value="">セッションを選択</option></select></label>
+      <div class="app-count-current-session">
+        <span>現在のセッション</span>
+        <strong id="appInventoryCurrentSessionName">セッション未選択</strong>
+      </div>
+    </div>
     <div class="app-count-toolbar">
+      <label>セッション名 <span class="required">必須</span><input id="appInventorySessionName" placeholder="例：2026/07/05 午前棚卸"></label>
       <label>担当者 <span class="required">必須</span><select id="appInventoryCountStaff"><option value="">担当者を選択</option></select></label>
+      <label>メモ<input id="appInventorySessionMemo" placeholder="例：店頭棚A、Easton、ストリング棚卸"></label>
       <button type="button" id="startAppInventoryCountBtn">棚卸開始</button>
       <button type="button" id="finishAppInventoryCountBtn" class="secondary">棚卸終了</button>
     </div>
@@ -281,11 +290,20 @@
       <section class="app-count-block">
         <h3>カウント入力</h3>
         <div class="app-count-input-grid">
-          <label>商品スキャン・バーコード<input id="appInventoryCountBarcode" autocomplete="off" placeholder="バーコードをスキャン、または手入力"></label>
+          <label class="app-count-scan-label">商品スキャン・バーコード<span class="app-count-scan-row"><input id="appInventoryCountBarcode" autocomplete="off" placeholder="バーコードをスキャン、または手入力"><button type="button" id="appInventoryCameraBtn" class="secondary app-count-camera-btn">📷カメラ</button></span></label>
           <label>商品名検索<input id="appInventoryCountSearch" autocomplete="off" placeholder="商品名の一部を入力"></label>
           <label>カウント数<input id="appInventoryCountQty" type="number" min="0" step="1" inputmode="numeric" value="1"></label>
-          <button type="button" id="saveAppInventoryCountBtn">保存</button>
+          <button type="button" id="saveAppInventoryCountBtn">登録</button>
         </div>
+        <div id="appInventoryCameraArea" class="app-count-camera-area" hidden>
+          <video id="appInventoryCountVideo" muted playsinline></video>
+          <div class="camera-guide-overlay is-active">
+            <div class="camera-guide-box"><div class="camera-guide-line"></div></div>
+            <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
+          </div>
+          <button type="button" id="appInventoryCloseCameraBtn" class="secondary">閉じる</button>
+        </div>
+        <div id="appInventoryCameraMessage" class="message">カメラを使う場合は棚卸開始後に「📷カメラ」を押してください。</div>
         <div id="appInventoryCountSearchResults" class="product-search-results"></div>
         <div id="appInventoryCountProductInfo" class="message">棚卸開始後、商品をスキャンまたは検索してください。</div>
       </section>
