@@ -278,6 +278,7 @@
         <span>現在のセッション</span>
         <strong id="appInventoryCurrentSessionName">セッション未選択</strong>
       </div>
+      <label class="inline-check app-count-toggle"><input type="checkbox" id="appInventoryShowEndedSessions">終了済みセッションを表示</label>
     </div>
     <div class="app-count-toolbar">
       <label>セッション名 <span class="required">必須</span><input id="appInventorySessionName" placeholder="例：2026/07/05 午前棚卸"></label>
@@ -285,6 +286,8 @@
       <label>メモ<input id="appInventorySessionMemo" placeholder="例：店頭棚A、Easton、ストリング棚卸"></label>
       <button type="button" id="startAppInventoryCountBtn">棚卸開始</button>
       <button type="button" id="finishAppInventoryCountBtn" class="secondary">棚卸終了</button>
+      <button type="button" id="closeAppInventorySessionBtn" class="secondary">セッション終了</button>
+      <button type="button" id="deleteAppInventorySessionBtn" class="danger">削除</button>
     </div>
     <div class="app-count-workflow">
       <section class="app-count-block">
@@ -342,7 +345,10 @@
     <section class="app-count-block">
       <div class="section-title">
         <h3>差異一覧</h3>
-        <div id="appInventoryDiffSummary" class="badge muted">未比較</div>
+        <div class="app-count-title-actions">
+          <label class="inline-check app-count-toggle"><input type="checkbox" id="appInventoryShowReflectedDiffs">反映済みを表示</label>
+          <div id="appInventoryDiffSummary" class="badge muted">未比較</div>
+        </div>
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table app-count-diff-table">

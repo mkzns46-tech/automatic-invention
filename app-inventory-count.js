@@ -9,6 +9,8 @@
   const STATUS_FINISHED="棚卸終了";
   const STATUS_COMPARED="比較済み";
 
+  const STATUS_CLOSED="セッション終了";
+
   const state={
     sessions:[],
     items:[],
@@ -56,6 +58,36 @@
     return state.sessions.find(session=>session.id===state.currentSessionId)||null;
   }
 
+  function hasAppInventoryAdminAccess(){
+    if(typeof hasInventoryPrivilegedAccess==="function")return hasInventoryPrivilegedAccess();
+    if(typeof isInventoryAdminAuthenticated==="function")return isInventoryAdminAuthenticated();
+    return false;
+  }
+
+  function requireAppInventoryAdminAccess(){
+    if(hasAppInventoryAdminAccess())return true;
+    if(typeof showPopup==="function")showPopup("管理者限定","管理者のみ操作できます");
+    if(typeof showMessage==="function")showMessage("管理者のみ操作できます","err");
+    setMessage("appInventoryCountProductInfo","管理者のみ操作できます","err");
+    return false;
+  }
+
+  function showEndedSessions(){
+    return !!document.getElementById("appInventoryShowEndedSessions")?.checked;
+  }
+
+  function showReflectedDiffs(){
+    return !!document.getElementById("appInventoryShowReflectedDiffs")?.checked;
+  }
+
+  function isClosedSession(session){
+    return session?.status===STATUS_CLOSED;
+  }
+
+  function visibleSessions(){
+    return state.sessions.filter(session=>showEndedSessions()||!isClosedSession(session));
+  }
+
   function itemKey(item){
     return normalizeKey(item.product_code||item.barcode||item.product_name);
   }
@@ -73,7 +105,9 @@
       staff:item.staff||"",
       updatedAt:item.counted_at||item.created_at||"",
       memo:item.memo||"",
-      adopted:!!item.adopted
+      adopted:!!item.adopted,
+      reflectedAt:item.reflected_at||"",
+      reflectedBy:item.reflected_by||""
     };
   }
 
@@ -97,8 +131,10 @@
       const rows=await sbAll("inventory_count_sessions?select=*&order=started_at.desc",1000,5000);
       state.sessions=Array.isArray(rows) ? rows : [];
       const saved=localStorage.getItem(CURRENT_SESSION_KEY)||"";
-      state.currentSessionId=state.sessions.some(row=>row.id===saved) ? saved : (state.sessions[0]?.id||"");
+      const selectable=visibleSessions();
+      state.currentSessionId=selectable.some(row=>row.id===saved) ? saved : (selectable[0]?.id||"");
       if(state.currentSessionId)localStorage.setItem(CURRENT_SESSION_KEY,state.currentSessionId);
+      else localStorage.removeItem(CURRENT_SESSION_KEY);
     }catch(error){
       state.sessions=[];
       state.currentSessionId="";
@@ -191,8 +227,9 @@
   function renderSessionControls(){
     const session=currentSession();
     const select=document.getElementById("appInventorySessionSelect");
+    const selectable=visibleSessions();
     if(select){
-      select.innerHTML='<option value="">セッションを選択</option>'+state.sessions
+      select.innerHTML='<option value="">セッションを選択</option>'+selectable
         .map(row=>`<option value="${safe(row.id)}">${safe(row.name)}（${safe(row.status)}）</option>`)
         .join("");
       select.value=state.currentSessionId||"";
@@ -203,6 +240,13 @@
     if(memoInput&&session)memoInput.value=session.memo||"";
     const currentName=document.getElementById("appInventoryCurrentSessionName");
     if(currentName)currentName.textContent=session ? `${session.name} / ${session.status}` : "セッション未選択";
+    const adminOnlyTitle=hasAppInventoryAdminAccess() ? "" : "管理者のみ操作できます";
+    ["startAppInventoryCountBtn","deleteAppInventorySessionBtn","closeAppInventorySessionBtn"].forEach(id=>{
+      const button=document.getElementById(id);
+      if(!button)return;
+      button.title=adminOnlyTitle;
+      button.classList.toggle("admin-required",!hasAppInventoryAdminAccess());
+    });
   }
 
   function renderStatus(){
@@ -270,7 +314,7 @@
         <td>${safe(row.count)}</td>
         <td>${safe(row.beforeStock)}</td>
         <td><strong class="${row.diff<0?"stock-minus":"stock-plus"}">${safe(row.diff)}</strong></td>
-        <td><button type="button" class="app-count-update-btn" data-id="${safe(row.id)}">更新</button></td>
+        <td>${row.reflectedAt?'<span class="badge muted">反映済み</span>':`<button type="button" class="app-count-update-btn" data-id="${safe(row.id)}">更新</button>`}</td>
       </tr>`).join("") : '<tr><td colspan="7" class="app-count-empty">差異のある商品はありません。</td></tr>';
     body.querySelectorAll(".app-count-update-btn").forEach(button=>{
       button.onclick=()=>updateCountedProductStock(button.dataset.id,button);
@@ -311,6 +355,7 @@
   }
 
   async function startCount(){
+    if(!requireAppInventoryAdminAccess())return;
     const staff=getStaffValue();
     const name=String(document.getElementById("appInventorySessionName")?.value||"").trim()||defaultSessionName();
     const memo=String(document.getElementById("appInventorySessionMemo")?.value||"").trim();
@@ -360,6 +405,71 @@
       });
       await refreshRemote();
       setMessage("appInventoryCountCsvInfo","棚卸を終了しました。差異比較を押すと、カウント数と棚卸前在庫を比較します。","ok");
+      renderAll();
+    }catch(error){
+      setRemoteError(error);
+    }
+  }
+
+  async function deleteCurrentSession(){
+    if(!requireAppInventoryAdminAccess())return;
+    const session=currentSession();
+    if(!session){
+      setMessage("appInventoryCountProductInfo","削除するセッションを選択してください。","err");
+      return;
+    }
+    const ok=confirm(`棚卸セッション『${session.name}』を削除します。このセッションのカウント履歴も削除されます。よろしいですか？`);
+    if(!ok)return;
+    try{
+      await stopAppInventoryCamera(false);
+      await sb(`inventory_count_sessions?id=eq.${encodeURIComponent(session.id)}`,{
+        method:"DELETE",
+        headers:{Prefer:"return=minimal"}
+      });
+      state.currentSessionId="";
+      state.items=[];
+      state.diffs=[];
+      state.duplicateGroups=[];
+      localStorage.removeItem(CURRENT_SESSION_KEY);
+      await refreshRemote();
+      clearScanForm(`棚卸セッション『${session.name}』を削除しました。`,"ok");
+      setMessage("appInventoryCountCsvInfo","選択中セッションの差異一覧をクリアしました。","ok");
+      renderAll();
+    }catch(error){
+      setRemoteError(error);
+    }
+  }
+
+  async function closeCurrentSession(){
+    if(!requireAppInventoryAdminAccess())return;
+    const session=currentSession();
+    if(!session){
+      setMessage("appInventoryCountCsvInfo","終了するセッションを選択してください。","err");
+      return;
+    }
+    if(session.status===STATUS_ACTIVE){
+      setMessage("appInventoryCountCsvInfo","先に棚卸終了を押してからセッション終了してください。","err");
+      return;
+    }
+    if(isClosedSession(session)){
+      setMessage("appInventoryCountCsvInfo","このセッションは終了済みです。","ok");
+      return;
+    }
+    const ok=confirm("この棚卸セッションを終了します。通常のセッション一覧には表示されなくなります。よろしいですか？");
+    if(!ok)return;
+    try{
+      await sb(`inventory_count_sessions?id=eq.${encodeURIComponent(session.id)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({status:STATUS_CLOSED,ended_at:nowIso()})
+      });
+      state.currentSessionId="";
+      state.items=[];
+      state.diffs=[];
+      state.duplicateGroups=[];
+      localStorage.removeItem(CURRENT_SESSION_KEY);
+      await refreshRemote();
+      setMessage("appInventoryCountCsvInfo","セッション終了にしました。通常一覧では非表示になります。","ok");
       renderAll();
     }catch(error){
       setRemoteError(error);
@@ -507,6 +617,7 @@
       const beforeStock=Number(counted.beforeStock||0);
       const diff=Number(counted.count)-beforeStock;
       if(diff===0)return;
+      if(counted.reflectedAt&&!showReflectedDiffs())return;
       state.diffs.push({
         ...counted,
         beforeStock,
@@ -578,6 +689,11 @@
       try{
         if(Array.isArray(logs))logs.unshift(savedLog||{created_at:nowIso(),type:"在庫修正",staff,barcode:product.barcode,product_name:row.name,quantity:diff,memo});
       }catch(_){}
+      await sb(`inventory_count_items?id=eq.${encodeURIComponent(row.id)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({reflected_at:nowIso(),reflected_by:staff})
+      });
       state.diffs=state.diffs.filter(item=>String(item.id)!==String(row.id));
       await loadItems();
       renderAll();
@@ -725,6 +841,8 @@
   function bindAppInventoryCountEvents(){
     document.getElementById("startAppInventoryCountBtn")?.addEventListener("click",startCount);
     document.getElementById("finishAppInventoryCountBtn")?.addEventListener("click",finishCount);
+    document.getElementById("deleteAppInventorySessionBtn")?.addEventListener("click",deleteCurrentSession);
+    document.getElementById("closeAppInventorySessionBtn")?.addEventListener("click",closeCurrentSession);
     document.getElementById("saveAppInventoryCountBtn")?.addEventListener("click",saveCount);
     document.getElementById("compareAppInventoryCountBtn")?.addEventListener("click",compareCountedWithAppStock);
     document.getElementById("appInventoryCameraBtn")?.addEventListener("click",startAppInventoryCamera);
@@ -743,6 +861,16 @@
       }
     });
     document.getElementById("appInventoryCountSearch")?.addEventListener("input",handleSearchInput);
+    document.getElementById("appInventoryShowEndedSessions")?.addEventListener("change",async ()=>{
+      await refreshRemote();
+      state.diffs=[];
+      state.duplicateGroups=[];
+      renderAll();
+    });
+    document.getElementById("appInventoryShowReflectedDiffs")?.addEventListener("change",()=>{
+      if(currentSession())compareCountedWithAppStock();
+      else renderAll();
+    });
     document.getElementById("appInventorySessionSelect")?.addEventListener("change",async event=>{
       state.currentSessionId=event.target.value||"";
       localStorage.setItem(CURRENT_SESSION_KEY,state.currentSessionId);

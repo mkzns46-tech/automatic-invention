@@ -27,18 +27,26 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
 
 .app-count-toolbar{
   display:grid;
-  grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) minmax(180px,1fr) auto auto;
+  grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) minmax(180px,1fr) repeat(4,auto);
   gap:12px;
   align-items:end;
   margin:14px 0 18px;
+  padding:14px;
+  border:1px solid #d9e7dd;
+  border-radius:10px;
+  background:#f8fcf9;
 }
 
 .app-count-session-bar{
   display:grid;
-  grid-template-columns:minmax(220px,.45fr) minmax(0,1fr);
+  grid-template-columns:minmax(220px,.42fr) minmax(0,1fr) auto;
   gap:12px;
   align-items:end;
   margin:12px 0;
+  padding:14px;
+  border:1px solid #d9e7dd;
+  border-radius:10px;
+  background:#f8fcf9;
 }
 
 .app-count-current-session{
@@ -66,6 +74,7 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   display:grid;
   grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);
   gap:16px;
+  align-items:stretch;
 }
 
 .app-count-block{
@@ -75,6 +84,13 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   margin-top:16px;
   padding-top:16px;
   border-top:1px solid #d9e7dd;
+}
+
+.app-count-workflow .app-count-block{
+  padding:16px;
+  border:1px solid #d9e7dd;
+  border-radius:10px;
+  background:#fff;
 }
 
 .app-count-block:first-child,
@@ -156,6 +172,53 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
 .app-count-input-grid input,
 .app-count-toolbar select{
   width:100%;
+}
+
+.app-count-toolbar button,
+.app-count-input-grid button,
+.app-count-workflow .button-row button{
+  min-height:44px;
+}
+
+.inline-check{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin:0;
+  color:#315f4a;
+  font-weight:800;
+}
+
+.inline-check input{
+  width:auto;
+  min-width:18px;
+  height:18px;
+  margin:0;
+}
+
+.app-count-toggle{
+  white-space:nowrap;
+}
+
+.app-count-title-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+button.danger{
+  background:#9d0208;
+  color:#fff;
+}
+
+button.danger:hover{
+  background:#6a040f;
+}
+
+button.admin-required{
+  box-shadow:inset 0 0 0 2px #f2c48d;
 }
 
 .product-search-results{
@@ -266,8 +329,10 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   }
 
   .app-count-table-wrap{
-    max-height:none;
+    max-height:min(58vh,460px);
     overflow-x:hidden;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
   }
 
   .app-count-table{
@@ -340,6 +405,15 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   .app-count-duplicate-table button{
     width:100%;
     min-height:44px;
+  }
+
+  .app-count-title-actions{
+    justify-content:space-between;
+    margin-top:8px;
+  }
+
+  .app-count-toggle{
+    white-space:normal;
   }
 }
 
