@@ -280,9 +280,12 @@
       </div>
       <label class="inline-check app-count-toggle"><input type="checkbox" id="appInventoryShowEndedSessions">終了済みセッションを表示</label>
     </div>
+    <div class="app-count-staff-row">
+      <label>担当者 <span class="required">必須</span><select id="appInventoryCountStaff"><option value="">担当者を選択</option></select><div id="appInventoryCountStaffPicker" class="staff-picker"></div></label>
+      <div class="app-count-current-staff">現在の担当者：<strong id="appInventoryCurrentStaffName">未選択</strong></div>
+    </div>
     <div class="app-count-toolbar">
       <label>セッション名 <span class="required">必須</span><input id="appInventorySessionName" placeholder="例：2026/07/05 午前棚卸"></label>
-      <label>担当者 <span class="required">必須</span><select id="appInventoryCountStaff"><option value="">担当者を選択</option></select></label>
       <label>メモ<input id="appInventorySessionMemo" placeholder="例：店頭棚A、Easton、ストリング棚卸"></label>
       <button type="button" id="startAppInventoryCountBtn">棚卸開始</button>
       <button type="button" id="finishAppInventoryCountBtn" class="secondary">棚卸終了</button>
@@ -295,7 +298,8 @@
         <div class="app-count-input-grid">
           <label class="app-count-scan-label">商品スキャン・バーコード<span class="app-count-scan-row"><input id="appInventoryCountBarcode" autocomplete="off" placeholder="バーコードをスキャン、または手入力"><button type="button" id="appInventoryCameraBtn" class="secondary app-count-camera-btn">📷カメラ</button></span></label>
           <label>商品名検索<input id="appInventoryCountSearch" autocomplete="off" placeholder="商品名の一部を入力"></label>
-          <label>カウント数<input id="appInventoryCountQty" type="number" min="0" step="1" inputmode="numeric" value="1"></label>
+          <div id="appInventoryCountSearchResults" class="product-search-results app-count-search-results"></div>
+          <label>カウント数<input id="appInventoryCountQty" type="number" min="0" step="1" inputmode="numeric" placeholder="数量を入力"></label>
           <button type="button" id="saveAppInventoryCountBtn">登録</button>
         </div>
         <div id="appInventoryCameraArea" class="app-count-camera-area" hidden>
@@ -307,7 +311,6 @@
           <button type="button" id="appInventoryCloseCameraBtn" class="secondary">閉じる</button>
         </div>
         <div id="appInventoryCameraMessage" class="message">カメラを使う場合は棚卸開始後に「📷カメラ」を押してください。</div>
-        <div id="appInventoryCountSearchResults" class="product-search-results"></div>
         <div id="appInventoryCountProductInfo" class="message">棚卸開始後、商品をスキャンまたは検索してください。</div>
       </section>
       <section class="app-count-block">
@@ -325,7 +328,7 @@
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table">
-          <thead><tr><th>商品名</th><th>商品コード</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>重複</th></tr></thead>
+          <thead><tr><th>商品名</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>重複</th></tr></thead>
           <tbody id="appInventoryCountBody"></tbody>
         </table>
       </div>
@@ -337,7 +340,7 @@
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table app-count-duplicate-table">
-          <thead><tr><th>商品名</th><th>商品コード</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>採用</th></tr></thead>
+          <thead><tr><th>商品名</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>採用</th></tr></thead>
           <tbody id="appInventoryDuplicateBody"></tbody>
         </table>
       </div>
@@ -352,8 +355,25 @@
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table app-count-diff-table">
-          <thead><tr><th>商品名</th><th>商品コード</th><th>バーコード</th><th>カウント数</th><th>棚卸前在庫</th><th>差異</th><th>更新</th></tr></thead>
+          <thead><tr><th>商品名</th><th>バーコード</th><th>カウント数</th><th>棚卸前在庫</th><th>差異</th><th>更新</th></tr></thead>
           <tbody id="appInventoryDiffBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="app-count-block app-count-history-block">
+      <div class="section-title">
+        <h3>棚卸履歴</h3>
+        <div id="appInventoryHistorySummary" class="badge muted">0件</div>
+      </div>
+      <div class="app-count-history-filter">
+        <label>セッション名検索<input id="appInventoryHistoryNameFilter" placeholder="セッション名"></label>
+        <label>担当者検索<input id="appInventoryHistoryStaffFilter" placeholder="担当者"></label>
+        <label>日付検索<input id="appInventoryHistoryDateFilter" type="date"></label>
+      </div>
+      <div class="table-wrap app-count-table-wrap">
+        <table class="app-count-table app-count-history-table">
+          <thead><tr><th>セッション名</th><th>担当者</th><th>開始日時</th><th>棚卸終了日時</th><th>セッション終了日時</th><th>カウント商品数</th><th>重複件数</th><th>差異件数</th><th>更新件数</th><th>ステータス</th></tr></thead>
+          <tbody id="appInventoryHistoryBody"></tbody>
         </table>
       </div>
     </section>

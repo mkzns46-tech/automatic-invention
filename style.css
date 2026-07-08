@@ -49,6 +49,35 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   background:#f8fcf9;
 }
 
+.app-count-staff-row{
+  display:grid;
+  grid-template-columns:minmax(220px,360px) minmax(0,1fr);
+  gap:12px;
+  align-items:end;
+  margin:12px 0 18px;
+  padding:14px;
+  border:1px solid #d9e7dd;
+  border-radius:10px;
+  background:#f8fcf9;
+}
+
+.app-count-current-staff{
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  padding:10px 12px;
+  border:1px solid #d9e7dd;
+  border-radius:8px;
+  background:#fff;
+  color:#315f4a;
+  font-weight:800;
+}
+
+.app-count-current-staff strong{
+  margin-left:4px;
+  color:#113b2b;
+}
+
 .app-count-current-session{
   display:grid;
   gap:4px;
@@ -109,6 +138,17 @@ body[data-inventory-screen="app-inventory-count"] .inventory-app-layout > .grid{
   grid-template-columns:minmax(260px,1.2fr) minmax(180px,1fr) 130px auto;
   gap:10px;
   align-items:end;
+}
+
+.app-count-search-results{
+  grid-column:2 / 3;
+  align-self:start;
+}
+
+.app-count-history-filter{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(160px,1fr));
+  gap:10px;
 }
 
 .app-count-scan-row{
@@ -299,9 +339,21 @@ button.admin-required{
 
   .app-count-toolbar,
   .app-count-session-bar,
+  .app-count-staff-row,
   .app-count-workflow,
   .app-count-input-grid{
     grid-template-columns:1fr;
+  }
+
+  .app-count-toolbar,
+  .app-count-workflow .app-count-block:nth-child(2){
+    display:none;
+  }
+
+  .app-count-session-bar,
+  .app-count-staff-row{
+    padding:12px;
+    margin:10px 0;
   }
 
   .app-count-scan-row{
@@ -375,28 +427,36 @@ button.admin-required{
   }
 
   .app-count-table td:nth-child(1)::before{content:"商品名";}
-  .app-count-table td:nth-child(2)::before{content:"商品コード";}
-  .app-count-table td:nth-child(3)::before{content:"バーコード";}
-  .app-count-table td:nth-child(4)::before{content:"カウント数";}
-  .app-count-table td:nth-child(5)::before{content:"担当者";}
-  .app-count-table td:nth-child(6)::before{content:"保存日時";}
-  .app-count-table td:nth-child(7)::before{content:"重複";}
+  .app-count-table td:nth-child(2)::before{content:"バーコード";}
+  .app-count-table td:nth-child(3)::before{content:"カウント数";}
+  .app-count-table td:nth-child(4)::before{content:"担当者";}
+  .app-count-table td:nth-child(5)::before{content:"保存日時";}
+  .app-count-table td:nth-child(6)::before{content:"重複";}
 
-  .app-count-diff-table td:nth-child(5)::before{content:"棚卸前在庫";}
-  .app-count-diff-table td:nth-child(6)::before{content:"差異";}
-  .app-count-diff-table td:nth-child(7)::before{content:"更新";}
+  .app-count-diff-table td:nth-child(4)::before{content:"棚卸前在庫";}
+  .app-count-diff-table td:nth-child(5)::before{content:"差異";}
+  .app-count-diff-table td:nth-child(6)::before{content:"更新";}
 
-  .app-count-duplicate-table td:nth-child(5)::before{content:"担当者";}
-  .app-count-duplicate-table td:nth-child(6)::before{content:"保存日時";}
-  .app-count-duplicate-table td:nth-child(7)::before{content:"採用";}
+  .app-count-duplicate-table td:nth-child(6)::before{content:"採用";}
 
-  .app-count-diff-table td:nth-child(7),
-  .app-count-duplicate-table td:nth-child(7){
+  .app-count-history-table td:nth-child(1)::before{content:"セッション名";}
+  .app-count-history-table td:nth-child(2)::before{content:"担当者";}
+  .app-count-history-table td:nth-child(3)::before{content:"開始日時";}
+  .app-count-history-table td:nth-child(4)::before{content:"棚卸終了日時";}
+  .app-count-history-table td:nth-child(5)::before{content:"セッション終了日時";}
+  .app-count-history-table td:nth-child(6)::before{content:"カウント商品数";}
+  .app-count-history-table td:nth-child(7)::before{content:"重複件数";}
+  .app-count-history-table td:nth-child(8)::before{content:"差異件数";}
+  .app-count-history-table td:nth-child(9)::before{content:"更新件数";}
+  .app-count-history-table td:nth-child(10)::before{content:"ステータス";}
+
+  .app-count-diff-table td:nth-child(6),
+  .app-count-duplicate-table td:nth-child(6){
     grid-template-columns:1fr;
   }
 
-  .app-count-diff-table td:nth-child(7)::before,
-  .app-count-duplicate-table td:nth-child(7)::before{
+  .app-count-diff-table td:nth-child(6)::before,
+  .app-count-duplicate-table td:nth-child(6)::before{
     content:"";
     display:none;
   }
@@ -414,6 +474,14 @@ button.admin-required{
 
   .app-count-toggle{
     white-space:normal;
+  }
+
+  .app-count-search-results{
+    grid-column:auto;
+  }
+
+  .app-count-history-filter{
+    grid-template-columns:1fr;
   }
 }
 

@@ -14,6 +14,7 @@
   const state={
     sessions:[],
     items:[],
+    historyItems:[],
     currentSessionId:"",
     diffs:[],
     duplicateGroups:[]
@@ -43,6 +44,13 @@
 
   function normalizeKey(value){
     return String(value??"").trim().toLowerCase().replace(/\s/g,"");
+  }
+
+  function normalizeSearchText(value){
+    return String(value??"")
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/\s+/g,"");
   }
 
   function formatDate(value){
@@ -157,9 +165,19 @@
     }
   }
 
+  async function loadHistoryItems(){
+    try{
+      const rows=await sbAll("inventory_count_items?select=*&order=counted_at.desc",1000,20000);
+      state.historyItems=Array.isArray(rows) ? rows : [];
+    }catch(_){
+      state.historyItems=[];
+    }
+  }
+
   async function refreshRemote(){
     await loadSessions();
     await loadItems();
+    await loadHistoryItems();
   }
 
   function duplicateKeySet(){
@@ -217,11 +235,15 @@
     const select=document.getElementById("appInventoryCountStaff");
     if(!select)return;
     const session=currentSession();
-    const current=select.value||session?.staff||localStorage.getItem("arico_current_staff_name")||"";
+    const current=select.value||localStorage.getItem("arico_current_staff_name")||session?.staff||"";
     const members=Array.isArray(window.staffMembers) ? window.staffMembers : (typeof staffMembers!=="undefined" ? staffMembers : []);
     const staffLabel=member=>typeof getStaffDisplayName==="function" ? getStaffDisplayName(member) : (member.name||"");
     select.innerHTML='<option value="">担当者を選択</option>'+members.map(member=>`<option value="${safe(staffLabel(member))}">${safe(staffLabel(member))}</option>`).join("");
     if(current)select.value=current;
+    if(select.value&&typeof setCurrentStaffName==="function")setCurrentStaffName(select.value);
+    if(typeof renderScrollableStaffPicker==="function")renderScrollableStaffPicker("appInventoryCountStaff","appInventoryCountStaffPicker");
+    const currentStaff=document.getElementById("appInventoryCurrentStaffName");
+    if(currentStaff)currentStaff.textContent=select.value||"未選択";
   }
 
   function renderSessionControls(){
@@ -267,13 +289,12 @@
     body.innerHTML=rows.length ? rows.map(row=>`
       <tr class="${dupKeys.has(row.key)?"app-count-duplicate-row":""}">
         <td>${safe(row.name)}</td>
-        <td>${safe(row.productCode)}</td>
         <td>${safe(row.barcode)}</td>
         <td>${safe(row.count)}</td>
         <td>${safe(row.staff)}</td>
         <td>${safe(formatDate(row.updatedAt))}</td>
         <td>${dupKeys.has(row.key)?'<span class="app-count-duplicate-badge">重複あり</span>':(row.adopted?'<span class="badge muted">採用</span>':"")}</td>
-      </tr>`).join("") : '<tr><td colspan="7" class="app-count-empty">カウント済み商品はありません。</td></tr>';
+      </tr>`).join("") : '<tr><td colspan="6" class="app-count-empty">カウント済み商品はありません。</td></tr>';
   }
 
   function renderDuplicateRows(){
@@ -285,13 +306,12 @@
     host.innerHTML=groups.length ? groups.map(group=>group.rows.map(row=>`
       <tr>
         <td>${safe(row.name)}</td>
-        <td>${safe(row.productCode)}</td>
         <td>${safe(row.barcode)}</td>
         <td>${safe(row.count)}</td>
         <td>${safe(row.staff)}</td>
         <td>${safe(formatDate(row.updatedAt))}</td>
         <td><button type="button" class="app-count-adopt-btn" data-id="${safe(row.id)}">${row.adopted?"採用中":"この数を採用"}</button></td>
-      </tr>`).join("")).join("") : '<tr><td colspan="7" class="app-count-empty">重複カウントはありません。</td></tr>';
+      </tr>`).join("")).join("") : '<tr><td colspan="6" class="app-count-empty">重複カウントはありません。</td></tr>';
     host.querySelectorAll(".app-count-adopt-btn").forEach(button=>{
       button.onclick=()=>adoptDuplicateItem(button.dataset.id,button);
     });
@@ -309,16 +329,66 @@
     body.innerHTML=state.diffs.length ? state.diffs.map(row=>`
       <tr>
         <td>${safe(row.name)}</td>
-        <td>${safe(row.productCode)}</td>
         <td>${safe(row.barcode)}</td>
         <td>${safe(row.count)}</td>
         <td>${safe(row.beforeStock)}</td>
         <td><strong class="${row.diff<0?"stock-minus":"stock-plus"}">${safe(row.diff)}</strong></td>
         <td>${row.reflectedAt?'<span class="badge muted">反映済み</span>':`<button type="button" class="app-count-update-btn" data-id="${safe(row.id)}">更新</button>`}</td>
-      </tr>`).join("") : '<tr><td colspan="7" class="app-count-empty">差異のある商品はありません。</td></tr>';
+      </tr>`).join("") : '<tr><td colspan="6" class="app-count-empty">差異のある商品はありません。</td></tr>';
     body.querySelectorAll(".app-count-update-btn").forEach(button=>{
       button.onclick=()=>updateCountedProductStock(button.dataset.id,button);
     });
+  }
+
+  function renderHistoryRows(){
+    const body=document.getElementById("appInventoryHistoryBody");
+    const summary=document.getElementById("appInventoryHistorySummary");
+    if(!body)return;
+    const nameFilter=normalizeSearchText(document.getElementById("appInventoryHistoryNameFilter")?.value||"");
+    const staffFilter=normalizeSearchText(document.getElementById("appInventoryHistoryStaffFilter")?.value||"");
+    const dateFilter=String(document.getElementById("appInventoryHistoryDateFilter")?.value||"").trim();
+    const itemsBySession=new Map();
+    state.historyItems.forEach(item=>{
+      const sid=String(item.session_id||"");
+      if(!sid)return;
+      if(!itemsBySession.has(sid))itemsBySession.set(sid,[]);
+      itemsBySession.get(sid).push(itemDisplay(item));
+    });
+    const rows=state.sessions.map(session=>{
+      const items=itemsBySession.get(String(session.id))||[];
+      const grouped=new Map();
+      items.forEach(item=>{
+        if(!item.key)return;
+        if(!grouped.has(item.key))grouped.set(item.key,[]);
+        grouped.get(item.key).push(item);
+      });
+      let duplicateCount=0;
+      grouped.forEach(group=>{if(group.length>1)duplicateCount+=1;});
+      const diffCount=items.filter(item=>Number(item.count)!==Number(item.beforeStock)).length;
+      const reflectedCount=items.filter(item=>item.reflectedAt).length;
+      return {session,items,duplicateCount,diffCount,reflectedCount};
+    }).filter(row=>{
+      const session=row.session;
+      const targetDate=[session.started_at,session.finished_at,session.ended_at,session.created_at].filter(Boolean).map(value=>String(value).slice(0,10));
+      if(nameFilter&&!normalizeSearchText(session.name).includes(nameFilter))return false;
+      if(staffFilter&&!normalizeSearchText(session.staff).includes(staffFilter))return false;
+      if(dateFilter&&!targetDate.includes(dateFilter))return false;
+      return true;
+    });
+    if(summary)summary.textContent=`${rows.length}件`;
+    body.innerHTML=rows.length ? rows.map(row=>`
+      <tr>
+        <td>${safe(row.session.name||"")}</td>
+        <td>${safe(row.session.staff||"")}</td>
+        <td>${safe(formatDate(row.session.started_at))}</td>
+        <td>${safe(formatDate(row.session.finished_at))}</td>
+        <td>${safe(formatDate(row.session.ended_at))}</td>
+        <td>${safe(row.items.length)}</td>
+        <td>${safe(row.duplicateCount)}</td>
+        <td>${safe(row.diffCount)}</td>
+        <td>${safe(row.reflectedCount)}</td>
+        <td>${safe(row.session.status||"")}</td>
+      </tr>`).join("") : '<tr><td colspan="10" class="app-count-empty">棚卸履歴はありません。</td></tr>';
   }
 
   function renderAll(){
@@ -328,6 +398,7 @@
     renderCountedRows();
     renderDuplicateRows();
     renderDiffRows();
+    renderHistoryRows();
   }
 
   window.renderAppInventoryCount=async function(){
@@ -479,16 +550,40 @@
   async function findProductsByName(keyword){
     keyword=String(keyword||"").trim();
     if(!keyword)return [];
+    const normalizedKeyword=normalizeSearchText(keyword);
+    const localRows=[];
+    const localProducts=Array.isArray(window.products) ? window.products : (typeof products!=="undefined"&&Array.isArray(products) ? products : []);
+    localProducts.forEach(row=>{
+      if(!row)return;
+      const values=Object.values(row).filter(value=>["string","number"].includes(typeof value));
+      const haystack=normalizeSearchText(values.join(" "));
+      if(haystack.includes(normalizedKeyword))localRows.push(row);
+    });
     if(typeof searchProductsByName==="function"){
-      return await searchProductsByName(keyword);
+      const remoteRows=await searchProductsByName(keyword).catch(()=>[]);
+      const merged=[...localRows,...(Array.isArray(remoteRows)?remoteRows:[])];
+      const seen=new Set();
+      return merged.filter(row=>{
+        const key=String(row?.barcode||row?.smaregi_product_id||row?.name||"");
+        if(!key||seen.has(key))return false;
+        seen.add(key);
+        return true;
+      }).slice(0,80);
     }
     const q=encodeURIComponent(`*${keyword}*`);
-    const rows=await sb(`products?select=*&name=ilike.${q}&order=name.asc&limit=80`).catch(()=>[]);
+    const rows=await sb(`products?select=*&or=(name.ilike.${q},barcode.ilike.${q},smaregi_product_id.ilike.${q})&order=name.asc&limit=120`).catch(()=>[]);
     if(Array.isArray(rows)){
       rows.forEach(row=>{if(row&&row.barcode&&!gp(row.barcode))products.push(row);});
-      return rows;
+      const merged=[...localRows,...rows];
+      const seen=new Set();
+      return merged.filter(row=>{
+        const key=String(row?.barcode||row?.smaregi_product_id||row?.name||"");
+        if(!key||seen.has(key))return false;
+        seen.add(key);
+        return true;
+      }).slice(0,80);
     }
-    return [];
+    return localRows.slice(0,80);
   }
 
   async function findProductByCode(code){
@@ -504,10 +599,10 @@
 
   function showProduct(product,resetQty=false){
     if(!product)return;
-    if(resetQty)document.getElementById("appInventoryCountQty").value="1";
+    if(resetQty)document.getElementById("appInventoryCountQty").value="";
     setMessage(
       "appInventoryCountProductInfo",
-      `商品名：${product.name||""}\n商品コード：${product.barcode||""}\nバーコード：${product.barcode||""}`,
+      `商品名：${product.name||""}\nバーコード：${product.barcode||""}\n現在のアプリ在庫：${Number(product.base_stock||0)}`,
       "ok"
     );
   }
@@ -525,7 +620,7 @@
     selectedProduct=null;
     const product=await findProductByCode(code);
     if(!product){
-      setMessage("appInventoryCountProductInfo",`未登録バーコード・商品コード：${code}\nバーコードがない商品は商品名検索から選択してください。`,"err");
+      setMessage("appInventoryCountProductInfo",`未登録バーコード：${code}\nバーコードがない商品は商品名検索から選択してください。`,"err");
       return null;
     }
     selectedProduct=product;
@@ -540,7 +635,7 @@
     const results=document.getElementById("appInventoryCountSearchResults");
     if(barcode)barcode.value="";
     if(search)search.value="";
-    if(qty)qty.value="1";
+    if(qty)qty.value="";
     if(results)results.innerHTML="";
     selectedProduct=null;
     if(message)setMessage("appInventoryCountProductInfo",message,type);
@@ -554,9 +649,17 @@
     const staff=getStaffValue();
     if(!staff){
       setMessage("appInventoryCountProductInfo","担当者を選択してください。","err");
+      if(typeof showMessage==="function")showMessage("担当者を選択してください。","err");
       return;
     }
-    const qty=Number(document.getElementById("appInventoryCountQty")?.value||0);
+    const qtyRaw=String(document.getElementById("appInventoryCountQty")?.value??"").trim();
+    if(qtyRaw===""){
+      setMessage("appInventoryCountProductInfo","カウント数を入力してください","err");
+      if(typeof showMessage==="function")showMessage("カウント数を入力してください","err");
+      document.getElementById("appInventoryCountQty")?.focus();
+      return;
+    }
+    const qty=Number(qtyRaw);
     if(!Number.isInteger(qty)||qty<0){
       setMessage("appInventoryCountProductInfo","カウント数は0以上の整数で入力してください。","err");
       return;
@@ -674,12 +777,12 @@
     const before=Number(product.base_stock||0);
     const after=Number(row.count||0);
     const diff=after-before;
-    const ok=confirm(`この商品だけアプリ在庫を更新します。\n\n商品名：${row.name}\n商品コード：${row.productCode}\n更新前在庫：${before}\n更新後在庫：${after}\n差分：${diff}\n\n実行しますか？`);
+    const ok=confirm(`この商品だけアプリ在庫を更新します。\n\n商品名：${row.name}\nバーコード：${row.barcode||row.productCode}\n更新前在庫：${before}\n更新後在庫：${after}\n差分：${diff}\n\n実行しますか？`);
     if(!ok)return;
     try{
       if(button)button.disabled=true;
       await updateProductCurrentStock(product.barcode,after);
-      const memo=`アプリ内棚卸 / セッション:${session?.name||""} / 棚卸前在庫:${row.beforeStock} / 更新前:${before} / 更新後:${after} / 商品コード:${row.productCode}`;
+      const memo=`アプリ内棚卸 / セッション:${session?.name||""} / 棚卸前在庫:${row.beforeStock} / 更新前:${before} / 更新後:${after} / バーコード:${row.barcode||row.productCode}`;
       const inserted=await sb("inventory_logs",{
         method:"POST",
         headers:{Prefer:"return=representation"},
@@ -719,7 +822,7 @@
       <div class="product-search-item" data-index="${safe(index)}">
         <div>
           <strong>${safe(row.name)}</strong>
-          <span>バーコード：${safe(row.barcode||"なし")} / 棚番：${safe(row.location||"")}</span>
+          <span>バーコード：${safe(row.barcode||"なし")} / 現在のアプリ在庫：${safe(Number(row.base_stock||0))}</span>
         </div>
         <button type="button">選択</button>
       </div>
@@ -755,8 +858,9 @@
     if(input)input.value=code;
     const product=await previewBarcode(true);
     if(product){
+      await stopAppInventoryCamera(false);
       document.getElementById("appInventoryCountQty")?.focus();
-      setMessage("appInventoryCameraMessage","読み取りました。数量を確認してEnterまたは登録を押してください。","ok");
+      setMessage("appInventoryCameraMessage","読み取りました。カメラを停止しました。カウント数を入力してください。","ok");
     }else{
       setMessage("appInventoryCameraMessage",`読み取りましたが商品が見つかりません：${code}`,"err");
     }
@@ -861,6 +965,18 @@
       }
     });
     document.getElementById("appInventoryCountSearch")?.addEventListener("input",handleSearchInput);
+    document.getElementById("appInventoryCountStaff")?.addEventListener("change",event=>{
+      const staff=event.target.value||"";
+      if(typeof applyStoreFromStaffValue==="function")applyStoreFromStaffValue(staff);
+      else if(typeof setCurrentStaffName==="function")setCurrentStaffName(staff);
+      const currentStaff=document.getElementById("appInventoryCurrentStaffName");
+      if(currentStaff)currentStaff.textContent=staff||"未選択";
+      if(typeof renderScrollableStaffPicker==="function")renderScrollableStaffPicker("appInventoryCountStaff","appInventoryCountStaffPicker");
+    });
+    ["appInventoryHistoryNameFilter","appInventoryHistoryStaffFilter","appInventoryHistoryDateFilter"].forEach(id=>{
+      document.getElementById(id)?.addEventListener("input",renderHistoryRows);
+      document.getElementById(id)?.addEventListener("change",renderHistoryRows);
+    });
     document.getElementById("appInventoryShowEndedSessions")?.addEventListener("change",async ()=>{
       await refreshRemote();
       state.diffs=[];
