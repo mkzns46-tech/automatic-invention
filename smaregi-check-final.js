@@ -279,8 +279,10 @@
     const change=getChangeForItem(item);
     const changedAt=change.changed_at || change.movement_datetime || item?.changed_at || item?.movement_datetime || "";
     const dateLabel=changedAt && typeof fmt==="function" ? fmt(changedAt) : changedAt;
+    const product=typeof gp==="function" ? gp(getItemBarcode(item)) : null;
     return `<div class="smaregi-final-product-info">
       <strong>${safeText(getItemName(item)||"商品名未設定")}</strong>
+      <small>棚番：${safeText(getProductShelfLabel(product||{location:item?.location||""}))}</small>
       <small>バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</small>
       <small>最終変動：${safeText(dateLabel||"-")}</small>
     </div>`;
@@ -574,9 +576,10 @@
       const showExclude=hasInventoryAdminAccessSafe();
       return `<tr class="smaregi-diff-row">
         <td class="smaregi-diff-product-cell">
-          <div class="smaregi-diff-pc-product">${safeText(name)}<div class="smaregi-movement-note">バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</div></div>
+          <div class="smaregi-diff-pc-product">${safeText(name)}<div class="smaregi-movement-note">棚番：${safeText(getProductShelfLabel(gp(getItemBarcode(item))||{location:item.location||""}))}</div><div class="smaregi-movement-note">バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</div></div>
           <div class="smaregi-diff-mobile-card">
             <strong class="smaregi-diff-mobile-name">${safeText(name)}</strong>
+            <div class="smaregi-diff-mobile-barcode">棚番：${safeText(getProductShelfLabel(gp(getItemBarcode(item))||{location:item.location||""}))}</div>
             <div class="smaregi-diff-mobile-barcode">バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</div>
             <div class="smaregi-diff-mobile-values">
               <label>実在庫<input type="number" class="smaregi-diff-actual-input smaregi-diff-mobile-actual-input" data-barcode="${safeText(barcode)}" min="0" step="1" inputmode="numeric" value="${safeText(actual)}"></label>
@@ -1011,8 +1014,9 @@
         <div class="smaregi-cause-header">
           <button type="button" id="closeSmaregiCauseDetailBtn" class="secondary">← 差異一覧に戻る</button>
           <div class="smaregi-cause-title">
-            <div><strong>バーコード：</strong>${safeText(itemBarcode||"バーコードなし")}</div>
             <div><strong>商品名：</strong>${safeText(itemName)}</div>
+            <div><strong>棚番：</strong>${safeText(getProductShelfLabel(gp(itemBarcode)||{location:item.location||""}))}</div>
+            <div><strong>バーコード：</strong>${safeText(itemBarcode||"バーコードなし")}</div>
           </div>
           <div class="smaregi-cause-store-badge">店舗：${safeText(storeLabel)}</div>
         </div>
@@ -1708,7 +1712,7 @@
       }
       const refreshedLog=await markEquipmentTransferChecked(latestLog,checkedBy);
       showMessage?.(`商品転用を確認しました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
-      showPopup?.("商品転用確認完了",`商品名：${product.name||latestLog.product_name||""}\nバーコード：${latestLog.barcode}\n数量：${absQty}\n現在庫：${nextStock}`);
+      showPopup?.("商品転用確認完了",`商品名：${product.name||latestLog.product_name||""}\n棚番：${getProductShelfLabel(product)}\nバーコード：${latestLog.barcode}\n数量：${absQty}\n現在庫：${nextStock}`);
       return true;
     }catch(error){
       if(button)button.disabled=false;
@@ -1801,7 +1805,7 @@
         }
       }catch(_){}
       showMessage?.(`商品転用をキャンセルしました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
-      showPopup?.("商品転用キャンセル完了",`商品名：${product.name||latestLog.product_name||""}\nバーコード：${latestLog.barcode}\n戻し数量：${absQty}\n現在庫：${nextStock}`);
+      showPopup?.("商品転用キャンセル完了",`商品名：${product.name||latestLog.product_name||""}\n棚番：${getProductShelfLabel(product)}\nバーコード：${latestLog.barcode}\n戻し数量：${absQty}\n現在庫：${nextStock}`);
       if(typeof renderGlobalHistory==="function")renderGlobalHistory();
       if(typeof selectedBarcode!=="undefined" && selectedBarcode && typeof showProductHistoryForBarcode==="function")showProductHistoryForBarcode(selectedBarcode);
       refreshSmaregiAnalysisAfterEquipmentChange();

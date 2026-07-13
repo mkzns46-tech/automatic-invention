@@ -6,6 +6,7 @@ function buildHistoryProductCell(barcode,productName=""){
   const barcodeLabel=String(barcode||"バーコードなし");
   return `<div class="product-history-identity">
     <strong>${esc(name)}</strong>
+    <small>棚番：${esc(getProductShelfLabel(product||{location:""}))}</small>
     <small>バーコード：${esc(barcodeLabel)}</small>
   </div>`;
 }

@@ -212,6 +212,7 @@
     box.innerHTML=`
       <div class="shelf-product-info">
         <strong>${safe(product.name||product.product_name||"商品名なし")}</strong>
+        <span>棚番：${safe(getProductShelfLabel(product,state.locations))}</span>
         <span>バーコード：${safe(product.barcode||"なし")}</span>
         <div>現在の棚番</div>
         <ul>${current}</ul>
@@ -276,7 +277,8 @@
       <div class="product-search-item" data-barcode="${safe(product.barcode)}">
         <div>
           <strong>${safe(product.name||"")}</strong>
-          <span>バーコード：${safe(product.barcode||"なし")} / 棚番：${safe(product.location||"棚番未設定")}</span>
+          <span>棚番：${safe(getProductShelfLabel(product))}</span>
+          <span>バーコード：${safe(product.barcode||"なし")}</span>
         </div>
         <button type="button">選択</button>
       </div>`).join("");
@@ -470,14 +472,14 @@
       initialColumn,
       summary:bulk
         ? `<p>変更元：<strong>${safe(log.after_shelf_code||"")}</strong></p><p>対象条件：同じ担当者、同じ作業日、同じ変更前棚番、選択した履歴日時以降</p>`
-        : `<p><strong>${safe(log.product_name||"")}</strong></p><p>バーコード：${safe(log.barcode||"")}</p><p>変更前棚番：${safe(log.after_shelf_code||"")}</p><p>担当者：${safe(log.staff||"")}</p>`,
+        : `<p><strong>${safe(log.product_name||"")}</strong></p><p>棚番：${safe(log.after_shelf_code||"棚番未設定")}</p><p>バーコード：${safe(log.barcode||"")}</p><p>変更前棚番：${safe(log.after_shelf_code||"")}</p><p>担当者：${safe(log.staff||"")}</p>`,
       confirmText:"変更先を選択"
     });
     if(!normalized){showShelfMessage("棚番形式が正しくありません","err"); return;}
     const staff=staffName()||"担当者";
     if(!bulk){
       const product=await findProductByCode(log.barcode);
-      if(!confirm(`棚番を変更します。\n\n商品名：${product?.name||log.product_name||""}\nバーコード：${log.barcode||""}\n変更前棚番：${log.after_shelf_code||""}\n変更後棚番：${normalized}\n担当者：${staff}`))return;
+      if(!confirm(`棚番を変更します。\n\n商品名：${product?.name||log.product_name||""}\n棚番：${getProductShelfLabel(product)}\nバーコード：${log.barcode||""}\n変更前棚番：${log.after_shelf_code||""}\n変更後棚番：${normalized}\n担当者：${staff}`))return;
       const ok=await changeProductShelf(product,log.after_shelf_code,normalized,staff);
       if(ok)showShelfMessage(`${product.name||log.product_name}を${normalized}へ変更しました`,"ok");
     }else{

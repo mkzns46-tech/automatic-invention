@@ -613,7 +613,7 @@
     if(resetQty)document.getElementById("appInventoryCountQty").value="";
     setMessage(
       "appInventoryCountProductInfo",
-      `商品名：${product.name||""}\nバーコード：${product.barcode||""}`,
+      buildProductIdentityText(product),
       "ok"
     );
   }
@@ -788,7 +788,7 @@
     const before=Number(product.base_stock||0);
     const after=Number(row.count||0);
     const diff=after-before;
-    const ok=confirm(`この商品だけアプリ在庫を更新します。\n\n商品名：${row.name}\nバーコード：${row.barcode||row.productCode}\n更新前在庫：${before}\n更新後在庫：${after}\n差分：${diff}\n\n実行しますか？`);
+    const ok=confirm(`この商品だけアプリ在庫を更新します。\n\n商品名：${row.name}\n棚番：${getProductShelfLabel(product)}\nバーコード：${row.barcode||row.productCode}\n更新前在庫：${before}\n更新後在庫：${after}\n差分：${diff}\n\n実行しますか？`);
     if(!ok)return;
     try{
       if(button)button.disabled=true;
@@ -833,6 +833,7 @@
       <div class="product-search-item" data-index="${safe(index)}">
         <div>
           <strong>${safe(row.name)}</strong>
+          <span>棚番：${safe(getProductShelfLabel(searchResultCache[Number(index)]||{location:row.location}))}</span>
           <span>バーコード：${safe(row.barcode||"なし")}</span>
         </div>
         <button type="button">選択</button>

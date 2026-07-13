@@ -684,6 +684,38 @@ function gp(barcode){
   return products.find(p=>String(p.barcode)===String(barcode));
 }
 
+function getProductPrimaryShelf(product){
+  return String(product?.location||product?.shelf_code||product?.shelf||product?.shelf_no||"").trim();
+}
+
+function getProductShelfLabel(product,locations=null){
+  if(Array.isArray(locations)&&locations.length){
+    const active=locations.filter(loc=>!loc.deleted_at);
+    const primary=active.find(loc=>loc.is_primary)||active[0];
+    const code=String(primary?.shelf_code||getProductPrimaryShelf(product)||"").trim();
+    const extra=Math.max(0,active.length-(code?1:0));
+    return code ? `${code}${extra?`（＋${extra}）`:""}` : "棚番未設定";
+  }
+  const code=getProductPrimaryShelf(product);
+  const extra=Number(product?.location_count||product?.shelf_count||product?.additional_shelf_count||0);
+  return code ? `${code}${extra>1?`（＋${extra-1}）`:""}` : "棚番未設定";
+}
+
+function buildProductIdentityText(product,options={}){
+  const name=String(product?.name||product?.product_name||options.name||"商品名なし");
+  const barcode=String(product?.barcode||options.barcode||"バーコードなし");
+  const shelf=getProductShelfLabel(product,options.locations||null);
+  return `商品名：${name}\n棚番：${shelf}\nバーコード：${barcode}`;
+}
+
+function buildProductIdentityHtml(product,options={}){
+  const escapeFn=typeof esc==="function" ? esc : (value=>String(value??""));
+  const name=String(product?.name||product?.product_name||options.name||"商品名なし");
+  const barcode=String(product?.barcode||options.barcode||"バーコードなし");
+  const shelf=getProductShelfLabel(product,options.locations||null);
+  return `<strong>${escapeFn(name)}</strong><small>棚番：${escapeFn(shelf)}</small><small>バーコード：${escapeFn(barcode)}</small>`;
+}
+
 async function fetchProductByBarcode(barcode){
   barcode=String(barcode||"").trim();
   if(!barcode)return null;

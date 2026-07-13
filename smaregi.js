@@ -812,7 +812,7 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
       const ok=await confirmAppAction(
         "実在庫保存確認",
         typeof getSmaregiOperationContextText==="function"
-          ? getSmaregiOperationContextText(`商品：${item.product_name||barcode}\nバーコード：${barcode}\n実在庫：${actual_stock}`)
+          ? getSmaregiOperationContextText(`商品：${item.product_name||barcode}\n棚番：${getProductShelfLabel(gp(barcode)||{location:item.location||""})}\nバーコード：${barcode}\n実在庫：${actual_stock}`)
           : `商品：${item.product_name||barcode}\n実在庫：${actual_stock}`,
         {okText:"保存"}
       );
@@ -1271,6 +1271,7 @@ function showEquipmentTransferConfirmPopup({log,product,quantity,checkedBy,onOk}
     <div class="app-popup-title">商品転用確認</div>
     <div class="app-popup-body">現在はCSV運用中です。スマレジAPIには接続せず、アプリ内の商品転用確認だけを行います。
 商品名：${esc(product?.name||log?.product_name||"-")}
+棚番：${esc(getProductShelfLabel(product))}
 バーコード：${esc(log?.barcode||product?.barcode||"-")}
 数量：${esc(quantity)}
 担当者：${esc(checkedBy)}
@@ -1334,7 +1335,7 @@ async function executeEquipmentTransferConfirmation({log,product=null,quantity,c
         ? logs.map(item=>String(item.id)===String(logId) ? displayLog : item)
         : [displayLog,...logs];
       showMessage(`商品転用を確認しました：${product.name} / 数量 ${quantity}（API通信なし）`,"ok");
-      showPopup("商品転用完了",`商品名：${product.name}\nバーコード：${latestLog.barcode}\n数量：${quantity}\n現在庫：${nextStock}\nスマレジ在庫：自動変更なし（CSV運用中）`);
+      showPopup("商品転用完了",`商品名：${product.name}\n棚番：${getProductShelfLabel(product)}\nバーコード：${latestLog.barcode}\n数量：${quantity}\n現在庫：${nextStock}\nスマレジ在庫：自動変更なし（CSV運用中）`);
       renderGlobalHistory();
       if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode,displayLog);
       replaceEquipmentConfirmationDom(logId,displayLog);

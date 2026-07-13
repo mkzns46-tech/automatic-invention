@@ -86,7 +86,8 @@ async function showSmaregiCauseDetail(barcode){
       <div class="section-title"><h3>差異原因確認</h3><button type="button" id="closeSmaregiCauseDetailBtn" class="secondary">閉じる</button></div>
       <div class="smaregi-detail-summary">
         <div><strong>商品名</strong><span>${esc(item.product_name||"")}</span></div>
-        <div><strong>商品コード</strong><span>${esc(barcode)}</span></div>
+        <div><strong>棚番</strong><span>${esc(getProductShelfLabel(gp(barcode)||{location:item.location||""}))}</span></div>
+        <div><strong>バーコード</strong><span>${esc(barcode)}</span></div>
         <div><strong>スマレジ在庫</strong><span>${Number(item.smaregi_stock||0)}</span></div>
         <div><strong>シート在庫</strong><span>${esc(getSmaregiAppStock(barcode))}</span></div>
         <div><strong>実在庫</strong><span>${check?.actual_stock??"-"}</span></div>

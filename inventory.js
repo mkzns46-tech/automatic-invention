@@ -365,7 +365,7 @@ async function renderScanPreview(){
       return;
     }
 
-    info.textContent=`商品名：${p.name} / 現在庫：${Number(p.base_stock||0)}`;
+    info.textContent=`${buildProductIdentityText(p)}\n現在庫：${Number(p.base_stock||0)}`;
     info.className="message ok";
   }catch(e){
     info.textContent="商品確認エラー。\n"+e.message;
@@ -411,7 +411,7 @@ async function renderProductStockInfo(){
     return;
   }
 
-  info.textContent=`登録済み：${p.name} / 現在庫：${Number(p.base_stock||0)}`;
+  info.textContent=`登録済み\n${buildProductIdentityText(p)}\n現在庫：${Number(p.base_stock||0)}`;
   info.className="message ok";
 }
 
@@ -447,7 +447,7 @@ async function saveProduct(e){
     }
 
     showMessage(`商品登録・更新：${name}`,"ok");
-    showPopup("商品登録完了", `商品名：${name}\nバーコード：${barcode}\n現在庫：${base_stock}`);
+    showPopup("商品登録完了", `商品名：${name}\n棚番：${getProductShelfLabel({location})}\nバーコード：${barcode}\n現在庫：${base_stock}`);
 
     el("productBarcode").value="";
     el("productName").value="";
@@ -656,7 +656,7 @@ async function registerEventPickFromInventory({event,product,barcode,qty,staff,m
     const stockLine=source==="storage" ? `イベント保管在庫：${storagePickResult?.nextStorage ?? "-"}`
       : `通常棚在庫：${newStock}`;
     showMessage(`イベントピック登録：${product.name} / イベント：${event.name||"-"} / 持ち出し元：${sourceLabel} / 数量 ${qty}`,"ok");
-    showPopup("イベントピック登録完了",`イベント名：${event.name||"-"}\n商品名：${product.name}\n持ち出し元：${sourceLabel}\n数量：${qty}\n${stockLine}\n担当者：${staff}\nスマレジ在庫：変更しません`);
+    showPopup("イベントピック登録完了",`イベント名：${event.name||"-"}\n商品名：${product.name}\n棚番：${getProductShelfLabel(product)}\nバーコード：${product.barcode||""}\n持ち出し元：${sourceLabel}\n数量：${qty}\n${stockLine}\n担当者：${staff}\nスマレジ在庫：変更しません`);
 
     el("barcodeInput").value="";
     el("qty").value="";
@@ -852,8 +852,8 @@ async function registerBarcode(barcode){
 
     showPopup("登録完了",
       type==="在庫修正"
-        ? `在庫修正\n商品名：${p.name}\n現在庫：${newStock}\n担当者：${staff}`
-        : `${type}登録\n商品名：${p.name}${visibleEventPickSourceLine}\n数量：${qty}${stockDisplayLine}\n担当者：${staff}`
+        ? `在庫修正\n${buildProductIdentityText(p)}\n現在庫：${newStock}\n担当者：${staff}`
+        : `${type}登録\n${buildProductIdentityText(p)}${visibleEventPickSourceLine}\n数量：${qty}${stockDisplayLine}\n担当者：${staff}`
     );
 
     el("barcodeInput").value="";
@@ -1018,6 +1018,7 @@ function showEquipmentTransferConfirmPopup({log,product,quantity,checkedBy,onOk}
 スマレジ在庫が減算されます。
 
 商品名：${esc(product.name||log.product_name||"-")}
+棚番：${esc(getProductShelfLabel(product))}
 バーコード：${esc(log.barcode||product.barcode||"-")}
 数量：${esc(quantity)}
 担当者：${esc(checkedBy)}
@@ -1098,7 +1099,7 @@ async function executeEquipmentTransferConfirmation({log,product=null,quantity,c
         : [displayLog,...logs];
 
       showMessage(`商品転用を確定しました：${product.name} / 数量 ${quantity}`,"ok");
-      showPopup("商品転用完了",`商品名：${product.name}\nバーコード：${latestLog.barcode}\n数量：${quantity}\n現在庫：${nextStock}\nスマレジ在庫：減算済み`);
+      showPopup("商品転用完了",`商品名：${product.name}\n棚番：${getProductShelfLabel(product)}\nバーコード：${latestLog.barcode}\n数量：${quantity}\n現在庫：${nextStock}\nスマレジ在庫：減算済み`);
       renderGlobalHistory();
       if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode,displayLog);
       replaceEquipmentConfirmationDom(logId,displayLog);

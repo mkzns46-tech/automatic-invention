@@ -196,7 +196,8 @@ function renderProductFormSearchResults(rows){
     <div class="product-search-item" data-barcode="${esc(p.barcode)}">
       <div>
         <strong>${esc(p.name)}</strong>
-        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)} / 棚番：${esc(p.location||"")}</span>
+        <span>棚番：${esc(getProductShelfLabel(p))}</span>
+        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)}</span>
       </div>
       <button type="button">選択</button>
     </div>
@@ -271,7 +272,8 @@ function renderInventoryProductSearchResults(rows){
     <div class="product-search-item" data-barcode="${esc(p.barcode)}">
       <div>
         <strong>${esc(p.name)}</strong>
-        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)} / 棚番：${esc(p.location||"")}</span>
+        <span>棚番：${esc(getProductShelfLabel(p))}</span>
+        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)}</span>
       </div>
       <button type="button">選択</button>
     </div>
@@ -378,7 +380,8 @@ function renderProductSearchResults(rows){
     <div class="product-search-item" data-barcode="${esc(p.barcode)}">
       <div>
         <strong>${esc(p.name)}</strong>
-        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)} / 棚番：${esc(p.location||"")}</span>
+        <span>棚番：${esc(getProductShelfLabel(p))}</span>
+        <span>バーコード：${esc(p.barcode)} / 現在庫：${Number(p.base_stock||0)}</span>
       </div>
       <button type="button">選択</button>
     </div>
@@ -444,7 +447,7 @@ function renderSelectedProductHistoryWithData(productLogs){
 
   const p=gp(selectedBarcode);
 
-  if(badge)badge.textContent=p?`${p.name} / 全履歴：${productLogs.length}件`:"商品を選択してください";
+  if(badge)badge.textContent=p?`${p.name} / 棚番：${getProductShelfLabel(p)} / バーコード：${p.barcode||selectedBarcode} / 全履歴：${productLogs.length}件`:"商品を選択してください";
   if(range)range.textContent=`全履歴：${productLogs.length}件`;
   console.log("[Selected Product History Render]",productLogs
     .filter(log=>log.type==="備品転用")
