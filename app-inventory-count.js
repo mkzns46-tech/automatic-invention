@@ -343,10 +343,9 @@
         <td>${safe(row.name)}</td>
         <td>${safe(row.barcode)}</td>
         <td>${safe(row.count)}</td>
-        <td>${safe(row.beforeStock)}</td>
         <td><strong class="${row.diff<0?"stock-minus":"stock-plus"}">${safe(row.diff)}</strong></td>
         <td>${row.reflectedAt?'<span class="badge muted">反映済み</span>':`<button type="button" class="app-count-update-btn" data-id="${safe(row.id)}">更新</button>`}</td>
-      </tr>`).join("") : '<tr><td colspan="6" class="app-count-empty">差異のある商品はありません。</td></tr>';
+      </tr>`).join("") : '<tr><td colspan="5" class="app-count-empty">差異のある商品はありません。</td></tr>';
     body.querySelectorAll(".app-count-update-btn").forEach(button=>{
       button.onclick=()=>updateCountedProductStock(button.dataset.id,button);
     });
@@ -487,7 +486,7 @@
         body:JSON.stringify({status:STATUS_FINISHED,finished_at:nowIso(),memo:document.getElementById("appInventorySessionMemo")?.value||session.memo||""})
       });
       await refreshRemote();
-      setMessage("appInventoryCountCsvInfo","棚卸を終了しました。差異比較を押すと、カウント数と棚卸前在庫を比較します。","ok");
+      setMessage("appInventoryCountCsvInfo","棚卸を終了しました。差異比較を実行できます。","ok");
       renderAll();
     }catch(error){
       setRemoteError(error);
@@ -614,7 +613,7 @@
     if(resetQty)document.getElementById("appInventoryCountQty").value="";
     setMessage(
       "appInventoryCountProductInfo",
-      `商品名：${product.name||""}\nバーコード：${product.barcode||""}\n現在のアプリ在庫：${Number(product.base_stock||0)}`,
+      `商品名：${product.name||""}\nバーコード：${product.barcode||""}`,
       "ok"
     );
   }
@@ -745,7 +744,7 @@
       body:JSON.stringify({status:STATUS_COMPARED,compared_at:nowIso()})
     }).catch(()=>{});
     await loadSessions();
-    setMessage("appInventoryCountCsvInfo",`比較完了：差異 ${state.diffs.length}件。カウント数と棚卸前在庫だけを比較しています。`,"ok");
+    setMessage("appInventoryCountCsvInfo",`比較完了：差異 ${state.diffs.length}件。`,"ok");
     renderAll();
   }
 
@@ -834,7 +833,7 @@
       <div class="product-search-item" data-index="${safe(index)}">
         <div>
           <strong>${safe(row.name)}</strong>
-          <span>バーコード：${safe(row.barcode||"なし")} / 現在のアプリ在庫：${safe(Number(row.base_stock||0))}</span>
+          <span>バーコード：${safe(row.barcode||"なし")}</span>
         </div>
         <button type="button">選択</button>
       </div>
