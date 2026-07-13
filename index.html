@@ -163,9 +163,9 @@
 
 <section class="mobile-force-history card wide pc-only-section" id="globalHistoryCard" data-inventory-screen="history" hidden><h2>全体履歴</h2><div class="history-filter-grid"><label>区分検索<select id="historyTypeFilter"><option value="">すべて</option><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option><option value="event_pick">イベントピック</option><option value="event_close_return">イベント締め棚戻し</option><option value="gacha_pick">ガチャピック</option><option value="gacha_return">ガチャ戻り</option></select></label><label>商品名検索<input id="historyProductFilter" placeholder="商品名キーワード"/></label><label>担当者検索<input id="historyStaffFilter" placeholder="担当者キーワード"/></label><label>備考検索<input id="historyMemoFilter" placeholder="備考キーワード"/></label></div><div class="button-row"><button id="allDataCsvBtn" class="secondary">全履歴CSV</button><button id="clearFilterBtn" class="secondary">検索をクリア</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
 <section class="card wide mobile-history-section" id="productHistoryCard" data-inventory-screen="history" hidden><div class="section-title"><h2>商品別履歴</h2></div><div id="productHistoryContent"><div id="historyRangeBadge" class="badge muted">商品を選択してください</div><div class="history-search-box"><label>商品履歴検索<input id="productHistoryBarcodeInput" placeholder="バーコードを入力またはスキャン" />
-<label class="product-name-search-label">商品名検索
+<div class="inventory-product-search-controls product-history-search-controls"><label class="product-name-search-label">商品名検索
   <input id="productNameSearchInput" placeholder="商品名の一部を入力" />
-</label>
+</label><label class="product-search-sort-label">並び順<select id="productHistorySearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label></div>
 <div id="productSearchResults" class="product-search-results"></div></label></div><div class="history-camera-row"><button type="button" id="historyCameraBtn">カメラ読取</button></div><div class="button-row"><button id="productHistoryCsvBtn" type="button">商品履歴CSV</button>
 <button id="showAllSelectedHistoryBtn" class="secondary">全履歴を表示</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="selectedHistoryBody"></tbody></table></div></div></section>
 <section class="card wide smaregi-stock-check-section" id="smaregiStockCheckCard" data-inventory-screen="smaregi" hidden>
@@ -186,6 +186,10 @@
   <div class="smaregi-toolbar smaregi-action-grid">
     <button type="button" id="refreshSmaregiChecksBtn" class="secondary">最新状態に更新</button>
     <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
+  </div>
+  <div class="inventory-product-search-controls smaregi-product-search-controls">
+    <label>商品検索<input id="smaregiStockSearchInput" type="text" placeholder="商品名・バーコードで検索"></label>
+    <label class="product-search-sort-label">並び順<select id="smaregiProductSearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label>
   </div>
   <div id="smaregiMessage" class="message"></div>
   <div class="table-wrap">
@@ -298,6 +302,7 @@
         <div class="app-count-input-grid">
           <label class="app-count-scan-label">商品スキャン・バーコード<span class="app-count-scan-row"><input id="appInventoryCountBarcode" autocomplete="off" placeholder="バーコードをスキャン、または手入力"><button type="button" id="appInventoryCameraBtn" class="secondary app-count-camera-btn">📷カメラ</button></span></label>
           <label>商品名検索<input id="appInventoryCountSearch" autocomplete="off" placeholder="商品名の一部を入力"></label>
+          <label class="product-search-sort-label app-count-sort-label">並び順<select id="appInventoryProductSearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label>
           <div id="appInventoryCountSearchResults" class="product-search-results app-count-search-results"></div>
           <label>カウント数<input id="appInventoryCountQty" type="number" min="0" step="1" inputmode="numeric" placeholder="数量を入力"></label>
           <button type="button" id="saveAppInventoryCountBtn">登録</button>

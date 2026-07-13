@@ -62,24 +62,67 @@ function getSmaregiCurrentTargetItems(){
 }
 
 function getSmaregiFilteredTargetItems(){
-  const keyword=String(el("smaregiStockSearchInput")?.value||"").trim().toLowerCase();
-  return getSmaregiCurrentTargetItems().filter(item=>{
+  const keyword=typeof normalizeSearchText==="function"
+    ? normalizeSearchText(el("smaregiStockSearchInput")?.value||"")
+    : String(el("smaregiStockSearchInput")?.value||"").trim().toLowerCase();
+  const sortMode=getSmaregiProductSearchSort();
+  const filtered=getSmaregiCurrentTargetItems().filter(item=>{
     const barcode=String(item?.barcode||"");
     const checked=!!getSmaregiCheck(barcode);
     if(smaregiCheckDisplayMode==="checked"&&!checked)return false;
     if(smaregiCheckDisplayMode==="unchecked"&&checked)return false;
     if(!keyword)return true;
+    const product=gp(barcode)||{};
     return [
       getSmaregiItemProductName(item),
       getSmaregiItemProductCode(item),
-      getSmaregiItemBarcode(item)
-    ].some(value=>String(value||"").toLowerCase().includes(keyword));
-  }).sort((a,b)=>{
+      getSmaregiItemBarcode(item),
+      product.location,
+      product.item_number,
+      product.part_number,
+      product.color,
+      product.size
+    ].some(value=>{
+      const text=typeof normalizeSearchText==="function" ? normalizeSearchText(value) : String(value||"").toLowerCase();
+      return text.includes(keyword);
+    });
+  });
+  if(typeof sortProductsForDisplay==="function"){
+    return sortProductsForDisplay(filtered.map(item=>({
+      ...item,
+      name:getSmaregiItemProductName(item),
+      barcode:getSmaregiItemBarcode(item),
+      location:(gp(getSmaregiItemBarcode(item))||{}).location||item.location||"",
+      updated_at:(gp(getSmaregiItemBarcode(item))||{}).updated_at||item.updated_at||""
+    })),sortMode);
+  }
+  return filtered.sort((a,b)=>{
     const at=new Date(smaregiLatestChangeByBarcode.get(String(a?.barcode||""))?.changed_at||0).getTime();
     const bt=new Date(smaregiLatestChangeByBarcode.get(String(b?.barcode||""))?.changed_at||0).getTime();
     return bt-at||getSmaregiItemProductName(a).localeCompare(getSmaregiItemProductName(b),"ja");
   });
 }
+
+function getSmaregiProductSearchSort(){
+  const key="arico_product_search_sort_smaregi";
+  const value=String(el("smaregiProductSearchSort")?.value||localStorage.getItem(key)||"name");
+  return ["name","barcode","location","updated"].includes(value) ? value : "name";
+}
+
+function bindSmaregiProductSearchSort(){
+  const select=el("smaregiProductSearchSort");
+  if(!select)return;
+  const key="arico_product_search_sort_smaregi";
+  select.value=getSmaregiProductSearchSort();
+  select.onchange=()=>{
+    localStorage.setItem(key,select.value||"name");
+    if(typeof renderSmaregiStockChecks==="function")renderSmaregiStockChecks();
+  };
+}
+
+window.addEventListener("DOMContentLoaded",bindSmaregiProductSearchSort);
+window.addEventListener("load",bindSmaregiProductSearchSort);
+setTimeout(bindSmaregiProductSearchSort,500);
 
 function ensureSmaregiCheckFilterControls(){
   const message=el("smaregiMessage");

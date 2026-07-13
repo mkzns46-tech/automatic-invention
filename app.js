@@ -198,6 +198,7 @@ function bindSmaregiStockCheckEvents(){
   on("aggregateSmaregiDifferenceRankingBtn","click",loadSmaregiDifferenceRanking);
   on("exportSmaregiDiffCardCsvBtn","click",()=>exportSmaregiCheckCsv(true));
   on("exportSmaregiReasonSummaryCsvBtn","click",exportSmaregiReasonSummaryCsv);
+  on("smaregiStockSearchInput","input",renderSmaregiStockChecks);
   on("smaregiCheckerName","change",e=>{
     localStorage.setItem("arico_smaregi_checker",e.target.value||"");
     updateSmaregiManagerControls();

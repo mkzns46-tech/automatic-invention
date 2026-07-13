@@ -3,6 +3,7 @@
   "use strict";
 
   const CURRENT_SESSION_KEY="arico_app_inventory_count_current_session_id";
+  const APP_INVENTORY_SEARCH_SORT_KEY="arico_product_search_sort_app_inventory";
   const SCAN_COOLDOWN_MS=1300;
   const STATUS_NOT_STARTED="未開始";
   const STATUS_ACTIVE="棚卸中";
@@ -90,6 +91,17 @@
 
   function isClosedSession(session){
     return session?.status===STATUS_CLOSED;
+  }
+
+  function getAppInventorySearchSort(){
+    const value=String(document.getElementById("appInventoryProductSearchSort")?.value||localStorage.getItem(APP_INVENTORY_SEARCH_SORT_KEY)||"name");
+    return ["name","barcode","location","updated"].includes(value) ? value : "name";
+  }
+
+  function sortAppInventoryProducts(rows){
+    if(typeof sortProductsForDisplay==="function")return sortProductsForDisplay(rows,getAppInventorySearchSort());
+    const collator=new Intl.Collator("ja-JP",{numeric:true,sensitivity:"base"});
+    return [...(Array.isArray(rows)?rows:[])].sort((a,b)=>collator.compare(String(a?.name||""),String(b?.name||"")));
   }
 
   function visibleSessions(){
@@ -817,7 +829,7 @@
       return;
     }
     const rows=await findProductsByName(keyword);
-    searchResultCache=rows.slice(0,20);
+    searchResultCache=sortAppInventoryProducts(rows).slice(0,20);
     host.innerHTML=searchResultCache.length ? searchResultCache.map((row,index)=>`
       <div class="product-search-item" data-index="${safe(index)}">
         <div>
@@ -965,6 +977,14 @@
       }
     });
     document.getElementById("appInventoryCountSearch")?.addEventListener("input",handleSearchInput);
+    const appSearchSort=document.getElementById("appInventoryProductSearchSort");
+    if(appSearchSort){
+      appSearchSort.value=getAppInventorySearchSort();
+      appSearchSort.addEventListener("change",()=>{
+        localStorage.setItem(APP_INVENTORY_SEARCH_SORT_KEY,appSearchSort.value||"name");
+        handleSearchInput();
+      });
+    }
     document.getElementById("appInventoryCountStaff")?.addEventListener("change",event=>{
       const staff=event.target.value||"";
       if(typeof applyStoreFromStaffValue==="function")applyStoreFromStaffValue(staff);

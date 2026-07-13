@@ -68,14 +68,26 @@ async function selectProductHistoryByBarcode(){
 
 
 function normalizeSearchText(s){
-  return String(s||"").trim().replace(/\s+/g," ");
+  return String(s||"").normalize("NFKC").trim().toLowerCase().replace(/\s+/g," ");
 }
 
-const INVENTORY_PRODUCT_SEARCH_SORT_KEY="arico_inventory_product_search_sort";
+const PRODUCT_SEARCH_SORT_STORAGE_PREFIX="arico_product_search_sort_";
+
+function getProductSearchSortValue(selectId,storageKey){
+  const value=String(el(selectId)?.value||localStorage.getItem(storageKey)||"name");
+  return ["name","barcode","location","updated"].includes(value) ? value : "name";
+}
 
 function getInventoryProductSearchSort(){
-  const value=String(el("inventoryProductSearchSort")?.value||localStorage.getItem(INVENTORY_PRODUCT_SEARCH_SORT_KEY)||"name");
-  return ["name","barcode","location","updated"].includes(value) ? value : "name";
+  return getProductSearchSortValue("inventoryProductSearchSort",PRODUCT_SEARCH_SORT_STORAGE_PREFIX+"inventory");
+}
+
+function getProductFormSearchSort(){
+  return getProductSearchSortValue("productFormSearchSort",PRODUCT_SEARCH_SORT_STORAGE_PREFIX+"product_form");
+}
+
+function getProductHistorySearchSort(){
+  return getProductSearchSortValue("productHistorySearchSort",PRODUCT_SEARCH_SORT_STORAGE_PREFIX+"product_history");
 }
 
 function getProductUpdatedTime(product){
@@ -91,8 +103,8 @@ function sortProductsForDisplay(rows,mode="name"){
       return collator.compare(String(a?.barcode||""),String(b?.barcode||""));
     }
     if(mode==="location"){
-      const al=String(a?.location||"").trim();
-      const bl=String(b?.location||"").trim();
+      const al=String(a?.location||a?.shelf||a?.shelf_no||"").trim();
+      const bl=String(b?.location||b?.shelf||b?.shelf_no||"").trim();
       if(!al&&bl)return 1;
       if(al&&!bl)return -1;
       return collator.compare(al,bl)||collator.compare(String(a?.name||""),String(b?.name||""));
@@ -106,23 +118,60 @@ function sortProductsForDisplay(rows,mode="name"){
 
 window.sortProductsForDisplay=sortProductsForDisplay;
 
+function getProductSearchHaystack(product){
+  const fields=[
+    product?.name,
+    product?.product_name,
+    product?.barcode,
+    product?.product_code,
+    product?.smaregi_product_id,
+    product?.item_number,
+    product?.part_number,
+    product?.model_number,
+    product?.color,
+    product?.colour,
+    product?.size,
+    product?.standard,
+    product?.spec
+  ];
+  return normalizeSearchText(fields.filter(value=>value!==null&&value!==undefined).join(" "));
+}
+
+function mergeUniqueProducts(...groups){
+  const seen=new Set();
+  const merged=[];
+  groups.flat().forEach(product=>{
+    if(!product)return;
+    const key=String(product.barcode||product.product_code||product.smaregi_product_id||product.name||"");
+    if(!key||seen.has(key))return;
+    seen.add(key);
+    merged.push(product);
+  });
+  return merged;
+}
+
 async function searchProductsByName(keyword){
   keyword=normalizeSearchText(keyword);
   if(!keyword || keyword.length<2)return [];
 
   try{
+    const localProducts=Array.isArray(window.products) ? window.products : (typeof products!=="undefined"&&Array.isArray(products) ? products : []);
+    const localRows=localProducts.filter(product=>getProductSearchHaystack(product).includes(keyword));
     const q=encodeURIComponent(`*${keyword}*`);
-    const rows=await sb(`products?select=*&name=ilike.${q}&order=name.asc&limit=80`);
+    const rows=await sb(`products?select=*&or=(name.ilike.${q},barcode.ilike.${q},location.ilike.${q},smaregi_product_id.ilike.${q})&order=name.asc&limit=200`);
 
     if(Array.isArray(rows)){
       rows.forEach(p=>{
         if(p && !gp(p.barcode))products.push(p);
       });
-      return rows;
+      return mergeUniqueProducts(localRows,rows).slice(0,120);
     }
 
-    return [];
+    return localRows.slice(0,120);
   }catch(e){
+    const localProducts=Array.isArray(window.products) ? window.products : (typeof products!=="undefined"&&Array.isArray(products) ? products : []);
+    const localRows=localProducts.filter(product=>getProductSearchHaystack(product).includes(keyword));
+    if(localRows.length)return localRows.slice(0,120);
     showMessage("商品名検索エラー。\n"+e.message,"err");
     return [];
   }
@@ -134,6 +183,7 @@ let productFormSearchTimer=null;
 function renderProductFormSearchResults(rows){
   const box=el("productFormSearchResults");
   if(!box)return;
+  rows=sortProductsForDisplay(rows,getProductFormSearchSort());
 
   if(!rows || !rows.length){
     box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>新規商品として登録できます</span></div>';
@@ -270,22 +320,52 @@ function handleInventoryProductNameSearchInput(){
 }
 
 function bindInventoryProductSearchSort(){
-  const select=el("inventoryProductSearchSort");
+  bindProductSearchSortSelect("inventoryProductSearchSort",PRODUCT_SEARCH_SORT_STORAGE_PREFIX+"inventory",handleInventoryProductNameSearchInput);
+}
+
+function bindProductSearchSortSelect(selectId,storageKey,rerender){
+  const select=el(selectId);
   if(!select)return;
-  select.value=getInventoryProductSearchSort();
+  select.value=getProductSearchSortValue(selectId,storageKey);
   select.onchange=()=>{
-    localStorage.setItem(INVENTORY_PRODUCT_SEARCH_SORT_KEY,select.value||"name");
-    handleInventoryProductNameSearchInput();
+    localStorage.setItem(storageKey,select.value||"name");
+    if(typeof rerender==="function")rerender();
   };
 }
 
-window.addEventListener("DOMContentLoaded",bindInventoryProductSearchSort);
-window.addEventListener("load",bindInventoryProductSearchSort);
-setTimeout(bindInventoryProductSearchSort,500);
+function ensureProductSearchSortControl(inputId,selectId,storageKey){
+  if(el(selectId)||!el(inputId))return;
+  const input=el(inputId);
+  const label=input.closest("label")||input.parentElement;
+  if(!label)return;
+  const wrap=document.createElement("div");
+  wrap.className="inventory-product-search-controls";
+  label.parentNode.insertBefore(wrap,label);
+  wrap.appendChild(label);
+  const sortLabel=document.createElement("label");
+  sortLabel.className="product-search-sort-label";
+  sortLabel.innerHTML=`並び順<select id="${selectId}"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select>`;
+  wrap.appendChild(sortLabel);
+  const select=el(selectId);
+  if(select)select.value=getProductSearchSortValue(selectId,storageKey);
+}
+
+function bindAllProductSearchSortControls(){
+  ensureProductSearchSortControl("productFormNameSearchInput","productFormSearchSort",PRODUCT_SEARCH_SORT_STORAGE_PREFIX+"product_form");
+  ensureProductSearchSortControl("productNameSearchInput","productHistorySearchSort",PRODUCT_SEARCH_SORT_STORAGE_PREFIX+"product_history");
+  bindProductSearchSortSelect("inventoryProductSearchSort",PRODUCT_SEARCH_SORT_STORAGE_PREFIX+"inventory",handleInventoryProductNameSearchInput);
+  bindProductSearchSortSelect("productFormSearchSort",PRODUCT_SEARCH_SORT_STORAGE_PREFIX+"product_form",handleProductFormNameSearchInput);
+  bindProductSearchSortSelect("productHistorySearchSort",PRODUCT_SEARCH_SORT_STORAGE_PREFIX+"product_history",handleProductNameSearchInput);
+}
+
+window.addEventListener("DOMContentLoaded",bindAllProductSearchSortControls);
+window.addEventListener("load",bindAllProductSearchSortControls);
+setTimeout(bindAllProductSearchSortControls,500);
 
 function renderProductSearchResults(rows){
   const box=el("productSearchResults");
   if(!box)return;
+  rows=sortProductsForDisplay(rows,getProductHistorySearchSort());
 
   if(!rows || !rows.length){
     box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>別のキーワードで検索してください</span></div>';
