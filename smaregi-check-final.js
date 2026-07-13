@@ -152,7 +152,7 @@
       ? window.getSavedSmaregiStockValue(item)
       : getStoreStockValue(item,storeCode,true);
     if(raw===null)return {raw:null,compare:null,storeCode};
-    return {raw,compare:raw,storeCode};
+    return {raw,compare:raw<0?0:raw,storeCode};
   }
 
   function getStoreDisplayStocks(source){
@@ -163,10 +163,15 @@
   }
 
   function getCsvSmaregiStock(item){
+    return getTargetSmaregiStock(item).raw;
+  }
+
+  function getComparableCsvSmaregiStock(item){
     return getTargetSmaregiStock(item).compare;
   }
 
   window.getCsvSmaregiStock=getCsvSmaregiStock;
+  window.getComparableCsvSmaregiStock=getComparableCsvSmaregiStock;
   window.getTargetSmaregiStock=getTargetSmaregiStock;
 
   function displayNumber(value,emptyLabel="未入力"){
@@ -341,10 +346,11 @@
       const eventStorageStock=Number(breakdown?.eventStorageStock ?? 0);
       const comparisonStock=Number(breakdown?.comparisonStock ?? actual);
       const smaregiStock=getCsvSmaregiStock(item);
-      if(!Number.isFinite(actual)||!Number.isFinite(smaregiStock)||!Number.isFinite(comparisonStock))return null;
-      const difference=comparisonStock-smaregiStock;
+      const smaregiCompareStock=getComparableCsvSmaregiStock(item);
+      if(!Number.isFinite(actual)||!Number.isFinite(smaregiStock)||!Number.isFinite(smaregiCompareStock)||!Number.isFinite(comparisonStock))return null;
+      const difference=comparisonStock-smaregiCompareStock;
       if(difference===0)return null;
-      return {item,check,actual,currentEventStock,eventStorageStock,comparisonStock,smaregiStock,difference};
+      return {item,check,actual,currentEventStock,eventStorageStock,comparisonStock,smaregiStock,smaregiCompareStock,difference};
     }).filter(Boolean);
   }
 
@@ -488,7 +494,8 @@
     if(noIssueReason===null)return false;
     const actual=Number(check.actual_stock);
     const smaregiStock=getCsvSmaregiStock(item);
-    const difference=Number.isFinite(actual)&&Number.isFinite(smaregiStock) ? actual-smaregiStock : check.difference;
+    const smaregiCompareStock=getComparableCsvSmaregiStock(item);
+    const difference=Number.isFinite(actual)&&Number.isFinite(smaregiCompareStock) ? actual-smaregiCompareStock : check.difference;
     const ok=confirm([
       "この差異を今回の棚卸では「問題なし」として登録します。",
       "",
@@ -739,12 +746,13 @@
       button.disabled=true;
       const checkedAt=new Date().toISOString();
       const smaregiStock=Number(getCsvSmaregiStock(item) ?? 0);
+      const smaregiCompareStock=Number(getComparableCsvSmaregiStock(item) ?? 0);
       const previousCheck=typeof getSmaregiCheck==="function" ? getSmaregiCheck(barcode) : null;
       const payload={
         snapshot_id:smaregiSnapshot.id,
         barcode,
         actual_stock:actualStock,
-        difference:actualStock-smaregiStock,
+        difference:actualStock-smaregiCompareStock,
         checked_by:checkedBy,
         checked_at:checkedAt,
         excluded:false,
@@ -993,11 +1001,11 @@
       const smaregiChanges=allSmaregiChanges;
       const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(itemBarcode) : null;
       const targetStockInfo=getTargetSmaregiStock(item);
-      const smaregiStock=targetStockInfo.compare;
-      const smaregiRawStock=targetStockInfo.raw;
+      const smaregiStock=targetStockInfo.raw;
+      const smaregiCompareStock=targetStockInfo.compare;
       const storeLabel=getInventoryStoreLabelSafe();
       const actual=check?.actual_stock ?? "";
-      const difference=actual===""||actual===null||actual===undefined||smaregiStock===null ? "-" : Number(actual)-Number(smaregiStock);
+      const difference=actual===""||actual===null||actual===undefined||smaregiCompareStock===null ? "-" : Number(actual)-Number(smaregiCompareStock);
       detail.innerHTML=`
         <div class="smaregi-cause-shell">
         <div class="smaregi-cause-header">
@@ -1016,7 +1024,7 @@
           <div class="smaregi-cause-summary-operator">−</div>
           <div class="smaregi-cause-summary-card">
             <strong>スマレジ在庫（${safeText(storeLabel)}）</strong>
-            <span class="is-smaregi-stock">${safeText(smaregiRawStock===null?"未取得":smaregiStock)}</span>
+            <span class="is-smaregi-stock">${safeText(smaregiStock===null?"未取得":smaregiStock)}</span>
           </div>
           <div class="smaregi-cause-summary-operator">=</div>
           <div class="smaregi-cause-summary-card is-difference-card">
@@ -1640,9 +1648,10 @@
       : null;
     const comparisonStock=Number(eventBreakdown?.comparisonStock ?? nextActualStock);
     const smaregiStock=getCsvSmaregiStock(item);
+    const smaregiCompareStock=getComparableCsvSmaregiStock(item);
     const payload={
       actual_stock:nextActualStock,
-      difference:Number.isFinite(comparisonStock)&&Number.isFinite(smaregiStock) ? comparisonStock-smaregiStock : nextActualStock-smaregiStock,
+      difference:Number.isFinite(comparisonStock)&&Number.isFinite(smaregiCompareStock) ? comparisonStock-smaregiCompareStock : nextActualStock-smaregiCompareStock,
       checked_by:checkedBy||check.checked_by||"",
       checked_at:checkedAt,
       excluded:false,

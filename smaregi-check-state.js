@@ -444,7 +444,7 @@ async function saveSmaregiCountOnlyActualStock(barcode,button=null){
       snapshot_id:smaregiSnapshot.id,
       barcode,
       actual_stock:actualStock,
-      difference:actualStock-smaregiStock,
+      difference:calculateSmaregiDifference(smaregiStock,actualStock),
       checked_by:checkedBy,
       checked_at:checkedAt,
       excluded:false
@@ -620,7 +620,7 @@ async function saveSmaregiCountOnlyActualStockFromButton(button){
       snapshot_id:smaregiSnapshot.id,
       barcode,
       actual_stock:actualStock,
-      difference:actualStock-smaregiStock,
+      difference:calculateSmaregiDifference(smaregiStock,actualStock),
       checked_by:checkedBy,
       checked_at:checkedAt,
       excluded:false,

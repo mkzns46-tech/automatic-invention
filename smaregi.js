@@ -46,8 +46,17 @@ function getSavedSmaregiStockNumber(item,fallback=0){
   return value===null ? fallback : value;
 }
 
+function getComparableSmaregiStockNumber(itemOrValue,fallback=0){
+  const raw=typeof itemOrValue==="number" || typeof itemOrValue==="string"
+    ? parseSavedSmaregiStockNumber(itemOrValue)
+    : getSavedSmaregiStockValue(itemOrValue);
+  const value=raw===null ? fallback : raw;
+  return value<0 ? 0 : value;
+}
+
 window.getSavedSmaregiStockValue=getSavedSmaregiStockValue;
 window.getSavedSmaregiStockNumber=getSavedSmaregiStockNumber;
+window.getComparableSmaregiStockNumber=getComparableSmaregiStockNumber;
 
 function getSmaregiCheck(barcode){
   const matches=(smaregiStockChecks||[]).filter(c=>String(c.barcode)===String(barcode));
@@ -79,7 +88,7 @@ function getSmaregiActualDifference(item){
 }
 
 function calculateSmaregiDifference(smaregiStock,actualStock){
-  const smaregi=Number(smaregiStock||0);
+  const smaregi=getComparableSmaregiStockNumber(smaregiStock,0);
   const actual=Number(actualStock||0);
   // スマレジ在庫がマイナスでも現物が0なら、棚卸上は差異なしとして扱う。
   return actual-smaregi;
