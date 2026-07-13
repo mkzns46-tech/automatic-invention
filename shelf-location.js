@@ -152,15 +152,13 @@
     const today=state.logs.filter(log=>String(log.created_at||"").slice(0,10)===todayKey);
     const atCode=today.filter(log=>log.after_shelf_code===code && !log.cancelled_at);
     const last=today.find(log=>!log.cancelled_at);
-    const staff=staffName()||"-";
     const summary=$("shelfLocationWorkSummary");
     if(summary){
       summary.innerHTML=`
-        <div class="shelf-summary-hero"><span>棚番登録 作業中</span><strong>${safe(code)}</strong><small>現在の登録先</small></div>
-        <div><span>今回の登録</span><strong>${atCode.length}商品</strong></div>
-        <div><span>最終登録</span><strong>${safe(last?.product_name||"-")}</strong></div>
-        <div><span>最終登録時刻</span><strong>${last?.created_at?fmt(last.created_at):"-"}</strong></div>
-        <div><span>担当者</span><strong>${safe(staff)}</strong></div>
+        <div class="shelf-summary-hero"><span>現在の登録先</span><strong>${safe(code)}</strong></div>
+        <div><span>今回</span><strong>${atCode.length}件</strong></div>
+        <div class="shelf-summary-last-product"><span>最終商品</span><strong>${safe(last?.product_name||"-")}</strong></div>
+        <div><span>最終登録</span><strong>${last?.created_at?fmt(last.created_at):"-"}</strong></div>
       `;
     }
     const counts=new Map();
