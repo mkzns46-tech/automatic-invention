@@ -33,6 +33,7 @@ const INVENTORY_APP_MENU_SECTIONS=[
   ]}
 ];
 INVENTORY_APP_MENU_SECTIONS[1]?.items?.unshift({key:"app-inventory-count",label:"アプリ内棚卸",action:"app-inventory-count"});
+INVENTORY_APP_MENU_SECTIONS[1]?.items?.unshift({key:"shelf-location",label:"棚番登録",action:"shelf-location"});
 const INVENTORY_APP_MENU_FOOTER_ITEMS=[
   {key:"admin-auth",label:"管理者認証",action:"admin-auth"},
   {key:"portal",label:"トップへ戻る",action:"portal"},
@@ -336,6 +337,11 @@ function renderInventoryAppMenu(){
   if(appInventoryCountButton)appInventoryCountButton.addEventListener("click",()=>{
     showInventoryScreen("app-inventory-count","app-inventory-count");
     if(typeof renderAppInventoryCount==="function")renderAppInventoryCount();
+  });
+  const shelfLocationButton=menu.querySelector('[data-menu-action="shelf-location"]');
+  if(shelfLocationButton)shelfLocationButton.addEventListener("click",()=>{
+    showInventoryScreen("shelf-location","shelf-location");
+    if(typeof renderShelfLocation==="function")renderShelfLocation();
   });
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
   if(boothButton)boothButton.addEventListener("click",()=>{

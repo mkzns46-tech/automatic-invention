@@ -78,6 +78,7 @@ function bindEvents(){
 
   on("showAllSelectedHistoryBtn","click",()=>showProductHistoryForBarcode(selectedBarcode));
   updateEquipmentMemoUi();
+  if(typeof bindShelfLocationEvents==="function")bindShelfLocationEvents();
 }
 
 async function startInventoryApp(){

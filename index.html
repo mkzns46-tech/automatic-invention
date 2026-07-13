@@ -272,6 +272,81 @@
       <div>適正在庫目安</div>
     </div>
   </section>
+  <section id="shelfLocationPanel" class="card wide shelf-location-card" data-inventory-screen="shelf-location" hidden>
+    <div class="section-title">
+      <div>
+        <h2>棚番登録</h2>
+        <p class="section-note">棚を回りながら、商品ごとの保管場所を連続登録します。在庫数は変更しません。</p>
+      </div>
+      <div id="shelfLocationHistorySummary" class="badge muted">0件</div>
+    </div>
+
+    <section class="shelf-location-block">
+      <h3>作業条件</h3>
+      <div class="shelf-location-condition-grid">
+        <label>担当者 <span class="required">必須</span><select id="shelfLocationStaff"><option value="">担当者を選択</option></select></label>
+        <label>棚<select id="shelfLocationShelf"></select></label>
+        <label>列<select id="shelfLocationColumn"></select></label>
+        <div class="shelf-location-current">現在の登録先：<strong id="shelfLocationCurrentCode">3-1</strong></div>
+      </div>
+      <div class="button-row">
+        <button type="button" id="shelfLocationPrevColumnBtn" class="secondary">前の列へ</button>
+        <button type="button" id="shelfLocationNextColumnBtn" class="secondary">次の列へ</button>
+      </div>
+      <div id="shelfLocationWorkSummary" class="shelf-location-summary"></div>
+      <div id="shelfLocationShelfCounts" class="shelf-location-counts"></div>
+    </section>
+
+    <section class="shelf-location-block">
+      <h3>商品登録</h3>
+      <div class="shelf-location-input-grid">
+        <label class="shelf-location-scan-label">商品スキャン・バーコード
+          <span class="shelf-location-scan-row">
+            <input id="shelfLocationBarcode" autocomplete="off" placeholder="バーコードをスキャン、または手入力">
+            <button type="button" id="shelfLocationCameraBtn" class="secondary">📷カメラ</button>
+          </span>
+        </label>
+        <label>商品名検索<input id="shelfLocationSearch" autocomplete="off" placeholder="商品名・バーコード・品番など"></label>
+        <label class="product-search-sort-label">並び順<select id="shelfLocationProductSearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label>
+        <div id="shelfLocationSearchResults" class="product-search-results shelf-location-search-results"></div>
+        <button type="button" id="shelfLocationRegisterBtn">登録</button>
+      </div>
+      <div id="shelfLocationCameraArea" class="shelf-location-camera-area" hidden>
+        <video id="shelfLocationVideo" muted playsinline></video>
+        <div class="camera-guide-overlay is-active">
+          <div class="camera-guide-box"><div class="camera-guide-line"></div></div>
+          <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
+        </div>
+        <button type="button" id="shelfLocationCloseCameraBtn" class="secondary">閉じる</button>
+      </div>
+      <div id="shelfLocationProductInfo" class="message">商品をスキャンまたは検索してください。</div>
+      <div id="shelfLocationMessage" class="message"></div>
+    </section>
+
+    <section class="shelf-location-block">
+      <div class="section-title">
+        <h3>棚番登録履歴</h3>
+        <div class="button-row">
+          <button type="button" id="shelfLocationShowTodayBtn" class="secondary">今回の作業履歴のみ</button>
+          <button type="button" id="shelfLocationShowAllBtn" class="secondary">全履歴</button>
+        </div>
+      </div>
+      <div class="shelf-location-filter-grid">
+        <label>商品名・バーコード検索<input id="shelfLocationHistoryProductFilter"></label>
+        <label>棚検索<select id="shelfLocationHistoryShelfFilter"><option value="">すべて</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="H">H</option><option value="I">I</option><option value="J">J</option><option value="K">K</option><option value="L">L</option><option value="M">M</option><option value="N">N</option><option value="O">O</option><option value="P">P</option><option value="Q">Q</option><option value="R">R</option><option value="S">S</option><option value="T">T</option><option value="U">U</option><option value="V">V</option><option value="W">W</option><option value="X">X</option><option value="Y">Y</option><option value="Z">Z</option></select></label>
+        <label>列検索<input id="shelfLocationHistoryColumnFilter" type="number" min="1" max="30"></label>
+        <label>担当者検索<input id="shelfLocationHistoryStaffFilter"></label>
+        <label>日付検索<input id="shelfLocationHistoryDateFilter" type="date"></label>
+        <label>操作内容検索<input id="shelfLocationHistoryActionFilter"></label>
+      </div>
+      <div class="table-wrap shelf-location-table-wrap">
+        <table class="shelf-location-table">
+          <thead><tr><th>登録日時</th><th>商品</th><th>変更前棚番</th><th>変更後棚番</th><th>操作内容</th><th>担当者</th><th>操作</th></tr></thead>
+          <tbody id="shelfLocationHistoryBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </section>
   <section id="appInventoryCountPanel" class="card wide app-inventory-count-card" data-inventory-screen="app-inventory-count" hidden>
     <div class="section-title">
       <div>
@@ -401,6 +476,7 @@
 <script src="./smaregi-check-state.js" defer></script>
 <script src="./booth.js" defer></script>
 <script src="./app-inventory-count.js" defer></script>
+<script src="./shelf-location.js" defer></script>
 <script src="./app.js" defer></script>
 <script src="./smaregi-check-final.js" defer></script>
 

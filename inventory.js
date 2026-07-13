@@ -28,6 +28,7 @@ function render(){
   renderGlobalHistory();
   renderSelectedProductHistory();
   if(typeof renderAppInventoryCount==="function")renderAppInventoryCount();
+  if(typeof renderShelfLocation==="function")renderShelfLocation();
   if(typeof applyLang==='function')setTimeout(applyLang,0);
 }
 

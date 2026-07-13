@@ -6145,3 +6145,178 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     border-radius:10px !important;
   }
 }
+/* Shelf location registration */
+.shelf-location-card{
+  display:block;
+}
+.shelf-location-block{
+  border:1px solid #b8dfc9;
+  border-radius:8px;
+  padding:14px;
+  margin:12px 0;
+  background:#f7fffa;
+}
+.shelf-location-condition-grid,
+.shelf-location-input-grid,
+.shelf-location-filter-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:10px;
+  align-items:end;
+}
+.shelf-location-current{
+  border:1px solid #b8dfc9;
+  border-radius:8px;
+  padding:12px;
+  background:#fff;
+  font-weight:700;
+}
+.shelf-location-current strong{
+  color:#0b5d3b;
+  font-size:1.2rem;
+}
+.shelf-location-summary{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:8px;
+  margin-top:10px;
+}
+.shelf-location-summary div,
+.shelf-location-counts{
+  border:1px solid #d6ebde;
+  border-radius:8px;
+  padding:10px;
+  background:#fff;
+}
+.shelf-location-summary span{
+  display:block;
+  color:#4b6657;
+  font-size:.85rem;
+}
+.shelf-location-summary strong,
+.shelf-history-product strong,
+.shelf-product-info strong{
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.shelf-location-pill{
+  display:inline-flex;
+  padding:5px 8px;
+  margin:3px;
+  border-radius:999px;
+  background:#e2f4e9;
+  color:#0b5d3b;
+  font-weight:700;
+}
+.shelf-location-scan-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+}
+.shelf-location-camera-area{
+  position:relative;
+  margin-top:10px;
+  border-radius:8px;
+  overflow:hidden;
+  background:#10241b;
+}
+.shelf-location-camera-area video{
+  width:100%;
+  max-height:55vh;
+  object-fit:cover;
+}
+.shelf-product-info{
+  display:grid;
+  gap:6px;
+}
+.shelf-product-info ul{
+  margin:0;
+  padding-left:1.2em;
+}
+.shelf-location-table{
+  width:100%;
+  min-width:0;
+  border-collapse:collapse;
+}
+.shelf-location-table th,
+.shelf-location-table td{
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.shelf-history-product small{
+  display:block;
+  color:#4b6657;
+  margin-top:4px;
+}
+.shelf-history-actions{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.shelf-location-table tr.is-cancelled{
+  opacity:.62;
+}
+
+@media (max-width: 760px){
+  body[data-inventory-screen="shelf-location"]{
+    overflow-x:hidden;
+  }
+  .shelf-location-block{
+    padding:12px;
+  }
+  .shelf-location-condition-grid,
+  .shelf-location-input-grid,
+  .shelf-location-filter-grid,
+  .shelf-location-summary{
+    grid-template-columns:1fr;
+  }
+  .shelf-location-scan-row{
+    grid-template-columns:1fr;
+  }
+  .shelf-location-scan-row button,
+  .shelf-location-block .button-row button,
+  .shelf-history-actions button{
+    width:100%;
+  }
+  .shelf-location-table-wrap{
+    overflow-x:hidden;
+    max-height:62vh;
+    overflow-y:auto;
+  }
+  .shelf-location-table,
+  .shelf-location-table tbody,
+  .shelf-location-table tr,
+  .shelf-location-table td{
+    display:block;
+    width:100%;
+  }
+  .shelf-location-table thead{
+    display:none;
+  }
+  .shelf-location-table tr{
+    border:1px solid #b8dfc9;
+    border-radius:8px;
+    margin:10px 0;
+    padding:10px;
+    background:#fff;
+  }
+  .shelf-location-table td{
+    border:0;
+    padding:6px 0;
+  }
+  .shelf-location-table td::before{
+    display:block;
+    color:#4b6657;
+    font-size:.78rem;
+    font-weight:700;
+    margin-bottom:2px;
+  }
+  .shelf-location-table td:nth-child(1)::before{content:"登録日時";}
+  .shelf-location-table td:nth-child(2)::before{content:"商品";}
+  .shelf-location-table td:nth-child(3)::before{content:"変更前";}
+  .shelf-location-table td:nth-child(4)::before{content:"変更後";}
+  .shelf-location-table td:nth-child(5)::before{content:"操作";}
+  .shelf-location-table td:nth-child(6)::before{content:"担当者";}
+  .shelf-location-table td:nth-child(7)::before{content:"操作";}
+}
