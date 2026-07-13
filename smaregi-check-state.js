@@ -193,11 +193,12 @@ function renderSmaregiStockChecks(){
     const checked=!!check;
     const actual=check?.actual_stock??"";
     const comparisonStock=getSmaregiAppStock(barcode);
-    const difference=check&&actual!=="" ? calculateSmaregiDifference(Number(item.smaregi_stock||0),Number(actual||0)) : "";
+    const savedSmaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||0);
+    const difference=check&&actual!=="" ? calculateSmaregiDifference(savedSmaregiStock,Number(actual||0)) : "";
     const status=checked ? "チェック済み" : "未チェック";
     return `<tr class="${checked?"is-checked":"is-unchecked"}">
       <td>${esc(status)}${check?.checked_at?`<div class="smaregi-movement-note">${fmt(check.checked_at)}</div>`:""}</td>
-      <td>${buildInventoryProductIdentityHtml(item)}${getSmaregiMovementSummaryHtml(item)}<div class="smaregi-movement-note">比較用在庫：${esc(comparisonStock)} / スマレジ在庫：${Number(item.smaregi_stock||0)} / 差異：${difference===""?"-":difference}</div></td>
+      <td>${buildInventoryProductIdentityHtml(item)}${getSmaregiMovementSummaryHtml(item)}<div class="smaregi-movement-note">比較用在庫：${esc(comparisonStock)} / スマレジ在庫：${savedSmaregiStock} / 差異：${difference===""?"-":difference}</div></td>
       <td><input type="number" class="smaregi-actual-stock-input" data-barcode="${esc(barcode)}" value="${esc(actual)}"></td>
       <td>
         <button type="button" class="smaregi-row-save-btn" data-barcode="${esc(barcode)}">確認</button>
@@ -332,7 +333,7 @@ function renderSmaregiStockChecks(){
     const actual=check?.actual_stock??"";
     const change=smaregiLatestChangeByBarcode.get(barcode)||{};
     const movementAmount=Number(change.amount||0);
-    const smaregiStock=Number(item.smaregi_stock||change.stock_amount||0);
+    const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||change.stock_amount||0);
     const actualNumber=actual===""||actual===null||typeof actual==="undefined" ? null : Number(actual);
     const diff=actualNumber===null||!Number.isFinite(actualNumber) ? "-" : actualNumber-smaregiStock;
     const status=excluded ? "除外済み" : (checked ? "チェック済み" : "未チェック");
@@ -438,7 +439,7 @@ async function saveSmaregiCountOnlyActualStock(barcode,button=null){
   try{
     if(button)button.disabled=true;
     const checkedAt=new Date().toISOString();
-    const smaregiStock=Number(item.smaregi_stock||0);
+    const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||0);
     const payload={
       snapshot_id:smaregiSnapshot.id,
       barcode,
@@ -613,7 +614,7 @@ async function saveSmaregiCountOnlyActualStockFromButton(button){
   try{
     button.disabled=true;
     const checkedAt=new Date().toISOString();
-    const smaregiStock=Number(item.smaregi_stock||0);
+    const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||0);
     const previousCheck=getSmaregiCheck(barcode);
     const payload={
       snapshot_id:smaregiSnapshot.id,
@@ -840,7 +841,7 @@ function renderSmaregiStockChecks(){
     const actual=check?.actual_stock??"";
     const change=smaregiLatestChangeByBarcode.get(barcode)||{};
     const movementAmount=Number(change.amount||0);
-    const smaregiStock=Number(item.smaregi_stock||change.stock_amount||0);
+    const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||change.stock_amount||0);
     const actualNumber=actual===""||actual===null||typeof actual==="undefined" ? null : Number(actual);
     const diff=actualNumber===null||!Number.isFinite(actualNumber) ? "-" : actualNumber-smaregiStock;
     const status=excluded ? "除外済み" : (checked ? "チェック済み" : "未チェック");
@@ -881,7 +882,8 @@ function getSmaregiDiffItems(){
   return getSmaregiCurrentTargetItems().map(item=>{
     const check=getSmaregiCheck(item.barcode);
     if(!check||check.actual_stock===""||check.actual_stock===null||typeof check.actual_stock==="undefined")return null;
-    const difference=calculateSmaregiDifference(Number(item.smaregi_stock||0),Number(check.actual_stock||0));
+    const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||0);
+    const difference=calculateSmaregiDifference(smaregiStock,Number(check.actual_stock||0));
     return difference ? {item,check,difference} : null;
   }).filter(Boolean);
 }
@@ -1025,7 +1027,7 @@ async function showSmaregiCauseDetail(barcode){
       <div class="smaregi-detail-summary">
         <div><strong>商品名</strong><span>${esc(getSmaregiItemProductName(item))}</span></div>
         <div><strong>バーコード</strong><span>${esc(barcodeLabel)}</span></div>
-        <div><strong>スマレジ在庫</strong><span>${Number(item.smaregi_stock||0)}</span></div>
+        <div><strong>スマレジ在庫</strong><span>${typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||0)}</span></div>
         <div><strong>シート在庫</strong><span>${esc(getSmaregiAppStock(barcode))}</span></div>
         <div><strong>実在庫</strong><span>${check?.actual_stock??"-"}</span></div>
         <div><strong>スマレジ差異</strong><span class="smaregi-difference${difference ? " is-negative" : ""}">${difference??"-"}</span></div>
@@ -1125,7 +1127,7 @@ function renderSmaregiStockChecks(){
     const actual=check?.actual_stock??"";
     const change=smaregiLatestChangeByBarcode.get(barcode)||{};
     const movementAmount=Number(change.amount||0);
-    const currentStock=Number(item.smaregi_stock||change.stock_amount||0);
+    const currentStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||change.stock_amount||0);
     const status=checked ? "チェック済み" : "未チェック";
     const disabled=checked ? "disabled" : "";
     return `<tr class="${checked?"is-checked":"is-unchecked"}">
@@ -1209,7 +1211,7 @@ function renderSmaregiStockChecks(){
     const actual=check?.actual_stock??"";
     const change=smaregiLatestChangeByBarcode.get(barcode)||{};
     const movementAmount=Number(change.amount||0);
-    const smaregiStock=Number(item.smaregi_stock||change.stock_amount||0);
+    const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||change.stock_amount||0);
     const actualNumber=actual===""||actual===null||typeof actual==="undefined" ? null : Number(actual);
     const diff=actualNumber===null||!Number.isFinite(actualNumber) ? "-" : actualNumber-smaregiStock;
     const status=excluded ? "除外済み" : (checked ? "チェック済み" : "未チェック");

@@ -147,11 +147,12 @@
   }
 
   function getTargetSmaregiStock(item){
-    const change=getChangeForItem(item);
     const storeCode=getInventoryStoreCodeSafe();
-    const raw=getStoreStockValue(item,storeCode,true) ?? getStoreStockValue(change,storeCode,true);
+    const raw=typeof window.getSavedSmaregiStockValue==="function"
+      ? window.getSavedSmaregiStockValue(item)
+      : getStoreStockValue(item,storeCode,true);
     if(raw===null)return {raw:null,compare:null,storeCode};
-    return {raw,compare:Math.max(0,raw),storeCode};
+    return {raw,compare:raw,storeCode};
   }
 
   function getStoreDisplayStocks(source){
@@ -164,6 +165,9 @@
   function getCsvSmaregiStock(item){
     return getTargetSmaregiStock(item).compare;
   }
+
+  window.getCsvSmaregiStock=getCsvSmaregiStock;
+  window.getTargetSmaregiStock=getTargetSmaregiStock;
 
   function displayNumber(value,emptyLabel="未入力"){
     if(value===null || value===undefined || String(value)==="")return emptyLabel;
@@ -944,16 +948,16 @@
     });
     const renderChange=(change)=>{
       const changedAt=getChangeDateValue(change);
-      const storeCode=getInventoryStoreCodeSafe();
-      const afterStock=getStoreStockValue(change,storeCode,true);
+      const afterStock=typeof window.getSavedSmaregiStockValue==="function"
+        ? window.getSavedSmaregiStockValue(change)
+        : parseStockNumber(change?.stock_amount);
       const qty=parseStockNumber(change.amount ?? change.movement_quantity);
-      const beforeStock=afterStock===null || qty===null ? null : afterStock-qty;
       const staff=change.staff_name || change.staff || change.operator_name || change.created_by || "-";
       const memo=change.memo || change.movement_reason || change.reason || "-";
       return `<tr>
         <td>${safeText(changedAt && typeof fmt==="function" ? fmt(changedAt) : changedAt || "")}</td>
         <td>${safeText(change.stock_division || change.movement_type || "")}</td>
-        <td>${safeText(beforeStock===null?"-":beforeStock)}</td>
+        <td>${safeText("-")}</td>
         <td class="${signedClass(qty)}">${safeText(qty===null?"-":formatSignedDisplay(qty))}</td>
         <td>${safeText(afterStock===null?"-":afterStock)}</td>
         <td>${safeText(memo)}</td>
@@ -1051,7 +1055,7 @@
             <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>処理前在庫</th><th>数量</th><th>処理後在庫</th><th>備考</th><th>担当者</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
           </section>
         </div>
-        <div class="smaregi-cause-footnote">スマレジ側の「処理前在庫」は、CSVの「変動数」と「対象店舗在庫」から計算しています。処理前在庫 = 処理後在庫 − 変動数</div>
+        <div class="smaregi-cause-footnote">スマレジ側の在庫は、CSV取込時に保存した在庫数をそのまま表示しています。</div>
         </div>
       `;
       const closeButton=document.getElementById("closeSmaregiCauseDetailBtn");

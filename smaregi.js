@@ -12,6 +12,43 @@ let smaregiAutoRefreshBusy=false;
 let smaregiMutationBusy=false;
 let smaregiReasonSummaryRows=[];
 
+function parseSavedSmaregiStockNumber(value){
+  if(value===null||value===undefined||String(value).trim()==="")return null;
+  const number=Number(String(value).replace(/,/g,""));
+  return Number.isFinite(number) ? number : null;
+}
+
+function getSavedSmaregiStockValue(item){
+  const fields=[
+    "smaregi_stock",
+    "smaregi_stock_quantity",
+    "stock_amount",
+    "stock_quantity",
+    "quantity_after",
+    "store_stock",
+    "在庫数"
+  ];
+  for(const field of fields){
+    const value=parseSavedSmaregiStockNumber(item?.[field]);
+    if(value!==null)return value;
+  }
+  const barcode=String(item?.barcode||item?.jan_code||item?.product_code||"").trim();
+  const change=barcode&&smaregiLatestChangeByBarcode instanceof Map ? smaregiLatestChangeByBarcode.get(barcode) : null;
+  for(const field of fields){
+    const value=parseSavedSmaregiStockNumber(change?.[field]);
+    if(value!==null)return value;
+  }
+  return null;
+}
+
+function getSavedSmaregiStockNumber(item,fallback=0){
+  const value=getSavedSmaregiStockValue(item);
+  return value===null ? fallback : value;
+}
+
+window.getSavedSmaregiStockValue=getSavedSmaregiStockValue;
+window.getSavedSmaregiStockNumber=getSavedSmaregiStockNumber;
+
 function getSmaregiCheck(barcode){
   const matches=(smaregiStockChecks||[]).filter(c=>String(c.barcode)===String(barcode));
   if(!matches.length)return null;
@@ -30,7 +67,7 @@ function getSmaregiDisplayCheckedBy(check){
 
 function getSmaregiSheetDifference(item){
   // 参考用：スマレジ在庫とシート在庫の差。棚卸差異の判定には使わない。
-  return Number(item.smaregi_stock||0)-Number(getSmaregiAppStock(item.barcode)||0);
+  return getSavedSmaregiStockNumber(item,0)-Number(getSmaregiAppStock(item.barcode)||0);
 }
 
 function getSmaregiActualDifference(item){
@@ -45,7 +82,6 @@ function calculateSmaregiDifference(smaregiStock,actualStock){
   const smaregi=Number(smaregiStock||0);
   const actual=Number(actualStock||0);
   // スマレジ在庫がマイナスでも現物が0なら、棚卸上は差異なしとして扱う。
-  if(smaregi<0&&actual===0)return 0;
   return actual-smaregi;
 }
 
@@ -82,7 +118,7 @@ function getSmaregiInventoryBreakdown(item,check=getSmaregiCheck(item?.barcode))
   const currentEventStock=getSmaregiCurrentEventStock(item?.barcode);
   const eventStorageStock=getSmaregiEventStorageStock(item?.barcode);
   const comparisonStock=actualStock===null ? null : actualStock+currentEventStock+eventStorageStock;
-  const smaregiStock=Number(item?.smaregi_stock||0);
+  const smaregiStock=getSavedSmaregiStockNumber(item,0);
   const difference=comparisonStock===null ? null : calculateSmaregiDifference(smaregiStock,comparisonStock);
   return {
     actualStock,
@@ -753,7 +789,7 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
     const previousCheck=getSmaregiCheck(barcode);
     const isUpdate=!!previousCheck;
     const comparison_stock=actual_stock+getSmaregiCurrentEventStock(item.barcode)+getSmaregiEventStorageStock(item.barcode);
-    const difference=calculateSmaregiDifference(item.smaregi_stock,comparison_stock);
+    const difference=calculateSmaregiDifference(getSavedSmaregiStockNumber(item,0),comparison_stock);
     const checked_by=getSmaregiCheckerName();
     if(!checked_by){
       showMessage("担当者を選択してください","err");
@@ -818,7 +854,7 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
       barcode,
       productName:item.product_name||"",
       actualStock:actual_stock,
-      smaregiStock:Number(item.smaregi_stock||0),
+      smaregiStock:getSavedSmaregiStockNumber(item,0),
       appStock:getSmaregiAppStock(barcode),
       difference,
       checkedBy:checked_by
@@ -963,7 +999,7 @@ function smaregiCsvRows(differenceOnly=false){
     rows.push([
       item.barcode,
       item.product_name||"",
-      Number(item.smaregi_stock||0),
+      getSavedSmaregiStockNumber(item,0),
       getSmaregiAppStock(item.barcode),
       check?.actual_stock??"",
       difference,
@@ -1005,7 +1041,7 @@ async function loadSmaregiHistoricalDifferenceRows(){
   return checks.map(check=>{
     const item=itemMap.get(`${check.snapshot_id}::${check.barcode}`)||{};
     const difference=check.difference===null||check.difference===undefined||String(check.difference)===""
-      ? calculateSmaregiDifference(item.smaregi_stock,check.actual_stock)
+      ? calculateSmaregiDifference(getSavedSmaregiStockNumber(item,0),check.actual_stock)
       : Number(check.difference);
     return {check,item,difference};
   });
@@ -1022,7 +1058,7 @@ async function smaregiHistoricalDifferenceCsvRows(){
       check.checked_at ? fmt(check.checked_at) : "",
       item.product_name||item.productName||"",
       check.barcode||"",
-      item.smaregi_stock??"",
+      getSavedSmaregiStockValue(item)??"",
       check.actual_stock??"",
       difference,
       getSmaregiDisplayCheckedBy(check),
@@ -1187,7 +1223,7 @@ async function importSmaregiStockCsvFile(file){
           snapshot_id:snapshotId,
           barcode:item.barcode,
           product_name:item.product_name,
-          smaregi_stock:item.smaregi_stock
+          smaregi_stock:getSavedSmaregiStockNumber(item,0)
         })))
       });
     }
