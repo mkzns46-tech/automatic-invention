@@ -5,7 +5,8 @@ function inventoryTypeLabel(type){
     event_delete_return:"イベント削除戻し",
     event_pick:"イベントピック",
     event_close_return:"イベント締め棚戻し",
-    equipment_transfer:"備品転用",
+    equipment_transfer:"商品転用",
+    "備品転用":"商品転用",
     gacha_pick:"ガチャピック",
     gacha_return:"ガチャ戻り"
   };
@@ -604,7 +605,7 @@ function buildGlobalHistoryRows(sourceLogs=logs){
 
 
 function buildHistoryExportRows(sourceLogs){
-  const rows=[["入力日時","区分","担当者","商品名","在庫数","入荷","出荷","現在庫","備考","備品転用確認","確認者","確認日時"]];
+  const rows=[["入力日時","区分","担当者","商品名","在庫数","入荷","出荷","現在庫","備考","商品転用確認","確認者","確認日時"]];
 
   const grouped=new Map();
 
@@ -654,7 +655,7 @@ function buildHistoryExportRows(sourceLogs){
           inQty,
           outQty,
           afterStock,
-          log.memo||"",
+          String(log.memo||"").replace(/備品転用/g,"商品転用"),
           (log.type==="備品転用"||log.type==="equipment_transfer") ? (isEquipmentTransferChecked(log) ? "確認済" : "未確認") : "",
           log.equipment_checked_by||"",
           log.equipment_checked_at ? fmt(log.equipment_checked_at) : ""
@@ -679,7 +680,7 @@ function exportProductHistoryCsv(){
     }
 
     const table=document.getElementById("selectedHistoryBody");
-    const rows=[["入力日時","区分","担当者","商品名","在庫数","入荷","出荷","現在庫","備考","備品転用確認"]];
+    const rows=[["入力日時","区分","担当者","商品名","在庫数","入荷","出荷","現在庫","備考","商品転用確認"]];
 
     if(table){
       [...table.querySelectorAll("tr")].forEach(tr=>{

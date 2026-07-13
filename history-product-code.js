@@ -28,7 +28,7 @@ function isHistoryIncreaseType(type){
   return isInventoryInType(text)
     || text==="入荷"
     || text==="仕入"
-    || text==="備品転用キャンセル"
+    || text==="商品転用キャンセル"
     || text==="イベント戻し"
     || text==="stock_in"
     || text==="equipment_transfer_cancel"
@@ -94,7 +94,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
     if(!row)return "";
     return `<tr>
       <td>${fmt(row.log.created_at)}</td>
-      <td>${esc(String(row.log.memo||"").includes("備品転用キャンセル") ? "備品転用キャンセル" : inventoryTypeLabel(row.log.type))}</td>
+      <td>${esc(String(row.log.memo||"").includes("備品転用キャンセル") ? "商品転用キャンセル" : inventoryTypeLabel(row.log.type))}</td>
       <td>${esc(row.log.staff||"-")}</td>
       <td>${buildHistoryProductCell(barcode,row.log.product_name||"")}</td>
       <td>${row.beforeStock}</td>
@@ -133,7 +133,7 @@ function buildGlobalHistoryRows(sourceLogs=logs){
 
     return `<tr>
       <td>${fmt(log.created_at)}</td>
-      <td>${esc(String(log.memo||"").includes("備品転用キャンセル") ? "備品転用キャンセル" : inventoryTypeLabel(log.type))}</td>
+      <td>${esc(String(log.memo||"").includes("備品転用キャンセル") ? "商品転用キャンセル" : inventoryTypeLabel(log.type))}</td>
       <td>${esc(log.staff||"-")}</td>
       <td>${buildHistoryProductCell(log.barcode,log.product_name||"")}</td>
       <td>${beforeStock}</td>

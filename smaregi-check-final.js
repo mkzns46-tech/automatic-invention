@@ -363,7 +363,7 @@
       <button type="button" class="smaregi-diff-save-btn" data-barcode="${safeText(barcode)}">保存</button>
       <button type="button" class="secondary smaregi-diff-cause-btn" data-barcode="${safeText(barcode)}">原因確認</button>
       <button type="button" class="secondary smaregi-no-issue-btn" data-barcode="${safeText(barcode)}">問題なし</button>
-      ${includeEquipment?`<button type="button" class="secondary smaregi-diff-equipment-btn" data-barcode="${safeText(barcode)}">備品転用</button>`:""}
+      ${includeEquipment?`<button type="button" class="secondary smaregi-diff-equipment-btn" data-barcode="${safeText(barcode)}">商品転用</button>`:""}
       ${includeExclude?`<button type="button" class="secondary smaregi-diff-exclude-btn" data-barcode="${safeText(barcode)}">除外</button>`:""}
     </div>`;
   }
@@ -449,7 +449,7 @@
     if(typeof showInventoryScreen==="function")showInventoryScreen("inventory");
     const typeSelect=document.getElementById("type");
     if(typeSelect){
-      const equipmentOption=[...typeSelect.options].find(option=>option.value==="備品転用" || option.textContent==="備品転用");
+      const equipmentOption=[...typeSelect.options].find(option=>option.value==="備品転用" || option.textContent==="商品転用");
       if(equipmentOption)typeSelect.value=equipmentOption.value;
       typeSelect.dispatchEvent(new Event("change",{bubbles:true}));
     }
@@ -462,8 +462,8 @@
     const qtyInput=document.getElementById("qty");
     if(qtyInput && !String(qtyInput.value||"").trim())qtyInput.value="1";
     const memoInput=document.getElementById("memo");
-    if(memoInput && !String(memoInput.value||"").trim())memoInput.value=`棚卸差異から備品転用 ${getItemName(item)||barcode}`;
-    showMessage?.("備品転用登録に移動しました。数量・担当者・備考を確認して登録してください。","ok");
+    if(memoInput && !String(memoInput.value||"").trim())memoInput.value=`棚卸差異から商品転用 ${getItemName(item)||barcode}`;
+    showMessage?.("商品転用登録に移動しました。数量・担当者・備考を確認して登録してください。","ok");
   }
 
   function readNoIssueReason(){
@@ -900,7 +900,7 @@
       let before=parseStockNumber(log.before_stock ?? log.stock_before ?? log.base_stock_before);
       if(after===null && runningStock!==null)after=runningStock;
       let delta=qty;
-      if(isEquipmentCancelLog || typeValue==="入荷" || typeValue==="蜈･闕ｷ" || typeValue==="stock_in" || typeValue==="event_return" || typeValue==="equipment_transfer_cancel" || typeValue==="備品転用キャンセル"){
+      if(isEquipmentCancelLog || typeValue==="入荷" || typeValue==="蜈･闕ｷ" || typeValue==="stock_in" || typeValue==="event_return" || typeValue==="equipment_transfer_cancel" || typeValue==="商品転用キャンセル"){
         delta=Math.abs(qty);
       }else if(typeValue==="出荷" || typeValue==="備品転用" || typeValue==="蜃ｺ闕ｷ" || typeValue==="蛯吝刀霆｢逕ｨ" || typeValue==="stock_out" || typeValue==="equipment_transfer" || typeValue==="event_pick"){
         delta=qty>0 ? -qty : qty;
@@ -914,7 +914,7 @@
     });
     const renderLog=(log)=>{
       const type=String(log.memo||log.note||"").includes("備品転用キャンセル")
-        ? "備品転用キャンセル"
+        ? "商品転用キャンセル"
         : (INVENTORY_TYPE_LABELS[String(log.type||"").trim()] || log.type || "");
       const staff=log.staff || log.staff_name || log.created_by || "";
       const memo=log.memo || log.note || "";
@@ -1517,11 +1517,12 @@
   }
 
   const INVENTORY_TYPE_LABELS={
-    equipment_transfer:"備品転用",
+    equipment_transfer:"商品転用",
+    "備品転用":"商品転用",
     event_pick:"イベント持出",
     event_return:"イベント戻し",
-    equipment_transfer_cancel:"備品転用キャンセル",
-    "備品転用キャンセル":"備品転用キャンセル",
+    equipment_transfer_cancel:"商品転用キャンセル",
+    "商品転用キャンセル":"商品転用キャンセル",
     stock_adjustment:"在庫修正",
     stock_in:"入荷",
     stock_out:"出荷"
@@ -1542,7 +1543,7 @@
         const typeText=String(typeCell?.textContent||"").trim();
         const memoText=String(memoCell?.textContent||"").trim();
         if(typeCell && memoText.includes("備品転用キャンセル") && (typeText==="備品転用" || typeText==="equipment_transfer")){
-          typeCell.textContent="備品転用キャンセル";
+          typeCell.textContent="商品転用キャンセル";
         }
       });
     });
@@ -1561,7 +1562,7 @@
 
   function isEquipmentTransferTypeValue(value){
     const text=String(value||"").trim();
-    if(text==="equipment_transfer_cancel" || text==="備品転用キャンセル")return false;
+    if(text==="equipment_transfer_cancel" || text==="商品転用キャンセル")return false;
     return text==="備品転用" || text==="equipment_transfer" || text.includes("蛯吝刀");
   }
 
@@ -1569,7 +1570,7 @@
     const type=String(log?.type||"").trim();
     const memo=String(log?.memo||log?.note||"");
     return type==="equipment_transfer_cancel"
-      || type==="備品転用キャンセル"
+      || type==="商品転用キャンセル"
       || memo.includes("備品転用キャンセル")
       || memo.includes("元履歴:");
   }
@@ -1620,7 +1621,7 @@
 
   async function markEquipmentTransferChecked(latestLog,checkedBy){
     const logId=String(latestLog?.id||"");
-    if(!logId)throw new Error("備品転用履歴IDが見つかりません。");
+    if(!logId)throw new Error("商品転用履歴IDが見つかりません。");
     const checkedAt=new Date().toISOString();
     const patch={equipment_checked:true,equipment_checked_at:checkedAt,equipment_checked_by:checkedBy||""};
     const refreshed=await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
@@ -1658,7 +1659,7 @@
       no_issue:true,
       no_issue_by:checkedBy||check.no_issue_by||null,
       no_issue_at:checkedAt,
-      no_issue_reason:check.no_issue_reason||"備品転用キャンセル確認済み",
+      no_issue_reason:check.no_issue_reason||"商品転用キャンセル確認済み",
       difference_reason_category:check.difference_reason_category||null,
       difference_reason_memo:check.difference_reason_memo||"",
       difference_reason_by:check.difference_reason_by||null,
@@ -1692,10 +1693,10 @@
       const logId=String(log?.id||"");
       const latestRows=logId ? await sbAll(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`,1,10000) : [];
       const latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : log;
-      if(!latestLog)throw new Error("備品転用履歴が見つかりません。");
-      if(!isEquipmentTransferTypeValue(latestLog.type))throw new Error("備品転用の履歴ではありません。");
+      if(!latestLog)throw new Error("商品転用履歴が見つかりません。");
+      if(!isEquipmentTransferTypeValue(latestLog.type))throw new Error("商品転用の履歴ではありません。");
       const alreadyChecked=typeof isEquipmentTransferChecked==="function" ? isEquipmentTransferChecked(latestLog) : (latestLog.equipment_checked===true || !!latestLog.equipment_checked_at);
-      if(alreadyChecked)throw new Error("この備品転用は確認済みです。");
+      if(alreadyChecked)throw new Error("この商品転用は確認済みです。");
       const rawQty=Number(latestLog.quantity ?? quantity ?? 1);
       const absQty=Math.abs(Number.isFinite(rawQty) && rawQty!==0 ? rawQty : 1);
       product=product || await fetchProductByBarcode(latestLog.barcode);
@@ -1706,12 +1707,12 @@
         await updateProductCurrentStock(latestLog.barcode,nextStock);
       }
       const refreshedLog=await markEquipmentTransferChecked(latestLog,checkedBy);
-      showMessage?.(`備品転用を確認しました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
-      showPopup?.("備品転用確認完了",`商品名：${product.name||latestLog.product_name||""}\nバーコード：${latestLog.barcode}\n数量：${absQty}\n現在庫：${nextStock}`);
+      showMessage?.(`商品転用を確認しました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
+      showPopup?.("商品転用確認完了",`商品名：${product.name||latestLog.product_name||""}\nバーコード：${latestLog.barcode}\n数量：${absQty}\n現在庫：${nextStock}`);
       return true;
     }catch(error){
       if(button)button.disabled=false;
-      showMessage?.("備品転用確認エラー\n"+error.message,"err");
+      showMessage?.("商品転用確認エラー\n"+error.message,"err");
       return false;
     }
   };
@@ -1719,12 +1720,12 @@
   window.confirmEquipmentTransfer=async function(logId,button){
     if(isEquipmentMobileView())return;
     if(typeof hasInventoryPrivilegedAccess==="function" && !hasInventoryPrivilegedAccess()){
-      showMessage?.("備品転用確認は管理者認証後に実行できます。","err");
+      showMessage?.("商品転用確認は管理者認証後に実行できます。","err");
       return;
     }
     const log=getEquipmentCache(logId);
     if(!log){
-      showMessage?.("備品転用履歴IDが見つかりません。再読み込みしてください。","err");
+      showMessage?.("商品転用履歴IDが見つかりません。再読み込みしてください。","err");
       return;
     }
     const checkedBy=typeof getSmaregiCheckerName==="function" ? getSmaregiCheckerName() : "";
@@ -1739,19 +1740,19 @@
   window.cancelEquipmentTransfer=async function(logId,button){
     if(isEquipmentMobileView())return;
     if(typeof hasInventoryPrivilegedAccess==="function" && !hasInventoryPrivilegedAccess()){
-      showMessage?.("備品転用キャンセルは管理者認証後に実行できます。","err");
+      showMessage?.("商品転用キャンセルは管理者認証後に実行できます。","err");
       return;
     }
     logId=String(logId||"");
     if(!logId){
-      showMessage?.("備品転用履歴IDが見つかりません。再読み込みしてください。","err");
+      showMessage?.("商品転用履歴IDが見つかりません。再読み込みしてください。","err");
       return;
     }
     if(equipmentCancelBusyLogIds.has(logId)){
-      showMessage?.("この備品転用キャンセルは処理中です。完了までお待ちください。","err");
+      showMessage?.("この商品転用キャンセルは処理中です。完了までお待ちください。","err");
       return;
     }
-    const ok=confirm("備品転用をキャンセルし、アプリ在庫を戻します。実行しますか？");
+    const ok=confirm("商品転用をキャンセルし、アプリ在庫を戻します。実行しますか？");
     if(!ok)return;
     let checkedLog=null;
     try{
@@ -1760,12 +1761,12 @@
       button.dataset.cancelBusy="1";
       const latestRows=await sbAll(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`,1,10000);
       const latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : getEquipmentCache(logId);
-      if(!latestLog)throw new Error("備品転用履歴が見つかりません。");
-      if(!isEquipmentTransferTypeValue(latestLog.type))throw new Error("備品転用の履歴ではありません。");
+      if(!latestLog)throw new Error("商品転用履歴が見つかりません。");
+      if(!isEquipmentTransferTypeValue(latestLog.type))throw new Error("商品転用の履歴ではありません。");
       const alreadyChecked=typeof isEquipmentTransferChecked==="function" ? isEquipmentTransferChecked(latestLog) : (latestLog.equipment_checked===true || !!latestLog.equipment_checked_at);
-      if(alreadyChecked)throw new Error("この備品転用はすでに確認終了済みです。再キャンセルはできません。");
+      if(alreadyChecked)throw new Error("この商品転用はすでに確認終了済みです。再キャンセルはできません。");
       const duplicate=await sbAll(`inventory_logs?select=id&barcode=eq.${encodeURIComponent(latestLog.barcode)}&memo=ilike.*${encodeURIComponent(logId)}*&limit=1`,1,10000).catch(()=>[]);
-      if(Array.isArray(duplicate)&&duplicate.length)throw new Error("この備品転用はすでにキャンセル済みです。");
+      if(Array.isArray(duplicate)&&duplicate.length)throw new Error("この商品転用はすでにキャンセル済みです。");
       const product=await fetchProductByBarcode(latestLog.barcode);
       if(!product)throw new Error("商品が見つかりません。");
       const absQty=Math.abs(Number(latestLog.quantity||1))||1;
@@ -1799,8 +1800,8 @@
           logs=logs.map(row=>String(row.id)===String(logId) ? {...row,...checkedLog} : row);
         }
       }catch(_){}
-      showMessage?.(`備品転用をキャンセルしました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
-      showPopup?.("備品転用キャンセル完了",`商品名：${product.name||latestLog.product_name||""}\nバーコード：${latestLog.barcode}\n戻し数量：${absQty}\n現在庫：${nextStock}`);
+      showMessage?.(`商品転用をキャンセルしました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
+      showPopup?.("商品転用キャンセル完了",`商品名：${product.name||latestLog.product_name||""}\nバーコード：${latestLog.barcode}\n戻し数量：${absQty}\n現在庫：${nextStock}`);
       if(typeof renderGlobalHistory==="function")renderGlobalHistory();
       if(typeof selectedBarcode!=="undefined" && selectedBarcode && typeof showProductHistoryForBarcode==="function")showProductHistoryForBarcode(selectedBarcode);
       refreshSmaregiAnalysisAfterEquipmentChange();
@@ -1810,7 +1811,7 @@
         button.disabled=false;
         delete button.dataset.cancelBusy;
       }
-      showMessage?.("備品転用キャンセルエラー\n"+error.message,"err");
+      showMessage?.("商品転用キャンセルエラー\n"+error.message,"err");
       return false;
     }finally{
       equipmentCancelBusyLogIds.delete(logId);
