@@ -1,60 +1,60 @@
-﻿<!doctype html><html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><title>ARICO ARCHERY 在庫管理</title><link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=1"/><link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png?v=1"/><meta name="theme-color" content="#2d6a4f"/><link rel="stylesheet" href="./style.css"/></head><body><div class="app">
-<header><div class="header-brand"><button type="button" id="inventoryMenuToggleBtn" class="inventory-menu-toggle" aria-label="繝｡繝九Η繝ｼ繧帝幕縺・ aria-expanded="false">笘ｰ</button><h1>ARICO ARCHERY 蝨ｨ蠎ｫ邂｡逅・/h1></div><div class="header-actions"><button id="reloadBtn">蜀崎ｪｭ縺ｿ霎ｼ縺ｿ</button></div></header><div class="language-bar"><button type="button" id="langJaBtn">譌･譛ｬ隱・/button><button type="button" id="langKoBtn">﨑懋ｵｭ・ｴ</button></div>
-<div id="smaregiContextBar" class="smaregi-context-bar" aria-label="繧ｹ繝槭Ξ繧ｸ謗･邯壼・蛻・崛"></div>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><title>ARICO ARCHERY 在庫管理</title><link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=1"/><link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png?v=1"/><meta name="theme-color" content="#2d6a4f"/><link rel="stylesheet" href="./style.css"/></head><body><div class="app">
+<header><div class="header-brand"><button type="button" id="inventoryMenuToggleBtn" class="inventory-menu-toggle" aria-label="メニューを開く" aria-expanded="false">☰</button><h1>ARICO ARCHERY 在庫管理</h1></div><div class="header-actions"><button id="reloadBtn">再読み込み</button></div></header><div class="language-bar"><button type="button" id="langJaBtn">日本語</button><button type="button" id="langKoBtn">한국어</button></div>
+<div id="smaregiContextBar" class="smaregi-context-bar" aria-label="スマレジ接続先切替"></div>
 <div class="inventory-app-layout">
 <aside class="inventory-sidebar">
-  <nav id="inventoryAppMenu" class="inventory-app-menu" aria-label="雋ｩ螢ｲ逕ｨ蝨ｨ蠎ｫ邂｡逅・Γ繝九Η繝ｼ"></nav>
+  <nav id="inventoryAppMenu" class="inventory-app-menu" aria-label="販売用在庫管理メニュー"></nav>
 </aside>
-<button type="button" id="inventoryMenuOverlay" class="inventory-menu-overlay" aria-label="繝｡繝九Η繝ｼ繧帝哩縺倥ｋ"></button>
+<button type="button" id="inventoryMenuOverlay" class="inventory-menu-overlay" aria-label="メニューを閉じる"></button>
 <main class="grid">
-<section class="card scanner" id="inventoryRegistrationCard" data-inventory-screen="inventory"><div class="section-title compact-title"><div><h2>蝨ｨ蠎ｫ螟牙虚逋ｻ骭ｲ</h2><p class="section-note">謖√■蜃ｺ縺励・蜈･闕ｷ繝ｻ蝨ｨ蠎ｫ菫ｮ豁｣繝ｻ蛯吝刀霆｢逕ｨ繧定ｨ倬鹸縺励∪縺・/p></div></div><div class="row"><label>蛹ｺ蛻・select id="type"><option value="蜈･闕ｷ">蜈･闕ｷ</option><option value="蜃ｺ闕ｷ">蜃ｺ闕ｷ</option><option value="蝨ｨ蠎ｫ菫ｮ豁｣">蝨ｨ蠎ｫ菫ｮ豁｣</option><option value="蛯吝刀霆｢逕ｨ">蛯吝刀霆｢逕ｨ</option><option value="event_pick">繧､繝吶Φ繝医ヴ繝・け</option></select></label><label id="eventPickEventLabel" hidden>繧､繝吶Φ繝亥錐 <span class="required">蠢・・/span><select id="eventPickEventSelect"><option value="">繧､繝吶Φ繝医ｒ驕ｸ謚・/option></select></label><label>諡・ｽ楢・<span class="required">蠢・・/span><select id="staff"><option value="">諡・ｽ楢・ｒ驕ｸ謚・/option></select><div id="staffPicker" class="staff-picker"></div></label><label>謨ｰ驥・<span class="required">蠢・・/span><input id="qty" type="number" min="1" step="1" placeholder="謨ｰ驥・ required/></label></div><label><span id="memoLabelText">蛯呵・ｼ郁・逕ｱ蜈･蜉帙・騾｣邯壹せ繧ｭ繝｣繝ｳ荳ｭ縺ｯ菫晄戟・・/span><span id="equipmentMemoRequired" class="required equipment-memo-required" hidden>蛯吝刀霆｢逕ｨ譎ゅ・逅・罰蜈･蜉帛ｿ・・/span><input id="memo" placeholder="萓具ｼ壽｣壼査蟾ｮ逡ｰ縲√し繝ｳ繝励Ν菴ｿ逕ｨ縲∽ｸ崎憶霑泌刀縺ｪ縺ｩ"/></label><div class="button-row"><button id="startCameraBtn">繧ｫ繝｡繝ｩ隱ｭ蜿・/button><div class="camera-zoom-row">
-  <label>繧ｫ繝｡繝ｩ繧ｺ繝ｼ繝
+<section class="card scanner" id="inventoryRegistrationCard" data-inventory-screen="inventory"><div class="section-title compact-title"><div><h2>在庫変動登録</h2><p class="section-note">持ち出し・入荷・在庫修正・備品転用を記録します</p></div></div><div class="row"><label>区分<select id="type"><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option><option value="event_pick">イベントピック</option></select></label><label id="eventPickEventLabel" hidden>イベント名 <span class="required">必須</span><select id="eventPickEventSelect"><option value="">イベントを選択</option></select></label><label>担当者 <span class="required">必須</span><select id="staff"><option value="">担当者を選択</option></select><div id="staffPicker" class="staff-picker"></div></label><label>数量 <span class="required">必須</span><input id="qty" type="number" min="1" step="1" placeholder="数量" required/></label></div><label><span id="memoLabelText">備考（自由入力・連続スキャン中は保持）</span><span id="equipmentMemoRequired" class="required equipment-memo-required" hidden>備品転用時は理由入力必須</span><input id="memo" placeholder="例：棚卸差異、サンプル使用、不良返品など"/></label><div class="button-row"><button id="startCameraBtn">カメラ読取</button><div class="camera-zoom-row">
+  <label>カメラズーム
     <input id="cameraZoomRange" type="range" min="1" max="3" step="0.1" value="1.5">
     <span id="cameraZoomValue">1.5x</span>
   </label>
 </div>
-<button id="stopCameraBtn" class="secondary">蛛懈ｭ｢</button></div><div class="camera-area">
+<button id="stopCameraBtn" class="secondary">停止</button></div><div class="camera-area">
   <video id="video" muted playsinline></video>
   <div id="cameraGuideOverlay" class="camera-guide-overlay">
     <div class="camera-guide-box">
       <div class="camera-guide-line"></div>
     </div>
-    <div class="camera-guide-text">襍､邱壹↓繝舌・繧ｳ繝ｼ繝峨ｒ蜷医ｏ縺帙※縺上□縺輔＞</div>
+    <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
   </div>
-</div><div id="qr-reader"></div><form id="manualForm"><div class="inventory-product-search-controls"><label class="product-name-search-label">蝠・刀蜷肴､懃ｴ｢<input id="inventoryProductNameSearchInput" autocomplete="off" placeholder="蝠・刀蜷阪・荳驛ｨ繧貞・蜉・/></label><label class="product-search-sort-label">荳ｦ縺ｳ鬆・select id="inventoryProductSearchSort"><option value="name">蝠・刀蜷埼・/option><option value="barcode">繝舌・繧ｳ繝ｼ繝蛾・/option><option value="location">譽夂分鬆・/option><option value="updated">譛邨よ峩譁ｰ鬆・/option></select></label></div><div id="inventoryProductSearchResults" class="product-search-results"></div><label>繝舌・繧ｳ繝ｼ繝牙・蜉・input id="barcodeInput" autocomplete="off" placeholder="繝舌・繧ｳ繝ｼ繝峨ｒ繧ｹ繧ｭ繝｣繝ｳ縲√∪縺溘・謇句・蜉・/></label><div id="scanProductInfo" class="message"></div><button type="submit">逋ｻ骭ｲ</button></form><div id="message" class="message">襍ｷ蜍穂ｸｭ...</div></section>
+</div><div id="qr-reader"></div><form id="manualForm"><div class="inventory-product-search-controls"><label class="product-name-search-label">商品名検索<input id="inventoryProductNameSearchInput" autocomplete="off" placeholder="商品名の一部を入力"/></label><label class="product-search-sort-label">並び順<select id="inventoryProductSearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label></div><div id="inventoryProductSearchResults" class="product-search-results"></div><label>バーコード入力<input id="barcodeInput" autocomplete="off" placeholder="バーコードをスキャン、または手入力"/></label><div id="scanProductInfo" class="message"></div><button type="submit">登録</button></form><div id="message" class="message">起動中...</div></section>
 <section class="card wide" id="recentRegistrationHistoryCard" data-inventory-screen="inventory">
-  <h2>譛霑代・逋ｻ骭ｲ螻･豁ｴ</h2>
-  <p class="section-note">逶ｴ霑・0莉ｶ縺ｮ蝨ｨ蠎ｫ螟牙虚繧定｡ｨ遉ｺ縺励∪縺吶・/p>
-  <div class="table-wrap"><table><thead><tr><th>蜈･蜉帶律譎・/th><th>蛹ｺ蛻・/th><th>諡・ｽ楢・/th><th>蝠・刀蜷・/th><th>蝨ｨ蠎ｫ謨ｰ</th><th>蜈･闕ｷ</th><th>蜃ｺ闕ｷ</th><th>迴ｾ蝨ｨ蠎ｫ</th><th>蛯呵・/th><th>蛯吝刀霆｢逕ｨ遒ｺ隱・/th></tr></thead><tbody id="recentRegistrationHistoryBody"></tbody></table></div>
+  <h2>最近の登録履歴</h2>
+  <p class="section-note">直近10件の在庫変動を表示します。</p>
+  <div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="recentRegistrationHistoryBody"></tbody></table></div>
 </section>
 <section class="card pc-only-section staff-admin-section" id="staffSettingsCard" data-inventory-screen="settings" hidden>
   <div class="section-title">
-    <h2>諡・ｽ楢・ｮ｡逅・/h2><p class="section-note">諡・ｽ楢・・霑ｽ蜉繝ｻ邱ｨ髮・・蜑企勁繧定｡後＞縺ｾ縺吶ゅせ繝槭・蛛ｴ縺ｮ諡・ｽ楢・・繝ｫ繝繧ｦ繝ｳ縺ｫ繧ょ渚譏縺輔ｌ縺ｾ縺・/p>
-    <div id="staffCountBadge" class="badge">諡・ｽ楢・ｼ・莠ｺ</div>
+    <h2>担当者管理</h2><p class="section-note">担当者の追加・編集・削除を行います。スマホ側の担当者プルダウンにも反映されます</p>
+    <div id="staffCountBadge" class="badge">担当者：0人</div>
   </div>
 
   <form id="staffForm">
-    <label>諡・ｽ楢・錐
-      <input id="staffNameInput" placeholder="萓具ｼ夂伐荳ｭ" />
+    <label>担当者名
+      <input id="staffNameInput" placeholder="例：田中" />
     </label>
-    <label>謇螻槫ｺ苓・ <span class="required">蠢・・/span>
+    <label>所属店舗 <span class="required">必須</span>
       <select id="staffStoreInput">
-        <option value="">蠎苓・繧帝∈謚・/option>
-        <option value="tokyo">譚ｱ莠ｬ</option>
-        <option value="aichi">諢帷衍</option>
-        <option value="nagano">髟ｷ驥・/option>
+        <option value="">店舗を選択</option>
+        <option value="tokyo">東京</option>
+        <option value="aichi">愛知</option>
+        <option value="nagano">長野</option>
       </select>
     </label>
-    <button type="submit">諡・ｽ楢・ｒ霑ｽ蜉</button>
+    <button type="submit">担当者を追加</button>
   </form>
 
   <div class="table-wrap small-table">
     <table>
       <thead>
         <tr>
-          <th>諡・ｽ楢・錐</th>
-          <th>謇螻槫ｺ苓・</th>
-          <th>謫堺ｽ・/th>
+          <th>担当者名</th>
+          <th>所属店舗</th>
+          <th>操作</th>
         </tr>
       </thead>
       <tbody id="staffListBody"></tbody>
@@ -62,84 +62,84 @@
   </div>
 </section>
 
-<section class="card csv-admin-section" id="productImportCard" data-inventory-screen="settings" hidden><h2>繝・・繧ｿ蜿悶ｊ霎ｼ縺ｿ</h2><p class="section-note">蝠・刀繝・・繧ｿ縺ｨ繧ｹ繝槭Ξ繧ｸ螟牙虚蝠・刀繝・・繧ｿ繧貞叙繧願ｾｼ縺ｿ縺ｾ縺・/p>
-<button type="button" id="importSmaregiProductsBtn">蝠・刀繝槭せ繧ｿ繝ｼCSV蜿冶ｾｼ</button>
-<button type="button" id="syncSmaregiStockBtn">繧ｹ繝槭Ξ繧ｸ蝨ｨ蠎ｫ螟牙虚CSV蜿冶ｾｼ</button>
+<section class="card csv-admin-section" id="productImportCard" data-inventory-screen="settings" hidden><h2>データ取り込み</h2><p class="section-note">商品データとスマレジ変動商品データを取り込みます</p>
+<button type="button" id="importSmaregiProductsBtn">商品マスターCSV取込</button>
+<button type="button" id="syncSmaregiStockBtn">スマレジ在庫変動CSV取込</button>
 <input type="file" id="smaregiStockCsvFile" accept=".csv,text/csv" hidden>
-<div class="message csv-mode-message">API蛛懈ｭ｢荳ｭ・修SV驕狗畑荳ｭ・壹せ繝槭Ξ繧ｸAPI縺ｸ縺ｯ謗･邯壹＠縺ｾ縺帙ｓ縲ょ膚蜩√・繧ｹ繧ｿ繝ｼ繝ｻ蝨ｨ蠎ｫ螟牙虚繝・・繧ｿ縺ｯCSV縺ｧ蜿悶ｊ霎ｼ繧薙〒縺上□縺輔＞縲・/div>
+<div class="message csv-mode-message">API停止中／CSV運用中：スマレジAPIへは接続しません。商品マスター・在庫変動データはCSVで取り込んでください。</div>
 <div id="productImportMessage" class="message"></div>
 <details class="csv-admin-details">
-  <summary>邂｡逅・・髄縺第ｩ溯・</summary>
-  <p class="section-note">萓句､門ｯｾ蠢懃畑縺ｮCSV蜿悶ｊ霎ｼ縺ｿ縺ｧ縺吶る壼ｸｸ縺ｯ繧ｹ繝槭Ξ繧ｸ蝠・刀繝槭せ繧ｿ繝ｼ蜿冶ｾｼ繧剃ｽｿ逕ｨ縺励※縺上□縺輔＞縲・/p>
-  <div class="button-row"><label class="file-button">筮・CSV霑ｽ蜉繝ｻ譖ｴ譁ｰ<input type="file" id="csvFile" accept=".csv,text/csv"/></label><button id="downloadSampleCsvBtn" class="secondary">繧ｵ繝ｳ繝励ΝCSV繧偵ム繧ｦ繝ｳ繝ｭ繝ｼ繝・/button></div>
+  <summary>管理者向け機能</summary>
+  <p class="section-note">例外対応用のCSV取り込みです。通常はスマレジ商品マスター取込を使用してください。</p>
+  <div class="button-row"><label class="file-button">⬆ CSV追加・更新<input type="file" id="csvFile" accept=".csv,text/csv"/></label><button id="downloadSampleCsvBtn" class="secondary">サンプルCSVをダウンロード</button></div>
 </details></section>
 <section class="card event-register-settings-card" id="eventRegisterSettingsCard" data-inventory-screen="settings" hidden>
   <div class="section-title">
     <div>
-      <h2>繧､繝吶Φ繝郁ｲｩ螢ｲ逕ｨ繝ｬ繧ｸ險ｭ螳・/h2>
-      <p class="section-note">雋ｩ螢ｲ蜿悶ｊ霎ｼ縺ｿ蟇ｾ雎｡縺ｫ縺吶ｋ繧､繝吶Φ繝医Ξ繧ｸ繧貞ｺ苓・縺斐→縺ｫ險ｭ螳壹＠縺ｾ縺吶よ悴險ｭ螳壹・蝣ｴ蜷医∬ｲｩ螢ｲ蜿悶ｊ霎ｼ縺ｿ縺ｯ螳溯｡後〒縺阪∪縺帙ｓ縲・/p>
+      <h2>イベント販売用レジ設定</h2>
+      <p class="section-note">販売取り込み対象にするイベントレジを店舗ごとに設定します。未設定の場合、販売取り込みは実行できません。</p>
     </div>
   </div>
   <form id="eventRegisterSettingsForm" class="event-register-settings-form">
     <div class="event-register-settings-grid">
       <fieldset>
-        <legend>譚ｱ莠ｬ繧､繝吶Φ繝医Ξ繧ｸ</legend>
-        <label>繝ｬ繧ｸ蜷・input id="tokyoEventRegisterName" placeholder="譚ｱ莠ｬ繧､繝吶Φ繝医Ξ繧ｸ"></label>
-        <label>register_id<input id="tokyoEventRegisterId" placeholder="蠕後〒逋ｻ骭ｲ"></label>
-        <label>terminal_id<input id="tokyoEventTerminalId" placeholder="蠕後〒逋ｻ骭ｲ"></label>
+        <legend>東京イベントレジ</legend>
+        <label>レジ名<input id="tokyoEventRegisterName" placeholder="東京イベントレジ"></label>
+        <label>register_id<input id="tokyoEventRegisterId" placeholder="後で登録"></label>
+        <label>terminal_id<input id="tokyoEventTerminalId" placeholder="後で登録"></label>
       </fieldset>
       <fieldset>
-        <legend>諢帷衍繧､繝吶Φ繝医Ξ繧ｸ</legend>
-        <label>繝ｬ繧ｸ蜷・input id="aichiEventRegisterName" placeholder="諢帷衍繧､繝吶Φ繝医Ξ繧ｸ"></label>
-        <label>register_id<input id="aichiEventRegisterId" placeholder="蠕後〒逋ｻ骭ｲ"></label>
-        <label>terminal_id<input id="aichiEventTerminalId" placeholder="蠕後〒逋ｻ骭ｲ"></label>
+        <legend>愛知イベントレジ</legend>
+        <label>レジ名<input id="aichiEventRegisterName" placeholder="愛知イベントレジ"></label>
+        <label>register_id<input id="aichiEventRegisterId" placeholder="後で登録"></label>
+        <label>terminal_id<input id="aichiEventTerminalId" placeholder="後で登録"></label>
       </fieldset>
     </div>
-    <button type="submit">繧､繝吶Φ繝医Ξ繧ｸ險ｭ螳壹ｒ菫晏ｭ・/button>
+    <button type="submit">イベントレジ設定を保存</button>
   </form>
   <div id="eventRegisterSettingsMessage" class="message"></div>
 </section>
 <section id="smaregiAccuracyPanel" class="card smaregi-accuracy-card" data-inventory-screen="analytics" hidden>
   <div class="section-title">
     <div>
-      <h2>譽壼査邊ｾ蠎ｦ</h2>
-      <p class="section-note">莉頑怦縺ｮ蟾ｮ逡ｰ邇・→蜑肴怦豈斐ｒ遒ｺ隱阪＠縺ｾ縺吶・/p>
+      <h2>棚卸精度</h2>
+      <p class="section-note">今月の差異率と前月比を確認します。</p>
     </div>
-    <div id="smaregiAccuracyBadge" class="badge muted">莉頑怦</div>
+    <div id="smaregiAccuracyBadge" class="badge muted">今月</div>
   </div>
-  <div id="smaregiAccuracyMessage" class="message">譽壼査邊ｾ蠎ｦ繧帝寔險井ｸｭ...</div>
+  <div id="smaregiAccuracyMessage" class="message">棚卸精度を集計中...</div>
   <div class="smaregi-accuracy-compact">
     <div class="smaregi-accuracy-main">
-      <span>譽壼査邊ｾ蠎ｦ</span>
+      <span>棚卸精度</span>
       <strong id="smaregiAccuracyPercent">-</strong>
       <div class="smaregi-accuracy-bar"><div id="smaregiAccuracyFill" style="width:0%"></div></div>
     </div>
-    <div class="smaregi-accuracy-metric"><span>蟾ｮ逡ｰ邇・/span><strong id="smaregiDifferenceRate">0%</strong></div>
-    <div class="smaregi-accuracy-metric"><span>蜑肴怦豈・/span><strong id="smaregiAccuracyChange">-</strong></div>
+    <div class="smaregi-accuracy-metric"><span>差異率</span><strong id="smaregiDifferenceRate">0%</strong></div>
+    <div class="smaregi-accuracy-metric"><span>前月比</span><strong id="smaregiAccuracyChange">-</strong></div>
   </div>
   <div class="smaregi-accuracy-trend">
-    <h3>譽壼査邊ｾ蠎ｦ 譛域ｬ｡謗ｨ遘ｻ</h3>
+    <h3>棚卸精度 月次推移</h3>
     <div id="smaregiAccuracyMonthlyTrend" class="inventory-accuracy-month-scroll">
-      <div class="smaregi-empty">譛域ｬ｡繝・・繧ｿ繧帝寔險井ｸｭ...</div>
+      <div class="smaregi-empty">月次データを集計中...</div>
     </div>
   </div>
 </section>
 <section id="smaregiDifferenceRankingPanel" class="card smaregi-difference-ranking-card" data-inventory-screen="analytics" hidden>
   <div class="section-title">
     <div>
-      <h2>蟾ｮ逡ｰ繝ｩ繝ｳ繧ｭ繝ｳ繧ｰ</h2>
-      <p class="section-note">謖・ｮ壽悄髢灘・縺ｧ蟾ｮ逡ｰ縺悟､壹＞蝠・刀繧堤｢ｺ隱阪＠縺ｾ縺吶・/p>
+      <h2>差異ランキング</h2>
+      <p class="section-note">指定期間内で差異が多い商品を確認します。</p>
     </div>
   </div>
   <div class="smaregi-ranking-filter date-filter-row">
-    <label>髢句ｧ区律<input id="smaregiRankingFromDate" type="date"/></label>
-    <label>邨ゆｺ・律<input id="smaregiRankingToDate" type="date"/></label>
-    <button type="button" id="aggregateSmaregiDifferenceRankingBtn">讀懃ｴ｢繝ｻ蜿肴丐</button>
+    <label>開始日<input id="smaregiRankingFromDate" type="date"/></label>
+    <label>終了日<input id="smaregiRankingToDate" type="date"/></label>
+    <button type="button" id="aggregateSmaregiDifferenceRankingBtn">検索・反映</button>
   </div>
-  <div id="smaregiDifferenceRankingMessage" class="message">蟾ｮ逡ｰ繝ｩ繝ｳ繧ｭ繝ｳ繧ｰ繧帝寔險井ｸｭ...</div>
+  <div id="smaregiDifferenceRankingMessage" class="message">差異ランキングを集計中...</div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>鬆・ｽ・/th><th>蝠・刀繧ｳ繝ｼ繝・/th><th>蝠・刀蜷・/th><th>蟾ｮ逡ｰ蝗樊焚</th><th>蟾ｮ逡ｰ謨ｰ驥・/th><th>荳ｻ縺ｪ蜴溷屏</th></tr></thead>
+      <thead><tr><th>順位</th><th>商品コード</th><th>商品名</th><th>差異回数</th><th>差異数量</th><th>主な原因</th></tr></thead>
       <tbody id="smaregiDifferenceRankingBody"></tbody>
     </table>
   </div>
@@ -147,54 +147,54 @@
 <section id="smaregiCompletionPanel" class="card wide smaregi-completion-analysis-card" data-inventory-screen="analytics" hidden>
   <div class="section-title">
     <div>
-      <h2>繧ｹ繝槭Ξ繧ｸ螟牙虚蝠・刀繝√ぉ繝・け螳御ｺ・/h2>
-      <p class="section-note">邂｡逅・・ｪ崎ｨｼ貂医∩縺ｮ蝣ｴ蜷医・縺ｿ縲√メ繧ｧ繝・け螳御ｺ・→螳御ｺ・ｧ｣髯､繧呈桃菴懊〒縺阪∪縺吶・/p>
+      <h2>スマレジ変動商品チェック完了</h2>
+      <p class="section-note">管理者認証済みの場合のみ、チェック完了と完了解除を操作できます。</p>
     </div>
   </div>
   <div class="smaregi-toolbar smaregi-action-grid">
-    <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">莉雁屓縺ｮ繝√ぉ繝・け繧貞ｮ御ｺ・/button>
+    <button type="button" id="completeSmaregiStockCheckBtn" class="secondary">今回のチェックを完了</button>
   </div>
   <div class="smaregi-reset-panel">
-    <label>繝√ぉ繝・け螳御ｺ・ｧ｣髯､譌･譎・input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
-    <button type="button" id="resetSmaregiCompletionBtn" class="secondary">繝√ぉ繝・け螳御ｺ・ｧ｣髯､・育ｮ｡逅・・・縺ｿ・・/button>
+    <label>チェック完了解除日時<input id="resetSmaregiCompletedAtInput" type="datetime-local"/></label>
+    <button type="button" id="resetSmaregiCompletionBtn" class="secondary">チェック完了解除（管理者のみ）</button>
   </div>
 </section>
 
 
-<section class="mobile-force-history card wide pc-only-section" id="globalHistoryCard" data-inventory-screen="history" hidden><h2>蜈ｨ菴灘ｱ･豁ｴ</h2><div class="history-filter-grid"><label>蛹ｺ蛻・､懃ｴ｢<select id="historyTypeFilter"><option value="">縺吶∋縺ｦ</option><option value="蜈･闕ｷ">蜈･闕ｷ</option><option value="蜃ｺ闕ｷ">蜃ｺ闕ｷ</option><option value="蝨ｨ蠎ｫ菫ｮ豁｣">蝨ｨ蠎ｫ菫ｮ豁｣</option><option value="蛯吝刀霆｢逕ｨ">蛯吝刀霆｢逕ｨ</option><option value="event_pick">繧､繝吶Φ繝医ヴ繝・け</option><option value="event_close_return">繧､繝吶Φ繝育ｷ繧∵｣壽綾縺・/option><option value="gacha_pick">繧ｬ繝√Ε繝斐ャ繧ｯ</option><option value="gacha_return">繧ｬ繝√Ε謌ｻ繧・/option></select></label><label>蝠・刀蜷肴､懃ｴ｢<input id="historyProductFilter" placeholder="蝠・刀蜷阪く繝ｼ繝ｯ繝ｼ繝・/></label><label>諡・ｽ楢・､懃ｴ｢<input id="historyStaffFilter" placeholder="諡・ｽ楢・く繝ｼ繝ｯ繝ｼ繝・/></label><label>蛯呵・､懃ｴ｢<input id="historyMemoFilter" placeholder="蛯呵・く繝ｼ繝ｯ繝ｼ繝・/></label></div><div class="button-row"><button id="allDataCsvBtn" class="secondary">蜈ｨ螻･豁ｴCSV</button><button id="clearFilterBtn" class="secondary">讀懃ｴ｢繧偵け繝ｪ繧｢</button></div><div class="table-wrap"><table><thead><tr><th>蜈･蜉帶律譎・/th><th>蛹ｺ蛻・/th><th>諡・ｽ楢・/th><th>蝠・刀蜷・/th><th>蝨ｨ蠎ｫ謨ｰ</th><th>蜈･闕ｷ</th><th>蜃ｺ闕ｷ</th><th>迴ｾ蝨ｨ蠎ｫ</th><th>蛯呵・/th><th>蛯吝刀霆｢逕ｨ遒ｺ隱・/th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
-<section class="card wide mobile-history-section" id="productHistoryCard" data-inventory-screen="history" hidden><div class="section-title"><h2>蝠・刀蛻･螻･豁ｴ</h2></div><div id="productHistoryContent"><div id="historyRangeBadge" class="badge muted">蝠・刀繧帝∈謚槭＠縺ｦ縺上□縺輔＞</div><div class="history-search-box"><label>蝠・刀螻･豁ｴ讀懃ｴ｢<input id="productHistoryBarcodeInput" placeholder="繝舌・繧ｳ繝ｼ繝峨ｒ蜈･蜉帙∪縺溘・繧ｹ繧ｭ繝｣繝ｳ" />
-<div class="inventory-product-search-controls product-history-search-controls"><label class="product-name-search-label">蝠・刀蜷肴､懃ｴ｢
-  <input id="productNameSearchInput" placeholder="蝠・刀蜷阪・荳驛ｨ繧貞・蜉・ />
-</label><label class="product-search-sort-label">荳ｦ縺ｳ鬆・select id="productHistorySearchSort"><option value="name">蝠・刀蜷埼・/option><option value="barcode">繝舌・繧ｳ繝ｼ繝蛾・/option><option value="location">譽夂分鬆・/option><option value="updated">譛邨よ峩譁ｰ鬆・/option></select></label></div>
-<div id="productSearchResults" class="product-search-results"></div></label></div><div class="history-camera-row"><button type="button" id="historyCameraBtn">繧ｫ繝｡繝ｩ隱ｭ蜿・/button></div><div class="button-row"><button id="productHistoryCsvBtn" type="button">蝠・刀螻･豁ｴCSV</button>
-<button id="showAllSelectedHistoryBtn" class="secondary">蜈ｨ螻･豁ｴ繧定｡ｨ遉ｺ</button></div><div class="table-wrap"><table><thead><tr><th>蜈･蜉帶律譎・/th><th>蛹ｺ蛻・/th><th>諡・ｽ楢・/th><th>蝠・刀蜷・/th><th>蝨ｨ蠎ｫ謨ｰ</th><th>蜈･闕ｷ</th><th>蜃ｺ闕ｷ</th><th>迴ｾ蝨ｨ蠎ｫ</th><th>蛯呵・/th><th>蛯吝刀霆｢逕ｨ遒ｺ隱・/th></tr></thead><tbody id="selectedHistoryBody"></tbody></table></div></div></section>
+<section class="mobile-force-history card wide pc-only-section" id="globalHistoryCard" data-inventory-screen="history" hidden><h2>全体履歴</h2><div class="history-filter-grid"><label>区分検索<select id="historyTypeFilter"><option value="">すべて</option><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">備品転用</option><option value="event_pick">イベントピック</option><option value="event_close_return">イベント締め棚戻し</option><option value="gacha_pick">ガチャピック</option><option value="gacha_return">ガチャ戻り</option></select></label><label>商品名検索<input id="historyProductFilter" placeholder="商品名キーワード"/></label><label>担当者検索<input id="historyStaffFilter" placeholder="担当者キーワード"/></label><label>備考検索<input id="historyMemoFilter" placeholder="備考キーワード"/></label></div><div class="button-row"><button id="allDataCsvBtn" class="secondary">全履歴CSV</button><button id="clearFilterBtn" class="secondary">検索をクリア</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
+<section class="card wide mobile-history-section" id="productHistoryCard" data-inventory-screen="history" hidden><div class="section-title"><h2>商品別履歴</h2></div><div id="productHistoryContent"><div id="historyRangeBadge" class="badge muted">商品を選択してください</div><div class="history-search-box"><label>商品履歴検索<input id="productHistoryBarcodeInput" placeholder="バーコードを入力またはスキャン" />
+<div class="inventory-product-search-controls product-history-search-controls"><label class="product-name-search-label">商品名検索
+  <input id="productNameSearchInput" placeholder="商品名の一部を入力" />
+</label><label class="product-search-sort-label">並び順<select id="productHistorySearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label></div>
+<div id="productSearchResults" class="product-search-results"></div></label></div><div class="history-camera-row"><button type="button" id="historyCameraBtn">カメラ読取</button></div><div class="button-row"><button id="productHistoryCsvBtn" type="button">商品履歴CSV</button>
+<button id="showAllSelectedHistoryBtn" class="secondary">全履歴を表示</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>備品転用確認</th></tr></thead><tbody id="selectedHistoryBody"></tbody></table></div></div></section>
 <section class="card wide smaregi-stock-check-section" id="smaregiStockCheckCard" data-inventory-screen="smaregi" hidden>
   <div class="section-title">
     <div>
-      <h2>繧ｹ繝槭Ξ繧ｸ螟牙虚蝠・刀繝√ぉ繝・け</h2>
-      <p class="section-note">繧ｹ繝槭Ξ繧ｸ蝨ｨ蠎ｫ螟牙虚CSV繧貞叙繧願ｾｼ縺ｿ縲∝､牙虚縺後≠縺｣縺溷膚蜩√ｒ遒ｺ隱阪＠縺ｾ縺吶・/p>
+      <h2>スマレジ変動商品チェック</h2>
+      <p class="section-note">スマレジ在庫変動CSVを取り込み、変動があった商品を確認します。</p>
     </div>
-    <div id="smaregiSnapshotBadge" class="badge muted">繧ｹ繝槭Ξ繧ｸ螟牙虚CSV譛ｪ蜿冶ｾｼ</div>
+    <div id="smaregiSnapshotBadge" class="badge muted">スマレジ変動CSV未取込</div>
   </div>
   <div class="smaregi-progress-row">
     <div class="smaregi-header-staff">
-      <div class="smaregi-header-label">繝√ぉ繝・け諡・ｽ楢・/div>
-      <label><select id="smaregiCheckerName"><option value="">諡・ｽ楢・ｒ驕ｸ謚・/option></select><div id="smaregiCheckerNamePicker" class="staff-picker"></div></label>
+      <div class="smaregi-header-label">チェック担当者</div>
+      <label><select id="smaregiCheckerName"><option value="">担当者を選択</option></select><div id="smaregiCheckerNamePicker" class="staff-picker"></div></label>
     </div>
-    <div id="smaregiProgressBadge" class="badge muted">繝√ぉ繝・け貂医∩・・ / 0</div>
+    <div id="smaregiProgressBadge" class="badge muted">チェック済み：0 / 0</div>
   </div>
   <div class="smaregi-toolbar smaregi-action-grid">
-    <button type="button" id="refreshSmaregiChecksBtn" class="secondary">譛譁ｰ迥ｶ諷九↓譖ｴ譁ｰ</button>
-    <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">蜈ｨ菴鼎SV</button>
+    <button type="button" id="refreshSmaregiChecksBtn" class="secondary">最新状態に更新</button>
+    <button type="button" id="exportSmaregiCheckCsvBtn" class="secondary">全体CSV</button>
   </div>
   <div class="inventory-product-search-controls smaregi-product-search-controls">
-    <label>蝠・刀讀懃ｴ｢<input id="smaregiStockSearchInput" type="text" placeholder="蝠・刀蜷阪・繝舌・繧ｳ繝ｼ繝峨〒讀懃ｴ｢"></label>
-    <label class="product-search-sort-label">荳ｦ縺ｳ鬆・select id="smaregiProductSearchSort"><option value="name">蝠・刀蜷埼・/option><option value="barcode">繝舌・繧ｳ繝ｼ繝蛾・/option><option value="location">譽夂分鬆・/option><option value="updated">譛邨よ峩譁ｰ鬆・/option></select></label>
+    <label>商品検索<input id="smaregiStockSearchInput" type="text" placeholder="商品名・バーコードで検索"></label>
+    <label class="product-search-sort-label">並び順<select id="smaregiProductSearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label>
   </div>
   <div id="smaregiMessage" class="message"></div>
   <div class="table-wrap">
     <table class="smaregi-check-table">
-      <thead><tr><th>蝠・刀諠・ｱ</th><th>螳溷惠蠎ｫ蜈･蜉・/th><th>菫晏ｭ・/th><th>髯､螟・/th></tr></thead>
+      <thead><tr><th>商品情報</th><th>実在庫入力</th><th>保存</th><th>除外</th></tr></thead>
       <tbody id="smaregiStockCheckBody"></tbody>
     </table>
   </div>
@@ -202,23 +202,23 @@
   <section id="smaregiDiffOnlyPanel" class="card wide smaregi-diff-panel smaregi-work-card" data-inventory-screen="analytics" hidden>
     <div class="section-title">
       <div>
-        <h2>蟾ｮ逡ｰ荳隕ｧ</h2>
-        <p class="section-note">蟾ｮ逡ｰ縺ｮ遒ｺ隱阪∝次蝗遒ｺ隱阪∝撫鬘後↑縺怜・逅・∽ｿｮ豁｣菫晏ｭ倥，SV蜃ｺ蜉帙ｒ陦後＞縺ｾ縺吶・/p>
+        <h2>差異一覧</h2>
+        <p class="section-note">差異の確認、原因確認、問題なし処理、修正保存、CSV出力を行います。</p>
       </div>
-      <div id="smaregiDiffSummary" class="badge muted">蟾ｮ逡ｰ・・莉ｶ</div>
+      <div id="smaregiDiffSummary" class="badge muted">差異：0件</div>
     </div>
     <div class="inventory-product-search-controls smaregi-diff-search-controls">
-      <label>蝠・刀讀懃ｴ｢<input id="smaregiDiffProductSearchInput" type="text" placeholder="蝠・刀蜷阪・繝舌・繧ｳ繝ｼ繝峨〒讀懃ｴ｢"></label>
-      <label class="product-search-sort-label">荳ｦ縺ｳ鬆・select id="smaregiDiffProductSearchSort"><option value="name">蝠・刀蜷埼・/option><option value="barcode">繝舌・繧ｳ繝ｼ繝蛾・/option><option value="location">譽夂分鬆・/option><option value="updated">譛邨よ峩譁ｰ鬆・/option></select></label>
+      <label>商品検索<input id="smaregiDiffProductSearchInput" type="text" placeholder="商品名・バーコードで検索"></label>
+      <label class="product-search-sort-label">並び順<select id="smaregiDiffProductSearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label>
     </div>
     <div class="smaregi-date-filter date-filter-row">
-      <label>蟾ｮ逡ｰCSV 髢句ｧ区律<input id="smaregiDiffCsvFromDate" type="date"/></label>
-      <label>邨ゆｺ・律<input id="smaregiDiffCsvToDate" type="date"/></label>
-      <button type="button" id="exportSmaregiDiffCardCsvBtn" class="secondary">蟾ｮ逡ｰCSV蜃ｺ蜉・/button>
+      <label>差異CSV 開始日<input id="smaregiDiffCsvFromDate" type="date"/></label>
+      <label>終了日<input id="smaregiDiffCsvToDate" type="date"/></label>
+      <button type="button" id="exportSmaregiDiffCardCsvBtn" class="secondary">差異CSV出力</button>
     </div>
     <div class="table-wrap">
       <table class="smaregi-check-table smaregi-diff-table">
-        <thead><tr><th>蝠・刀蜷・/th><th>螳溷惠蠎ｫ</th><th>莉雁屓繧､繝吶Φ繝亥惠蠎ｫ</th><th>繧､繝吶Φ繝井ｿ晉ｮ｡蝨ｨ蠎ｫ</th><th>豈碑ｼ・畑蝨ｨ蠎ｫ</th><th>繧ｹ繝槭Ξ繧ｸ蝨ｨ蠎ｫ</th><th>蟾ｮ逡ｰ</th><th>諡・ｽ楢・/th><th>繝√ぉ繝・け譌･譎・/th><th>謫堺ｽ・/th></tr></thead>
+        <thead><tr><th>商品名</th><th>実在庫</th><th>今回イベント在庫</th><th>イベント保管在庫</th><th>比較用在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th></tr></thead>
         <tbody id="smaregiDiffOnlyBody"></tbody>
       </table>
     </div>
@@ -227,20 +227,20 @@
   <section id="smaregiReasonSummaryPanel" class="card wide smaregi-diff-panel smaregi-work-card" data-inventory-screen="analytics" hidden>
     <div class="section-title">
       <div>
-        <h2>蜴溷屏髮・ｨ・/h2>
-        <p class="section-note">謖・ｮ壽悄髢灘・縺ｮ蜴溷屏蛻･繝ｩ繝ｳ繧ｭ繝ｳ繧ｰ繧定｡ｨ遉ｺ縺励∵隼蝟・ｯｾ雎｡繧堤｢ｺ隱阪＠縺ｾ縺吶・/p>
+        <h2>原因集計</h2>
+        <p class="section-note">指定期間内の原因別ランキングを表示し、改善対象を確認します。</p>
       </div>
     </div>
     <div class="smaregi-date-filter date-filter-row">
-      <label>蜴溷屏髮・ｨ・髢句ｧ区律<input id="smaregiReasonFromDate" type="date"/></label>
-      <label>邨ゆｺ・律<input id="smaregiReasonToDate" type="date"/></label>
-      <button type="button" id="aggregateSmaregiReasonSummaryBtn">髮・ｨ・/button>
-      <button type="button" id="exportSmaregiReasonSummaryCsvBtn" class="secondary">髮・ｨ・SV蜃ｺ蜉・/button>
+      <label>原因集計 開始日<input id="smaregiReasonFromDate" type="date"/></label>
+      <label>終了日<input id="smaregiReasonToDate" type="date"/></label>
+      <button type="button" id="aggregateSmaregiReasonSummaryBtn">集計</button>
+      <button type="button" id="exportSmaregiReasonSummaryCsvBtn" class="secondary">集計CSV出力</button>
     </div>
     <div id="smaregiReasonSummaryMessage" class="message"></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>蜴溷屏髮・ｨ医Λ繝ｳ繧ｭ繝ｳ繧ｰ</th><th>莉ｶ謨ｰ</th><th>蟾ｮ逡ｰ謨ｰ驥丞粋險・/th></tr></thead>
+        <thead><tr><th>原因集計ランキング</th><th>件数</th><th>差異数量合計</th></tr></thead>
         <tbody id="smaregiReasonSummaryBody"></tbody>
       </table>
     </div>
@@ -248,10 +248,10 @@
   <section id="boothManagementPanel" class="card wide booth-management-card" data-inventory-screen="booth" hidden>
     <div class="section-title">
       <div>
-        <h2>繧､繝吶Φ繝育ｮ｡逅・/h2>
-        <p class="section-note">繧､繝吶Φ繝井ｽ懈・縺ｨ繧､繝吶Φ繝井ｸ隕ｧ繧堤ｮ｡逅・＠縺ｾ縺吶よ戟縺｡蜃ｺ縺励・繧､繝吶Φ繝亥・蝨ｨ蠎ｫ縺ｨ縺励※險倬鹸縺励√せ繝槭Ξ繧ｸ蝨ｨ蠎ｫ縺ｯ螟画峩縺励∪縺帙ｓ縲・/p>
+        <h2>イベント管理</h2>
+        <p class="section-note">イベント作成とイベント一覧を管理します。持ち出しはイベント内在庫として記録し、スマレジ在庫は変更しません。</p>
       </div>
-      <div class="badge muted">繧､繝吶Φ繝郁ｲｩ螢ｲ</div>
+      <div class="badge muted">イベント販売</div>
     </div>
     <div id="boothMessage" class="message"></div>
     <div id="boothManagementRoot" class="booth-management-root"></div>
@@ -259,105 +259,107 @@
   <section id="boothAnalyticsPanel" class="card wide booth-analytics-card" data-inventory-screen="booth-analytics" hidden>
     <div class="section-title">
       <div>
-        <h2>繧､繝吶Φ繝亥・譫・/h2>
-        <p class="section-note">繧､繝吶Φ繝育ｮ｡逅・・螳溯｣・ｾ後↓繝・・繧ｿ騾｣謳ｺ縺励∪縺吶ら樟蝨ｨ縺ｯ陦ｨ遉ｺ譫縺ｮ縺ｿ縺ｧ縺吶・/p>
+        <h2>イベント分析</h2>
+        <p class="section-note">イベント管理の実装後にデータ連携します。現在は表示枠のみです。</p>
       </div>
-      <div class="badge muted">貅門ｙ荳ｭ</div>
+      <div class="badge muted">準備中</div>
     </div>
     <div class="booth-analytics-placeholder-grid">
-      <div>繧､繝吶Φ繝郁ｲｩ螢ｲ螻･豁ｴ</div>
-      <div>螢ｲ繧後※縺・ｋ蝠・刀繝ｩ繝ｳ繧ｭ繝ｳ繧ｰ</div>
-      <div>螢ｲ繧後※縺・↑縺・膚蜩√Λ繝ｳ繧ｭ繝ｳ繧ｰ</div>
-      <div>谺｡蝗樊戟縺｡蜃ｺ縺玲耳螂ｨ謨ｰ</div>
-      <div>驕ｩ豁｣蝨ｨ蠎ｫ逶ｮ螳・/div>
+      <div>イベント販売履歴</div>
+      <div>売れている商品ランキング</div>
+      <div>売れていない商品ランキング</div>
+      <div>次回持ち出し推奨数</div>
+      <div>適正在庫目安</div>
     </div>
   </section>
   <section id="appInventoryCountPanel" class="card wide app-inventory-count-card" data-inventory-screen="app-inventory-count" hidden>
     <div class="section-title">
       <div>
-        <h2>繧｢繝励Μ蜀・｣壼査</h2>
-        <p class="section-note">繧ｹ繧ｭ繝｣繝ｳ繝ｻ讀懃ｴ｢縺ｧ繧ｫ繧ｦ繝ｳ繝医＠縺溷膚蜩√□縺代ｒ縲∵｣壼査蜑阪・繧｢繝励Μ蝨ｨ蠎ｫ縺ｨ豈碑ｼ・＠縺ｾ縺吶・/p>
+        <h2>アプリ内棚卸</h2>
+        <p class="section-note">スキャン・検索でカウントした商品だけを、棚卸前のアプリ在庫と比較します。</p>
       </div>
-      <div id="appInventoryCountStatus" class="badge muted">譛ｪ髢句ｧ・/div>
+      <div id="appInventoryCountStatus" class="badge muted">未開始</div>
     </div>
     <div class="app-count-session-bar">
-      <label>繧ｻ繝・す繝ｧ繝ｳ蛻・崛<select id="appInventorySessionSelect"><option value="">繧ｻ繝・す繝ｧ繝ｳ繧帝∈謚・/option></select></label>
+      <label>セッション切替<select id="appInventorySessionSelect"><option value="">セッションを選択</option></select></label>
       <div class="app-count-current-session">
-        <span>迴ｾ蝨ｨ縺ｮ繧ｻ繝・す繝ｧ繝ｳ</span>
-        <strong id="appInventoryCurrentSessionName">繧ｻ繝・す繝ｧ繝ｳ譛ｪ驕ｸ謚・/strong>
+        <span>現在のセッション</span>
+        <strong id="appInventoryCurrentSessionName">セッション未選択</strong>
       </div>
-      <label class="inline-check app-count-toggle"><input type="checkbox" id="appInventoryShowEndedSessions">邨ゆｺ・ｸ医∩繧ｻ繝・す繝ｧ繝ｳ繧定｡ｨ遉ｺ</label>
+      <label class="inline-check app-count-toggle"><input type="checkbox" id="appInventoryShowEndedSessions">終了済みセッションを表示</label>
     </div>
     <div class="app-count-staff-row">
-      <label>諡・ｽ楢・<span class="required">蠢・・/span><select id="appInventoryCountStaff"><option value="">諡・ｽ楢・ｒ驕ｸ謚・/option></select><div id="appInventoryCountStaffPicker" class="staff-picker"></div></label>
-      <div class="app-count-current-staff">迴ｾ蝨ｨ縺ｮ諡・ｽ楢・ｼ・strong id="appInventoryCurrentStaffName">譛ｪ驕ｸ謚・/strong></div>
+      <label>担当者 <span class="required">必須</span><select id="appInventoryCountStaff"><option value="">担当者を選択</option></select><div id="appInventoryCountStaffPicker" class="staff-picker"></div></label>
+      <div class="app-count-current-staff">現在の担当者：<strong id="appInventoryCurrentStaffName">未選択</strong></div>
     </div>
     <div class="app-count-toolbar">
-      <label>繧ｻ繝・す繝ｧ繝ｳ蜷・<span class="required">蠢・・/span><input id="appInventorySessionName" placeholder="萓具ｼ・026/07/05 蜊亥燕譽壼査"></label>
-      <label>繝｡繝｢<input id="appInventorySessionMemo" placeholder="萓具ｼ壼ｺ鈴ｭ譽哂縲・aston縲√せ繝医Μ繝ｳ繧ｰ譽壼査"></label>
-      <button type="button" id="startAppInventoryCountBtn">譽壼査髢句ｧ・/button>
-      <button type="button" id="finishAppInventoryCountBtn" class="secondary">譽壼査邨ゆｺ・/button>
-      <button type="button" id="closeAppInventorySessionBtn" class="secondary">繧ｻ繝・す繝ｧ繝ｳ邨ゆｺ・/button>
-      <button type="button" id="deleteAppInventorySessionBtn" class="danger">蜑企勁</button>
+      <label>セッション名 <span class="required">必須</span><input id="appInventorySessionName" placeholder="例：2026/07/05 午前棚卸"></label>
+      <label>メモ<input id="appInventorySessionMemo" placeholder="例：店頭棚A、Easton、ストリング棚卸"></label>
+      <button type="button" id="startAppInventoryCountBtn">棚卸開始</button>
+      <button type="button" id="finishAppInventoryCountBtn" class="secondary">棚卸終了</button>
+      <button type="button" id="closeAppInventorySessionBtn" class="secondary">セッション終了</button>
+      <button type="button" id="deleteAppInventorySessionBtn" class="danger">削除</button>
     </div>
     <div class="app-count-workflow">
       <section class="app-count-block">
-        <h3>繧ｫ繧ｦ繝ｳ繝亥・蜉・/h3>
+        <h3>カウント入力</h3>
         <div class="app-count-input-grid">
-          <label class="app-count-scan-label">蝠・刀繧ｹ繧ｭ繝｣繝ｳ繝ｻ繝舌・繧ｳ繝ｼ繝・span class="app-count-scan-row"><input id="appInventoryCountBarcode" autocomplete="off" placeholder="繝舌・繧ｳ繝ｼ繝峨ｒ繧ｹ繧ｭ繝｣繝ｳ縲√∪縺溘・謇句・蜉・><button type="button" id="appInventoryCameraBtn" class="secondary app-count-camera-btn">胴繧ｫ繝｡繝ｩ</button></span></label>
-          <label>蝠・刀蜷肴､懃ｴ｢<input id="appInventoryCountSearch" autocomplete="off" placeholder="蝠・刀蜷阪・荳驛ｨ繧貞・蜉・></label>
-          <label class="product-search-sort-label app-count-sort-label">荳ｦ縺ｳ鬆・select id="appInventoryProductSearchSort"><option value="name">蝠・刀蜷埼・/option><option value="barcode">繝舌・繧ｳ繝ｼ繝蛾・/option><option value="location">譽夂分鬆・/option><option value="updated">譛邨よ峩譁ｰ鬆・/option></select></label>
+          <label class="app-count-scan-label">商品スキャン・バーコード<span class="app-count-scan-row"><input id="appInventoryCountBarcode" autocomplete="off" placeholder="バーコードをスキャン、または手入力"><button type="button" id="appInventoryCameraBtn" class="secondary app-count-camera-btn">📷カメラ</button></span></label>
+          <label>商品名検索<input id="appInventoryCountSearch" autocomplete="off" placeholder="商品名の一部を入力"></label>
+          <label class="product-search-sort-label app-count-sort-label">並び順<select id="appInventoryProductSearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label>
           <div id="appInventoryCountSearchResults" class="product-search-results app-count-search-results"></div>
-          <label>繧ｫ繧ｦ繝ｳ繝域焚<input id="appInventoryCountQty" type="number" min="0" step="1" inputmode="numeric" placeholder="謨ｰ驥上ｒ蜈･蜉・></label>
-          <button type="button" id="saveAppInventoryCountBtn">逋ｻ骭ｲ</button>
+          <label>カウント数<input id="appInventoryCountQty" type="number" min="0" step="1" inputmode="numeric" placeholder="数量を入力"></label>
+          <button type="button" id="saveAppInventoryCountBtn">登録</button>
         </div>
         <div id="appInventoryCameraArea" class="app-count-camera-area" hidden>
           <video id="appInventoryCountVideo" muted playsinline></video>
           <div class="camera-guide-overlay is-active">
             <div class="camera-guide-box"><div class="camera-guide-line"></div></div>
-            <div class="camera-guide-text">襍､邱壹↓繝舌・繧ｳ繝ｼ繝峨ｒ蜷医ｏ縺帙※縺上□縺輔＞</div>
+            <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
           </div>
-          <button type="button" id="appInventoryCloseCameraBtn" class="secondary">髢峨§繧・/button>
+          <button type="button" id="appInventoryCloseCameraBtn" class="secondary">閉じる</button>
         </div>
-        <div id="appInventoryCameraMessage" class="message">繧ｫ繝｡繝ｩ繧剃ｽｿ縺・ｴ蜷医・譽壼査髢句ｧ句ｾ後↓縲交沒ｷ繧ｫ繝｡繝ｩ縲阪ｒ謚ｼ縺励※縺上□縺輔＞縲・/div>
-        <div id="appInventoryCountProductInfo" class="message">譽壼査髢句ｧ句ｾ後∝膚蜩√ｒ繧ｹ繧ｭ繝｣繝ｳ縺ｾ縺溘・讀懃ｴ｢縺励※縺上□縺輔＞縲・/div>
+        <div id="appInventoryCameraMessage" class="message">カメラを使う場合は棚卸開始後に「📷カメラ」を押してください。</div>
+        <div id="appInventoryCountProductInfo" class="message">棚卸開始後、商品をスキャンまたは検索してください。</div>
       </section>
       <section class="app-count-block">
-        <h3>譽壼査蜑阪い繝励Μ蝨ｨ蠎ｫ豈碑ｼ・/h3>
+        <h3>棚卸前アプリ在庫比較</h3>
         <div class="button-row">
-          <button type="button" id="compareAppInventoryCountBtn" class="secondary">蟾ｮ逡ｰ豈碑ｼ・/button>
+          <button type="button" id="compareAppInventoryCountBtn" class="secondary">差異比較</button>
         </div>
         <div id="appInventoryCountCsvInfo" class="message">棚卸終了後、差異比較を実行できます。</div>
+      </section>
+    </div>
     <section class="app-count-block">
       <div class="section-title">
-        <h3>繧ｫ繧ｦ繝ｳ繝域ｸ医∩蝠・刀</h3>
-        <div id="appInventoryCountSummary" class="badge muted">0莉ｶ</div>
+        <h3>カウント済み商品</h3>
+        <div id="appInventoryCountSummary" class="badge muted">0件</div>
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table">
-          <thead><tr><th>蝠・刀蜷・/th><th>繝舌・繧ｳ繝ｼ繝・/th><th>繧ｫ繧ｦ繝ｳ繝域焚</th><th>諡・ｽ楢・/th><th>菫晏ｭ俶律譎・/th><th>驥崎､・/th></tr></thead>
+          <thead><tr><th>商品名</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>重複</th></tr></thead>
           <tbody id="appInventoryCountBody"></tbody>
         </table>
       </div>
     </section>
     <section class="app-count-block">
       <div class="section-title">
-        <h3>驥崎､・｢ｺ隱・/h3>
-        <div id="appInventoryDuplicateSummary" class="badge muted">驥崎､・↑縺・/div>
+        <h3>重複確認</h3>
+        <div id="appInventoryDuplicateSummary" class="badge muted">重複なし</div>
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table app-count-duplicate-table">
-          <thead><tr><th>蝠・刀蜷・/th><th>繝舌・繧ｳ繝ｼ繝・/th><th>繧ｫ繧ｦ繝ｳ繝域焚</th><th>諡・ｽ楢・/th><th>菫晏ｭ俶律譎・/th><th>謗｡逕ｨ</th></tr></thead>
+          <thead><tr><th>商品名</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>採用</th></tr></thead>
           <tbody id="appInventoryDuplicateBody"></tbody>
         </table>
       </div>
     </section>
     <section class="app-count-block">
       <div class="section-title">
-        <h3>蟾ｮ逡ｰ荳隕ｧ</h3>
+        <h3>差異一覧</h3>
         <div class="app-count-title-actions">
-          <label class="inline-check app-count-toggle"><input type="checkbox" id="appInventoryShowReflectedDiffs">蜿肴丐貂医∩繧定｡ｨ遉ｺ</label>
-          <div id="appInventoryDiffSummary" class="badge muted">譛ｪ豈碑ｼ・/div>
+          <label class="inline-check app-count-toggle"><input type="checkbox" id="appInventoryShowReflectedDiffs">反映済みを表示</label>
+          <div id="appInventoryDiffSummary" class="badge muted">未比較</div>
         </div>
       </div>
       <div class="table-wrap app-count-table-wrap">
@@ -369,17 +371,17 @@
     </section>
     <section class="app-count-block app-count-history-block">
       <div class="section-title">
-        <h3>譽壼査螻･豁ｴ</h3>
-        <div id="appInventoryHistorySummary" class="badge muted">0莉ｶ</div>
+        <h3>棚卸履歴</h3>
+        <div id="appInventoryHistorySummary" class="badge muted">0件</div>
       </div>
       <div class="app-count-history-filter">
-        <label>繧ｻ繝・す繝ｧ繝ｳ蜷肴､懃ｴ｢<input id="appInventoryHistoryNameFilter" placeholder="繧ｻ繝・す繝ｧ繝ｳ蜷・></label>
-        <label>諡・ｽ楢・､懃ｴ｢<input id="appInventoryHistoryStaffFilter" placeholder="諡・ｽ楢・></label>
-        <label>譌･莉俶､懃ｴ｢<input id="appInventoryHistoryDateFilter" type="date"></label>
+        <label>セッション名検索<input id="appInventoryHistoryNameFilter" placeholder="セッション名"></label>
+        <label>担当者検索<input id="appInventoryHistoryStaffFilter" placeholder="担当者"></label>
+        <label>日付検索<input id="appInventoryHistoryDateFilter" type="date"></label>
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table app-count-history-table">
-          <thead><tr><th>繧ｻ繝・す繝ｧ繝ｳ蜷・/th><th>諡・ｽ楢・/th><th>髢句ｧ区律譎・/th><th>譽壼査邨ゆｺ・律譎・/th><th>繧ｻ繝・す繝ｧ繝ｳ邨ゆｺ・律譎・/th><th>繧ｫ繧ｦ繝ｳ繝亥膚蜩∵焚</th><th>驥崎､・ｻｶ謨ｰ</th><th>蟾ｮ逡ｰ莉ｶ謨ｰ</th><th>譖ｴ譁ｰ莉ｶ謨ｰ</th><th>繧ｹ繝・・繧ｿ繧ｹ</th></tr></thead>
+          <thead><tr><th>セッション名</th><th>担当者</th><th>開始日時</th><th>棚卸終了日時</th><th>セッション終了日時</th><th>カウント商品数</th><th>重複件数</th><th>差異件数</th><th>更新件数</th><th>ステータス</th></tr></thead>
           <tbody id="appInventoryHistoryBody"></tbody>
         </table>
       </div>
@@ -387,7 +389,7 @@
   </section>
 </main>
 </div>
-<footer>ﾂｩ ARICO ARCHERY 蝨ｨ蠎ｫ邂｡逅・/footer></div>
+<footer>© ARICO ARCHERY 在庫管理</footer></div>
 <script src="./auth.js" defer></script>
 <script src="./core.js" defer></script>
 <script src="./inventory.js" defer></script>
@@ -404,7 +406,7 @@
 
 <div id="appPopup" class="app-popup" style="display:none;">
   <div class="app-popup-card">
-    <div id="appPopupTitle" class="app-popup-title">螳御ｺ・/div>
+    <div id="appPopupTitle" class="app-popup-title">完了</div>
     <div id="appPopupBody" class="app-popup-body"></div>
     <button type="button" id="appPopupClose">OK</button>
   </div>
