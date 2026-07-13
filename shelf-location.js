@@ -220,7 +220,7 @@
     if(!product?.barcode)return;
     await sb(`products?barcode=eq.${encodeURIComponent(product.barcode)}`,{
       method:"PATCH",
-      body:JSON.stringify({location,updated_at:new Date().toISOString()})
+      body:JSON.stringify({location})
     });
     product.location=location;
   }
