@@ -1714,6 +1714,24 @@ header h1{
   display:block;
   margin-top:12px;
 }
+
+.inventory-product-search-controls{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(150px,190px);
+  gap:10px;
+  align-items:end;
+}
+
+.inventory-product-search-controls .product-name-search-label,
+.inventory-product-search-controls .product-search-sort-label{
+  margin-top:12px;
+}
+
+.product-search-sort-label select{
+  min-height:48px;
+  font-size:15px;
+}
+
 #productNameSearchInput{
   margin-top:8px;
 }
@@ -2736,6 +2754,8 @@ body[data-inventory-screen="analytics"] #smaregiReasonSummaryPanel:not([hidden])
 
 @media(max-width:800px){
   .product-search-results,#productSearchResults,#productFormSearchResults,#inventoryProductSearchResults{max-height:230px !important;}
+  .inventory-product-search-controls{grid-template-columns:1fr;}
+  .product-search-sort-label select{min-height:54px;font-size:17px;}
   #staff,#smaregiCheckerName,#checkerName{min-height:56px;font-size:18px;}
   .camera-zoom-row label{grid-template-columns:1fr;}
   #cameraZoomValue{text-align:left;}

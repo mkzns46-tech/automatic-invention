@@ -71,6 +71,41 @@ function normalizeSearchText(s){
   return String(s||"").trim().replace(/\s+/g," ");
 }
 
+const INVENTORY_PRODUCT_SEARCH_SORT_KEY="arico_inventory_product_search_sort";
+
+function getInventoryProductSearchSort(){
+  const value=String(el("inventoryProductSearchSort")?.value||localStorage.getItem(INVENTORY_PRODUCT_SEARCH_SORT_KEY)||"name");
+  return ["name","barcode","location","updated"].includes(value) ? value : "name";
+}
+
+function getProductUpdatedTime(product){
+  const value=product?.updated_at||product?.modified_at||product?.created_at||"";
+  const time=value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function sortProductsForDisplay(rows,mode="name"){
+  const collator=new Intl.Collator("ja-JP",{numeric:true,sensitivity:"base"});
+  return [...(Array.isArray(rows)?rows:[])].sort((a,b)=>{
+    if(mode==="barcode"){
+      return collator.compare(String(a?.barcode||""),String(b?.barcode||""));
+    }
+    if(mode==="location"){
+      const al=String(a?.location||"").trim();
+      const bl=String(b?.location||"").trim();
+      if(!al&&bl)return 1;
+      if(al&&!bl)return -1;
+      return collator.compare(al,bl)||collator.compare(String(a?.name||""),String(b?.name||""));
+    }
+    if(mode==="updated"){
+      return getProductUpdatedTime(b)-getProductUpdatedTime(a)||collator.compare(String(a?.name||""),String(b?.name||""));
+    }
+    return collator.compare(String(a?.name||""),String(b?.name||""));
+  });
+}
+
+window.sortProductsForDisplay=sortProductsForDisplay;
+
 async function searchProductsByName(keyword){
   keyword=normalizeSearchText(keyword);
   if(!keyword || keyword.length<2)return [];
@@ -173,6 +208,7 @@ let inventoryProductSearchTimer=null;
 function renderInventoryProductSearchResults(rows){
   const box=el("inventoryProductSearchResults");
   if(!box)return;
+  rows=sortProductsForDisplay(rows,getInventoryProductSearchSort());
 
   if(!rows || !rows.length){
     box.innerHTML='<div class="product-search-item"><strong>該当商品なし</strong><span>別のキーワードで検索してください</span></div>';
@@ -232,6 +268,20 @@ function handleInventoryProductNameSearchInput(){
     renderInventoryProductSearchResults(rows);
   },250);
 }
+
+function bindInventoryProductSearchSort(){
+  const select=el("inventoryProductSearchSort");
+  if(!select)return;
+  select.value=getInventoryProductSearchSort();
+  select.onchange=()=>{
+    localStorage.setItem(INVENTORY_PRODUCT_SEARCH_SORT_KEY,select.value||"name");
+    handleInventoryProductNameSearchInput();
+  };
+}
+
+window.addEventListener("DOMContentLoaded",bindInventoryProductSearchSort);
+window.addEventListener("load",bindInventoryProductSearchSort);
+setTimeout(bindInventoryProductSearchSort,500);
 
 function renderProductSearchResults(rows){
   const box=el("productSearchResults");
