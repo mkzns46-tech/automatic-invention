@@ -35,6 +35,96 @@
     }
     if(typeof showMessage==="function" && text)showMessage(text,type);
   }
+  function shelfChoices(){
+    return [...Array.from({length:15},(_,i)=>String(i+1)),...Array.from({length:26},(_,i)=>String.fromCharCode(65+i))];
+  }
+  function columnChoices(){
+    return Array.from({length:30},(_,i)=>String(i+1));
+  }
+  function buildShelfCode(shelf,column){
+    return `${String(shelf||"").trim()}-${Math.max(1,Math.min(30,Number(column)||1))}`;
+  }
+  function playShelfSuccess(){
+    if(typeof playSuccessSound==="function")playSuccessSound();
+  }
+  function isLatestOwnAddLog(log){
+    if(!log || log.cancelled_at || log.action_type!=="棚番追加")return false;
+    const staff=staffName();
+    if(!staff || log.staff!==staff)return false;
+    const latest=state.logs
+      .filter(row=>!row.cancelled_at && row.staff===staff && row.action_type==="棚番追加")
+      .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];
+    return latest && String(latest.id)===String(log.id);
+  }
+  function canCancelLog(log){
+    return !!log && !log.cancelled_at && log.action_type!=="取消" && (isAdmin() || isLatestOwnAddLog(log));
+  }
+  function canUseAdminHistoryAction(log){
+    return !!log && !log.cancelled_at && log.action_type!=="取消" && !!log.after_shelf_code && isAdmin();
+  }
+  function requestShelfSelection({title,summary="",initialShelf=null,initialColumn=null,confirmText="実行"}={}){
+    return new Promise(resolve=>{
+      const overlay=document.createElement("div");
+      overlay.className="shelf-location-dialog-backdrop";
+      const shelves=shelfChoices();
+      const columns=columnChoices();
+      const current=normalizeShelfCode(initialShelf&&initialColumn?buildShelfCode(initialShelf,initialColumn):shelfCode())||shelfCode();
+      const [currentShelf,currentColumn]=current.split("-");
+      overlay.innerHTML=`
+        <div class="shelf-location-dialog" role="dialog" aria-modal="true">
+          <h3>${safe(title||"棚番を選択")}</h3>
+          <div class="shelf-location-dialog-summary">${summary}</div>
+          <div class="shelf-location-dialog-grid">
+            <label>棚<select data-shelf-dialog-shelf>${shelves.map(v=>`<option value="${v}" ${v===currentShelf?"selected":""}>${v}</option>`).join("")}</select></label>
+            <label>列<select data-shelf-dialog-column>${columns.map(v=>`<option value="${v}" ${v===String(Number(currentColumn||1))?"selected":""}>${v}</option>`).join("")}</select></label>
+            <div class="shelf-location-dialog-target">変更先：<strong data-shelf-dialog-target></strong></div>
+          </div>
+          <div class="button-row shelf-location-dialog-actions">
+            <button type="button" class="secondary" data-shelf-dialog-cancel>キャンセル</button>
+            <button type="button" data-shelf-dialog-ok>${safe(confirmText)}</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const shelfSelect=overlay.querySelector("[data-shelf-dialog-shelf]");
+      const columnSelect=overlay.querySelector("[data-shelf-dialog-column]");
+      const target=overlay.querySelector("[data-shelf-dialog-target]");
+      const update=()=>{target.textContent=buildShelfCode(shelfSelect.value,columnSelect.value);};
+      const close=value=>{overlay.remove(); resolve(value);};
+      shelfSelect.addEventListener("change",update);
+      columnSelect.addEventListener("change",update);
+      overlay.querySelector("[data-shelf-dialog-cancel]").onclick=()=>close("");
+      overlay.querySelector("[data-shelf-dialog-ok]").onclick=()=>close(buildShelfCode(shelfSelect.value,columnSelect.value));
+      update();
+      shelfSelect.focus();
+    });
+  }
+  function requestPrimaryReplacement(loc,others){
+    return new Promise(resolve=>{
+      const overlay=document.createElement("div");
+      overlay.className="shelf-location-dialog-backdrop";
+      overlay.innerHTML=`
+        <div class="shelf-location-dialog" role="dialog" aria-modal="true">
+          <h3>次の主棚番を選択してください</h3>
+          <div class="shelf-location-dialog-summary">
+            <p>この棚番は主棚番です。削除後に主棚番にする棚番を選択してください。</p>
+            <p><strong>削除する棚番：</strong>${safe(loc.shelf_code)}</p>
+          </div>
+          <label>次の主棚番
+            <select data-shelf-primary-next>${others.map(row=>`<option value="${safe(row.id)}">${safe(row.shelf_code)}</option>`).join("")}</select>
+          </label>
+          <div class="button-row shelf-location-dialog-actions">
+            <button type="button" class="secondary" data-shelf-dialog-cancel>キャンセル</button>
+            <button type="button" class="danger" data-shelf-dialog-ok>削除して主棚番を変更</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const select=overlay.querySelector("[data-shelf-primary-next]");
+      const close=value=>{overlay.remove(); resolve(value);};
+      overlay.querySelector("[data-shelf-dialog-cancel]").onclick=()=>close("");
+      overlay.querySelector("[data-shelf-dialog-ok]").onclick=()=>close(select.value);
+      select.focus();
+    });
+  }
   function shelfCode(){
     const shelf=String($("shelfLocationShelf")?.value||localStorage.getItem(STORAGE.shelf)||"3").trim();
     const col=Number($("shelfLocationColumn")?.value||localStorage.getItem(STORAGE.column)||1);
@@ -115,8 +205,9 @@
       box.innerHTML="商品をスキャンまたは検索してください。";
       return;
     }
+    const admin=isAdmin();
     const current=state.locations.length
-      ? state.locations.map(loc=>`<li><span>${safe(loc.shelf_code)}${loc.is_primary?"（主棚番）":""}</span> <button type="button" class="secondary" data-shelf-primary="${safe(loc.id)}">主棚番に設定</button> <button type="button" class="danger" data-shelf-delete="${safe(loc.id)}">削除</button></li>`).join("")
+      ? state.locations.map(loc=>`<li><span>${safe(loc.shelf_code)}${loc.is_primary?"（主棚番）":""}</span>${admin?` <button type="button" class="secondary" data-shelf-primary="${safe(loc.id)}">主棚番に設定</button> <button type="button" class="danger" data-shelf-delete="${safe(loc.id)}">削除</button>`:""}</li>`).join("")
       : "<li>未登録</li>";
     box.innerHTML=`
       <div class="shelf-product-info">
@@ -285,16 +376,37 @@
     if(!requireAdmin())return;
     const loc=state.locations.find(row=>String(row.id)===String(locationId));
     if(!loc||!state.product)return;
-    if(!confirm(`${loc.shelf_code}を削除します。よろしいですか？`))return;
     const staff=staffName()||"管理者";
     const others=state.locations.filter(row=>String(row.id)!==String(locationId));
+    let nextPrimary=null;
     if(loc.is_primary && others.length){
-      showShelfMessage("主棚番を削除する前に、他の棚番を主棚番に設定してください。","err");
+      const nextId=await requestPrimaryReplacement(loc,others);
+      if(!nextId)return;
+      nextPrimary=others.find(row=>String(row.id)===String(nextId));
+      if(!nextPrimary){showShelfMessage("次の主棚番が見つかりません。","err"); return;}
+      if(!confirm(`${loc.shelf_code}を削除し、${nextPrimary.shelf_code}を主棚番にします。よろしいですか？`))return;
+    }else if(!confirm(`${loc.shelf_code}を削除します。よろしいですか？`)){
       return;
     }
-    await sb(`product_locations?id=eq.${encodeURIComponent(loc.id)}`,{method:"DELETE"});
-    if(loc.is_primary)await patchProductLocation(state.product,"");
-    await insertLocationLog({product_id:state.product.id||null,barcode:loc.barcode,product_name:state.product.name||"",action_type:"棚番削除",before_shelf_code:loc.shelf_code,after_shelf_code:"",staff});
+    try{
+      if(nextPrimary){
+        await sb(`product_locations?barcode=eq.${encodeURIComponent(loc.barcode)}`,{method:"PATCH",body:JSON.stringify({is_primary:false,updated_by:staff,updated_at:new Date().toISOString()})});
+        await sb(`product_locations?id=eq.${encodeURIComponent(nextPrimary.id)}`,{method:"PATCH",body:JSON.stringify({is_primary:true,updated_by:staff,updated_at:new Date().toISOString()})});
+        await sb(`product_locations?id=eq.${encodeURIComponent(loc.id)}`,{method:"DELETE"});
+        await patchProductLocation(state.product,nextPrimary.shelf_code);
+      }else{
+        await sb(`product_locations?id=eq.${encodeURIComponent(loc.id)}`,{method:"DELETE"});
+        if(loc.is_primary)await patchProductLocation(state.product,"");
+      }
+    }catch(error){
+      if(nextPrimary){
+        await sb(`product_locations?id=eq.${encodeURIComponent(loc.id)}`,{method:"PATCH",body:JSON.stringify({is_primary:true,updated_by:staff,updated_at:new Date().toISOString()})}).catch(()=>null);
+        await patchProductLocation(state.product,loc.shelf_code).catch(()=>null);
+      }
+      showShelfMessage("棚番削除エラー。\n"+error.message,"err");
+      return;
+    }
+    await insertLocationLog({product_id:state.product.id||null,barcode:loc.barcode,product_name:state.product.name||"",action_type:"棚番削除",before_shelf_code:loc.shelf_code,after_shelf_code:nextPrimary?.shelf_code||"",staff});
     await selectProduct(state.product);
     await loadShelfLocationLogs();
     showShelfMessage(`${loc.shelf_code}を削除しました`,"ok");
@@ -302,8 +414,13 @@
   async function cancelLog(logId){
     const log=state.logs.find(row=>String(row.id)===String(logId));
     if(!log)return;
+    if(log.cancelled_at){showShelfMessage("この履歴は取消済みです。","err"); return;}
     const currentStaff=staffName();
-    if(log.staff!==currentStaff && !requireAdmin())return;
+    if(!canCancelLog(log)){
+      if(isAdmin())showShelfMessage("取消できない履歴です。","err");
+      else showShelfMessage("通常担当者が取消できるのは、自分の直前の棚番追加のみです。","err");
+      return;
+    }
     if(!confirm("この履歴を取消し、棚番状態を戻します。よろしいですか？"))return;
     const staff=currentStaff||"担当者";
     await revertLogChange(log,staff);
@@ -344,20 +461,32 @@
   async function promptChangeFromLog(logId,bulk=false){
     const log=state.logs.find(row=>String(row.id)===String(logId));
     if(!log)return;
-    if(bulk && !requireAdmin())return;
-    const to=prompt("変更先棚番を入力してください（例：3-2、B-4）",shelfCode());
-    const normalized=normalizeShelfCode(to);
+    if(!requireAdmin())return;
+    if(log.cancelled_at){showShelfMessage("取消済み履歴は変更できません。","err"); return;}
+    const [initialShelf,initialColumn]=String(log.after_shelf_code||shelfCode()).split("-");
+    const normalized=await requestShelfSelection({
+      title:bulk ? "この時点以降を棚番変更" : "棚番変更",
+      initialShelf,
+      initialColumn,
+      summary:bulk
+        ? `<p>変更元：<strong>${safe(log.after_shelf_code||"")}</strong></p><p>対象条件：同じ担当者、同じ作業日、同じ変更前棚番、選択した履歴日時以降</p>`
+        : `<p><strong>${safe(log.product_name||"")}</strong></p><p>バーコード：${safe(log.barcode||"")}</p><p>変更前棚番：${safe(log.after_shelf_code||"")}</p><p>担当者：${safe(log.staff||"")}</p>`,
+      confirmText:"変更先を選択"
+    });
     if(!normalized){showShelfMessage("棚番形式が正しくありません","err"); return;}
     const staff=staffName()||"担当者";
     if(!bulk){
       const product=await findProductByCode(log.barcode);
+      if(!confirm(`棚番を変更します。\n\n商品名：${product?.name||log.product_name||""}\nバーコード：${log.barcode||""}\n変更前棚番：${log.after_shelf_code||""}\n変更後棚番：${normalized}\n担当者：${staff}`))return;
       const ok=await changeProductShelf(product,log.after_shelf_code,normalized,staff);
       if(ok)showShelfMessage(`${product.name||log.product_name}を${normalized}へ変更しました`,"ok");
     }else{
       const day=String(log.created_at||"").slice(0,10);
       const targets=state.logs.filter(row=>!row.cancelled_at && row.staff===log.staff && String(row.created_at||"").slice(0,10)===day && row.after_shelf_code===log.after_shelf_code && new Date(row.created_at)>=new Date(log.created_at));
       const names=targets.map(row=>`・${row.product_name||row.barcode}`).join("\n");
-      if(!confirm(`${targets.length}件の商品を${log.after_shelf_code}から${normalized}へ変更します。\n\n${names}`))return;
+      const start=targets[targets.length-1]?.created_at||log.created_at;
+      const end=targets[0]?.created_at||log.created_at;
+      if(!confirm(`一括棚番変更を実行します。\n\n変更前棚番：${log.after_shelf_code}\n変更後棚番：${normalized}\n対象件数：${targets.length}件\n対象担当者：${log.staff||""}\n対象日時範囲：${fmt(start)} ～ ${fmt(end)}\n\n${names}`))return;
       let count=0;
       for(const row of targets){
         const product=await findProductByCode(row.barcode);
@@ -414,7 +543,14 @@
       body.innerHTML='<tr><td colspan="8">履歴はありません。</td></tr>';
       return;
     }
-    body.innerHTML=rows.map(log=>`
+    body.innerHTML=rows.map(log=>{
+      const actions=[];
+      if(canCancelLog(log))actions.push(`<button type="button" data-shelf-cancel="${safe(log.id)}" class="secondary">取消</button>`);
+      if(canUseAdminHistoryAction(log)){
+        actions.push(`<button type="button" data-shelf-change="${safe(log.id)}" class="secondary">棚番変更</button>`);
+        actions.push(`<button type="button" data-shelf-bulk="${safe(log.id)}" class="secondary">この時点以降を棚番変更</button>`);
+      }
+      return `
       <tr class="${log.cancelled_at?"is-cancelled":""}">
         <td>${fmt(log.created_at)}</td>
         <td class="shelf-history-product"><strong>${safe(log.product_name||"")}</strong><small>バーコード：${safe(log.barcode||"")}</small></td>
@@ -422,12 +558,9 @@
         <td>${safe(log.after_shelf_code||"")}</td>
         <td><span class="badge muted">${safe(log.action_type||"")}</span>${log.cancelled_at?'<span class="badge">取消済</span>':""}</td>
         <td>${safe(log.staff||"")}</td>
-        <td class="shelf-history-actions">
-          <button type="button" data-shelf-cancel="${safe(log.id)}" class="secondary">取消</button>
-          <button type="button" data-shelf-change="${safe(log.id)}" class="secondary">棚番変更</button>
-          <button type="button" data-shelf-bulk="${safe(log.id)}" class="secondary">この時点以降を棚番変更</button>
-        </td>
-      </tr>`).join("");
+        <td class="shelf-history-actions">${actions.join("")||'<span class="muted-text">操作なし</span>'}</td>
+      </tr>`;
+    }).join("");
     body.querySelectorAll("[data-shelf-cancel]").forEach(btn=>btn.onclick=()=>cancelLog(btn.dataset.shelfCancel));
     body.querySelectorAll("[data-shelf-change]").forEach(btn=>btn.onclick=()=>promptChangeFromLog(btn.dataset.shelfChange,false));
     body.querySelectorAll("[data-shelf-bulk]").forEach(btn=>btn.onclick=()=>promptChangeFromLog(btn.dataset.shelfBulk,true));
@@ -444,11 +577,10 @@
     const shelf=$("shelfLocationShelf");
     const col=$("shelfLocationColumn");
     if(shelf && !shelf.options.length){
-      const shelves=[...Array.from({length:15},(_,i)=>String(i+1)),...Array.from({length:26},(_,i)=>String.fromCharCode(65+i))];
-      shelf.innerHTML=shelves.map(v=>`<option value="${v}">${v}</option>`).join("");
+      shelf.innerHTML=shelfChoices().map(v=>`<option value="${v}">${v}</option>`).join("");
     }
     if(col && !col.options.length){
-      col.innerHTML=Array.from({length:30},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join("");
+      col.innerHTML=columnChoices().map(v=>`<option value="${v}">${v}</option>`).join("");
     }
     if(shelf)shelf.value=localStorage.getItem(STORAGE.shelf)||"3";
     if(col)col.value=localStorage.getItem(STORAGE.column)||"1";
