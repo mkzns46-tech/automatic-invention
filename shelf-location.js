@@ -152,13 +152,15 @@
     const today=state.logs.filter(log=>String(log.created_at||"").slice(0,10)===todayKey);
     const atCode=today.filter(log=>log.after_shelf_code===code && !log.cancelled_at);
     const last=today.find(log=>!log.cancelled_at);
+    const staff=staffName()||"-";
     const summary=$("shelfLocationWorkSummary");
     if(summary){
       summary.innerHTML=`
-        <div><span>現在の登録先</span><strong>${safe(code)}</strong></div>
-        <div><span>今回登録</span><strong>${atCode.length}商品</strong></div>
-        <div><span>最終登録商品</span><strong>${safe(last?.product_name||"-")}</strong></div>
+        <div class="shelf-summary-hero"><span>棚番登録 作業中</span><strong>${safe(code)}</strong><small>現在の登録先</small></div>
+        <div><span>今回の登録</span><strong>${atCode.length}商品</strong></div>
+        <div><span>最終登録</span><strong>${safe(last?.product_name||"-")}</strong></div>
         <div><span>最終登録時刻</span><strong>${last?.created_at?fmt(last.created_at):"-"}</strong></div>
+        <div><span>担当者</span><strong>${safe(staff)}</strong></div>
       `;
     }
     const counts=new Map();
@@ -508,7 +510,7 @@
     const params=["select=*","order=created_at.desc","limit=500"];
     const rows=await sbAll(`product_location_logs?${params.join("&")}`,1000,5000).catch(error=>{
       const body=$("shelfLocationHistoryBody");
-      if(body)body.innerHTML=`<tr><td colspan="7">棚番履歴テーブルを確認してください：${safe(error.message)}</td></tr>`;
+      if(body)body.innerHTML=`<tr><td colspan="6">棚番履歴テーブルを確認してください：${safe(error.message)}</td></tr>`;
       return [];
     });
     state.logs=Array.isArray(rows)?rows:[];
@@ -540,9 +542,11 @@
     const body=$("shelfLocationHistoryBody");
     const summary=$("shelfLocationHistorySummary");
     if(summary)summary.textContent=`${rows.length}件`;
+    $("shelfLocationShowTodayBtn")?.classList.toggle("is-active",state.historyMode==="today");
+    $("shelfLocationShowAllBtn")?.classList.toggle("is-active",state.historyMode==="all");
     if(!body)return;
     if(!rows.length){
-      body.innerHTML='<tr><td colspan="8">履歴はありません。</td></tr>';
+      body.innerHTML='<tr><td colspan="6">履歴はありません。</td></tr>';
       return;
     }
     body.innerHTML=rows.map(log=>{
@@ -550,15 +554,16 @@
       if(canCancelLog(log))actions.push(`<button type="button" data-shelf-cancel="${safe(log.id)}" class="secondary">取消</button>`);
       if(canUseAdminHistoryAction(log)){
         actions.push(`<button type="button" data-shelf-change="${safe(log.id)}" class="secondary">棚番変更</button>`);
-        actions.push(`<button type="button" data-shelf-bulk="${safe(log.id)}" class="secondary">この時点以降を棚番変更</button>`);
+        actions.push(`<button type="button" data-shelf-bulk="${safe(log.id)}" class="secondary">この時点以降を変更</button>`);
       }
+      const product={name:log.product_name||"",barcode:log.barcode||"",location:log.after_shelf_code||log.before_shelf_code||""};
+      const actionClass=String(log.action_type||"").includes("削除")?"is-delete":String(log.action_type||"").includes("主棚番")?"is-primary":String(log.action_type||"").includes("取消")?"is-cancel":String(log.action_type||"").includes("一括")?"is-bulk":"is-add";
       return `
       <tr class="${log.cancelled_at?"is-cancelled":""}">
         <td>${fmt(log.created_at)}</td>
-        <td class="shelf-history-product"><strong>${safe(log.product_name||"")}</strong><small>バーコード：${safe(log.barcode||"")}</small></td>
-        <td>${safe(log.before_shelf_code||"未登録")}</td>
-        <td>${safe(log.after_shelf_code||"")}</td>
-        <td><span class="badge muted">${safe(log.action_type||"")}</span>${log.cancelled_at?'<span class="badge">取消済</span>':""}</td>
+        <td class="shelf-history-product">${buildProductIdentityHtml(product)}</td>
+        <td class="shelf-history-change"><span class="shelf-before">${safe(log.before_shelf_code||"未登録")}</span><span class="shelf-arrow">↓</span><span class="shelf-after">${safe(log.after_shelf_code||"")}</span></td>
+        <td><span class="shelf-action-badge ${actionClass}">${safe(log.action_type||"")}</span>${log.cancelled_at?'<span class="shelf-action-badge is-cancelled">取消済み</span>':""}</td>
         <td>${safe(log.staff||"")}</td>
         <td class="shelf-history-actions">${actions.join("")||'<span class="muted-text">操作なし</span>'}</td>
       </tr>`;

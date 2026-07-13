@@ -6157,13 +6157,18 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 /* Shelf location registration */
 .shelf-location-card{
   display:block;
+  padding:18px;
 }
 .shelf-location-block{
   border:1px solid #b8dfc9;
-  border-radius:8px;
-  padding:14px;
-  margin:12px 0;
+  border-radius:12px;
+  padding:16px;
+  margin:14px 0;
   background:#f7fffa;
+  box-shadow:0 2px 12px rgba(13,74,49,.06);
+}
+.shelf-location-block h3{
+  margin-top:0;
 }
 .shelf-location-condition-grid,
 .shelf-location-input-grid,
@@ -6174,19 +6179,40 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   align-items:end;
 }
 .shelf-location-input-grid{
-  grid-template-columns:minmax(220px,1fr) minmax(280px,1.15fr) minmax(180px,.75fr) minmax(150px,.65fr);
+  grid-template-columns:minmax(260px,1.3fr) minmax(180px,.65fr);
+  align-items:start;
 }
-.shelf-location-input-grid > label:nth-child(1){grid-column:1;grid-row:1;}
-.shelf-location-input-grid > label:nth-child(2){grid-column:2;grid-row:1;}
-.shelf-location-input-grid > label:nth-child(3){grid-column:3;grid-row:1;}
-.shelf-location-input-grid > #shelfLocationRegisterBtn{grid-column:4;grid-row:1;}
+.shelf-location-input-grid > label:nth-child(1){grid-column:1 / -1;grid-row:5;}
+.shelf-location-input-grid > label:nth-child(2){grid-column:1;grid-row:2;}
+.shelf-location-input-grid > label:nth-child(3){grid-column:2;grid-row:4;}
+.shelf-location-input-grid > #shelfLocationRegisterBtn{
+  grid-column:1 / -1;
+  grid-row:8;
+  min-height:56px;
+  font-size:18px;
+}
 .shelf-location-search-results{
-  grid-column:2 / 4;
-  grid-row:2;
+  grid-column:1;
+  grid-row:3;
   width:100%;
   max-width:100%;
   align-self:start;
   justify-self:stretch;
+}
+.shelf-location-input-grid > label:nth-child(2)::before{
+  content:"商品登録";
+  display:block;
+  margin:0 0 8px;
+  color:#0b5d3b;
+  font-size:16px;
+  font-weight:900;
+}
+.shelf-location-input-grid > label:nth-child(1)::before{
+  content:"バーコード入力";
+  display:block;
+  margin:0 0 6px;
+  color:#0b5d3b;
+  font-weight:900;
 }
 .shelf-location-current{
   border:1px solid #b8dfc9;
@@ -6194,23 +6220,38 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   padding:12px;
   background:#fff;
   font-weight:700;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
 }
 .shelf-location-current strong{
   color:#0b5d3b;
-  font-size:1.2rem;
+  font-size:1.65rem;
 }
 .shelf-location-summary{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
-  gap:8px;
+  grid-template-columns:minmax(220px,1.3fr) repeat(4,minmax(150px,1fr));
+  gap:10px;
   margin-top:10px;
 }
 .shelf-location-summary div,
 .shelf-location-counts{
   border:1px solid #d6ebde;
-  border-radius:8px;
-  padding:10px;
+  border-radius:10px;
+  padding:12px;
   background:#fff;
+}
+.shelf-location-summary .shelf-summary-hero{
+  background:#0b5d3b;
+  color:#fff;
+}
+.shelf-location-summary .shelf-summary-hero span,
+.shelf-location-summary .shelf-summary-hero small{
+  color:#e7f8ef;
+}
+.shelf-location-summary .shelf-summary-hero strong{
+  color:#fff;
+  font-size:2.1rem;
 }
 .shelf-location-summary span{
   display:block;
@@ -6252,15 +6293,34 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 .shelf-product-info{
   display:grid;
   gap:6px;
+  border:1px solid #d6ebde;
+  border-radius:10px;
+  padding:12px;
+  background:#fff;
+  margin-top:12px;
 }
 .shelf-product-info ul{
   margin:0;
   padding-left:1.2em;
 }
+.shelf-product-info > strong{
+  font-size:1.08rem;
+}
 .shelf-location-table{
   width:100%;
   min-width:0;
   border-collapse:collapse;
+  table-layout:fixed;
+}
+.shelf-location-table th:nth-child(1){width:130px;}
+.shelf-location-table th:nth-child(2){width:34%;}
+.shelf-location-table th:nth-child(3){width:140px;}
+.shelf-location-table th:nth-child(4){width:120px;}
+.shelf-location-table th:nth-child(5){width:120px;}
+.shelf-location-table th:nth-child(6){width:190px;}
+.shelf-location-table-wrap{
+  max-height:none;
+  overflow-x:hidden;
 }
 .shelf-location-table th,
 .shelf-location-table td{
@@ -6273,10 +6333,58 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   color:#4b6657;
   margin-top:4px;
 }
+.shelf-history-change{
+  display:grid;
+  gap:4px;
+}
+.shelf-before,
+.shelf-after{
+  display:inline-flex;
+  width:fit-content;
+  max-width:100%;
+  border-radius:999px;
+  padding:4px 9px;
+  font-weight:900;
+}
+.shelf-before{
+  background:#edf2f0;
+  color:#4b6657;
+}
+.shelf-after{
+  background:#d8f3dc;
+  color:#0b5d3b;
+}
+.shelf-arrow{
+  color:#4b6657;
+  font-weight:900;
+}
+.shelf-action-badge{
+  display:inline-flex;
+  align-items:center;
+  width:fit-content;
+  max-width:100%;
+  border-radius:999px;
+  padding:5px 10px;
+  margin:2px 4px 2px 0;
+  font-size:12px;
+  font-weight:900;
+}
+.shelf-action-badge.is-add{background:#d8f3dc;color:#0b5d3b;}
+.shelf-action-badge.is-primary{background:#dbeafe;color:#1d4ed8;}
+.shelf-action-badge.is-delete{background:#fee2e2;color:#991b1b;}
+.shelf-action-badge.is-bulk{background:#fef3c7;color:#92400e;}
+.shelf-action-badge.is-cancel,
+.shelf-action-badge.is-cancelled{background:#e5e7eb;color:#374151;}
 .shelf-history-actions{
-  display:flex;
+  display:grid;
+  grid-template-columns:1fr;
   gap:6px;
-  flex-wrap:wrap;
+}
+.shelf-history-actions button{
+  margin:0;
+  padding:8px 10px;
+  border-radius:8px;
+  font-size:13px;
 }
 .shelf-location-table tr.is-cancelled{
   opacity:.62;
@@ -6406,4 +6514,240 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   .shelf-location-table td:nth-child(5)::before{content:"操作";}
   .shelf-location-table td:nth-child(6)::before{content:"担当者";}
   .shelf-location-table td:nth-child(7)::before{content:"操作";}
+}
+
+/* Shelf location UI polish: layout only */
+body[data-inventory-screen="shelf-location"] .shelf-location-card{
+  display:grid;
+  gap:14px;
+  padding:18px;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-card > .section-title{
+  margin-bottom:0;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-block{
+  margin:0;
+  border-radius:12px;
+  background:#fbfffd;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-block:nth-of-type(1){
+  display:grid;
+  gap:12px;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-summary{
+  order:-2;
+  grid-template-columns:minmax(220px,1.4fr) repeat(4,minmax(130px,1fr));
+  margin:0;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-condition-grid{
+  grid-template-columns:minmax(220px,1.2fr) minmax(90px,.45fr) minmax(90px,.45fr) minmax(150px,.7fr);
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-block:nth-of-type(1) > .button-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+body[data-inventory-screen="shelf-location"] #shelfLocationPrevColumnBtn{
+  background:#dcebe1;
+  color:#0b5d3b;
+}
+body[data-inventory-screen="shelf-location"] #shelfLocationNextColumnBtn{
+  background:#2d6a4f;
+  color:#fff;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-counts{
+  margin-top:0;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-input-grid{
+  grid-template-columns:minmax(280px,1.2fr) minmax(180px,.55fr);
+  gap:12px;
+  align-items:start;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-input-grid > label:nth-child(2){
+  grid-column:1;
+  grid-row:1;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-search-results{
+  grid-column:1;
+  grid-row:2;
+  margin-top:-4px;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-input-grid > label:nth-child(3){
+  grid-column:2;
+  grid-row:1;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-input-grid > label:nth-child(1){
+  grid-column:1 / -1;
+  grid-row:3;
+}
+body[data-inventory-screen="shelf-location"] #shelfLocationRegisterBtn{
+  grid-column:1 / -1;
+  grid-row:4;
+  min-height:58px;
+  margin-top:0;
+  font-size:18px;
+}
+body[data-inventory-screen="shelf-location"] #shelfLocationProductInfo{
+  margin-top:12px;
+}
+body[data-inventory-screen="shelf-location"] #shelfLocationMessage:empty{
+  display:none;
+}
+body[data-inventory-screen="shelf-location"] .section-title .button-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+body[data-inventory-screen="shelf-location"] #shelfLocationShowTodayBtn,
+body[data-inventory-screen="shelf-location"] #shelfLocationShowAllBtn{
+  margin:0;
+  border:1px solid #b8dfc9;
+}
+body[data-inventory-screen="shelf-location"] #shelfLocationShowTodayBtn.is-active,
+body[data-inventory-screen="shelf-location"] #shelfLocationShowAllBtn.is-active{
+  background:#2d6a4f;
+  color:#fff;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-filter-grid{
+  grid-template-columns:repeat(3,minmax(180px,1fr));
+  margin:12px 0 14px;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-table-wrap{
+  max-height:min(58vh,620px);
+  overflow-y:auto;
+  overflow-x:hidden;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-table{
+  table-layout:fixed;
+}
+body[data-inventory-screen="shelf-location"] .shelf-location-table th:nth-child(1){width:130px;}
+body[data-inventory-screen="shelf-location"] .shelf-location-table th:nth-child(2){width:36%;}
+body[data-inventory-screen="shelf-location"] .shelf-location-table th:nth-child(3){width:150px;}
+body[data-inventory-screen="shelf-location"] .shelf-location-table th:nth-child(4){width:120px;}
+body[data-inventory-screen="shelf-location"] .shelf-location-table th:nth-child(5){width:120px;}
+body[data-inventory-screen="shelf-location"] .shelf-location-table th:nth-child(6){width:190px;}
+body[data-inventory-screen="shelf-location"] .shelf-history-product strong,
+body[data-inventory-screen="shelf-location"] .shelf-history-product small{
+  display:block;
+}
+body[data-inventory-screen="shelf-location"] .shelf-history-change{
+  display:grid;
+  gap:4px;
+}
+body[data-inventory-screen="shelf-location"] .shelf-before,
+body[data-inventory-screen="shelf-location"] .shelf-after{
+  display:inline-flex;
+  width:fit-content;
+  max-width:100%;
+  border-radius:999px;
+  padding:4px 9px;
+  font-weight:900;
+}
+body[data-inventory-screen="shelf-location"] .shelf-before{
+  background:#edf2f0;
+  color:#4b6657;
+}
+body[data-inventory-screen="shelf-location"] .shelf-after{
+  background:#d8f3dc;
+  color:#0b5d3b;
+}
+body[data-inventory-screen="shelf-location"] .shelf-arrow{
+  color:#4b6657;
+  font-weight:900;
+}
+body[data-inventory-screen="shelf-location"] .shelf-action-badge{
+  display:inline-flex;
+  align-items:center;
+  width:fit-content;
+  max-width:100%;
+  border-radius:999px;
+  padding:5px 10px;
+  margin:2px 4px 2px 0;
+  font-size:12px;
+  font-weight:900;
+}
+body[data-inventory-screen="shelf-location"] .shelf-action-badge.is-add{background:#d8f3dc;color:#0b5d3b;}
+body[data-inventory-screen="shelf-location"] .shelf-action-badge.is-primary{background:#dbeafe;color:#1d4ed8;}
+body[data-inventory-screen="shelf-location"] .shelf-action-badge.is-delete{background:#fee2e2;color:#991b1b;}
+body[data-inventory-screen="shelf-location"] .shelf-action-badge.is-bulk{background:#fef3c7;color:#92400e;}
+body[data-inventory-screen="shelf-location"] .shelf-action-badge.is-cancel,
+body[data-inventory-screen="shelf-location"] .shelf-action-badge.is-cancelled{background:#e5e7eb;color:#374151;}
+body[data-inventory-screen="shelf-location"] .shelf-history-actions{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:6px;
+}
+body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
+  margin:0;
+  padding:8px 10px;
+  border-radius:8px;
+  font-size:13px;
+}
+
+@media (max-width: 760px){
+  body[data-inventory-screen="shelf-location"] .shelf-location-card{
+    padding:10px;
+    gap:10px;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-summary,
+  body[data-inventory-screen="shelf-location"] .shelf-location-condition-grid,
+  body[data-inventory-screen="shelf-location"] .shelf-location-input-grid,
+  body[data-inventory-screen="shelf-location"] .shelf-location-filter-grid{
+    grid-template-columns:1fr;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-summary .shelf-summary-hero strong{
+    font-size:2rem;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-block:nth-of-type(1) > .button-row{
+    grid-template-columns:1fr 1fr;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-input-grid > label:nth-child(2){grid-column:1;grid-row:1;}
+  body[data-inventory-screen="shelf-location"] .shelf-location-search-results{grid-column:1;grid-row:2;}
+  body[data-inventory-screen="shelf-location"] .shelf-location-input-grid > label:nth-child(3){grid-column:1;grid-row:3;}
+  body[data-inventory-screen="shelf-location"] .shelf-location-input-grid > label:nth-child(1){grid-column:1;grid-row:4;}
+  body[data-inventory-screen="shelf-location"] #shelfLocationRegisterBtn{grid-column:1;grid-row:5;}
+  body[data-inventory-screen="shelf-location"] .section-title .button-row{
+    grid-template-columns:1fr 1fr;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-table-wrap{
+    max-height:none;
+    overflow:visible;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-table,
+  body[data-inventory-screen="shelf-location"] .shelf-location-table tbody,
+  body[data-inventory-screen="shelf-location"] .shelf-location-table tr,
+  body[data-inventory-screen="shelf-location"] .shelf-location-table td{
+    display:block;
+    width:100%;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-table thead{
+    display:none;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-table tr{
+    border:1px solid #b8dfc9;
+    border-radius:12px;
+    margin:10px 0;
+    padding:12px;
+    background:#fff;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-table td{
+    border:0;
+    padding:7px 0;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-table td::before{
+    display:block;
+    color:#4b6657;
+    font-size:.78rem;
+    font-weight:800;
+    margin-bottom:2px;
+  }
+  body[data-inventory-screen="shelf-location"] .shelf-location-table td:nth-child(1)::before{content:"登録日時";}
+  body[data-inventory-screen="shelf-location"] .shelf-location-table td:nth-child(2)::before{content:"商品情報";}
+  body[data-inventory-screen="shelf-location"] .shelf-location-table td:nth-child(3)::before{content:"棚番変更";}
+  body[data-inventory-screen="shelf-location"] .shelf-location-table td:nth-child(4)::before{content:"操作内容";}
+  body[data-inventory-screen="shelf-location"] .shelf-location-table td:nth-child(5)::before{content:"担当者";}
+  body[data-inventory-screen="shelf-location"] .shelf-location-table td:nth-child(6)::before{content:"操作";}
+  body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
+    width:100%;
+  }
 }
