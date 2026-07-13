@@ -359,6 +359,82 @@
     </div>`;
   }
 
+  function getSmaregiDiffProductSearchSort(){
+    const key="arico_product_search_sort_smaregi_diff";
+    const value=String(document.getElementById("smaregiDiffProductSearchSort")?.value||localStorage.getItem(key)||"name");
+    return ["name","barcode","location","updated"].includes(value) ? value : "name";
+  }
+
+  function getDiffProductSearchText(){
+    const value=document.getElementById("smaregiDiffProductSearchInput")?.value||"";
+    return typeof normalizeSearchText==="function" ? normalizeSearchText(value) : String(value||"").trim().toLowerCase();
+  }
+
+  function getDiffProductHaystack(row){
+    const item=row?.item||{};
+    const barcode=String(getItemBarcode(item)||item.barcode||"");
+    const product=typeof gp==="function" ? (gp(barcode)||{}) : {};
+    const values=[
+      getItemName(item),
+      barcode,
+      item.product_code,
+      item.item_number,
+      item.color,
+      item.size,
+      product.name,
+      product.barcode,
+      product.product_code,
+      product.smaregi_product_id,
+      product.item_number,
+      product.part_number,
+      product.color,
+      product.size,
+      product.location
+    ];
+    const text=values.filter(value=>value!==null&&value!==undefined).join(" ");
+    return typeof normalizeSearchText==="function" ? normalizeSearchText(text) : String(text).toLowerCase();
+  }
+
+  function sortDiffRowsForDisplay(rows){
+    const mode=getSmaregiDiffProductSearchSort();
+    if(typeof sortProductsForDisplay!=="function"){
+      return [...rows].sort((a,b)=>String(getItemName(a.item)||"").localeCompare(String(getItemName(b.item)||""),"ja"));
+    }
+    const mapped=rows.map((row,index)=>{
+      const barcode=String(getItemBarcode(row.item)||row.item?.barcode||"");
+      const product=typeof gp==="function" ? (gp(barcode)||{}) : {};
+      return {
+        ...row,
+        __index:index,
+        name:getItemName(row.item)||product.name||"",
+        barcode,
+        location:product.location||row.item?.location||"",
+        updated_at:product.updated_at||row.item?.updated_at||row.item?.changed_at||""
+      };
+    });
+    return sortProductsForDisplay(mapped,mode);
+  }
+
+  function bindSmaregiDiffProductSearchControls(){
+    const input=document.getElementById("smaregiDiffProductSearchInput");
+    const select=document.getElementById("smaregiDiffProductSearchSort");
+    const key="arico_product_search_sort_smaregi_diff";
+    if(input&&input.dataset.diffSearchBound!=="1"){
+      input.dataset.diffSearchBound="1";
+      input.addEventListener("input",()=>renderSmaregiDiffOnlyPanel());
+    }
+    if(select){
+      select.value=getSmaregiDiffProductSearchSort();
+      if(select.dataset.diffSortBound!=="1"){
+        select.dataset.diffSortBound="1";
+        select.addEventListener("change",()=>{
+          localStorage.setItem(key,select.value||"name");
+          renderSmaregiDiffOnlyPanel();
+        });
+      }
+    }
+  }
+
   function prepareEquipmentTransferFromDiff(barcode){
     const item=getAllMovementItems().find(row=>String(row.barcode||"")===String(barcode));
     if(typeof showInventoryScreen==="function")showInventoryScreen("inventory");
@@ -465,8 +541,11 @@
     const summary=typeof el==="function" ? el("smaregiDiffSummary") : document.getElementById("smaregiDiffSummary");
     if(!panel||!body)return;
     const stats=getSmaregiStats();
-    const rows=getDiffRows();
-    if(summary)summary.textContent=`差異：${rows.length}件 / チェック済み：${stats.completed||0}件 / 未チェック：${stats.unchecked||0}件 / 除外：${stats.excluded||0}件`;
+    bindSmaregiDiffProductSearchControls();
+    const allRows=getDiffRows();
+    const keyword=getDiffProductSearchText();
+    const rows=sortDiffRowsForDisplay(keyword ? allRows.filter(row=>getDiffProductHaystack(row).includes(keyword)) : allRows);
+    if(summary)summary.textContent=`差異：${allRows.length}件 / 表示：${rows.length}件 / チェック済み：${stats.completed||0}件 / 未チェック：${stats.unchecked||0}件 / 除外：${stats.excluded||0}件`;
     const hasMovementData=getAllMovementItems().length>0;
     if(!hasMovementData){
       body.innerHTML='<tr><td colspan="10" class="smaregi-empty">スマレジ変動CSV未取込です。</td></tr>';
