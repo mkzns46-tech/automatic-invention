@@ -203,15 +203,14 @@
     const items=getAllMovementItems();
     const lastCheckedAt=getLastCheckedAtSafe();
     const lastTime=new Date(lastCheckedAt).getTime();
-    const filtered=items.filter(item=>{
+    return items.filter(item=>{
       const change=getChangeForItem(item);
       const changedAt=change.changed_at || change.movement_datetime || item?.changed_at || item?.movement_datetime;
       const changedTime=new Date(changedAt).getTime();
-      if(!Number.isFinite(changedTime))return true;
+      if(!Number.isFinite(changedTime))return false;
       if(!Number.isFinite(lastTime))return true;
       return changedTime>lastTime;
     });
-    return filtered.length ? filtered : items;
   };
 
   window.getSmaregiFilteredTargetItems=function(){
