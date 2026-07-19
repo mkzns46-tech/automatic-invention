@@ -17,12 +17,6 @@ function env(...names) {
   return "";
 }
 
-function required(name) {
-  const value = cleanEnv(process.env[name]);
-  if (!value) throw new Error(`Missing Vercel environment variable: ${name}`);
-  return value;
-}
-
 function parseBody(req) {
   if (!req.body) return {};
   if (typeof req.body === "object") return req.body;
@@ -198,9 +192,18 @@ module.exports = async function handler(req, res) {
   try {
     const body = parseBody(req);
     const storeContext = resolveStoreContext(body);
-    const contractId = required("SMAREGI_CONTRACT_ID");
-    const clientId = required("SMAREGI_CLIENT_ID");
-    const clientSecret = required("SMAREGI_CLIENT_SECRET");
+    const contractId = env("SMAREGI_CONTRACT_ID", "SMAREGI_CONTRACTID");
+    const clientId = env("SMAREGI_CLIENT_ID");
+    const clientSecret = env("SMAREGI_CLIENT_SECRET");
+    const accessToken = env("SMAREGI_ACCESS_TOKEN");
+    const configuredApiBase = env("SMAREGI_POS_API_BASE_URL");
+    const configuredTokenUrl = env("SMAREGI_TOKEN_URL", "SMAREGI_OAUTH_TOKEN_URL");
+    if (!accessToken && (!contractId || !clientId || !clientSecret)) {
+      throw new Error("Smaregi OAuth settings are incomplete. Set SMAREGI_CONTRACT_ID, SMAREGI_CLIENT_ID and SMAREGI_CLIENT_SECRET, or set SMAREGI_ACCESS_TOKEN.");
+    }
+    if (!contractId && !configuredApiBase) {
+      throw new Error("Smaregi API base is incomplete. Set SMAREGI_CONTRACT_ID or SMAREGI_POS_API_BASE_URL.");
+    }
     const configuredEnv = cleanEnv(process.env.SMAREGI_ENV).toLowerCase();
     if (configuredEnv && !["sandbox", "production"].includes(configuredEnv)) {
       throw new Error("SMAREGI_ENV must be sandbox or production.");
@@ -208,8 +211,8 @@ module.exports = async function handler(req, res) {
 
     const sandbox = configuredEnv ? configuredEnv === "sandbox" : contractId.startsWith("sb_");
     const idBase = sandbox ? "https://id.smaregi.dev" : "https://id.smaregi.jp";
-    const apiBase = `${sandbox ? "https://api.smaregi.dev" : "https://api.smaregi.jp"}/${encodeURIComponent(contractId)}/pos`;
-    const tokenUrl = `${idBase}/app/${encodeURIComponent(contractId)}/token`;
+    const apiBase = configuredApiBase || `${sandbox ? "https://api.smaregi.dev" : "https://api.smaregi.jp"}/${encodeURIComponent(contractId)}/pos`;
+    const tokenUrl = configuredTokenUrl || `${idBase}/app/${encodeURIComponent(contractId)}/token`;
     const scope = "pos.stock:read pos.products:read pos.stock-changes:read";
     console.info("[smaregi-auth]", {
       environment: sandbox ? "sandbox" : "production",
@@ -217,18 +220,23 @@ module.exports = async function handler(req, res) {
       contract_id_prefix: prefix(contractId),
       client_id_prefix: prefix(clientId),
       store_code: storeContext.storeCode,
-      store_id: storeContext.storeId
+      store_id: storeContext.storeId,
+      auth_mode: accessToken ? "access_token" : "client_credentials"
     });
 
-    const tokenData = await readJson(await fetch(tokenUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64")}`,
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({ grant_type: "client_credentials", scope }).toString()
-    }), "Smaregi OAuth");
-    const token = tokenData.access_token;
+    let token = accessToken;
+    if (!token) {
+      const tokenData = await readJson(await fetch(tokenUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64")}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json"
+        },
+        body: new URLSearchParams({ grant_type: "client_credentials", scope }).toString()
+      }), "Smaregi OAuth");
+      token = tokenData.access_token;
+    }
     if (!token) throw new Error("Smaregi OAuth did not return an access token.");
 
     const now = new Date();
@@ -345,6 +353,7 @@ module.exports = async function handler(req, res) {
       store_code: storeContext.storeCode,
       store_name: storeContext.storeName,
       store_id: storeContext.storeId,
+      auth_mode: accessToken ? "access_token" : "client_credentials",
       initial_sync: !lastCompletedAt
     });
   } catch (error) {
