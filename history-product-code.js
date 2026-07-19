@@ -58,6 +58,8 @@ function historyQuantityClass(value){
 }
 
 function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode){
+  selectedLogs=uniqueInventoryLogsById(selectedLogs);
+  allLogsForBarcode=uniqueInventoryLogsById(allLogsForBarcode);
   const product=gp(barcode);
   let running=Number(product?.base_stock||0);
   const allDesc=allLogsForBarcode.slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
@@ -109,7 +111,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
 }
 
 function buildGlobalHistoryRows(sourceLogs=logs){
-  return sourceLogs.map(log=>{
+  return uniqueInventoryLogsById(sourceLogs).map(log=>{
     const rawQuantity=Number(log.quantity||0);
     const displayType=String(log.memo||"").includes("備品転用キャンセル") ? "equipment_transfer_cancel" : log.type;
     const delta=getHistorySignedDelta(displayType,rawQuantity);

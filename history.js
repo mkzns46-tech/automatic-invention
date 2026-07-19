@@ -28,6 +28,20 @@ function inventoryTypeMatchesFilter(logType,filterType){
   return logType===filterType;
 }
 
+function uniqueInventoryLogsById(sourceLogs){
+  const seen=new Set();
+  const unique=[];
+  (Array.isArray(sourceLogs)?sourceLogs:[]).forEach(log=>{
+    const id=String(log?.id||"").trim();
+    if(id){
+      if(seen.has(id))return;
+      seen.add(id);
+    }
+    unique.push(log);
+  });
+  return unique;
+}
+
 async function loadProductHistoryByBarcode(barcode){
   const productLogs=await sbAll(`inventory_logs?select=*&barcode=eq.${encodeURIComponent(barcode)}&order=created_at.desc`,1000,10000);
   console.log("[Product History Equipment State]",productLogs
@@ -38,7 +52,7 @@ async function loadProductHistoryByBarcode(barcode){
       equipment_checked_by:log.equipment_checked_by,
       equipment_checked_at:log.equipment_checked_at
     })));
-  return productLogs;
+  return uniqueInventoryLogsById(productLogs);
 }
 
 async function showProductHistoryForBarcode(barcode,replacementLog=null){
@@ -542,7 +556,7 @@ function getFilteredGlobalLogs(){
   const product=String(el("historyProductFilter")?.value||"").trim().toLowerCase();
   const staff=String(el("historyStaffFilter")?.value||"").trim().toLowerCase();
   const memo=String(el("historyMemoFilter")?.value||"").trim().toLowerCase();
-  return logs.filter(log=>{
+  return uniqueInventoryLogsById(logs).filter(log=>{
     const productName=String(gp(log.barcode)?.name||log.product_name||"").toLowerCase();
     return inventoryTypeMatchesFilter(log.type,type)
       &&(!product||productName.includes(product))
@@ -562,13 +576,13 @@ function renderGlobalHistory(){
 function renderRecentRegistrationHistory(){
   const body=el("recentRegistrationHistoryBody");
   if(!body)return;
-  body.innerHTML=buildGlobalHistoryRows(logs.slice(0,10));
+  body.innerHTML=buildGlobalHistoryRows(uniqueInventoryLogsById(logs).slice(0,10));
   bindMemoEditButtons();
   bindEquipmentConfirmButtons();
 }
 
 function buildGlobalHistoryRows(sourceLogs=logs){
-  return sourceLogs.map(log=>{
+  return uniqueInventoryLogsById(sourceLogs).map(log=>{
     const q=Number(log.quantity||0);
 
     let beforeStock="";
