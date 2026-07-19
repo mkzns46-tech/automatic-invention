@@ -38,12 +38,13 @@ function resolveStoreContext(body = {}) {
   const storeCode = normalizeStoreCode(body.storeCode || body.currentStore || body.store);
   const storePrefix = storeCode.toUpperCase();
   const labels = { tokyo: "Tokyo", aichi: "Aichi", nagano: "Nagano" };
+  const localLabels = { tokyo: "東京", aichi: "愛知", nagano: "長野" };
   const storeId = env(
     `SMAREGI_${storePrefix}_STORE_ID`,
     storeCode === "tokyo" ? "SMAREGI_STORE_ID" : ""
   );
   if (!storeId) throw new Error(`Smaregi store id is not configured for ${labels[storeCode] || storeCode}.`);
-  return { storeCode, storeName: labels[storeCode] || storeCode, storeId: String(storeId) };
+  return { storeCode, storeName: labels[storeCode] || storeCode, storeLabel: localLabels[storeCode] || labels[storeCode] || storeCode, storeId: String(storeId) };
 }
 
 function prefix(value, length = 6) {
@@ -79,6 +80,13 @@ async function supabase(path, opt = {}) {
 }
 
 async function smaregiFetch(base, token, path, params = {}, debugContext = {}) {
+  if (debugContext.apiStats) {
+    debugContext.apiStats.total += 1;
+    if (path === "/stock") debugContext.apiStats.stock += 1;
+    else if (path.startsWith("/stock/changes/")) debugContext.apiStats.stockChanges += 1;
+    else if (path.startsWith("/products/")) debugContext.apiStats.products += 1;
+    else debugContext.apiStats.other += 1;
+  }
   const url = new URL(`${base}${path}`);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
@@ -143,48 +151,81 @@ async function mapLimit(rows, limit, fn) {
   return results;
 }
 
-async function fetchChanges(base, token, productId, storeId, since) {
+function getChangeTimeValue(change) {
+  return change?.targetDateTime || change?.updDateTime || "";
+}
+
+async function fetchChanges(base, token, productId, storeId, since, until, apiStats) {
   const rows = [];
+  const sinceTime = new Date(since).getTime();
+  const untilTime = new Date(until).getTime();
   for (let page = 1; page <= 100; page++) {
     const part = await smaregiFetch(base, token, `/stock/changes/${encodeURIComponent(productId)}/${encodeURIComponent(storeId)}`, {
       sort: "updDateTime:desc",
       limit: 1000,
       page
-    });
+    }, { apiStats });
     if (!Array.isArray(part)) break;
-    const current = part.filter(row => new Date(row.updDateTime) >= new Date(since));
+    const current = part.filter(row => {
+      const rowStoreId = String(row.storeId || row.store_id || storeId);
+      if (rowStoreId !== String(storeId)) return false;
+      const changedTime = new Date(getChangeTimeValue(row)).getTime();
+      return Number.isFinite(changedTime) && changedTime > sinceTime && changedTime <= untilTime;
+    });
     rows.push(...current);
-    if (part.length < 1000 || current.length < part.length) break;
+    const pageHasNewerRows = part.some(row => {
+      const changedTime = new Date(getChangeTimeValue(row)).getTime();
+      return Number.isFinite(changedTime) && changedTime > sinceTime;
+    });
+    if (part.length < 1000 || !pageHasNewerRows) break;
   }
   return rows;
 }
 
-async function fetchChangesSafely(base, token, productId, storeId, since) {
-  try {
-    return { rows: await fetchChanges(base, token, productId, storeId, since), warning: "" };
-  } catch (error) {
-    return { rows: [], warning: `stock changes API failed: ${error.message || String(error)}` };
-  }
+function buildStoreCheckpointTokens(storeContext) {
+  return [...new Set([
+    storeContext.storeCode,
+    storeContext.storeName,
+    storeContext.storeLabel,
+    storeContext.storeCode === "tokyo" ? "東京" : "",
+    storeContext.storeCode === "aichi" ? "愛知" : "",
+    storeContext.storeCode === "nagano" ? "長野" : ""
+  ].map(value => String(value || "").trim()).filter(Boolean))];
 }
 
 async function getLastCompletedAtForStore(storeContext) {
   const storeId = String(storeContext.storeId || "");
   const storeCode = String(storeContext.storeCode || "");
   const noteFilter = encodeURIComponent(`*store_id:${storeId}*`);
-  const storeSnapshots = await supabase(`smaregi_stock_snapshots?select=completed_at&source=eq.api&note=ilike.${noteFilter}&completed_at=not.is.null&order=completed_at.desc&limit=1`);
-  if (Array.isArray(storeSnapshots) && storeSnapshots[0]?.completed_at) return storeSnapshots[0].completed_at;
+  const storeSnapshots = await supabase(`smaregi_stock_snapshots?select=id,completed_at,source,note&source=eq.api&note=ilike.${noteFilter}&completed_at=not.is.null&order=completed_at.desc&limit=1`);
+  if (Array.isArray(storeSnapshots) && storeSnapshots[0]?.completed_at) return { completedAt: storeSnapshots[0].completed_at, source: "api_note_store_id", snapshotId: storeSnapshots[0].id || "" };
   const codeFilter = encodeURIComponent(`*store_code:${storeCode}*`);
-  const codeSnapshots = await supabase(`smaregi_stock_snapshots?select=completed_at&source=eq.api&note=ilike.${codeFilter}&completed_at=not.is.null&order=completed_at.desc&limit=1`);
-  if (Array.isArray(codeSnapshots) && codeSnapshots[0]?.completed_at) return codeSnapshots[0].completed_at;
+  const codeSnapshots = await supabase(`smaregi_stock_snapshots?select=id,completed_at,source,note&source=eq.api&note=ilike.${codeFilter}&completed_at=not.is.null&order=completed_at.desc&limit=1`);
+  if (Array.isArray(codeSnapshots) && codeSnapshots[0]?.completed_at) return { completedAt: codeSnapshots[0].completed_at, source: "api_note_store_code", snapshotId: codeSnapshots[0].id || "" };
   const itemRows = await supabase(`smaregi_stock_items?select=snapshot_id&store_id=eq.${encodeURIComponent(storeId)}&snapshot_id=not.is.null&limit=10000`);
   const snapshotIds = [...new Set((Array.isArray(itemRows) ? itemRows : [])
     .map(row => String(row.snapshot_id || "").trim())
     .filter(Boolean))];
-  if (!snapshotIds.length) return "";
-  const idFilter = snapshotIds.map(id => id.replace(/[(),]/g, "")).join(",");
-  if (!idFilter) return "";
-  const snapshots = await supabase(`smaregi_stock_snapshots?select=completed_at&id=in.(${idFilter})&completed_at=not.is.null&order=completed_at.desc&limit=1`);
-  return Array.isArray(snapshots) && snapshots[0]?.completed_at ? snapshots[0].completed_at : "";
+  if (snapshotIds.length) {
+    const idFilter = snapshotIds.map(id => id.replace(/[(),]/g, "")).join(",");
+    if (idFilter) {
+      const snapshots = await supabase(`smaregi_stock_snapshots?select=id,completed_at,source,note&id=in.(${idFilter})&completed_at=not.is.null&order=completed_at.desc&limit=1`);
+      if (Array.isArray(snapshots) && snapshots[0]?.completed_at) return { completedAt: snapshots[0].completed_at, source: "api_items_store_id", snapshotId: snapshots[0].id || "" };
+    }
+  }
+
+  const tokens = buildStoreCheckpointTokens(storeContext);
+  const completedSnapshots = await supabase("smaregi_stock_snapshots?select=id,completed_at,source,note&completed_at=not.is.null&order=completed_at.desc&limit=50");
+  for (const snapshot of Array.isArray(completedSnapshots) ? completedSnapshots : []) {
+    if (!snapshot?.id || snapshot.source === "api") continue;
+    const checks = await supabase(`smaregi_stock_checks?select=checked_by&snapshot_id=eq.${encodeURIComponent(snapshot.id)}&limit=1000`).catch(() => []);
+    const names = (Array.isArray(checks) ? checks : []).map(row => String(row.checked_by || ""));
+    if (names.some(name => tokens.some(token => name.includes(token)))) {
+      return { completedAt: snapshot.completed_at, source: "legacy_csv_checked_by_store_label", snapshotId: snapshot.id || "" };
+    }
+  }
+
+  return { completedAt: "", source: "not_found", snapshotId: "" };
 }
 
 module.exports = async function handler(req, res) {
@@ -247,11 +288,14 @@ module.exports = async function handler(req, res) {
     }
     if (!token) throw new Error("Smaregi OAuth did not return an access token.");
 
-    const now = new Date();
-    const lastCompletedAt = await getLastCompletedAtForStore(storeContext);
-    const since = lastCompletedAt || new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const syncStartedAt = new Date();
+    const checkpoint = await getLastCompletedAtForStore(storeContext);
+    const lastCompletedAt = checkpoint.completedAt || "";
+    const initialLookbackDays = Math.max(1, Math.min(30, Number(env("SMAREGI_INITIAL_LOOKBACK_DAYS")) || 7));
+    const since = lastCompletedAt || new Date(syncStartedAt.getTime() - initialLookbackDays * 24 * 60 * 60 * 1000).toISOString();
     const changed = [];
-    for (const [from, to] of splitDateRanges(since, now.toISOString())) {
+    const apiStats = { total: 0, stock: 0, stockChanges: 0, products: 0, other: 0, stockPages: 0, stockChangePages: 0 };
+    for (const [from, to] of splitDateRanges(since, syncStartedAt.toISOString())) {
       changed.push(...await fetchAll(apiBase, token, "/stock", {
         store_id: storeContext.storeId,
         "upd_date_time-from": formatSmaregiDate(from),
@@ -259,9 +303,11 @@ module.exports = async function handler(req, res) {
       }, {
         SMAREGI_ENV: sandbox ? "sandbox" : "production",
         token_url: tokenUrl,
-        store_code: storeContext.storeCode
+        store_code: storeContext.storeCode,
+        apiStats
       }));
     }
+    apiStats.stockPages = apiStats.stock;
 
     const latestByStoreProduct = new Map();
     changed.forEach(row => {
@@ -273,23 +319,29 @@ module.exports = async function handler(req, res) {
       const old = latestByStoreProduct.get(key);
       if (!old || new Date(row.updDateTime) > new Date(old.updDateTime)) latestByStoreProduct.set(key, row);
     });
-    const stockRows = [...latestByStoreProduct.values()];
+    const stockCandidates = [...latestByStoreProduct.values()];
+    const changeResults = stockCandidates.length
+      ? await mapLimit(stockCandidates, 4, async row => ({
+        stock: row,
+        rows: await fetchChanges(apiBase, token, row.productId, storeContext.storeId, since, syncStartedAt.toISOString(), apiStats)
+      }))
+      : [];
+    apiStats.stockChangePages = apiStats.stockChanges;
+    const activeResults = changeResults
+      .map(result => {
+        const unique = new Map();
+        result.rows.forEach(change => {
+          const changeId = String(change.id || `${result.stock.productId}-${getChangeTimeValue(change)}`);
+          if (!unique.has(changeId)) unique.set(changeId, change);
+        });
+        return { ...result, rows: [...unique.values()] };
+      })
+      .filter(result => result.rows.length > 0);
+    const stockRows = activeResults.map(result => result.stock);
+    const changes = activeResults.map(result => result.rows);
     const products = await mapLimit(stockRows, 8, row => smaregiFetch(apiBase, token, `/products/${encodeURIComponent(row.productId)}`, {
       fields: "productId,productCode,productName"
-    }));
-
-    let changeResults = [];
-    if (stockRows.length) {
-      const first = await fetchChangesSafely(apiBase, token, stockRows[0].productId, storeContext.storeId, since);
-      if (first.warning) {
-        changeResults = stockRows.map(() => ({ rows: [], warning: first.warning }));
-      } else {
-        const remaining = await mapLimit(stockRows.slice(1), 4, row => fetchChangesSafely(apiBase, token, row.productId, storeContext.storeId, since));
-        changeResults = [first, ...remaining];
-      }
-    }
-    const changes = changeResults.map(result => result.rows);
-    const historyWarnings = [...new Set(changeResults.map(result => result.warning).filter(Boolean))];
+    }, { apiStats }));
 
     const items = stockRows.map((stock, index) => ({
       barcode: String(products[index]?.productCode || products[index]?.productId || stock.productId),
@@ -297,7 +349,10 @@ module.exports = async function handler(req, res) {
       smaregi_stock: Math.trunc(Number(stock.stockAmount || 0)),
       product_id: String(stock.productId),
       store_id: String(storeContext.storeId),
-      latest_change_at: stock.updDateTime,
+      latest_change_at: changes[index].reduce((latest, change) => {
+        const value = getChangeTimeValue(change);
+        return !latest || new Date(value) > new Date(latest) ? value : latest;
+      }, ""),
       change_count: changes[index]?.length || 0
     }));
 
@@ -310,10 +365,11 @@ module.exports = async function handler(req, res) {
           "smaregi-api-sync",
           `store_code:${storeContext.storeCode}`,
           `store_id:${storeContext.storeId}`,
-          historyWarnings[0] || ""
+          `checkpoint:${checkpoint.source || "not_found"}`,
+          `candidates:${stockCandidates.length}`
         ].filter(Boolean).join(" / "),
         range_from: new Date(since).toISOString(),
-        range_to: now.toISOString()
+        range_to: syncStartedAt.toISOString()
       }])
     });
     const snapshot = snapshots[0];
@@ -335,7 +391,7 @@ module.exports = async function handler(req, res) {
         product_id: String(stockRows[index].productId),
         store_id: String(storeContext.storeId),
         barcode: items[index].barcode,
-        changed_at: change.updDateTime || change.targetDateTime || null,
+        changed_at: getChangeTimeValue(change) || null,
         amount: Math.trunc(Number(change.amount || 0)),
         stock_amount: Math.trunc(Number(change.stockAmount || 0)),
         stock_division: String(change.stockDivision || ""),
@@ -354,15 +410,19 @@ module.exports = async function handler(req, res) {
       snapshot_id: snapshot.id,
       item_count: items.length,
       change_count: changes.reduce((sum, rows) => sum + rows.length, 0),
-      history_available: historyWarnings.length === 0,
-      warning: historyWarnings[0] || "",
+      candidate_count: stockCandidates.length,
+      history_available: true,
+      warning: "",
       range_from: new Date(since).toISOString(),
-      range_to: now.toISOString(),
+      range_to: syncStartedAt.toISOString(),
       store_code: storeContext.storeCode,
       store_name: storeContext.storeName,
       store_id: storeContext.storeId,
       auth_mode: accessToken ? "access_token" : "client_credentials",
-      initial_sync: !lastCompletedAt
+      initial_sync: !lastCompletedAt,
+      checkpoint_source: checkpoint.source || "not_found",
+      checkpoint_snapshot_id: checkpoint.snapshotId || "",
+      api_request_count: apiStats
     });
   } catch (error) {
     const debug = authDebug ? {

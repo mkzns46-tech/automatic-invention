@@ -93,7 +93,7 @@ function getSmaregiFilteredTargetItems(){
       name:getSmaregiItemProductName(item),
       barcode:getSmaregiItemBarcode(item),
       location:(gp(getSmaregiItemBarcode(item))||{}).location||item.location||"",
-      updated_at:(gp(getSmaregiItemBarcode(item))||{}).updated_at||item.updated_at||""
+      updated_at:smaregiLatestChangeByBarcode.get(String(item?.barcode||""))?.changed_at||item.latest_change_at||item.changed_at||item.updated_at||(gp(getSmaregiItemBarcode(item))||{}).updated_at||""
     })),sortMode);
   }
   return filtered.sort((a,b)=>{
@@ -938,7 +938,7 @@ async function completeSmaregiStockCheck(){
   const warning=stats.unchecked>0?`\n\n未チェック商品が${stats.unchecked}件あります。\nこのまま今回のチェックを完了しますか？`:"";
   if(!confirm(`今回のチェックを完了します。\n対象：${stats.total}件\nチェック済み：${stats.completed}件${warning}`))return;
   try{
-    const completedAt=new Date().toISOString();
+    const completedAt=smaregiSnapshot.range_to || new Date().toISOString();
     const completedBy=getSmaregiCheckerName();
     const appliedCount=typeof applySmaregiActualStocksToSheet==="function" ? await applySmaregiActualStocksToSheet(completedBy) : 0;
     await sb(`smaregi_stock_snapshots?id=eq.${encodeURIComponent(smaregiSnapshot.id)}`,{
