@@ -209,7 +209,8 @@ module.exports = async function handler(req, res) {
       throw new Error("SMAREGI_ENV must be sandbox or production.");
     }
 
-    const sandbox = configuredEnv ? configuredEnv === "sandbox" : contractId.startsWith("sb_");
+    const isSandboxContract = contractId.startsWith("sb_");
+    const sandbox = isSandboxContract || configuredEnv === "sandbox";
     const idBase = sandbox ? "https://id.smaregi.dev" : "https://id.smaregi.jp";
     const apiBase = configuredApiBase || `${sandbox ? "https://api.smaregi.dev" : "https://api.smaregi.jp"}/${encodeURIComponent(contractId)}/pos`;
     const tokenUrl = configuredTokenUrl || `${idBase}/app/${encodeURIComponent(contractId)}/token`;
