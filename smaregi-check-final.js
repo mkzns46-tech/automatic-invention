@@ -476,7 +476,7 @@
 
   async function markSmaregiDifferenceNoIssue(barcode,button=null){
     if(!smaregiSnapshot){
-      showMessage?.("スマレジ在庫変動CSVを取り込んでから登録してください。","err");
+      showMessage?.("スマレジAPIから在庫変動を取得してから登録してください。","err");
       return false;
     }
     const item=getAllMovementItems().find(row=>String(row.barcode||"")===String(barcode));
@@ -560,7 +560,7 @@
     if(summary)summary.textContent=`差異：${allRows.length}件 / 表示：${rows.length}件 / チェック済み：${stats.completed||0}件 / 未チェック：${stats.unchecked||0}件 / 除外：${stats.excluded||0}件`;
     const hasMovementData=getAllMovementItems().length>0;
     if(!hasMovementData){
-      body.innerHTML='<tr><td colspan="10" class="smaregi-empty">スマレジ変動CSV未取込です。</td></tr>';
+      body.innerHTML='<tr><td colspan="10" class="smaregi-empty">スマレジ変動API未取得です。</td></tr>';
       return;
     }
     if(!rows.length){
@@ -658,6 +658,9 @@
   }
 
   function ensureSmaregiCsvClearButton(){
+    const existing=document.getElementById("clearSmaregiMovementCsvBtn");
+    if(existing)existing.hidden=true;
+    return;
     const host=document.getElementById("smaregiCheckFilterControls")
       || document.querySelector(".smaregi-check-filter-controls")
       || document.getElementById("smaregiStockProgress")
@@ -730,7 +733,7 @@
 
   async function saveSmaregiActualStockCore(barcode,actualStock,button,{markCorrected=false}={}){
     if(!smaregiSnapshot){
-      showMessage?.("スマレジ在庫変動CSVを取り込んでから保存してください。","err");
+      showMessage?.("スマレジAPIから在庫変動を取得してから保存してください。","err");
       return false;
     }
     const item=getAllMovementItems().find(row=>String(row.barcode||"")===barcode);
@@ -1062,11 +1065,11 @@
           </section>
           <section class="smaregi-cause-history-card">
             <h3>スマレジ側の在庫変動履歴</h3>
-            <p class="section-note">CSV取込済みのスマレジ在庫変動履歴です。</p>
+            <p class="section-note">スマレジAPIから取得した指定店舗の在庫変動履歴です。</p>
             <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>処理前在庫</th><th>数量</th><th>処理後在庫</th><th>備考</th><th>担当者</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
           </section>
         </div>
-        <div class="smaregi-cause-footnote">スマレジ側の在庫は、CSV取込時に保存した在庫数をそのまま表示しています。</div>
+        <div class="smaregi-cause-footnote">スマレジ側の在庫は、API取得時に保存した在庫数をそのまま表示しています。</div>
         </div>
       `;
       const closeButton=document.getElementById("closeSmaregiCauseDetailBtn");

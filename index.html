@@ -62,11 +62,11 @@
   </div>
 </section>
 
-<section class="card csv-admin-section" id="productImportCard" data-inventory-screen="settings" hidden><h2>データ取り込み</h2><p class="section-note">商品データとスマレジ変動商品データを取り込みます</p>
+<section class="card csv-admin-section" id="productImportCard" data-inventory-screen="settings" hidden><h2>データ取り込み</h2><p class="section-note">商品マスターCSVとスマレジ在庫変動API取得を実行します</p>
 <button type="button" id="importSmaregiProductsBtn">商品マスターCSV取込</button>
-<button type="button" id="syncSmaregiStockBtn">スマレジ在庫変動CSV取込</button>
+<button type="button" id="syncSmaregiStockBtn">スマレジ在庫変動API取得</button>
 <input type="file" id="smaregiStockCsvFile" accept=".csv,text/csv" hidden>
-<div class="message csv-mode-message">API停止中／CSV運用中：スマレジAPIへは接続しません。商品マスター・在庫変動データはCSVで取り込んでください。</div>
+<div class="message csv-mode-message">商品マスターはCSV取込、スマレジ在庫変動チェックはAPI取得で運用します。</div>
 <div id="productImportMessage" class="message"></div>
 <details class="csv-admin-details">
   <summary>管理者向け機能</summary>
@@ -172,9 +172,9 @@
   <div class="section-title">
     <div>
       <h2>スマレジ変動商品チェック</h2>
-      <p class="section-note">スマレジ在庫変動CSVを取り込み、変動があった商品を確認します。</p>
+      <p class="section-note">スマレジAPIから指定店舗の在庫変動を取得し、変動があった商品を確認します。</p>
     </div>
-    <div id="smaregiSnapshotBadge" class="badge muted">スマレジ変動CSV未取込</div>
+    <div id="smaregiSnapshotBadge" class="badge muted">スマレジ変動API未取得</div>
   </div>
   <div class="smaregi-progress-row">
     <div class="smaregi-header-staff">
