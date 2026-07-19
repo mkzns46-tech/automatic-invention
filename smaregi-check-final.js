@@ -1972,7 +1972,8 @@ async function loadLatestSmaregiSnapshot(){
     const snapshots=await sb(`smaregi_stock_snapshots?select=*&source=eq.api&note=ilike.${noteFilter}&order=imported_at.desc&limit=1`);
     smaregiSnapshot=Array.isArray(snapshots)&&snapshots.length ? snapshots[0] : null;
     const resetInput=typeof el==="function" ? el("resetSmaregiCompletedAtInput") : document.getElementById("resetSmaregiCompletedAtInput");
-    if(resetInput)resetInput.value=smaregiSnapshot?.completed_at && typeof formatDateTimeLocal==="function" ? formatDateTimeLocal(smaregiSnapshot.completed_at) : "";
+    const lastCheckValue=smaregiSnapshot?.completed_at || smaregiSnapshot?.range_from || "";
+    if(resetInput)resetInput.value=lastCheckValue && typeof formatDateTimeLocal==="function" ? formatDateTimeLocal(lastCheckValue) : "";
     smaregiStockItems=[];
     smaregiStockChecks=[];
     smaregiLatestChangeByBarcode=new Map();

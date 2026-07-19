@@ -369,7 +369,8 @@ module.exports = async function handler(req, res) {
           `candidates:${stockCandidates.length}`
         ].filter(Boolean).join(" / "),
         range_from: new Date(since).toISOString(),
-        range_to: syncStartedAt.toISOString()
+        range_to: syncStartedAt.toISOString(),
+        completed_at: new Date(since).toISOString()
       }])
     });
     const snapshot = snapshots[0];
