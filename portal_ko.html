@@ -17,7 +17,7 @@ function aricoLogout(){ clearAuthSession(); sessionStorage.removeItem(ARICO_PORT
 function openInventory(){ location.href = ARICO_INVENTORY_URL; }
 function openBackorder(){ location.href = "/backorder/backorder.html"; }
 </script>
-</head>
+<script src="./version.js" defer></script></head>
 <body>
 <main class="wrap"><section class="card">
 <div class="topbar"><div><div class="brand">ARICO TOKYO</div><h1>시스템 입구</h1></div><div class="top-actions"><a class="pill" href="portal.html">日本語</a><a class="pill active" href="portal_ko.html">한국어</a><a class="pill" href="#" onclick="aricoLogout(); return false;">로그아웃</a></div></div>
