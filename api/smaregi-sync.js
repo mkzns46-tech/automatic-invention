@@ -189,6 +189,7 @@ async function getLastCompletedAtForStore(storeContext) {
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  let authDebug = null;
   try {
     const body = parseBody(req);
     const storeContext = resolveStoreContext(body);
@@ -217,15 +218,19 @@ module.exports = async function handler(req, res) {
     const apiBase = isSandboxContract ? defaultApiBase : (configuredApiBase || defaultApiBase);
     const tokenUrl = isSandboxContract ? defaultTokenUrl : (configuredTokenUrl || defaultTokenUrl);
     const scope = "pos.stock:read pos.products:read pos.stock-changes:read";
-    console.info("[smaregi-auth]", {
+    authDebug = {
       environment: sandbox ? "sandbox" : "production",
       token_url: tokenUrl,
+      api_base: apiBase,
       contract_id_prefix: prefix(contractId),
       client_id_prefix: prefix(clientId),
       store_code: storeContext.storeCode,
       store_id: storeContext.storeId,
-      auth_mode: accessToken ? "access_token" : "client_credentials"
-    });
+      auth_mode: accessToken ? "access_token" : "client_credentials",
+      configured_env: configuredEnv || "",
+      sandbox_contract: isSandboxContract
+    };
+    console.info("[smaregi-auth]", authDebug);
 
     let token = accessToken;
     if (!token) {
@@ -360,6 +365,18 @@ module.exports = async function handler(req, res) {
       initial_sync: !lastCompletedAt
     });
   } catch (error) {
-    return res.status(500).json({ error: error.message || String(error) });
+    const debug = authDebug ? {
+      environment: authDebug.environment,
+      token_host: (() => { try { return new URL(authDebug.token_url).host; } catch (_) { return ""; } })(),
+      api_host: (() => { try { return new URL(authDebug.api_base).host; } catch (_) { return ""; } })(),
+      contract_id_prefix: authDebug.contract_id_prefix,
+      client_id_prefix: authDebug.client_id_prefix,
+      store_code: authDebug.store_code,
+      store_id: authDebug.store_id,
+      auth_mode: authDebug.auth_mode,
+      configured_env: authDebug.configured_env,
+      sandbox_contract: authDebug.sandbox_contract
+    } : null;
+    return res.status(500).json({ error: error.message || String(error), debug });
   }
 };
