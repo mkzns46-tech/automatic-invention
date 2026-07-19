@@ -298,7 +298,7 @@
     const lastCheckedAt=getLastCheckedAtSafe();
     const lastLabel=lastCheckedAt && typeof fmt==="function" ? fmt(lastCheckedAt) : String(lastCheckedAt||"前回チェック未設定");
     const checker=typeof getSmaregiCheckerName==="function" ? getSmaregiCheckerName() : "";
-    if(badge)badge.textContent=hasMovementData ? "スマレジ変動CSV取込済み" : "スマレジ変動CSV未取込";
+    if(badge)badge.textContent=hasMovementData ? "スマレジ変動API取得済み" : "スマレジ変動API未取得";
     if(progress){
       progress.innerHTML=[
         `<div class="smaregi-progress-main">今回チェック対象 <span>${stats.total}件</span></div>`,
@@ -1094,7 +1094,7 @@
     const hasMovementData=getAllMovementItems().length>0;
     const emptyColspan=canShowExcludeColumn()?4:3;
     if(!hasMovementData){
-      body.innerHTML=`<tr><td colspan="${emptyColspan}">スマレジ在庫変動CSVを取り込むと、前回チェック完了以降の変動商品が表示されます。</td></tr>`;
+      body.innerHTML=`<tr><td colspan="${emptyColspan}">スマレジAPIから在庫変動を取得すると、前回チェック完了以降の変動商品が表示されます。</td></tr>`;
       updateSmaregiProgressOnly();
       if(complete)complete.disabled=true;
       renderSmaregiDiffOnlyPanel();
@@ -1890,3 +1890,138 @@
     setTimeout(bootFinalSmaregiCheck,0);
   }
 })();
+
+function getSmaregiApiStoreContextForCheck(){
+  const context=typeof getSmaregiRequestContext==="function" ? getSmaregiRequestContext() : {};
+  const storeCode=String(context.storeCode||window.currentStore||"tokyo").trim().toLowerCase()||"tokyo";
+  return {
+    ...context,
+    storeCode,
+    currentStore:storeCode,
+    storeName:context.storeName||storeCode
+  };
+}
+
+function parseSmaregiSnapshotStoreId(snapshot){
+  const note=String(snapshot?.note||"");
+  const match=note.match(/store_id:([^/\s]+)/);
+  return match ? match[1].trim() : "";
+}
+
+async function loadLatestSmaregiSnapshot(){
+  const context=getSmaregiApiStoreContextForCheck();
+  const storeCode=context.storeCode;
+  const noteFilter=encodeURIComponent(`*store_code:${storeCode}*`);
+  try{
+    showMessage?.(`スマレジAPIデータを取得中：${context.storeName||storeCode}`);
+    const snapshots=await sb(`smaregi_stock_snapshots?select=*&source=eq.api&note=ilike.${noteFilter}&order=imported_at.desc&limit=1`);
+    smaregiSnapshot=Array.isArray(snapshots)&&snapshots.length ? snapshots[0] : null;
+    const resetInput=typeof el==="function" ? el("resetSmaregiCompletedAtInput") : document.getElementById("resetSmaregiCompletedAtInput");
+    if(resetInput)resetInput.value=smaregiSnapshot?.completed_at && typeof formatDateTimeLocal==="function" ? formatDateTimeLocal(smaregiSnapshot.completed_at) : "";
+    smaregiStockItems=[];
+    smaregiStockChecks=[];
+    smaregiLatestChangeByBarcode=new Map();
+    if(smaregiSnapshot){
+      const snapshotId=encodeURIComponent(smaregiSnapshot.id);
+      const storeId=parseSmaregiSnapshotStoreId(smaregiSnapshot);
+      const itemStoreFilter=storeId ? `&store_id=eq.${encodeURIComponent(storeId)}` : "";
+      smaregiStockItems=await sbAll(`smaregi_stock_items?select=*&snapshot_id=eq.${snapshotId}${itemStoreFilter}&order=product_name.asc`,1000,20000);
+      smaregiStockChecks=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=eq.${snapshotId}&order=checked_at.desc`,1000,20000);
+      const changeStoreFilter=storeId ? `&store_id=eq.${encodeURIComponent(storeId)}` : "";
+      const latestChanges=await sbAll(`smaregi_stock_changes?select=*&snapshot_id=eq.${snapshotId}${changeStoreFilter}&order=changed_at.desc`,1000,50000).catch(()=>[]);
+      smaregiLatestChangeByBarcode=latestSmaregiChangesByBarcode(latestChanges);
+      await fetchProductsByBarcodes(smaregiStockItems.map(item=>item.barcode));
+      await loadSmaregiEventInventoryCache(smaregiStockItems.map(item=>item.barcode));
+    }else{
+      smaregiCurrentEventStockByBarcode=new Map();
+      smaregiEventStorageStockByBarcode=new Map();
+    }
+    renderSmaregiStockChecks();
+    showMessage?.(smaregiSnapshot
+      ? `スマレジAPIデータを取得しました：${context.storeName||storeCode} / ${smaregiStockItems.length}件`
+      : `スマレジAPIデータはまだありません：${context.storeName||storeCode}`,"ok");
+  }catch(error){
+    smaregiSnapshot=null;
+    smaregiStockItems=[];
+    smaregiStockChecks=[];
+    smaregiLatestChangeByBarcode=new Map();
+    renderSmaregiStockChecks();
+    showMessage?.(`スマレジAPIデータ取得エラー\n${error.message}`,"err");
+  }
+}
+
+async function syncSmaregiStockFromApi(){
+  const context=getSmaregiApiStoreContextForCheck();
+  if(typeof hasInventoryPrivilegedAccess==="function"&&!hasInventoryPrivilegedAccess()){
+    showMessage?.("スマレジAPI取得は管理者認証後に実行できます。","err");
+    return;
+  }
+  if(typeof confirmAppAction==="function"){
+    const ok=await confirmAppAction(
+      "スマレジAPI取得確認",
+      `対象店舗：${context.storeName||context.storeCode}\n前回チェック完了以降の在庫変動商品をAPIから取得します。`,
+      {okText:"取得"}
+    );
+    if(!ok)return;
+  }
+  try{
+    showMessage?.(`スマレジAPIから在庫変動を取得中：${context.storeName||context.storeCode}`);
+    const res=await fetch("./api/smaregi-sync",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(context)
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(data.error||`API error ${res.status}`);
+    await loadLatestSmaregiSnapshot();
+    showPopup?.("スマレジAPI取得完了",
+      `対象店舗：${data.store_name||context.storeName||context.storeCode}\n対象商品：${Number(data.item_count||0)}件\n変動履歴：${Number(data.change_count||0)}件\n対象期間：${fmt(data.range_from)} - ${fmt(data.range_to)}${data.warning?`\n\n注意：${data.warning}`:""}`
+    );
+    showMessage?.(`スマレジAPI取得完了：${Number(data.item_count||0)}件 / ${data.store_name||context.storeName||context.storeCode}`,"ok");
+  }catch(error){
+    showMessage?.(`スマレジAPI取得失敗\n${error.message}`,"err");
+  }
+}
+
+async function resetSmaregiStockCheckCompletion(){
+  if(typeof hasInventoryPrivilegedAccess==="function"&&!hasInventoryPrivilegedAccess()){
+    showMessage?.("チェック完了解除は管理者認証後に実行できます。","err");
+    return;
+  }
+  if(!smaregiSnapshot){
+    showMessage?.("解除するスマレジ在庫変動チェックがありません。","err");
+    return;
+  }
+  const input=typeof el==="function" ? el("resetSmaregiCompletedAtInput") : document.getElementById("resetSmaregiCompletedAtInput");
+  const selected=String(input?.value||"").trim();
+  if(!selected){
+    showMessage?.("戻す日時を選択してください。","err");
+    input?.focus();
+    return;
+  }
+  const date=new Date(selected);
+  if(Number.isNaN(date.getTime())){
+    showMessage?.("戻す日時を正しく選択してください。","err");
+    input?.focus();
+    return;
+  }
+  const context=getSmaregiApiStoreContextForCheck();
+  const ok=typeof confirmAppAction==="function"
+    ? await confirmAppAction("チェック完了解除",`対象店舗：${context.storeName||context.storeCode}\nこの店舗の現在のチェック完了日時だけを変更します。`,{okText:"解除"})
+    : confirm(`この店舗の現在のチェック完了日時だけを変更します。\n対象店舗：${context.storeName||context.storeCode}`);
+  if(!ok)return;
+  try{
+    const resetTo=date.toISOString();
+    await sb(`smaregi_stock_snapshots?id=eq.${encodeURIComponent(smaregiSnapshot.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({completed_at:resetTo})
+    });
+    smaregiSnapshot.completed_at=resetTo;
+    renderSmaregiStockChecks();
+    showPopup?.("チェック完了解除",`対象店舗：${context.storeName||context.storeCode}\n前回チェック完了：${fmt(resetTo)}`);
+    showMessage?.("この店舗のチェック完了日時を更新しました。","ok");
+  }catch(error){
+    showMessage?.("チェック完了解除エラー\n"+error.message,"err");
+  }
+}
