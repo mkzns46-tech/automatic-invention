@@ -212,8 +212,10 @@ module.exports = async function handler(req, res) {
     const isSandboxContract = contractId.startsWith("sb_");
     const sandbox = isSandboxContract || configuredEnv === "sandbox";
     const idBase = sandbox ? "https://id.smaregi.dev" : "https://id.smaregi.jp";
-    const apiBase = configuredApiBase || `${sandbox ? "https://api.smaregi.dev" : "https://api.smaregi.jp"}/${encodeURIComponent(contractId)}/pos`;
-    const tokenUrl = configuredTokenUrl || `${idBase}/app/${encodeURIComponent(contractId)}/token`;
+    const defaultApiBase = `${sandbox ? "https://api.smaregi.dev" : "https://api.smaregi.jp"}/${encodeURIComponent(contractId)}/pos`;
+    const defaultTokenUrl = `${idBase}/app/${encodeURIComponent(contractId)}/token`;
+    const apiBase = isSandboxContract ? defaultApiBase : (configuredApiBase || defaultApiBase);
+    const tokenUrl = isSandboxContract ? defaultTokenUrl : (configuredTokenUrl || defaultTokenUrl);
     const scope = "pos.stock:read pos.products:read pos.stock-changes:read";
     console.info("[smaregi-auth]", {
       environment: sandbox ? "sandbox" : "production",
