@@ -4717,6 +4717,19 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   color:#073f2a;
   font-size:14px;
 }
+.booth-status-note{
+  display:inline-block;
+  margin-top:4px;
+  padding:3px 8px;
+  border-radius:999px;
+  background:#fff3cd;
+  color:#6a4a00;
+  font-size:12px;
+  font-weight:700;
+}
+.booth-departure-list-table td{
+  vertical-align:top;
+}
 .booth-work-area{
   display:grid;
   gap:12px;
