@@ -6955,6 +6955,77 @@ body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
   color:var(--main-dark);
   font-size:1.35rem;
 }
+.booth-work-card{
+  display:grid;
+  gap:14px;
+}
+.booth-work-card > h4,
+.booth-list-header h4{
+  margin:0;
+  color:var(--main-dark);
+}
+.booth-list-header{
+  align-items:start;
+  gap:12px;
+}
+.booth-list-header .section-note,
+.booth-work-card .section-note{
+  max-width:980px;
+  line-height:1.55;
+}
+.booth-scan-row,
+.booth-storage-scan-row,
+.booth-diff-filters,
+.booth-event-inventory-controls{
+  gap:10px;
+}
+.booth-scan-row button,
+.booth-storage-scan-row button,
+.booth-diff-filters button,
+.booth-event-inventory-controls button{
+  min-height:42px;
+}
+.booth-history-table-wrap{
+  max-height:min(58vh,620px);
+  overflow:auto;
+}
+.booth-history-table-wrap .booth-history-table thead th{
+  position:sticky;
+  top:0;
+  z-index:2;
+}
+.booth-report-overview-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+.booth-report-overview-grid div{
+  border:1px solid #b8dfc9;
+  border-radius:10px;
+  padding:10px;
+  background:#f7fcf8;
+  min-width:0;
+}
+.booth-report-overview-grid span{
+  display:block;
+  color:#527161;
+  font-size:.84rem;
+  font-weight:800;
+}
+.booth-report-overview-grid strong{
+  display:block;
+  color:var(--main-dark);
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.booth-report-sales-summary{
+  grid-template-columns:repeat(5,minmax(0,1fr));
+}
+.booth-report-sales-product-table td:first-child,
+.booth-report-product-card strong{
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
 
 @media(max-width:800px){
   .booth-event-inventory-controls{
@@ -6992,5 +7063,36 @@ body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
   }
   .booth-report-mini-summary{
     grid-template-columns:1fr 1fr;
+  }
+  .booth-list-header{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+  .booth-scan-row,
+  .booth-storage-scan-row,
+  .booth-diff-filters,
+  .booth-event-inventory-controls{
+    grid-template-columns:1fr;
+  }
+  .booth-scan-row button,
+  .booth-storage-scan-row button,
+  .booth-diff-filters button,
+  .booth-event-inventory-controls button{
+    width:100%;
+  }
+  .booth-history-table-wrap{
+    display:none;
+  }
+  .booth-history-cards{
+    max-height:60vh;
+    overflow-y:auto;
+  }
+  .booth-report-overview-grid,
+  .booth-report-sales-summary{
+    grid-template-columns:1fr 1fr;
+  }
+  .booth-report-overview-grid div,
+  .booth-report-sales-summary > div{
+    padding:8px;
   }
 }

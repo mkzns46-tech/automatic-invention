@@ -6077,6 +6077,8 @@ async function importBoothSalesDraft(){
         barcode,
         product_name:item.product_name||item.name||sale.product_name||"",
         quantity:Number(sale.quantity||0),
+        unit_price:Number(sale.unit_price||0),
+        amount:Number(sale.amount||0),
         sold_at:sale.sold_at||null,
         store_code:context.storeCode,
         smaregi_store_id:body.context?.storeId||null,
@@ -6092,11 +6094,21 @@ async function importBoothSalesDraft(){
     }).filter(row=>row&&row.smaregi_transaction_id&&row.smaregi_detail_id&&row.quantity>0);
 
     if(rows.length){
-      await sb("event_sales_imports",{
-        method:"POST",
-        headers:{Prefer:"return=minimal"},
-        body:JSON.stringify(rows)
-      });
+      try{
+        await sb("event_sales_imports",{
+          method:"POST",
+          headers:{Prefer:"return=minimal"},
+          body:JSON.stringify(rows)
+        });
+      }catch(insertError){
+        if(!String(insertError?.message||"").includes("unit_price")&&!String(insertError?.message||"").includes("amount"))throw insertError;
+        const fallbackRows=rows.map(({unit_price,amount,...row})=>row);
+        await sb("event_sales_imports",{
+          method:"POST",
+          headers:{Prefer:"return=minimal"},
+          body:JSON.stringify(fallbackRows)
+        });
+      }
     }
     await loadBoothSalesImports(event.id);
     boothShowSuccess("販売データ仮取り込み完了",`仮取り込み ${rows.length} 行を保存しました。確定するまで販売数には反映されません。`);
@@ -6380,5 +6392,241 @@ loadBoothEventReport=async function(eventId){
   }catch(e){
     body.innerHTML='<div class="booth-empty">イベントレポートを読み込めませんでした。</div>';
     boothShowError("イベントレポートエラー","イベントレポートの読み込みに失敗しました。\n"+e.message);
+  }
+};
+
+function boothMoney(value){
+  return `¥${Number(value||0).toLocaleString("ja-JP")}`;
+}
+
+function getBoothSaleAmount(row){
+  const amount=Number(row?.amount||0);
+  if(amount)return amount;
+  return Number(row?.unit_price||0)*Number(row?.quantity||0);
+}
+
+function isBoothGachaSaleRow(row){
+  return String(row?.product_name||"").includes("ガチャ");
+}
+
+function aggregateBoothSalesByProduct(rows){
+  const map=new Map();
+  (Array.isArray(rows)?rows:[]).forEach(row=>{
+    const key=String(row.smaregi_product_id||row.barcode||row.product_name||"").trim();
+    if(!key)return;
+    const current=map.get(key)||{
+      product_name:row.product_name||"",
+      barcode:row.barcode||"",
+      smaregi_product_id:row.smaregi_product_id||"",
+      quantity:0,
+      amount:0,
+      transaction_count:0
+    };
+    current.product_name=current.product_name||row.product_name||"";
+    current.barcode=current.barcode||row.barcode||"";
+    current.smaregi_product_id=current.smaregi_product_id||row.smaregi_product_id||"";
+    current.quantity+=Number(row.quantity||0);
+    current.amount+=getBoothSaleAmount(row);
+    current.transaction_count+=1;
+    map.set(key,current);
+  });
+  return [...map.values()].sort((a,b)=>String(a.product_name||"").localeCompare(String(b.product_name||""),"ja",{numeric:true,sensitivity:"base"}));
+}
+
+function getBoothReportSalesSummaryRows(rows){
+  const list=Array.isArray(rows)?rows:[];
+  return {
+    detailCount:list.length,
+    productCount:aggregateBoothSalesByProduct(list).length,
+    qty:list.reduce((sum,row)=>sum+Number(row.quantity||0),0),
+    amount:list.reduce((sum,row)=>sum+getBoothSaleAmount(row),0)
+  };
+}
+
+buildBoothEventReportData=async function(eventId){
+  const [items,imports,movements,diffRows]=await Promise.all([
+    sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,event_storage_qty,shelf_return_qty,updated_at&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc&limit=3000`).catch(()=>[]),
+    sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed)&order=sold_at.asc&limit=3000`).catch(()=>[]),
+    sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,memo,movement_type,item_type&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(departure_count,return,gacha_pick,gacha_return,event_close_return)&order=created_at.desc&limit=3000`).catch(()=>[]),
+    buildBoothDiffUniverseRows(eventId).catch(()=>[])
+  ]);
+  const rows=Array.isArray(items)?items:[];
+  const gacha=rows.filter(row=>String(row.item_type||"")==="gacha_prize");
+  const salesRows=Array.isArray(imports)?imports:[];
+  const normalSales=salesRows.filter(row=>!isBoothGachaSaleRow(row));
+  const gachaSales=salesRows.filter(isBoothGachaSaleRow);
+  const normalSummary=getBoothReportSalesSummaryRows(normalSales);
+  const gachaSummary=getBoothReportSalesSummaryRows(gachaSales);
+  return {
+    normal:rows.filter(row=>String(row.item_type||"normal")==="normal"),
+    gacha,
+    salesRows,
+    normalSales,
+    gachaSales,
+    normalSalesProducts:aggregateBoothSalesByProduct(normalSales),
+    gachaSalesProducts:aggregateBoothSalesByProduct(gachaSales),
+    movements:Array.isArray(movements)?movements:[],
+    diffRows:Array.isArray(diffRows)?diffRows:[],
+    totals:{
+      normalSalesQty:normalSummary.qty,
+      normalSalesAmount:normalSummary.amount,
+      normalSalesProducts:normalSummary.productCount,
+      gachaSalesQty:gachaSummary.qty,
+      gachaSalesAmount:gachaSummary.amount,
+      gachaSalesProducts:gachaSummary.productCount,
+      totalSalesAmount:normalSummary.amount+gachaSummary.amount,
+      gachaRegistered:gacha.reduce((sum,row)=>sum+Number(row.taken_qty||0),0),
+      gachaUsed:gacha.reduce((sum,row)=>sum+Number(row.consumed_qty||0),0),
+      start:rows.filter(row=>String(row.item_type||"normal")==="normal").reduce((sum,row)=>sum+Number(row.taken_qty||0),0),
+      diffCount:(Array.isArray(diffRows)?diffRows:[]).filter(row=>calculateBoothItemDifference(row)!==0||!row.taken_registered).length
+    }
+  };
+};
+
+function renderBoothReportOverview(event,data){
+  return `<section class="booth-report-section booth-report-overview">
+    <h5>1. イベント概要</h5>
+    <div class="booth-report-overview-grid">
+      <div><span>イベント名</span><strong>${esc(event?.name||"-")}</strong></div>
+      <div><span>会場</span><strong>${esc(event?.venue||"-")}</strong></div>
+      <div><span>期間</span><strong>${esc([event?.event_start,event?.event_end].filter(Boolean).join(" - ")||"-")}</strong></div>
+      <div><span>持ち出し確定数</span><strong>${esc(data.totals.start)}</strong></div>
+    </div>
+  </section>`;
+}
+
+function renderBoothReportSalesSummaryCards(data){
+  return `<section class="booth-report-section">
+    <h5>2. 売上サマリー</h5>
+    <div class="booth-report-summary-grid booth-report-sales-summary">
+      <div><span>通常売上</span><strong>${esc(boothMoney(data.totals.normalSalesAmount))}</strong></div>
+      <div><span>通常販売点数</span><strong>${esc(data.totals.normalSalesQty)}</strong></div>
+      <div><span>ガチャ売上</span><strong>${esc(boothMoney(data.totals.gachaSalesAmount))}</strong></div>
+      <div><span>ガチャ回数</span><strong>${esc(data.totals.gachaSalesQty)}</strong></div>
+      <div><span>合計売上</span><strong>${esc(boothMoney(data.totals.totalSalesAmount))}</strong></div>
+    </div>
+  </section>`;
+}
+
+renderBoothReportSalesRows=function(rows){
+  const aggregated=aggregateBoothSalesByProduct(rows);
+  if(!aggregated.length)return '<div class="booth-empty">販売実績はありません。</div>';
+  const tableRows=aggregated.map(row=>{
+    const avg=row.quantity?Math.round(row.amount/row.quantity):0;
+    return `<tr><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.quantity)}</td><td>${esc(boothMoney(row.amount))}</td><td>${esc(boothMoney(avg))}</td></tr>`;
+  }).join("");
+  const cards=aggregated.map(row=>{
+    const avg=row.quantity?Math.round(row.amount/row.quantity):0;
+    return `<article class="booth-history-card booth-report-product-card">
+      <div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong></div>
+      <div class="booth-history-card-meta">
+        <span>バーコード：${esc(row.barcode||"-")}</span>
+        <span>販売数量合計：${esc(row.quantity)}</span>
+        <span>売上金額合計：${esc(boothMoney(row.amount))}</span>
+        <span>平均販売単価：${esc(boothMoney(avg))}</span>
+      </div>
+    </article>`;
+  }).join("");
+  return `<div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table booth-report-sales-product-table">
+    <thead><tr><th>商品名</th><th>バーコード</th><th>販売数量合計</th><th>売上金額合計</th><th>平均販売単価</th></tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table></div><div class="booth-history-cards booth-scroll-cards">${cards}</div>`;
+};
+
+renderBoothReportSalesSummary=function(rows){
+  const summary=getBoothReportSalesSummaryRows(rows);
+  if(!summary.detailCount)return '<div class="booth-empty">対象売上はありません。</div>';
+  return `<div class="booth-report-mini-summary">
+    <div><span>商品数</span><strong>${esc(summary.productCount)}</strong></div>
+    <div><span>販売点数</span><strong>${esc(summary.qty)}</strong></div>
+    <div><span>売上金額</span><strong>${esc(boothMoney(summary.amount))}</strong></div>
+  </div>`;
+};
+
+loadBoothEventReport=async function(eventId){
+  const body=el("boothEventReportBody");
+  if(!body)return;
+  try{
+    body.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    const event=getBoothCurrentEvent();
+    const data=await buildBoothEventReportData(eventId);
+    body.innerHTML=`
+      ${renderBoothReportOverview(event,data)}
+      ${renderBoothReportSalesSummaryCards(data)}
+      <section class="booth-report-section"><h5>3. 商品別販売実績</h5><p class="section-note">商品ごとに集計した販売実績です。取引ごとの詳細は販売履歴で確認します。</p>${renderBoothReportSalesRows(data.normalSales)}</section>
+      <section class="booth-report-section"><h5>4. ガチャ実績</h5>${renderBoothReportSalesSummary(data.gachaSales)}${renderBoothReportGachaItems(data.gacha)}</section>
+      <section class="booth-report-section"><h5>5. 在庫結果</h5>${renderBoothReportDiffRows(data.diffRows)}</section>`;
+  }catch(e){
+    body.innerHTML='<div class="booth-empty">イベントレポートを読み込めませんでした。</div>';
+    boothShowError("イベントレポートエラー","イベントレポートの読み込みに失敗しました。\n"+e.message);
+  }
+};
+
+exportBoothEventReportCsv=async function(event){
+  try{
+    const data=await buildBoothEventReportData(event.id);
+    const diffRows=data.diffRows.filter(row=>calculateBoothItemDifference(row)!==0||!row.taken_registered);
+    const normalProducts=aggregateBoothSalesByProduct(data.normalSales);
+    const gachaProducts=aggregateBoothSalesByProduct(data.gachaSales);
+    const rows=[
+      ["イベント概要"],
+      ["イベント名",event?.name||""],
+      ["会場",event?.venue||""],
+      ["開始日",event?.event_start||""],
+      ["終了日",event?.event_end||""],
+      [],
+      ["売上サマリー"],
+      ["通常売上","通常販売点数","ガチャ売上","ガチャ回数","合計売上"],
+      [data.totals.normalSalesAmount,data.totals.normalSalesQty,data.totals.gachaSalesAmount,data.totals.gachaSalesQty,data.totals.totalSalesAmount],
+      [],
+      ["商品別販売実績"],
+      ["商品名","バーコード","販売数量合計","売上金額合計"],
+      ...normalProducts.map(row=>[row.product_name||"",row.barcode||"",row.quantity,row.amount]),
+      [],
+      ["ガチャ売上集計"],
+      ["商品名","バーコード","販売数量合計","売上金額合計"],
+      ...gachaProducts.map(row=>[row.product_name||"",row.barcode||"",row.quantity,row.amount]),
+      [],
+      ["ガチャ景品実績"],
+      ["商品名","バーコード","ガチャ持ち出し数","ガチャ使用数","ガチャ戻し数","現在ガチャ残数"],
+      ...data.gacha.map(row=>[row.product_name||"",row.barcode||"",row.taken_qty??0,row.consumed_qty??0,row.returned_qty??0,boothGachaItemCurrentQty(row)]),
+      [],
+      ["在庫差異"],
+      ["商品名","バーコード","比較店舗","持ち出し","販売","戻り","消費","差異","状態"],
+      ...diffRows.map(row=>[row.product_name||"",row.barcode||"",row.store_code||"",row.taken_registered?row.taken_qty:"未登録",row.sold_qty??0,row.returned_qty??0,row.consumed_qty??0,calculateBoothItemDifference(row),row.taken_registered?"要確認":"持ち出し未登録"])
+    ];
+    downloadBoothCsvFile(`イベントレポート_${boothSafeExportName(event?.name)}_${boothTodayYmd()}.csv`,rows);
+  }catch(e){
+    boothShowError("CSV出力エラー","イベントレポートCSVの出力に失敗しました。\n"+e.message);
+  }
+};
+
+exportBoothEventReportPdf=async function(event){
+  try{
+    const data=await buildBoothEventReportData(event.id);
+    const normalProducts=aggregateBoothSalesByProduct(data.normalSales);
+    const gachaProducts=aggregateBoothSalesByProduct(data.gachaSales);
+    const diffRows=data.diffRows.filter(row=>calculateBoothItemDifference(row)!==0||!row.taken_registered);
+    const html=`<h1>イベントレポート</h1>
+      <div class="meta">
+        <strong>イベント</strong><span>${esc(event?.name||"-")}</span>
+        <strong>会場</strong><span>${esc(event?.venue||"-")}</span>
+        <strong>期間</strong><span>${esc([event?.event_start,event?.event_end].filter(Boolean).join(" - ")||"-")}</span>
+        <strong>出力日時</strong><span>${esc(new Date().toLocaleString("ja-JP"))}</span>
+      </div>
+      <div class="summary">
+        <div><strong>通常売上</strong><br>${esc(boothMoney(data.totals.normalSalesAmount))}</div>
+        <div><strong>通常販売点数</strong><br>${esc(data.totals.normalSalesQty)}</div>
+        <div><strong>ガチャ売上</strong><br>${esc(boothMoney(data.totals.gachaSalesAmount))}</div>
+        <div><strong>ガチャ回数</strong><br>${esc(data.totals.gachaSalesQty)}</div>
+        <div><strong>合計売上</strong><br>${esc(boothMoney(data.totals.totalSalesAmount))}</div>
+      </div>
+      ${boothPdfTable("商品別販売実績",["商品名","バーコード","販売数量合計","売上金額合計"],normalProducts.map(row=>[row.product_name||"",row.barcode||"",row.quantity,boothMoney(row.amount)]))}
+      ${boothPdfTable("ガチャ売上集計",["商品名","バーコード","販売数量合計","売上金額合計"],gachaProducts.map(row=>[row.product_name||"",row.barcode||"",row.quantity,boothMoney(row.amount)]))}
+      ${boothPdfTable("ガチャ景品実績",["商品名","バーコード","ガチャ持ち出し数","ガチャ使用数","ガチャ戻し数","現在ガチャ残数"],data.gacha.map(row=>[row.product_name||"",row.barcode||"",row.taken_qty??0,row.consumed_qty??0,row.returned_qty??0,boothGachaItemCurrentQty(row)]))}
+      ${boothPdfTable("在庫差異",["商品名","バーコード","比較店舗","持ち出し","販売","戻り","消費","差異","状態"],diffRows.map(row=>[row.product_name||"",row.barcode||"",row.store_code||"",row.taken_registered?row.taken_qty:"未登録",row.sold_qty??0,row.returned_qty??0,row.consumed_qty??0,calculateBoothItemDifference(row),row.taken_registered?"要確認":"持ち出し未登録"]))}`;
+    if(openBoothPdfWindow("イベントレポート",html))boothShowSuccess("PDF出力","イベントレポートPDFの印刷画面を開きました。");
+  }catch(e){
+    boothShowError("PDF出力エラー","イベントレポートPDFの出力に失敗しました。\n"+e.message);
   }
 };
