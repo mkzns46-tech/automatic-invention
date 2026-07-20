@@ -6,7 +6,7 @@ create table if not exists public.event_sales_imports (
   smaregi_product_id text not null,
   barcode text not null,
   product_name text not null,
-  quantity integer not null check (quantity > 0),
+  quantity integer not null check (quantity <> 0),
   sold_at timestamptz,
   store_code text not null,
   smaregi_store_id text,
@@ -49,3 +49,20 @@ create index if not exists event_sales_imports_register_idx
   on public.event_sales_imports(store_code, smaregi_register_id, sold_at);
 
 grant select, insert, update on public.event_sales_imports to anon, authenticated;
+
+do $$
+begin
+  if exists (
+    select 1
+    from pg_constraint
+    where conname = 'event_sales_imports_quantity_check'
+      and conrelid = 'public.event_sales_imports'::regclass
+  ) then
+    alter table public.event_sales_imports
+      drop constraint event_sales_imports_quantity_check;
+  end if;
+end $$;
+
+alter table public.event_sales_imports
+  add constraint event_sales_imports_quantity_check
+  check (quantity <> 0);
