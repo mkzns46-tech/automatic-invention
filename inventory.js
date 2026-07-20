@@ -38,21 +38,24 @@ function updateEquipmentMemoUi(){
   const memo=el("memo");
   const isEquipment=el("type")?.value==="備品転用";
   const isEventPick=el("type")?.value==="event_pick";
+  const isGacha=el("type")?.value==="gacha";
+  const isGachaReturn=el("type")?.value==="gacha_return";
   const isStockOut=el("type")?.value==="出荷";
-  const canChooseSource=isEventPick||isStockOut;
+  const canChooseSource=isStockOut;
   if(required)required.hidden=!isEquipment;
   if(memo)memo.required=isEquipment;
   const eventLabel=el("eventPickEventLabel");
   if(eventLabel){
-    eventLabel.hidden=!isEventPick;
-    eventLabel.style.display=isEventPick?"":"none";
+    const needsEvent=isEventPick||isGacha||isGachaReturn;
+    eventLabel.hidden=!needsEvent;
+    eventLabel.style.display=needsEvent?"":"none";
   }
   const sourceLabel=el("eventPickSourceLabel");
   if(sourceLabel){
     sourceLabel.hidden=!canChooseSource;
     sourceLabel.style.display=canChooseSource?"":"none";
   }
-  if(isEventPick&&typeof loadEventPickEvents==="function"&&!eventPickEvents.length){
+  if((isEventPick||isGacha||isGachaReturn)&&typeof loadEventPickEvents==="function"&&!eventPickEvents.length){
     loadEventPickEvents().then(()=>{
       renderEventPickOptions();
       renderScrollableEventPickPicker();
@@ -682,6 +685,251 @@ async function registerEventPickFromInventory({event,product,barcode,qty,staff,m
   }
 }
 
+async function findInventoryEventItem(eventId,barcode,itemType="normal"){
+  const rows=await sb(`booth_event_items?select=*&event_id=eq.${encodeURIComponent(eventId)}&barcode=eq.${encodeURIComponent(barcode)}&item_type=eq.${encodeURIComponent(itemType)}&limit=1`);
+  return Array.isArray(rows)&&rows[0] ? rows[0] : null;
+}
+
+function getEventShelfCurrentQty(item){
+  if(!item)return 0;
+  const taken=Number(item.taken_qty||0);
+  const sold=Number(item.sold_qty||0);
+  const returned=Number(item.returned_qty||0);
+  const consumed=Number(item.consumed_qty||0);
+  return Math.max(0,taken-sold-returned-consumed);
+}
+
+function getGachaCurrentQty(item){
+  if(!item)return 0;
+  return Math.max(0,Number(item.taken_qty||0)-Number(item.returned_qty||0));
+}
+
+async function patchInventoryEventItem(item,payload){
+  await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+    method:"PATCH",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify({...payload,updated_at:new Date().toISOString()})
+  });
+}
+
+async function moveEventShelfQtyToGacha(event,product,qty){
+  const item=await findInventoryEventItem(event.id,product.barcode,"normal");
+  const current=getEventShelfCurrentQty(item);
+  if(!item||current<qty)return false;
+  const normal=Math.max(0,Number(item.normal_takeout_qty||0));
+  const storage=Math.max(0,Number(item.storage_takeout_qty||0));
+  const useNormal=Math.min(normal,qty);
+  const useStorage=Math.min(storage,qty-useNormal);
+  await patchInventoryEventItem(item,{
+    taken_qty:Math.max(0,Number(item.taken_qty||0)-qty),
+    normal_takeout_qty:normal-useNormal,
+    storage_takeout_qty:storage-useStorage
+  });
+  return true;
+}
+
+async function addQtyToEventShelf(event,product,qty){
+  const item=await findInventoryEventItem(event.id,product.barcode,"normal");
+  if(item){
+    await patchInventoryEventItem(item,{
+      product_name:product.name||item.product_name||"",
+      taken_qty:Number(item.taken_qty||0)+qty,
+      normal_takeout_qty:Number(item.normal_takeout_qty||0)+qty
+    });
+    return;
+  }
+  await sb("booth_event_items",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      event_id:event.id,
+      barcode:product.barcode,
+      product_name:product.name||"",
+      item_type:"normal",
+      taken_qty:qty,
+      normal_takeout_qty:qty,
+      storage_takeout_qty:0,
+      sold_qty:0,
+      returned_qty:0,
+      consumed_qty:0,
+      difference_qty:0,
+      updated_at:new Date().toISOString()
+    }])
+  });
+}
+
+async function upsertInventoryGachaEventItem(event,product,qty,action){
+  const item=await findInventoryEventItem(event.id,product.barcode,"gacha_prize");
+  if(item){
+    const taken=Number(item.taken_qty||0);
+    const returned=Number(item.returned_qty||0);
+    const nextTaken=action==="pick" ? taken+qty : taken;
+    const nextReturned=action==="return" ? returned+qty : returned;
+    await patchInventoryEventItem(item,{
+      product_name:product.name||item.product_name||"",
+      taken_qty:nextTaken,
+      returned_qty:nextReturned,
+      consumed_qty:Math.max(0,nextTaken-nextReturned),
+      difference_qty:0
+    });
+    return;
+  }
+  const taken=action==="pick" ? qty : 0;
+  const returned=action==="return" ? qty : 0;
+  await sb("booth_event_items",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      event_id:event.id,
+      barcode:product.barcode,
+      product_name:product.name||"",
+      item_type:"gacha_prize",
+      taken_qty:taken,
+      returned_qty:returned,
+      consumed_qty:Math.max(0,taken-returned),
+      difference_qty:0,
+      updated_at:new Date().toISOString()
+    }])
+  });
+}
+
+async function rollbackInventoryGachaEventItem(event,product,qty,action){
+  const item=await findInventoryEventItem(event.id,product.barcode,"gacha_prize");
+  if(!item)return;
+  const taken=Number(item.taken_qty||0);
+  const returned=Number(item.returned_qty||0);
+  const nextTaken=action==="pick" ? Math.max(0,taken-qty) : taken;
+  const nextReturned=action==="return" ? Math.max(0,returned-qty) : returned;
+  await patchInventoryEventItem(item,{
+    taken_qty:nextTaken,
+    returned_qty:nextReturned,
+    consumed_qty:Math.max(0,nextTaken-nextReturned)
+  });
+}
+
+async function insertInventoryGachaMovement(event,product,qty,staff,memo,movementType,delta,source){
+  await sb("booth_stock_movements",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      event_id:event.id,
+      barcode:product.barcode,
+      product_name:product.name||"",
+      item_type:"gacha_prize",
+      movement_type:movementType,
+      quantity:qty,
+      staff,
+      memo,
+      takeout_source:source||"",
+      affects_smaregi:true,
+      smaregi_delta:delta
+    }])
+  });
+}
+
+async function registerGachaFromInventory({action,event,product,barcode,qty,staff,memo,currentStock}){
+  const isPick=action==="pick";
+  const movementType=isPick?"gacha_pick":"gacha_return";
+  const delta=isPick?-qty:qty;
+  let source="";
+  let productUpdated=false;
+  let sourceMoved=false;
+  let gachaUpdated=false;
+  let previousStock=currentStock;
+  let insertedLog=null;
+  let insertedLogId="";
+  try{
+    if(isPick){
+      const movedFromEventShelf=await moveEventShelfQtyToGacha(event,product,qty);
+      source=movedFromEventShelf?"event_shelf":"normal";
+      sourceMoved=true;
+      if(!movedFromEventShelf){
+        const nextStock=currentStock-qty;
+        if(nextStock<0)throw new Error(`在庫不足：${product.name||barcode} / 現在庫 ${currentStock} / ガチャ ${qty}`);
+        await updateProductCurrentStock(barcode,nextStock);
+        productUpdated=true;
+      }
+    }else{
+      const gachaItem=await findInventoryEventItem(event.id,barcode,"gacha_prize");
+      const currentGacha=getGachaCurrentQty(gachaItem);
+      if(currentGacha<qty)throw new Error(`ガチャ在庫不足：${product.name||barcode} / 現在ガチャ在庫 ${currentGacha} / 戻し ${qty}`);
+      await addQtyToEventShelf(event,product,qty);
+      sourceMoved=true;
+      source="event_shelf";
+    }
+
+    insertedLog=await sb("inventory_logs",{
+      method:"POST",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify({
+        type:movementType,
+        staff,
+        barcode,
+        product_name:product.name,
+        quantity:qty,
+        memo,
+        event_id:event.id,
+        affects_smaregi:true,
+        smaregi_delta:delta,
+        equipment_checked:false
+      })
+    });
+    insertedLogId=Array.isArray(insertedLog)&&insertedLog[0]?String(insertedLog[0].id||""):"";
+
+    await upsertInventoryGachaEventItem(event,product,qty,action);
+    gachaUpdated=true;
+    await insertInventoryGachaMovement(event,product,qty,staff,memo,movementType,delta,source);
+
+    const logRow=Array.isArray(insertedLog)&&insertedLog[0]?insertedLog[0]:null;
+    logs.unshift({
+      id:insertedLogId,
+      created_at:logRow?.created_at||new Date().toISOString(),
+      type:movementType,
+      staff,
+      barcode,
+      product_name:product.name,
+      quantity:qty,
+      memo,
+      event_id:event.id,
+      affects_smaregi:true,
+      smaregi_delta:delta,
+      equipment_checked:false
+    });
+
+    const label=isPick?"ガチャ":"ガチャ戻し";
+    showMessage(`${label}登録：${product.name||barcode} / イベント：${event.name||"-"} / 数量 ${qty}`,"ok");
+    showPopup(`${label}登録完了`,`${label}\n${buildProductIdentityText(product)}\nイベント：${event.name||"-"}\n数量：${qty}\n担当者：${staff}\nスマレジ在庫：手動確認対象`);
+
+    el("barcodeInput").value="";
+    el("qty").value="";
+    await renderScanPreview();
+    await showProductHistoryForBarcode(barcode);
+    el("barcodeInput").focus();
+  }catch(e){
+    if(productUpdated){
+      try{await updateProductCurrentStock(barcode,previousStock);}catch(_){}
+    }
+    if(gachaUpdated){
+      try{await rollbackInventoryGachaEventItem(event,product,qty,action);}catch(_){}
+    }
+    if(sourceMoved&&source==="event_shelf"){
+      try{
+        if(isPick)await addQtyToEventShelf(event,product,qty);
+        else await moveEventShelfQtyToGacha(event,product,qty);
+      }catch(_){}
+    }
+    if(insertedLogId){
+      try{
+        await sb(`inventory_logs?id=eq.${encodeURIComponent(insertedLogId)}`,{
+          method:"DELETE",
+          headers:{Prefer:"return=minimal"}
+        });
+      }catch(_){}
+    }
+    throw e;
+  }
+}
+
 async function registerBarcode(barcode){
   let directStorageOutResult=null;
   let directStorageOutProduct=null;
@@ -695,13 +943,16 @@ async function registerBarcode(barcode){
     const qty=Number(qtyRaw);
     const memo=el("memo").value.trim();
     const isEventPick=type==="event_pick";
-    const isStockOut=type==="出荷";
-    const canChooseSource=isEventPick||isStockOut;
+    const isGacha=type==="gacha";
+    const isGachaReturn=type==="gacha_return";
+    const requiresEvent=isEventPick||isGacha||isGachaReturn;
+    const isStockOut=type==="\u51fa\u8377";
+    const canChooseSource=isStockOut;
     const eventPickEventId=String(el("eventPickEventSelect")?.value||"").trim();
-    const eventPickEvent=isEventPick?findEventPickEvent(eventPickEventId):null;
+    const eventPickEvent=requiresEvent?findEventPickEvent(eventPickEventId):null;
     const eventPickSource=canChooseSource?getEventPickSource():"normal";
 
-    if(isEventPick){
+    if(requiresEvent){
       if(!eventPickEvent){
         showMessage("イベント名を選択してください","err");
         el("eventPickEventSelect")?.focus();
@@ -737,12 +988,12 @@ async function registerBarcode(barcode){
       return;
     }
 
-    const requiresStaffStoreMatch=type==="備品転用"||type==="在庫修正"||isEventPick||(type==="出荷"&&eventPickSource==="storage");
+    const requiresStaffStoreMatch=type==="備品転用"||type==="在庫修正"||requiresEvent||(type==="\u51fa\u8377"&&eventPickSource==="storage");
     if(requiresStaffStoreMatch&&typeof enforceStaffStoreMatch==="function"&&!enforceStaffStoreMatch(staff,"店舗確認エラー","staff")){
       return;
     }
 
-    if(isEventPick&&!eventPickEvent){
+    if(requiresEvent&&!eventPickEvent){
       showMessage("イベントピックするイベントを選択してください。","err");
       el("eventPickEventSelect")?.focus();
       return;
@@ -794,6 +1045,20 @@ async function registerBarcode(barcode){
         currentStock,
         newStock,
         source:eventPickSource
+      });
+      return;
+    }
+
+    if(isGacha||isGachaReturn){
+      await registerGachaFromInventory({
+        action:isGacha?"pick":"return",
+        event:eventPickEvent,
+        product:p,
+        barcode,
+        qty,
+        staff,
+        memo,
+        currentStock
       });
       return;
     }
@@ -925,8 +1190,18 @@ function isEquipmentTransferChecked(log){
     || Boolean(log?.equipment_checked_at);
 }
 
+function isManualSmaregiConfirmationType(log){
+  const type=String(log?.type||"");
+  return type==="備品転用"||type==="equipment_transfer"||type==="gacha_pick"||type==="gacha_return";
+}
+
+function isGachaInventoryLog(log){
+  const type=String(log?.type||"");
+  return type==="gacha_pick"||type==="gacha_return";
+}
+
 function equipmentCheckHtml(log){
-  if(log.type!=="備品転用"&&log.type!=="equipment_transfer")return "";
+  if(!isManualSmaregiConfirmationType(log))return "";
   const rawLogId=String(log.id||"");
   if(rawLogId)equipmentTransferLogCache.set(rawLogId,log);
   const logId=esc(rawLogId);
@@ -938,6 +1213,76 @@ function equipmentCheckHtml(log){
     return `<div class="equipment-check-cell" data-log-id="${logId}"><span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${logId}" disabled title="管理者認証後に操作できます">管理者認証が必要</button></div>`;
   }
   return `<div class="equipment-check-cell" data-log-id="${logId}"><span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${logId}">確認</button></div>`;
+}
+
+function showManualSmaregiConfirmPopup({log,quantity,checkedBy,onOk}){
+  const typeLabel=String(log.type)==="gacha_return" ? "ガチャ戻し" : "ガチャ";
+  const popup=document.createElement("div");
+  popup.className="app-popup app-confirm-popup";
+  popup.style.display="flex";
+  popup.innerHTML=`<div class="app-popup-card">
+    <div class="app-popup-title">${esc(typeLabel)}確認</div>
+    <div class="app-popup-body">${esc(typeLabel)}のスマレジ手動調整を確認済みにします。
+
+商品名：${esc(log.product_name||"-")}
+棚番：${esc(getProductShelfLabel({location:log.location||""}))}
+バーコード：${esc(log.barcode||"-")}
+数量：${esc(quantity)}
+担当者：${esc(log.staff||"-")}
+確認者：${esc(checkedBy)}
+
+よろしいですか？</div>
+    <div class="app-confirm-actions">
+      <button type="button" class="secondary app-manual-smaregi-cancel-btn">キャンセル</button>
+      <button type="button" class="app-manual-smaregi-ok-btn">確認済みにする</button>
+    </div>
+  </div>`;
+  const close=()=>{try{document.body.removeChild(popup);}catch(_){}};
+  popup.querySelector(".app-manual-smaregi-cancel-btn")?.addEventListener("click",close);
+  popup.querySelector(".app-manual-smaregi-ok-btn")?.addEventListener("click",()=>{
+    close();
+    onOk();
+  });
+  popup.addEventListener("click",event=>{
+    if(event.target===popup)close();
+  });
+  document.body.appendChild(popup);
+}
+
+async function executeManualSmaregiConfirmation({log,checkedBy,button}){
+  const logId=String(log.id||"").trim();
+  await runWithSmaregiAutoRefreshPaused(async()=>{
+    try{
+      const latestRows=await sb(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`);
+      const latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : null;
+      if(!latestLog)throw new Error(`inventory_logs.id=${logId} が見つかりません`);
+      if(!isGachaInventoryLog(latestLog))throw new Error("ガチャ履歴ではありません");
+      if(isEquipmentTransferChecked(latestLog))throw new Error("すでに確認済みです");
+      const equipment_checked_at=new Date().toISOString();
+      const patchedRows=await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}&select=*`,{
+        method:"PATCH",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify({
+          equipment_checked:true,
+          equipment_checked_by:checkedBy,
+          equipment_checked_at
+        })
+      });
+      const refreshedLog=Array.isArray(patchedRows)&&patchedRows[0] ? patchedRows[0] : null;
+      if(!refreshedLog)throw new Error(`inventory_logs.id=${logId} を更新できませんでした`);
+      equipmentTransferLogCache.set(logId,refreshedLog);
+      replaceEquipmentConfirmationDom(logId,refreshedLog);
+      logs=(logs||[]).some(item=>String(item.id)===String(logId))
+        ? logs.map(item=>String(item.id)===String(logId) ? refreshedLog : item)
+        : [refreshedLog,...logs];
+      showMessage("スマレジ手動調整を確認済みにしました","ok");
+      renderGlobalHistory();
+      if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode,refreshedLog);
+      if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
+    }catch(e){
+      showMessage("スマレジ手動確認エラー\n"+e.message,"err");
+    }
+  },{button});
 }
 
 function replaceEquipmentConfirmationDom(logId,log){
@@ -1139,6 +1484,17 @@ async function confirmEquipmentTransfer(logId,button=null){
     if(isEquipmentTransferChecked(log)){
       showMessage("この商品転用は確認済みです。","err");
       replaceEquipmentConfirmationDom(logId,log);
+      return;
+    }
+    if(isGachaInventoryLog(log)){
+      const quantity=Number(log.quantity||0);
+      if(!Number.isInteger(quantity)||quantity<=0)throw new Error("数量は1以上で入力してください。");
+      showManualSmaregiConfirmPopup({
+        log,
+        quantity,
+        checkedBy,
+        onOk:()=>executeManualSmaregiConfirmation({log,checkedBy,button})
+      });
       return;
     }
     if(log.type!=="備品転用")throw new Error("商品転用の履歴ではありません。");

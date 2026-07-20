@@ -484,7 +484,7 @@ function renderBoothEventDetail(event){
     <div class="booth-work-menu-title">作業内容を選んでください</div>
     <div class="booth-event-menu" aria-label="イベント内メニュー">
       <button type="button" class="booth-event-menu-btn" data-booth-menu="copy">前回イベントコピー</button>
-      <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">保管在庫持ち出し</button>
+      <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">イベント在庫一覧</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="return">戻り棚卸</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">イベント保管</button>
@@ -1901,7 +1901,7 @@ function renderBoothEventDetail(event){
       <div class="booth-detail-memo"><span>メモ</span><strong>${esc(event.memo||"-")}</strong></div>
     </div>
     <div class="booth-event-menu" aria-label="イベント内メニュー">
-      <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">保管在庫持ち出し</button>
+      <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">イベント在庫一覧</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="return">戻り棚卸</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="storage">イベント保管</button>
@@ -1912,7 +1912,7 @@ function renderBoothEventDetail(event){
     </div>
     <div id="boothEventWorkArea" class="booth-work-area">
       <section class="booth-work-card booth-carry-out-card">
-        <h4>保管在庫持ち出し</h4>
+        <h4>イベント在庫一覧</h4>
         <p class="section-note">イベント保管在庫から今回イベント在庫へ移動します。スマレジ在庫・通常棚在庫・inventory_logsは変更しません。</p>
         <div class="button-row booth-camera-button-row">
           <button type="button" id="boothStartCameraBtn">カメラ読取</button>
@@ -1978,6 +1978,232 @@ function renderBoothEventDetail(event){
   updateBoothCameraZoomLabel();
   loadBoothCarryOutHistory(event.id);
   loadBoothPlannedItems(event.id);
+  renderBoothEventInventoryPanel(event);
+}
+
+function boothEventItemCurrentQty(item){
+  const taken=Number(item?.taken_qty||0);
+  const sold=Number(item?.sold_qty||0);
+  const returned=Number(item?.returned_qty||0);
+  const consumed=Number(item?.consumed_qty||0);
+  return Math.max(0,taken-sold-returned-consumed);
+}
+
+function boothGachaItemCurrentQty(item){
+  return Math.max(0,Number(item?.taken_qty||0)-Number(item?.returned_qty||0));
+}
+
+function boothProductShelfText(product){
+  if(typeof getProductShelfLabel==="function")return getProductShelfLabel(product||{});
+  const location=String(product?.location||"").trim();
+  return location||"未設定";
+}
+
+function boothProductIdentityBlock(row){
+  return `<div class="booth-product-identity">
+    <strong>${esc(row.name||row.product_name||"-")}</strong>
+    <span>棚番：${esc(row.shelf||"未設定")}</span>
+    <span>バーコード：${esc(row.barcode||"-")}</span>
+  </div>`;
+}
+
+async function loadBoothProductsByBarcode(barcodes){
+  const unique=[...new Set((barcodes||[]).filter(Boolean).map(String))];
+  if(!unique.length)return new Map();
+  const inList=unique.map(v=>encodeURIComponent(v)).join(",");
+  const rows=await sb(`products?select=barcode,name,location,updated_at&barcode=in.(${inList})&limit=1000`).catch(()=>[]);
+  return new Map((Array.isArray(rows)?rows:[]).map(row=>[String(row.barcode||""),row]));
+}
+
+function sortBoothInventoryRows(rows,sortKey){
+  const list=[...(rows||[])];
+  if(typeof sortProductsForDisplay==="function"){
+    return sortProductsForDisplay(list,sortKey);
+  }
+  const collator=new Intl.Collator("ja",{numeric:true,sensitivity:"base"});
+  if(sortKey==="barcode")return list.sort((a,b)=>collator.compare(String(a.barcode||""),String(b.barcode||"")));
+  if(sortKey==="location")return list.sort((a,b)=>{
+    const av=String(a.shelf||"");
+    const bv=String(b.shelf||"");
+    if(!av&&!bv)return 0;
+    if(!av)return 1;
+    if(!bv)return -1;
+    return collator.compare(av,bv);
+  });
+  if(sortKey==="updated_at")return list.sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
+  return list.sort((a,b)=>collator.compare(String(a.name||""),String(b.name||"")));
+}
+
+async function buildBoothEventInventoryRows(eventId){
+  const items=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty,updated_at&event_id=eq.${encodeURIComponent(eventId)}&item_type=in.(normal,gacha_prize)&order=product_name.asc&limit=2000`);
+  const rows=Array.isArray(items)?items:[];
+  const productsByBarcode=await loadBoothProductsByBarcode(rows.map(row=>row.barcode));
+  const map=new Map();
+  rows.forEach(item=>{
+    const barcode=String(item.barcode||"");
+    if(!barcode)return;
+    const product=productsByBarcode.get(barcode)||{};
+    const row=map.get(barcode)||{
+      barcode,
+      name:product.name||item.product_name||"",
+      product_name:item.product_name||product.name||"",
+      shelf:boothProductShelfText(product),
+      updated_at:product.updated_at||item.updated_at||"",
+      eventShelfQty:0,
+      gachaQty:0
+    };
+    if(item.item_type==="gacha_prize")row.gachaQty+=boothGachaItemCurrentQty(item);
+    else row.eventShelfQty+=boothEventItemCurrentQty(item);
+    map.set(barcode,row);
+  });
+  return [...map.values()].map(row=>({...row,totalQty:row.eventShelfQty+row.gachaQty})).filter(row=>row.totalQty!==0);
+}
+
+async function renderBoothEventInventoryPanel(event){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  area.innerHTML=`<section class="booth-work-card booth-event-inventory-card">
+    <div class="booth-list-header">
+      <div>
+        <h4>イベント在庫一覧</h4>
+        <p class="section-note">在庫変動登録のイベントピック、ガチャ登録から現在のイベント関連在庫を集計します。</p>
+      </div>
+      <span id="boothEventInventoryCount" class="inventory-count-pill">0件</span>
+    </div>
+    <div class="booth-event-inventory-controls">
+      <label>商品検索
+        <input id="boothEventInventorySearch" autocomplete="off" placeholder="商品名・バーコード">
+      </label>
+      <label>並び順
+        <select id="boothEventInventorySort">
+          <option value="name">商品名順</option>
+          <option value="barcode">バーコード順</option>
+          <option value="location">棚番順</option>
+          <option value="updated_at">最終更新順</option>
+        </select>
+      </label>
+      <button type="button" id="boothEventInventoryReloadBtn" class="secondary">再読込</button>
+    </div>
+    <div id="boothEventInventoryList" class="booth-event-inventory-list"><div class="booth-empty">読み込み中...</div></div>
+  </section>`;
+  const storageKey="arico_booth_event_inventory_sort";
+  const sortEl=el("boothEventInventorySort");
+  if(sortEl)sortEl.value=localStorage.getItem(storageKey)||"name";
+  const draw=async()=>{
+    const listEl=el("boothEventInventoryList");
+    if(!listEl)return;
+    listEl.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    try{
+      const query=String(el("boothEventInventorySearch")?.value||"").trim().toLowerCase();
+      const sortKey=String(el("boothEventInventorySort")?.value||"name");
+      localStorage.setItem(storageKey,sortKey);
+      let rows=await buildBoothEventInventoryRows(event.id);
+      if(query){
+        rows=rows.filter(row=>[row.name,row.product_name,row.barcode,row.shelf].some(v=>String(v||"").toLowerCase().includes(query)));
+      }
+      rows=sortBoothInventoryRows(rows,sortKey);
+      const countEl=el("boothEventInventoryCount");
+      if(countEl)countEl.textContent=`${rows.length}件`;
+      if(!rows.length){
+        listEl.innerHTML='<div class="booth-empty">イベント関連在庫はありません。</div>';
+        return;
+      }
+      listEl.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table booth-event-inventory-table">
+        <thead><tr><th>商品情報</th><th>イベント棚在庫</th><th>ガチャ在庫</th><th>合計</th></tr></thead>
+        <tbody>${rows.map(row=>`<tr>
+          <td>${boothProductIdentityBlock(row)}</td>
+          <td>${esc(row.eventShelfQty)}</td>
+          <td>${esc(row.gachaQty)}</td>
+          <td><strong>${esc(row.totalQty)}</strong></td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+      <div class="booth-history-cards">
+        ${rows.map(row=>`<article class="booth-history-card">
+          ${boothProductIdentityBlock(row)}
+          <div class="booth-history-card-meta">
+            <span>イベント棚在庫：${esc(row.eventShelfQty)}</span>
+            <span>ガチャ在庫：${esc(row.gachaQty)}</span>
+            <span>イベント関連在庫合計：${esc(row.totalQty)}</span>
+          </div>
+        </article>`).join("")}
+      </div>`;
+    }catch(e){
+      listEl.innerHTML='<div class="booth-empty">イベント在庫一覧を読み込めませんでした。</div>';
+      boothShowError("イベント在庫一覧エラー","イベント在庫一覧の読み込みに失敗しました。\n"+e.message);
+    }
+  };
+  el("boothEventInventorySearch")?.addEventListener("input",draw);
+  el("boothEventInventorySort")?.addEventListener("change",draw);
+  el("boothEventInventoryReloadBtn")?.addEventListener("click",draw);
+  draw();
+}
+
+async function renderBoothGachaListPanel(event){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  area.innerHTML=`<section class="booth-work-card booth-gacha-card">
+    <div class="booth-list-header">
+      <div>
+        <h4>ガチャ商品</h4>
+        <p class="section-note">在庫変動登録で対象イベントへ登録したガチャ商品を表示します。</p>
+      </div>
+      <button type="button" id="reloadBoothGachaListBtn" class="secondary">再読込</button>
+    </div>
+    <div id="boothGachaList" class="booth-carry-history-list"><div class="booth-empty">読み込み中...</div></div>
+  </section>`;
+  const draw=async()=>{
+    const list=el("boothGachaList");
+    if(!list)return;
+    list.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    try{
+      const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,difference_qty,updated_at&event_id=eq.${encodeURIComponent(event.id)}&item_type=eq.gacha_prize&order=product_name.asc&limit=1000`);
+      const items=Array.isArray(rows)?rows:[];
+      const productsByBarcode=await loadBoothProductsByBarcode(items.map(row=>row.barcode));
+      const viewRows=items.map(item=>{
+        const product=productsByBarcode.get(String(item.barcode||""))||{};
+        const registered=Number(item.taken_qty||0);
+        const returned=Number(item.returned_qty||0);
+        const current=Math.max(0,registered-returned);
+        return {
+          barcode:item.barcode,
+          name:product.name||item.product_name||"",
+          shelf:boothProductShelfText(product),
+          registered,
+          used:Number(item.consumed_qty||current),
+          current,
+          updated_at:product.updated_at||item.updated_at||""
+        };
+      });
+      if(!viewRows.length){
+        list.innerHTML='<div class="booth-empty">ガチャ商品はありません。在庫変動登録で「ガチャ」を登録してください。</div>';
+        return;
+      }
+      list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table booth-gacha-list-table">
+        <thead><tr><th>商品情報</th><th>ガチャ登録数</th><th>使用数</th><th>現在ガチャ在庫</th></tr></thead>
+        <tbody>${viewRows.map(row=>`<tr>
+          <td>${boothProductIdentityBlock(row)}</td>
+          <td>${esc(row.registered)}</td>
+          <td>${esc(row.used)}</td>
+          <td><strong>${esc(row.current)}</strong></td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+      <div class="booth-history-cards">
+        ${viewRows.map(row=>`<article class="booth-history-card">
+          ${boothProductIdentityBlock(row)}
+          <div class="booth-history-card-meta">
+            <span>ガチャ登録数：${esc(row.registered)}</span>
+            <span>使用数：${esc(row.used)}</span>
+            <span>現在ガチャ在庫：${esc(row.current)}</span>
+          </div>
+        </article>`).join("")}
+      </div>`;
+    }catch(e){
+      list.innerHTML='<div class="booth-empty">ガチャ商品を読み込めませんでした。</div>';
+      boothShowError("ガチャ商品エラー","ガチャ商品の読み込みに失敗しました。\n"+e.message);
+    }
+  };
+  el("reloadBoothGachaListBtn")?.addEventListener("click",draw);
+  draw();
 }
 
 async function findBoothProductByBarcode(barcode){
@@ -2441,7 +2667,7 @@ function renderBoothEventDetail(event){
     <div class="booth-work-menu-title">作業内容を選んでください</div>
     <div class="booth-event-menu" aria-label="イベント内メニュー">
       <button type="button" class="booth-event-menu-btn" data-booth-menu="copy">前回イベントコピー</button>
-      <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">保管在庫持ち出し</button>
+      <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">イベント在庫一覧</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="gacha">ガチャ管理</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="sales">販売取り込み</button>
@@ -2451,7 +2677,7 @@ function renderBoothEventDetail(event){
     </div>
     <div id="boothEventWorkArea" class="booth-work-area">
       <section class="booth-work-card booth-carry-out-card">
-        <h4>保管在庫持ち出し</h4>
+        <h4>イベント在庫一覧</h4>
         <p class="section-note">今回はスマレジAPIを呼ばず、event_id: ${esc(event.id)} に持ち出し履歴だけ保存します。</p>
         <div class="button-row booth-camera-button-row">
           <button type="button" id="boothStartCameraBtn">カメラ読取</button>
@@ -2486,7 +2712,7 @@ function renderBoothEventDetail(event){
           <label>担当者<span class="required">必須</span>
             <select id="boothCarryOutStaff" ${closed?"disabled":""}>${staffOptions}</select>
           </label>
-          <button type="button" id="boothCarryOutRegisterBtn" ${closed?"disabled":""}>保管在庫持ち出し登録</button>
+          <button type="button" id="boothCarryOutRegisterBtn" ${closed?"disabled":""}>イベント在庫一覧登録</button>
         </div>
         <div id="boothProductPreview" class="booth-product-preview" hidden></div>
         <label class="booth-carry-memo-label">メモ
@@ -2547,7 +2773,7 @@ function switchBoothEventMenu(menu){
     return;
   }
   if(menu==="carry-out"){
-    renderBoothEventDetail(event);
+    renderBoothEventInventoryPanel(event);
     return;
   }
   if(menu==="return"){
@@ -2555,7 +2781,7 @@ function switchBoothEventMenu(menu){
     return;
   }
   if(menu==="gacha"){
-    renderBoothGachaPanel(event);
+    renderBoothGachaListPanel(event);
     return;
   }
   if(menu==="sales"){
