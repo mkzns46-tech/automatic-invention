@@ -6815,7 +6815,53 @@ body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
   body[data-inventory-screen="shelf-location"] .shelf-location-table td:nth-child(4)::before{content:"操作内容";}
   body[data-inventory-screen="shelf-location"] .shelf-location-table td:nth-child(5)::before{content:"担当者";}
   body[data-inventory-screen="shelf-location"] .shelf-location-table td:nth-child(6)::before{content:"操作";}
-  body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
+body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
+  width:100%;
+  }
+}
+
+.booth-event-inventory-controls{
+  display:grid;
+  grid-template-columns:minmax(220px,1fr) minmax(180px,240px) auto;
+  gap:10px;
+  align-items:end;
+  margin:12px 0;
+}
+.booth-product-identity{
+  display:grid;
+  gap:3px;
+  min-width:0;
+  white-space:normal;
+}
+.booth-product-identity strong{
+  color:var(--main-dark);
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.booth-product-identity span{
+  color:#527161;
+  font-size:.88rem;
+  overflow-wrap:anywhere;
+}
+.booth-event-inventory-table td,
+.booth-gacha-list-table td{
+  vertical-align:top;
+  white-space:normal;
+}
+.booth-event-inventory-table th:first-child,
+.booth-gacha-list-table th:first-child{
+  width:58%;
+}
+
+@media(max-width:800px){
+  .booth-event-inventory-controls{
+    grid-template-columns:1fr;
+  }
+  .booth-event-inventory-controls button{
     width:100%;
+  }
+  .booth-event-inventory-table,
+  .booth-gacha-list-table{
+    display:none;
   }
 }
