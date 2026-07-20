@@ -94,6 +94,12 @@ function toPositiveInteger(value) {
   return Math.trunc(Math.abs(n));
 }
 
+function toSignedInteger(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.trunc(n);
+}
+
 function toNumber(value) {
   const n = Number(String(value ?? "").replace(/,/g, ""));
   return Number.isFinite(n) ? n : 0;
@@ -116,6 +122,19 @@ function normalizeJstDateTime(value, fallbackDate, edge) {
 
 function isCancelledTransaction(row) {
   const cancelDivision = String(pick(row, ["cancelDivision", "cancel_division"], "0") || "0").toLowerCase();
+  const status = String(pick(row, ["status", "transactionStatus", "transaction_status"], "") || "").toLowerCase();
+  if (cancelDivision === "1" || cancelDivision.includes("cancel")) return true;
+  if (status.includes("cancel")) return true;
+  return false;
+}
+
+function isCancelledDetail(row) {
+  const cancelDivision = String(pick(row, ["cancelDivision", "cancel_division"], "0") || "0").toLowerCase();
+  const status = String(pick(row, ["status", "detailStatus", "detail_status"], "") || "").toLowerCase();
+  return cancelDivision === "1" || cancelDivision.includes("cancel") || status.includes("cancel");
+}
+
+function isReturnTransaction(row) {
   const transactionDivision = String(pick(row, [
     "transactionHeadDivision",
     "transaction_head_division",
@@ -123,15 +142,13 @@ function isCancelledTransaction(row) {
     "transaction_division"
   ], "1") || "1").toLowerCase();
   const status = String(pick(row, ["status", "transactionStatus", "transaction_status"], "") || "").toLowerCase();
-  if (cancelDivision === "1" || cancelDivision.includes("cancel")) return true;
-  if (status.includes("cancel") || status.includes("return")) return true;
-  return transactionDivision && transactionDivision !== "1";
+  return status.includes("return") || status.includes("refund") || transactionDivision === "2" || transactionDivision === "return" || transactionDivision === "refund";
 }
 
-function isCancelledDetail(row) {
-  const cancelDivision = String(pick(row, ["cancelDivision", "cancel_division"], "0") || "0").toLowerCase();
+function isReturnDetail(row) {
+  const division = String(pick(row, ["transactionDetailDivision", "transaction_detail_division", "detailDivision", "detail_division"], "") || "").toLowerCase();
   const status = String(pick(row, ["status", "detailStatus", "detail_status"], "") || "").toLowerCase();
-  return cancelDivision === "1" || cancelDivision.includes("cancel") || status.includes("cancel") || status.includes("return");
+  return status.includes("return") || status.includes("refund") || division === "2" || division === "return" || division === "refund";
 }
 
 function getDetails(row) {
@@ -143,6 +160,7 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
   const sales = [];
   for (const transaction of transactions) {
     if (!transaction || isCancelledTransaction(transaction)) continue;
+    const transactionSign = isReturnTransaction(transaction) ? -1 : 1;
     const terminalId = String(pick(transaction, ["terminalId", "terminal_id"], "") || "").trim();
     if (String(targetTerminalId || "").trim() && terminalId !== String(targetTerminalId || "").trim()) continue;
     const transactionId = String(pick(transaction, [
@@ -163,12 +181,15 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
 
     getDetails(transaction).forEach((detail, index) => {
       if (!detail || isCancelledDetail(detail)) return;
+      const sign = transactionSign * (isReturnDetail(detail) ? -1 : 1);
       const productId = String(pick(detail, ["productId", "product_id"]) || "").trim();
       if (!productId || (productIdSet.size && !productIdSet.has(productId))) return;
-      const quantity = toPositiveInteger(pick(detail, ["quantity", "salesQuantity", "sales_quantity", "unitSalesQuantity", "unit_sales_quantity"], 0));
+      const rawQuantity = toSignedInteger(pick(detail, ["quantity", "salesQuantity", "sales_quantity", "unitSalesQuantity", "unit_sales_quantity"], 0));
+      const quantity = Math.abs(rawQuantity) * sign;
       if (!quantity) return;
       const unitPrice = toNumber(pick(detail, ["unitPrice", "unit_price", "salesPrice", "sales_price", "price"], 0));
       const amountValue = toNumber(pick(detail, ["salesAmount", "sales_amount", "subtotal", "amount", "total"], 0));
+      const amount = Math.abs(amountValue) * sign;
       const detailId = String(pick(detail, [
         "transactionDetailId",
         "transaction_detail_id",
@@ -182,7 +203,7 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
         smaregi_terminal_id: terminalId,
         quantity,
         unit_price: unitPrice,
-        amount: amountValue || unitPrice * quantity,
+        amount,
         sold_at: soldAt,
         product_name: String(pick(detail, ["productName", "product_name"], "") || "").trim()
       });

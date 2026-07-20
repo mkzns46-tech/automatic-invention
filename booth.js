@@ -6091,7 +6091,7 @@ async function importBoothSalesDraft(){
         imported_at:now,
         updated_at:now
       };
-    }).filter(row=>row&&row.smaregi_transaction_id&&row.smaregi_detail_id&&row.quantity>0);
+    }).filter(row=>row&&row.smaregi_transaction_id&&row.smaregi_detail_id&&row.quantity!==0);
 
     if(rows.length){
       try{
@@ -6400,9 +6400,7 @@ function boothMoney(value){
 }
 
 function getBoothSaleAmount(row){
-  const amount=Number(row?.amount||0);
-  if(amount)return amount;
-  return Number(row?.unit_price||0)*Number(row?.quantity||0);
+  return Number(row?.amount||0);
 }
 
 function isBoothGachaSaleRow(row){
