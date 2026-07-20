@@ -497,7 +497,7 @@
     const autoScript = action === "print"
       ? `<script>window.onload = () => { document.title=${safeTitleLiteral}; setTimeout(() => window.print(), 120); };</script>`
       : "";
-    win.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><base href="${escapeHtml(baseHref)}"><title>${escapeHtml(title)}</title>${css()}</head><body>${body}${autoScript}</body></html>`);
+    win.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet"><base href="${escapeHtml(baseHref)}"><title>${escapeHtml(title)}</title>${css()}</head><body>${body}${autoScript}</body></html>`);
     win.document.close();
     return true;
   }

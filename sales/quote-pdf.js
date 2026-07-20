@@ -37,7 +37,7 @@ function printQuotePdf(quote) {
   const html = `<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <title>${quoteEscape(quote.quoteNo || "見積書")}</title>
 <style>
 @page { size: A4; margin: 16mm; }

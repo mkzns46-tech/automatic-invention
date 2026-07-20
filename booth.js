@@ -1622,7 +1622,7 @@ async function exportPreviousBoothEventPlanPdf(targetEventId){
     const gachaSummary=getBoothCopySummary(rows.gacha,"gacha");
     const eventDate=[sourceEvent?.event_start,sourceEvent?.event_end].filter(Boolean).join(" ～ ")||"-";
     const outputAt=new Date().toLocaleString("ja-JP");
-    const html=`<!doctype html><html lang="ja"><head><meta charset="utf-8">
+    const html=`<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
       <title>ARICO ARCHERY イベント予定リスト</title>
       <style>
         body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#12372a;margin:24px;}

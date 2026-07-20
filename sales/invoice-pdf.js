@@ -113,7 +113,7 @@ function printInvoicePdf(invoice) {
   win.document.write(`<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <title>${invoicePdfEscape(doc.invoiceNo || "invoice")}</title>
 <style>
   @page{size:A4;margin:14mm}

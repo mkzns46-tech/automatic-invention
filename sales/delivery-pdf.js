@@ -25,7 +25,7 @@ function printDeliveryPdf(delivery) {
   const shippingBox = shippingDate || delivery.shippingCarrier || delivery.trackingNumber || delivery.shippingMethod
     ? `<div class="box">発送方法：${shippingMethod}<br>${shippingDateLabel}：${shippingDate || ""}${deliveryOnlyInfo}<br>担当者：${getSalesStaffDisplayName(delivery.shippingStaff || "")}</div>`
     : "";
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>納品書 ${delivery.deliveryNo || ""}</title>
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet"><title>納品書 ${delivery.deliveryNo || ""}</title>
   <style>
     body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#10251b;margin:32px}
     h1{font-size:28px;margin:0 0 20px} .head{display:flex;justify-content:space-between;gap:24px;margin-bottom:24px}

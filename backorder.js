@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARICO 取り寄せ管理</title>
 <link rel="stylesheet" href="backorder.css">

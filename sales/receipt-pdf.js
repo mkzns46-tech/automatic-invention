@@ -4,7 +4,7 @@ function printReceiptPdf(receipt) {
   const isRefund = String(receipt.transactionType || "").trim() === "返金" || Number(receipt.amount || 0) < 0;
   const amountClass = value => Number(value || 0) < 0 || isRefund ? "amount-negative refund-amount" : "";
   const win = window.open("", "_blank");
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>領収書 ${receipt.receiptNo || ""}</title>
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet"><title>領収書 ${receipt.receiptNo || ""}</title>
   <style>
     body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#10251b;margin:38px}
     h1{font-size:30px;margin:0 0 24px;text-align:center}.row{display:flex;justify-content:space-between;gap:24px;margin-bottom:18px}
