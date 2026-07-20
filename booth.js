@@ -491,6 +491,7 @@ function renderBoothEventDetail(event){
       <button type="button" class="booth-event-menu-btn" data-booth-menu="gacha">ガチャ管理</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="sales">販売取込</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="diff">差異確認</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="report">イベントレポート</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="close">イベント締め</button>
     </div>
     <section class="booth-copy-card">
@@ -596,6 +597,10 @@ function switchBoothEventMenu(menu){
   }
   if(menu==="diff"){
     renderBoothDiffPanel(event);
+    return;
+  }
+  if(menu==="report"){
+    renderBoothEventReportPanel(event);
     return;
   }
   if(menu==="storage"){
@@ -2085,6 +2090,29 @@ async function renderBoothEventInventoryPanel(event){
       <button type="button" id="boothEventInventoryReloadBtn" class="secondary">再読込</button>
     </div>
     <div id="boothEventInventoryList" class="booth-event-inventory-list"><div class="booth-empty">読み込み中...</div></div>
+  </section>
+  <section class="booth-work-card booth-departure-count-card">
+    <div class="booth-list-header">
+      <div>
+        <h4>持出時棚卸</h4>
+        <p class="section-note">イベント棚全体をスキャンして、開始時確定在庫として保存します。通常在庫とスマレジ在庫は変更しません。</p>
+      </div>
+    </div>
+    <div class="booth-scan-row">
+      <label>バーコード
+        <input id="boothDepartureBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードをスキャン、または手入力">
+      </label>
+      <label>数量
+        <input id="boothDepartureQty" type="number" min="1" step="1" value="1">
+      </label>
+      <label>担当者<span class="required">必須</span>
+        <select id="boothDepartureStaff">${getBoothSalesStaffOptions()}</select>
+      </label>
+      <button type="button" id="boothDepartureCameraBtn" class="secondary">カメラ</button>
+      <button type="button" id="boothDepartureAddBtn">カウント追加</button>
+      <button type="button" id="boothDepartureCompleteBtn" class="secondary">持出時棚卸を確定</button>
+    </div>
+    <div id="boothDepartureCountList" class="booth-carry-history-list"><div class="booth-empty">まだカウントはありません。</div></div>
   </section>`;
   const storageKey="arico_booth_event_inventory_sort";
   const sortEl=el("boothEventInventorySort");
@@ -2135,7 +2163,176 @@ async function renderBoothEventInventoryPanel(event){
   el("boothEventInventorySearch")?.addEventListener("input",draw);
   el("boothEventInventorySort")?.addEventListener("change",draw);
   el("boothEventInventoryReloadBtn")?.addEventListener("click",draw);
+  el("boothDepartureAddBtn")?.addEventListener("click",addBoothDepartureCountFromInput);
+  el("boothDepartureCompleteBtn")?.addEventListener("click",completeBoothDepartureCount);
+  el("boothDepartureCameraBtn")?.addEventListener("click",()=>{
+    boothScanTarget="departure-count";
+    startBoothCarryOutCamera();
+  });
+  el("boothDepartureBarcode")?.addEventListener("keydown",event=>{
+    if(event.key==="Enter"){
+      event.preventDefault();
+      addBoothDepartureCountFromInput();
+    }
+  });
   draw();
+  renderBoothDepartureCountList(event.id);
+}
+
+function getBoothDepartureCountStorageKey(eventId){
+  return `arico_booth_departure_count_${eventId}`;
+}
+
+function readBoothDepartureCounts(eventId){
+  try{
+    const raw=localStorage.getItem(getBoothDepartureCountStorageKey(eventId));
+    const data=raw?JSON.parse(raw):{};
+    return data&&typeof data==="object"?data:{};
+  }catch(_){
+    return {};
+  }
+}
+
+function writeBoothDepartureCounts(eventId,data){
+  localStorage.setItem(getBoothDepartureCountStorageKey(eventId),JSON.stringify(data||{}));
+}
+
+async function addBoothDepartureCountFromInput(){
+  const event=getBoothCurrentEvent();
+  if(!event)return;
+  const barcode=String(el("boothDepartureBarcode")?.value||"").trim();
+  const qtyText=String(el("boothDepartureQty")?.value||"1").trim()||"1";
+  if(!barcode){
+    boothShowError("持出時棚卸エラー","バーコードを入力してください。","boothDepartureBarcode");
+    return;
+  }
+  if(!/^[1-9]\d*$/.test(qtyText)){
+    boothShowError("持出時棚卸エラー","数量は1以上の整数で入力してください。","boothDepartureQty");
+    return;
+  }
+  const product=await findBoothProductByBarcode(barcode);
+  if(!product){
+    boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothDepartureBarcode");
+    return;
+  }
+  const counts=readBoothDepartureCounts(event.id);
+  const current=counts[barcode]||{barcode,product_name:product.name||"",quantity:0};
+  current.product_name=product.name||current.product_name||"";
+  current.quantity=Number(current.quantity||0)+Number(qtyText);
+  counts[barcode]=current;
+  writeBoothDepartureCounts(event.id,counts);
+  if(el("boothDepartureBarcode"))el("boothDepartureBarcode").value="";
+  if(el("boothDepartureQty"))el("boothDepartureQty").value="1";
+  await renderBoothDepartureCountList(event.id);
+  boothShowSuccess("持出時棚卸","カウントを追加しました。");
+  el("boothDepartureBarcode")?.focus();
+}
+
+async function renderBoothDepartureCountList(eventId){
+  const list=el("boothDepartureCountList");
+  if(!list)return;
+  const counts=Object.values(readBoothDepartureCounts(eventId));
+  if(!counts.length){
+    list.innerHTML='<div class="booth-empty">まだカウントはありません。</div>';
+    return;
+  }
+  const items=await fetchBoothEventItems(eventId).catch(()=>[]);
+  const itemMap=new Map((Array.isArray(items)?items:[]).map(item=>[String(item.barcode||""),item]));
+  list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table">
+    <thead><tr><th>商品名</th><th>バーコード</th><th>イベント棚理論数</th><th>実カウント</th><th>差異</th></tr></thead>
+    <tbody>${counts.map(row=>{
+      const item=itemMap.get(String(row.barcode||""))||{};
+      const theory=boothEventItemCurrentQty(item);
+      const count=Number(row.quantity||0);
+      return `<tr><td>${esc(row.product_name||item.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(theory)}</td><td><strong>${esc(count)}</strong></td><td>${esc(count-theory)}</td></tr>`;
+    }).join("")}</tbody>
+  </table></div>`;
+}
+
+async function completeBoothDepartureCount(){
+  const event=getBoothCurrentEvent();
+  if(!event)return;
+  if(isBoothEventClosed(event)){
+    showBoothClosedError();
+    return;
+  }
+  const staff=String(el("boothDepartureStaff")?.value||"").trim();
+  if(!staff){
+    boothShowError("持出時棚卸エラー","担当者を選択してください。","boothDepartureStaff");
+    return;
+  }
+  if(!validateBoothStaffStore(staff,"担当者確認エラー","boothDepartureStaff"))return;
+  const counts=Object.values(readBoothDepartureCounts(event.id));
+  if(!counts.length){
+    boothShowError("持出時棚卸エラー","確定するカウントがありません。");
+    return;
+  }
+  const ok=typeof confirmAppAction==="function"
+    ? await confirmAppAction("持出時棚卸確定",`${counts.length} 商品の実カウントを開始時確定在庫として保存します。`,{okText:"確定"})
+    : true;
+  if(!ok)return;
+  try{
+    const items=await fetchBoothEventItems(event.id);
+    const itemMap=new Map((Array.isArray(items)?items:[]).map(item=>[String(item.barcode||""),item]));
+    const now=new Date().toISOString();
+    for(const row of counts){
+      const barcode=String(row.barcode||"");
+      const count=Number(row.quantity||0);
+      const item=itemMap.get(barcode);
+      const theory=item?boothEventItemCurrentQty(item):0;
+      if(item){
+        await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+          method:"PATCH",
+          headers:{Prefer:"return=minimal"},
+          body:JSON.stringify({
+            taken_qty:count,
+            difference_qty:count-theory,
+            updated_at:now
+          })
+        });
+      }else{
+        await sb("booth_event_items",{
+          method:"POST",
+          headers:{Prefer:"return=minimal"},
+          body:JSON.stringify([{
+            event_id:event.id,
+            barcode,
+            product_name:row.product_name||"",
+            item_type:"normal",
+            taken_qty:count,
+            normal_takeout_qty:count,
+            storage_takeout_qty:0,
+            sold_qty:0,
+            returned_qty:0,
+            consumed_qty:0,
+            difference_qty:count,
+            updated_at:now
+          }])
+        });
+      }
+      await sb("booth_stock_movements",{
+        method:"POST",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify([{
+          event_id:event.id,
+          barcode,
+          product_name:row.product_name||item?.product_name||"",
+          item_type:"normal",
+          movement_type:"departure_count",
+          quantity:count,
+          staff,
+          memo:`theory=${theory}; actual=${count}`,
+          affects_smaregi:false,
+          smaregi_delta:0
+        }])
+      }).catch(()=>{});
+    }
+    localStorage.removeItem(getBoothDepartureCountStorageKey(event.id));
+    boothShowSuccess("持出時棚卸確定","開始時確定在庫を保存しました。");
+    await renderBoothEventInventoryPanel(event);
+  }catch(e){
+    boothShowError("持出時棚卸エラー","持出時棚卸の確定に失敗しました。\n"+e.message);
+  }
 }
 
 async function renderBoothGachaListPanel(event){
@@ -2673,6 +2870,7 @@ function renderBoothEventDetail(event){
       <button type="button" class="booth-event-menu-btn" data-booth-menu="sales">販売取り込み</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="return">戻り在庫処理</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="diff">差異確認</button>
+      <button type="button" class="booth-event-menu-btn" data-booth-menu="report">イベントレポート</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="close">イベント締め</button>
     </div>
     <div id="boothEventWorkArea" class="booth-work-area">
@@ -2790,6 +2988,10 @@ function switchBoothEventMenu(menu){
   }
   if(menu==="diff"){
     renderBoothDiffPanel(event);
+    return;
+  }
+  if(menu==="report"){
+    renderBoothEventReportPanel(event);
     return;
   }
   if(menu==="storage"){
@@ -3169,11 +3371,12 @@ async function handleBoothScannedCode(code){
   if(code===boothLastScan&&t-boothLastScanAt<1800)return;
   boothLastScan=code;
   boothLastScanAt=t;
-  const input=el(boothScanTarget==="return"?"boothReturnBarcode":boothScanTarget==="storage"?"boothStorageBarcode":boothScanTarget==="gacha"?"boothGachaBarcode":"boothCarryOutBarcode");
+  const input=el(boothScanTarget==="return"?"boothReturnBarcode":boothScanTarget==="storage"?"boothStorageBarcode":boothScanTarget==="gacha"?"boothGachaBarcode":boothScanTarget==="departure-count"?"boothDepartureBarcode":"boothCarryOutBarcode");
   if(input)input.value=code;
   await stopBoothCarryOutCamera(false);
   boothCameraSuccess("バーコードを読み取りました。");
-  if(boothScanTarget==="return")await previewBoothReturnProduct({popupOnError:false});
+  if(boothScanTarget==="departure-count")await addBoothDepartureCountFromInput();
+  else if(boothScanTarget==="return")await previewBoothReturnProduct({popupOnError:false});
   else if(boothScanTarget==="storage")await previewBoothStorageProduct({popupOnError:false});
   else if(boothScanTarget==="gacha")await previewBoothGachaProduct({popupOnError:false});
   else await previewBoothCarryOutProduct({popupOnError:false});
@@ -5005,8 +5208,6 @@ function validateBoothSalesForm(){
 }
 
 async function importBoothSalesDraft(){
-  boothShowError("API停止中／CSV運用中","スマレジAPIから販売データは取得しません。イベント販売データはCSV取込で反映してください。");
-  return;
   const form=validateBoothSalesForm();
   if(!form)return;
   const {event,fromDate,toDate,staff,register}=form;
@@ -5036,7 +5237,9 @@ async function importBoothSalesDraft(){
       return;
     }
 
-    const response=await fetch("about:blank",{
+    const fromDateTime=String(event.event_start||"").includes("T")?event.event_start:null;
+    const toDateTime=String(event.event_end||"").includes("T")?event.event_end:null;
+    const response=await fetch("/api/smaregi-event-sales",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
@@ -5048,6 +5251,8 @@ async function importBoothSalesDraft(){
         targetTerminalId:register.terminalId||register.registerId,
         fromDate,
         toDate,
+        fromDateTime,
+        toDateTime,
         smaregiProductIds:productIds
       })
     });
@@ -5147,6 +5352,95 @@ async function confirmBoothSalesImport(){
   }catch(e){
     boothShowError("販売取り込み確定エラー","販売取り込みの確定に失敗しました。\n"+e.message);
   }
+}
+
+async function renderBoothEventReportPanel(event){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  area.innerHTML=`<section class="booth-work-card booth-event-report-card">
+    <div class="booth-list-header">
+      <div>
+        <h4>イベントレポート</h4>
+        <p class="section-note">指定イベントの販売・ガチャ・棚卸結果を集計表示します。スマレジ在庫や products.base_stock は変更しません。</p>
+      </div>
+      <button type="button" id="boothEventReportReloadBtn" class="secondary">再読み込み</button>
+    </div>
+    <div id="boothEventReportBody" class="booth-event-report-body"><div class="booth-empty">読み込み中...</div></div>
+  </section>`;
+  el("boothEventReportReloadBtn")?.addEventListener("click",()=>loadBoothEventReport(event.id));
+  loadBoothEventReport(event.id);
+}
+
+async function loadBoothEventReport(eventId){
+  const body=el("boothEventReportBody");
+  if(!body)return;
+  try{
+    body.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    const [items,imports,movements]=await Promise.all([
+      sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,event_storage_qty,shelf_return_qty,updated_at&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc&limit=2000`),
+      sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=eq.confirmed&order=sold_at.asc&limit=2000`).catch(()=>[]),
+      sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,memo,movement_type,item_type&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(departure_count,return,gacha_pick,gacha_return)&order=created_at.desc&limit=2000`).catch(()=>[])
+    ]);
+    const rows=Array.isArray(items)?items:[];
+    const normal=rows.filter(row=>String(row.item_type||"normal")==="normal");
+    const gacha=rows.filter(row=>String(row.item_type||"")==="gacha_prize");
+    const salesRows=Array.isArray(imports)?imports:[];
+    const movementRows=Array.isArray(movements)?movements:[];
+    const totalSalesQty=salesRows.reduce((sum,row)=>sum+Number(row.quantity||0),0);
+    const totalGachaRegistered=gacha.reduce((sum,row)=>sum+Number(row.taken_qty||0),0);
+    const totalGachaUsed=gacha.reduce((sum,row)=>sum+Number(row.consumed_qty||0),0);
+    const totalStart=normal.reduce((sum,row)=>sum+Number(row.taken_qty||0),0);
+    const totalReturned=normal.reduce((sum,row)=>sum+Number(row.returned_qty||0),0);
+    const totalRemain=normal.reduce((sum,row)=>sum+calculateBoothItemDifference(row),0);
+    const departureLogs=movementRows.filter(row=>String(row.movement_type)==="departure_count");
+    body.innerHTML=`
+      <div class="booth-report-summary-grid">
+        <div><span>開始時確定在庫</span><strong>${esc(totalStart)}</strong></div>
+        <div><span>通常販売数</span><strong>${esc(totalSalesQty)}</strong></div>
+        <div><span>戻り実数</span><strong>${esc(totalReturned)}</strong></div>
+        <div><span>イベント棚残数</span><strong>${esc(totalRemain)}</strong></div>
+        <div><span>ガチャ登録 / 使用</span><strong>${esc(totalGachaRegistered)} / ${esc(totalGachaUsed)}</strong></div>
+      </div>
+      <section class="booth-report-section"><h5>商品別 通常在庫</h5>${renderBoothReportNormalItems(normal)}</section>
+      <section class="booth-report-section"><h5>ガチャ商品</h5>${renderBoothReportGachaItems(gacha)}</section>
+      <section class="booth-report-section"><h5>スマレジ販売履歴（対象ブース端末のみ）</h5>${renderBoothReportSalesRows(salesRows)}</section>
+      <section class="booth-report-section"><h5>持出時棚卸ログ</h5>${renderBoothReportMovementRows(departureLogs)}</section>`;
+  }catch(e){
+    body.innerHTML='<div class="booth-empty">イベントレポートを読み込めませんでした。</div>';
+    boothShowError("イベントレポートエラー","イベントレポートの読み込みに失敗しました。\n"+e.message);
+  }
+}
+
+function renderBoothReportNormalItems(rows){
+  if(!rows.length)return '<div class="booth-empty">通常イベント在庫はありません。</div>';
+  return `<div class="booth-history-table-wrap"><table class="booth-history-table">
+    <thead><tr><th>商品名</th><th>バーコード</th><th>開始時確定</th><th>販売</th><th>戻り</th><th>ガチャ使用</th><th>理論残</th></tr></thead>
+    <tbody>${rows.map(row=>`<tr><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.taken_qty??0)}</td><td>${esc(row.sold_qty??0)}</td><td>${esc(row.returned_qty??0)}</td><td>${esc(row.consumed_qty??0)}</td><td><strong>${esc(calculateBoothItemDifference(row))}</strong></td></tr>`).join("")}</tbody>
+  </table></div>`;
+}
+
+function renderBoothReportGachaItems(rows){
+  if(!rows.length)return '<div class="booth-empty">ガチャ商品はありません。</div>';
+  return `<div class="booth-history-table-wrap"><table class="booth-history-table">
+    <thead><tr><th>商品名</th><th>バーコード</th><th>ガチャ登録</th><th>景品使用</th><th>戻し</th><th>現在ガチャ在庫</th></tr></thead>
+    <tbody>${rows.map(row=>`<tr><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.taken_qty??0)}</td><td>${esc(row.consumed_qty??0)}</td><td>${esc(row.returned_qty??0)}</td><td><strong>${esc(boothGachaItemCurrentQty(row))}</strong></td></tr>`).join("")}</tbody>
+  </table></div>`;
+}
+
+function renderBoothReportSalesRows(rows){
+  if(!rows.length)return '<div class="booth-empty">確定済み販売履歴はありません。</div>';
+  return `<div class="booth-history-table-wrap"><table class="booth-history-table">
+    <thead><tr><th>販売日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>端末ID</th></tr></thead>
+    <tbody>${rows.map(row=>`<tr><td>${esc(formatBoothDateTime(row.sold_at))}</td><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.quantity??0)}</td><td>${esc(row.smaregi_terminal_id||"-")}</td></tr>`).join("")}</tbody>
+  </table></div>`;
+}
+
+function renderBoothReportMovementRows(rows){
+  if(!rows.length)return '<div class="booth-empty">持出時棚卸ログはありません。</div>';
+  return `<div class="booth-history-table-wrap"><table class="booth-history-table">
+    <thead><tr><th>日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>担当者</th><th>メモ</th></tr></thead>
+    <tbody>${rows.map(row=>`<tr><td>${esc(formatBoothDateTime(row.created_at))}</td><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.quantity??0)}</td><td>${esc(row.staff||"-")}</td><td>${esc(row.memo||"")}</td></tr>`).join("")}</tbody>
+  </table></div>`;
 }
 
 async function deleteBoothEvent(eventId){

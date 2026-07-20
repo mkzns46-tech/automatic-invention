@@ -4683,6 +4683,40 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 .booth-report-actions button{
   margin:0;
 }
+.booth-departure-count-card,
+.booth-event-report-card{
+  margin-top:14px;
+}
+.booth-report-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:10px;
+  margin:12px 0 16px;
+}
+.booth-report-summary-grid > div{
+  border:1px solid #b9ddc7;
+  border-radius:8px;
+  background:#f4fbf6;
+  padding:12px;
+}
+.booth-report-summary-grid span{
+  display:block;
+  color:#476554;
+  font-size:12px;
+  margin-bottom:4px;
+}
+.booth-report-summary-grid strong{
+  color:#075334;
+  font-size:20px;
+}
+.booth-report-section{
+  margin-top:16px;
+}
+.booth-report-section h5{
+  margin:0 0 8px;
+  color:#073f2a;
+  font-size:14px;
+}
 .booth-work-area{
   display:grid;
   gap:12px;

@@ -154,8 +154,9 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     : [];
   if(openEventIds.length){
     const eventFilter=buildSmaregiInFilter(openEventIds);
-    const eventItems=await sbAll(`booth_event_items?select=event_id,barcode,taken_qty,sold_qty,returned_qty,event_storage_qty,consumed_qty&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})`,1000,50000);
+    const eventItems=await sbAll(`booth_event_items?select=event_id,barcode,item_type,taken_qty,sold_qty,returned_qty,event_storage_qty,consumed_qty&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&item_type=eq.normal`,1000,50000);
     (Array.isArray(eventItems)?eventItems:[]).forEach(row=>{
+      if(String(row.item_type||"normal")!=="normal")return;
       const qty=Number(row.taken_qty||0)
         -Number(row.sold_qty||0)
         -Number(row.returned_qty||0)
