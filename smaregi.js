@@ -154,9 +154,14 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     : [];
   if(openEventIds.length){
     const eventFilter=buildSmaregiInFilter(openEventIds);
-    const eventItems=await sbAll(`booth_event_items?select=event_id,barcode,item_type,taken_qty,sold_qty,returned_qty,event_storage_qty,consumed_qty&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&item_type=eq.normal`,1000,50000);
+    const [eventItems,departureLogs]=await Promise.all([
+      sbAll(`booth_event_items?select=event_id,barcode,item_type,taken_qty,sold_qty,returned_qty,event_storage_qty,consumed_qty&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&item_type=eq.normal`,1000,50000),
+      sbAll(`booth_stock_movements?select=event_id,barcode,movement_type&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&movement_type=eq.departure_count&item_type=eq.normal`,1000,50000).catch(()=>[])
+    ]);
+    const confirmedDepartureKeys=new Set((Array.isArray(departureLogs)?departureLogs:[]).map(row=>`${row.event_id}::${row.barcode}`));
     (Array.isArray(eventItems)?eventItems:[]).forEach(row=>{
       if(String(row.item_type||"normal")!=="normal")return;
+      if(!confirmedDepartureKeys.has(`${row.event_id}::${row.barcode}`))return;
       const qty=Number(row.taken_qty||0)
         -Number(row.sold_qty||0)
         -Number(row.returned_qty||0)
