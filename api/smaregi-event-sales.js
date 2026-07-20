@@ -25,11 +25,11 @@ function resolveSmaregiContext(body = {}) {
   const requestedStoreCode = normalizeKey(body.storeCode || body.currentStore, "tokyo");
   const storeCode = requestedStoreCode === "aichi" ? "aichi" : "tokyo";
   const storePrefix = storeCode === "aichi" ? "AICHI" : "TOKYO";
-  const storeName = storeCode === "aichi" ? "愛知" : "東京";
+  const storeName = storeCode === "aichi" ? "Aichi" : "Tokyo";
   const targetRegisterCode = normalizeKey(body.targetRegisterCode || body.registerCode, "event");
   const targetRegisterId = String(body.targetRegisterId || body.registerId || "").trim();
   const targetTerminalId = String(body.targetTerminalId || body.terminalId || targetRegisterId || "").trim();
-  const targetRegisterName = String(body.targetRegisterName || body.registerName || `${storeName}イベントレジ`).trim();
+  const targetRegisterName = String(body.targetRegisterName || body.registerName || `${storeName} event register`).trim();
   const storeId = env(
     `SMAREGI_${storePrefix}_STORE_ID`,
     storeCode === "tokyo" ? "SMAREGI_STORE_ID" : ""
@@ -37,7 +37,7 @@ function resolveSmaregiContext(body = {}) {
 
   return {
     accountKey: "production",
-    accountName: env("SMAREGI_ACCOUNT_NAME") || "スマレジ本番接続",
+    accountName: env("SMAREGI_ACCOUNT_NAME") || "Smaregi production",
     storeCode,
     storeName,
     storeId,
@@ -58,7 +58,7 @@ async function getAccessToken(context) {
   const { contractId, clientId, clientSecret, accessToken } = context;
   if (accessToken) return accessToken;
   if (!contractId || !clientId || !clientSecret) {
-    throw new Error(`スマレジOAuth設定が不足しています。${context.accountName} / ${context.storeName}`);
+    throw new Error(`Smaregi OAuth settings are missing. ${context.accountName} / ${context.storeName}`);
   }
 
   const tokenUrl = `https://id.smaregi.jp/app/${contractId}/token`;
@@ -76,7 +76,7 @@ async function getAccessToken(context) {
   });
   const body = await response.json().catch(() => null);
   if (!response.ok || !body?.access_token) {
-    throw new Error(`スマレジOAuth認証エラー ${response.status}: ${JSON.stringify(body)}`);
+    throw new Error(`Smaregi OAuth error ${response.status}: ${JSON.stringify(body)}`);
   }
   return body.access_token;
 }
@@ -92,6 +92,26 @@ function toPositiveInteger(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
   return Math.trunc(Math.abs(n));
+}
+
+function toNumber(value) {
+  const n = Number(String(value ?? "").replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeJstDateTime(value, fallbackDate, edge) {
+  const raw = String(value || "").trim();
+  if (raw) {
+    if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) {
+      return /([+-]\d{2}:\d{2}|Z)$/.test(raw) ? raw : `${raw}+09:00`;
+    }
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(raw)) {
+      return `${raw.replace(" ", "T")}+09:00`;
+    }
+  }
+  const date = String(fallbackDate || "").slice(0, 10);
+  if (!date) return "";
+  return edge === "end" ? `${date}T23:59:59+09:00` : `${date}T00:00:00+09:00`;
 }
 
 function isCancelledTransaction(row) {
@@ -147,6 +167,8 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
       if (!productId || (productIdSet.size && !productIdSet.has(productId))) return;
       const quantity = toPositiveInteger(pick(detail, ["quantity", "salesQuantity", "sales_quantity", "unitSalesQuantity", "unit_sales_quantity"], 0));
       if (!quantity) return;
+      const unitPrice = toNumber(pick(detail, ["unitPrice", "unit_price", "salesPrice", "sales_price", "price"], 0));
+      const amountValue = toNumber(pick(detail, ["salesAmount", "sales_amount", "subtotal", "amount", "total"], 0));
       const detailId = String(pick(detail, [
         "transactionDetailId",
         "transaction_detail_id",
@@ -159,6 +181,8 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
         smaregi_product_id: productId,
         smaregi_terminal_id: terminalId,
         quantity,
+        unit_price: unitPrice,
+        amount: amountValue || unitPrice * quantity,
         sold_at: soldAt,
         product_name: String(pick(detail, ["productName", "product_name"], "") || "").trim()
       });
@@ -167,18 +191,18 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
   return sales;
 }
 
-async function fetchTransactions(apiBase, token, context, fromDate, toDate) {
+async function fetchTransactions(apiBase, token, context, fromDateTime, toDateTime) {
   const rows = [];
+  let pageCount = 0;
   for (let page = 1; page <= 100; page += 1) {
+    pageCount = page;
     const url = new URL(apiBase + "/transactions");
     url.searchParams.set("limit", String(DEFAULT_LIMIT));
     url.searchParams.set("page", String(page));
     url.searchParams.set("with_details", "all");
     url.searchParams.set("store_id", context.storeId);
-    url.searchParams.set("terminal_tran_date_time-from", `${fromDate}T00:00:00+09:00`);
-    url.searchParams.set("terminal_tran_date_time-to", `${toDate}T23:59:59+09:00`);
-    // /transactions does not support product_id as a query parameter.
-    // Product matching is done after transaction details are fetched.
+    url.searchParams.set("terminal_tran_date_time-from", fromDateTime);
+    url.searchParams.set("terminal_tran_date_time-to", toDateTime);
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }
     });
@@ -190,7 +214,7 @@ async function fetchTransactions(apiBase, token, context, fromDate, toDate) {
     rows.push(...body);
     if (body.length < DEFAULT_LIMIT) break;
   }
-  return rows;
+  return { rows, pageCount };
 }
 
 module.exports = async function handler(req, res) {
@@ -203,25 +227,34 @@ module.exports = async function handler(req, res) {
     const body = parseBody(req);
     const fromDate = String(body.fromDate || "").trim();
     const toDate = String(body.toDate || "").trim();
+    const fromDateTime = normalizeJstDateTime(body.fromDateTime, fromDate, "start");
+    const toDateTime = normalizeJstDateTime(body.toDateTime, toDate, "end");
     const productIds = Array.isArray(body.smaregiProductIds)
       ? body.smaregiProductIds.map(value => String(value || "").trim()).filter(Boolean)
       : [];
 
-    if (!fromDate || !toDate) throw new Error("対象期間を指定してください。");
-    if (fromDate > toDate) throw new Error("終了日は開始日以降の日付を入力してください。");
+    if (!fromDateTime || !toDateTime) throw new Error("Target period is required.");
+    if (fromDateTime > toDateTime) throw new Error("Target period end must be after start.");
 
     const context = resolveSmaregiContext(body);
-    if (!context.storeId) throw new Error(`店舗IDが未設定です。${context.storeName} の環境変数を確認してください。`);
-    if (!context.targetTerminalId) throw new Error("イベント販売用レジIDが未設定です");
+    if (!context.storeId) throw new Error(`Smaregi store id is not configured for ${context.storeName}.`);
+    if (!context.targetTerminalId) throw new Error("Target booth terminal id is required.");
     const token = await getAccessToken(context);
     const apiBase = context.apiBase || `https://api.smaregi.jp/${context.contractId}/pos`;
-    const transactions = await fetchTransactions(apiBase, token, context, fromDate, toDate);
+    const fetchedAt = new Date().toISOString();
+    const result = await fetchTransactions(apiBase, token, context, fromDateTime, toDateTime);
+    const transactions = result.rows;
     const productIdSet = new Set(productIds);
     const sales = normalizeSales(transactions, productIdSet, context.targetTerminalId);
 
     return res.status(200).json({
       sales,
       count: sales.length,
+      fetchedAt,
+      fromDateTime,
+      toDateTime,
+      transactionsCount: transactions.length,
+      pages: result.pageCount,
       context: {
         accountKey: context.accountKey,
         accountName: context.accountName,
