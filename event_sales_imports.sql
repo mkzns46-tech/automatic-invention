@@ -29,7 +29,9 @@ alter table public.event_sales_imports
   add column if not exists target_register_code text,
   add column if not exists target_register_name text,
   add column if not exists smaregi_register_id text,
-  add column if not exists smaregi_terminal_id text;
+  add column if not exists smaregi_terminal_id text,
+  add column if not exists unit_price integer not null default 0,
+  add column if not exists amount integer not null default 0;
 
 create index if not exists event_sales_imports_event_status_idx
   on public.event_sales_imports(event_id, import_status);
