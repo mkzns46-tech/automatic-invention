@@ -5897,13 +5897,43 @@ async function updateBoothStorageHistorySplit(itemId){
   }
 }
 
-async function fetchExistingBoothSalesImportKeys(eventId){
-  const rows=await sb(`event_sales_imports?select=smaregi_transaction_id,smaregi_detail_id&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed)`);
-  const keys=new Set();
+function getBoothSalesImportKey(row){
+  return `${row.smaregi_transaction_id}::${row.smaregi_detail_id}`;
+}
+
+async function fetchExistingBoothSalesImportMap(eventId){
+  const rows=await sb(`event_sales_imports?select=id,smaregi_transaction_id,smaregi_detail_id,quantity,unit_price,amount,import_status&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed)`);
+  const map=new Map();
   (Array.isArray(rows)?rows:[]).forEach(row=>{
-    keys.add(`${row.smaregi_transaction_id}::${row.smaregi_detail_id}`);
+    map.set(getBoothSalesImportKey(row),row);
   });
-  return keys;
+  return map;
+}
+
+async function saveBoothSalesImportRows(rows,existingMap){
+  const insertRows=[];
+  const updateRows=[];
+  rows.forEach(row=>{
+    const existing=existingMap.get(getBoothSalesImportKey(row));
+    if(existing)updateRows.push({existing,row});
+    else insertRows.push(row);
+  });
+  if(insertRows.length){
+    await sb("event_sales_imports",{
+      method:"POST",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify(insertRows)
+    });
+  }
+  for(const {existing,row} of updateRows){
+    const {import_status,...update}=row;
+    await sb(`event_sales_imports?id=eq.${encodeURIComponent(existing.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify(update)
+    });
+  }
+  return {inserted:insertRows.length,updated:updateRows.length};
 }
 
 async function loadBoothSalesImports(eventId){
@@ -6058,7 +6088,7 @@ async function importBoothSalesDraft(){
     const body=await response.json().catch(()=>null);
     if(!response.ok)throw new Error(body?.error||`スマレジ販売データ取得エラー ${response.status}`);
 
-    const existingKeys=await fetchExistingBoothSalesImportKeys(event.id);
+    const existingMap=await fetchExistingBoothSalesImportMap(event.id);
     const salesProductIds=[...new Set((body.sales||[]).map(sale=>String(sale.smaregi_product_id||"").trim()).filter(Boolean))];
     const saleProducts=await fetchBoothProductsBySmaregiProductIds(salesProductIds);
     const productBySmaregiId=new Map((saleProducts||[]).map(product=>[String(product.smaregi_product_id||""),product]));
@@ -6066,8 +6096,6 @@ async function importBoothSalesDraft(){
     const rows=(body.sales||[]).map(sale=>{
       const smaregiProductId=String(sale.smaregi_product_id||"");
       const item=itemByProductId.get(smaregiProductId)||productBySmaregiId.get(smaregiProductId)||{};
-      const key=`${sale.smaregi_transaction_id}::${sale.smaregi_detail_id}`;
-      if(existingKeys.has(key))return null;
       const barcode=String(item.barcode||smaregiProductId||"").trim();
       return {
         event_id:event.id,
@@ -6095,19 +6123,11 @@ async function importBoothSalesDraft(){
 
     if(rows.length){
       try{
-        await sb("event_sales_imports",{
-          method:"POST",
-          headers:{Prefer:"return=minimal"},
-          body:JSON.stringify(rows)
-        });
+        await saveBoothSalesImportRows(rows,existingMap);
       }catch(insertError){
         if(!String(insertError?.message||"").includes("unit_price")&&!String(insertError?.message||"").includes("amount"))throw insertError;
         const fallbackRows=rows.map(({unit_price,amount,...row})=>row);
-        await sb("event_sales_imports",{
-          method:"POST",
-          headers:{Prefer:"return=minimal"},
-          body:JSON.stringify(fallbackRows)
-        });
+        await saveBoothSalesImportRows(fallbackRows,existingMap);
       }
     }
     await loadBoothSalesImports(event.id);

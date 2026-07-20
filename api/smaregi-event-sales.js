@@ -105,6 +105,49 @@ function toNumber(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function pickNumberWithKey(obj, keys) {
+  for (const key of keys) {
+    if (!obj || obj[key] === undefined || obj[key] === null || obj[key] === "") continue;
+    return { key, value: toNumber(obj[key]) };
+  }
+  return { key: "", value: 0 };
+}
+
+function getDetailAmountInfo(detail, quantity) {
+  const direct = pickNumberWithKey(detail, [
+    "unitDiscountedSum",
+    "unit_discounted_sum",
+    "salesAmount",
+    "sales_amount",
+    "detailAmount",
+    "detail_amount",
+    "subtotal",
+    "amount",
+    "total"
+  ]);
+  if (direct.key) return { amount: direct.value, source: direct.key };
+
+  const nonDiscount = pickNumberWithKey(detail, ["unitNonDiscountSum", "unit_non_discount_sum"]);
+  if (nonDiscount.key) {
+    const discount = pickNumberWithKey(detail, ["unitDiscountSum", "unit_discount_sum"]);
+    return {
+      amount: nonDiscount.value - discount.value,
+      source: discount.key ? `${nonDiscount.key}-${discount.key}` : nonDiscount.key
+    };
+  }
+
+  const salesPrice = pickNumberWithKey(detail, ["salesPrice", "sales_price"]);
+  if (salesPrice.key) {
+    const unitDiscount = pickNumberWithKey(detail, ["unitDiscountPrice", "unit_discount_price"]);
+    return {
+      amount: (salesPrice.value - unitDiscount.value) * Math.abs(quantity),
+      source: unitDiscount.key ? `${salesPrice.key}-${unitDiscount.key}*quantity` : `${salesPrice.key}*quantity`
+    };
+  }
+
+  return { amount: 0, source: "" };
+}
+
 function normalizeJstDateTime(value, fallbackDate, edge) {
   const raw = String(value || "").trim();
   if (raw) {
@@ -188,8 +231,8 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
       const quantity = Math.abs(rawQuantity) * sign;
       if (!quantity) return;
       const unitPrice = toNumber(pick(detail, ["unitPrice", "unit_price", "salesPrice", "sales_price", "price"], 0));
-      const amountValue = toNumber(pick(detail, ["salesAmount", "sales_amount", "subtotal", "amount", "total"], 0));
-      const amount = Math.abs(amountValue) * sign;
+      const amountInfo = getDetailAmountInfo(detail, quantity);
+      const amount = Math.abs(amountInfo.amount) * sign;
       const detailId = String(pick(detail, [
         "transactionDetailId",
         "transaction_detail_id",
@@ -204,6 +247,15 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
         quantity,
         unit_price: unitPrice,
         amount,
+        amount_source: amountInfo.source,
+        smaregi_amount_fields: {
+          price: pick(detail, ["price"], ""),
+          salesPrice: pick(detail, ["salesPrice", "sales_price"], ""),
+          unitDiscountPrice: pick(detail, ["unitDiscountPrice", "unit_discount_price"], ""),
+          unitDiscountSum: pick(detail, ["unitDiscountSum", "unit_discount_sum"], ""),
+          unitNonDiscountSum: pick(detail, ["unitNonDiscountSum", "unit_non_discount_sum"], ""),
+          unitDiscountedSum: pick(detail, ["unitDiscountedSum", "unit_discounted_sum"], "")
+        },
         sold_at: soldAt,
         product_name: String(pick(detail, ["productName", "product_name"], "") || "").trim()
       });
