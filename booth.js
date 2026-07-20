@@ -6082,7 +6082,7 @@ async function importBoothSalesDraft(){
         toDate,
         fromDateTime,
         toDateTime,
-        smaregiProductIds:productIds
+        smaregiProductIds:[]
       })
     });
     const body=await response.json().catch(()=>null);
