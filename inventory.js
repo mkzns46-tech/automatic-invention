@@ -828,6 +828,11 @@ async function insertInventoryGachaMovement(event,product,qty,staff,memo,movemen
 }
 
 async function registerGachaFromInventory({action,event,product,barcode,qty,staff,memo,currentStock}){
+  if(window.__aricoInventoryGachaSaving){
+    showMessage("ガチャ登録処理中です。完了までお待ちください。","err");
+    return;
+  }
+  window.__aricoInventoryGachaSaving=true;
   const isPick=action==="pick";
   const movementType=isPick?"gacha_pick":"gacha_return";
   const delta=isPick?-qty:qty;
@@ -853,9 +858,10 @@ async function registerGachaFromInventory({action,event,product,barcode,qty,staf
       const gachaItem=await findInventoryEventItem(event.id,barcode,"gacha_prize");
       const currentGacha=getGachaCurrentQty(gachaItem);
       if(currentGacha<qty)throw new Error(`ガチャ在庫不足：${product.name||barcode} / 現在ガチャ在庫 ${currentGacha} / 戻し ${qty}`);
-      await addQtyToEventShelf(event,product,qty);
-      sourceMoved=true;
-      source="event_shelf";
+      const nextStock=currentStock+qty;
+      await updateProductCurrentStock(barcode,nextStock);
+      productUpdated=true;
+      source="normal";
     }
 
     insertedLog=await sb("inventory_logs",{
@@ -927,6 +933,8 @@ async function registerGachaFromInventory({action,event,product,barcode,qty,staf
       }catch(_){}
     }
     throw e;
+  }finally{
+    window.__aricoInventoryGachaSaving=false;
   }
 }
 

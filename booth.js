@@ -1542,7 +1542,7 @@ async function exportBoothEventReportCsv(event){
       ["商品名","バーコード","比較店舗","持ち出し","販売","戻り","消費","差異","状態"],
       ...diffRows.map(row=>[row.product_name||"",row.barcode||"",row.store_code||"",row.taken_registered?row.taken_qty:"未登録",row.sold_qty??0,row.returned_qty??0,row.consumed_qty??0,calculateBoothItemDifference(row),row.taken_registered?"要確認":"持ち出し未登録"])
     ];
-    downloadBoothCsvFile(`イベントレポート_${boothSafeExportName(event?.name)}_${boothTodayYmd()}.csv`,rows);
+    downloadBoothCsvFile(`${boothEventExportBaseName(event,"イベントレポート")}.csv`,rows);
   }catch(e){
     boothShowError("CSV出力エラー","イベントレポートCSVの出力に失敗しました。\n"+e.message);
   }
@@ -2257,6 +2257,21 @@ function boothTodayYmd(){
   return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
 }
 
+function boothDateToYmd(value){
+  const text=String(value||"").trim();
+  const match=text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(match)return `${match[1]}${match[2]}${match[3]}`;
+  const d=new Date(text);
+  if(!Number.isNaN(d.getTime()))return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`;
+  return boothTodayYmd();
+}
+
+function boothEventExportBaseName(event,suffix){
+  const start=boothDateToYmd(event?.event_start);
+  const end=boothDateToYmd(event?.event_end||event?.event_start);
+  return `${start}～${end}${boothSafeExportName(event?.name||"イベント")}${suffix}`;
+}
+
 function boothPdfTable(title,headers,rows){
   const body=(rows||[]).length
     ? rows.map(row=>`<tr>${row.map(value=>`<td>${esc(value)}</td>`).join("")}</tr>`).join("")
@@ -2960,7 +2975,7 @@ async function exportBoothDepartureInventoryCsv(event){
         row.remain
       ])
     ];
-    downloadBoothCsvFile(`持ち出し在庫一覧_${boothSafeExportName(event?.name)}_${boothTodayYmd()}.csv`,rows);
+    downloadBoothCsvFile(`${boothEventExportBaseName(event,"持ち出し在庫一覧")}.csv`,rows);
   }catch(e){
     boothShowError("CSV出力エラー","持ち出し在庫一覧CSVの出力に失敗しました。\n"+e.message);
   }
@@ -2989,7 +3004,7 @@ async function exportBoothDepartureInventoryPdf(event){
         row.returned,
         row.remain
       ]))}`;
-    if(openBoothPdfWindow("持ち出し在庫一覧",html))boothShowSuccess("PDF出力","持ち出し在庫一覧PDFの印刷画面を開きました。");
+    if(openBoothPdfWindow(boothEventExportBaseName(event,"持ち出し在庫一覧"),html))boothShowSuccess("PDF出力","持ち出し在庫一覧PDFの印刷画面を開きました。");
   }catch(e){
     boothShowError("PDF出力エラー","持ち出し在庫一覧PDFの出力に失敗しました。\n"+e.message);
   }
@@ -3706,7 +3721,7 @@ function clearBoothReturnPreview(){
 }
 
 async function findBoothEventItemByBarcode(eventId,barcode){
-  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,difference_qty,consumed_qty&event_id=eq.${encodeURIComponent(eventId)}&barcode=eq.${encodeURIComponent(barcode)}&item_type=eq.normal&limit=1`);
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,difference_qty,consumed_qty&event_id=eq.${encodeURIComponent(eventId)}&barcode=eq.${encodeURIComponent(barcode)}&item_type=eq.normal&limit=1`);
   return Array.isArray(rows)&&rows[0]?rows[0]:null;
 }
 
@@ -4268,6 +4283,49 @@ async function getBoothGachaSummary(eventId,barcode){
   };
 }
 
+function getBoothEventShelfCurrentQty(item){
+  if(!item)return 0;
+  const taken=Number(item.taken_qty||0);
+  const sold=Number(item.sold_qty||0);
+  const returned=Number(item.returned_qty||0);
+  const consumed=Number(item.consumed_qty||0);
+  return Math.max(0,taken-sold-returned-consumed);
+}
+
+async function patchBoothEventItem(item,payload){
+  await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+    method:"PATCH",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify({...payload,updated_at:new Date().toISOString()})
+  });
+}
+
+async function moveBoothEventShelfQtyToGacha(event,product,quantity){
+  const item=await findBoothEventItemByBarcode(event.id,product.barcode);
+  const current=getBoothEventShelfCurrentQty(item);
+  if(!item||current<quantity)return null;
+  const normal=Math.max(0,Number(item.normal_takeout_qty||0));
+  const storage=Math.max(0,Number(item.storage_takeout_qty||0));
+  const useNormal=Math.min(normal,quantity);
+  const useStorage=Math.min(storage,quantity-useNormal);
+  const previous={
+    taken_qty:Number(item.taken_qty||0),
+    normal_takeout_qty:normal,
+    storage_takeout_qty:storage
+  };
+  await patchBoothEventItem(item,{
+    taken_qty:Math.max(0,Number(item.taken_qty||0)-quantity),
+    normal_takeout_qty:normal-useNormal,
+    storage_takeout_qty:storage-useStorage
+  });
+  return {item,previous};
+}
+
+async function rollbackBoothEventShelfQty(moveResult){
+  if(!moveResult?.item||!moveResult?.previous)return;
+  await patchBoothEventItem(moveResult.item,moveResult.previous);
+}
+
 function renderBoothGachaPreview(product,smaregiStock,summary){
   const preview=el("boothGachaProductPreview");
   if(!preview||!product)return;
@@ -4373,13 +4431,14 @@ async function insertBoothGachaInventoryLog(event,product,quantity,staff,memo,ty
       memo,
       event_id:event.id,
       affects_smaregi:true,
-      smaregi_delta:delta
+      smaregi_delta:delta,
+      equipment_checked:false
     })
   });
   return Array.isArray(inserted)&&inserted[0]?inserted[0]:null;
 }
 
-async function insertBoothGachaMovement(event,product,quantity,staff,memo,movementType,delta){
+async function insertBoothGachaMovement(event,product,quantity,staff,memo,movementType,delta,source){
   await sb("booth_stock_movements",{
     method:"POST",
     headers:{Prefer:"return=minimal"},
@@ -4392,6 +4451,7 @@ async function insertBoothGachaMovement(event,product,quantity,staff,memo,moveme
       quantity,
       staff,
       memo,
+      takeout_source:source||"normal",
       affects_smaregi:true,
       smaregi_delta:delta
     }])
@@ -4555,9 +4615,13 @@ async function validateBoothGachaForm(action){
   }
   const quantity=Number(qtyText);
   const currentStock=Number(product.base_stock||0);
-  const summary=await getBoothGachaSummary(event.id,barcode);
-  if(action==="pick"&&currentStock-quantity<0){
-    boothShowError("ガチャ登録エラー",`通常棚在庫が不足しています。\n現在庫：${currentStock}\n登録数：${quantity}`,"boothGachaQty");
+  const [summary,eventShelfItem]=await Promise.all([
+    getBoothGachaSummary(event.id,barcode),
+    findBoothEventItemByBarcode(event.id,barcode).catch(()=>null)
+  ]);
+  const eventShelfCurrent=getBoothEventShelfCurrentQty(eventShelfItem);
+  if(action==="pick"&&eventShelfCurrent<quantity&&currentStock-quantity<0){
+    boothShowError("ガチャ登録エラー",`イベント棚在庫・通常棚在庫が不足しています。\nイベント棚在庫：${eventShelfCurrent}\n通常棚在庫：${currentStock}\n登録数：${quantity}`,"boothGachaQty");
     return null;
   }
   if(action==="return"&&summary.current<quantity){
@@ -4566,7 +4630,7 @@ async function validateBoothGachaForm(action){
   }
   const smaregiStock=await getBoothLatestSmaregiStock(barcode);
   renderBoothGachaPreview(product,smaregiStock,summary);
-  return {event,product,quantity,staff,memo,currentStock,summary};
+  return {event,product,quantity,staff,memo,currentStock,summary,eventShelfCurrent};
 }
 
 async function confirmBoothGachaPick(){
@@ -4578,7 +4642,8 @@ async function confirmBoothGachaPick(){
     `担当者：${data.staff}`,
     "",
     "この商品をガチャ景品として登録します。",
-    "スマレジ在庫が減算されます。",
+    "ARICO側のガチャ在庫として記録します。",
+    "スマレジ在庫は自動変更しません。スマレジ側は手動修正後に履歴で確認してください。",
     "",
     "よろしいですか？"
   ].join("\n");
@@ -4594,7 +4659,8 @@ async function confirmBoothGachaReturn(){
     `担当者：${data.staff}`,
     "",
     "この商品をガチャ戻りとして登録します。",
-    "スマレジ在庫が加算されます。",
+    "ガチャ在庫を減らし、通常棚在庫へ戻します。",
+    "スマレジ在庫は自動変更しません。スマレジ側は手動修正後に履歴で確認してください。",
     "",
     "よろしいですか？"
   ].join("\n");
@@ -4602,26 +4668,38 @@ async function confirmBoothGachaReturn(){
 }
 
 async function registerBoothGachaMovement(action,data){
+  if(window.__aricoBoothGachaSaving){
+    boothShowError("ガチャ登録エラー","ガチャ登録処理中です。完了までお待ちください。");
+    return;
+  }
+  window.__aricoBoothGachaSaving=true;
   const isPick=action==="pick";
   const movementType=isPick?"gacha_pick":"gacha_return";
   const delta=isPick?-data.quantity:data.quantity;
-  const nextStock=data.currentStock+delta;
-  let smaregiAdjusted=false;
   let productUpdated=false;
+  let eventShelfMoveResult=null;
+  let movementSource="normal";
   try{
-    await callBoothSmaregiStockAdjust({
-      event:data.event,
-      product:data.product,
-      delta,
-      memo:`ARICOイベント管理 ${isPick?"ガチャピック":"ガチャ戻り"} ${data.event.name||""}`
-    });
-    smaregiAdjusted=true;
-
-    await updateBoothProductBaseStock(data.product.barcode,nextStock);
-    productUpdated=true;
+    if(isPick){
+      eventShelfMoveResult=await moveBoothEventShelfQtyToGacha(data.event,data.product,data.quantity);
+      if(eventShelfMoveResult){
+        movementSource="event_shelf";
+      }else{
+        const nextStock=data.currentStock-data.quantity;
+        if(nextStock<0)throw new Error(`通常棚在庫が不足しています：現在庫 ${data.currentStock} / 登録数 ${data.quantity}`);
+        await updateBoothProductBaseStock(data.product.barcode,nextStock);
+        productUpdated=true;
+        movementSource="normal";
+      }
+    }else{
+      const nextStock=data.currentStock+data.quantity;
+      await updateBoothProductBaseStock(data.product.barcode,nextStock);
+      productUpdated=true;
+      movementSource="normal";
+    }
 
     await insertBoothGachaInventoryLog(data.event,data.product,data.quantity,data.staff,data.memo,movementType,delta);
-    await insertBoothGachaMovement(data.event,data.product,data.quantity,data.staff,data.memo,movementType,delta);
+    await insertBoothGachaMovement(data.event,data.product,data.quantity,data.staff,data.memo,movementType,delta,movementSource);
     await upsertBoothGachaEventItem(data.event,data.product,data.quantity,action);
 
     el("boothGachaBarcode").value="";
@@ -4629,27 +4707,18 @@ async function registerBoothGachaMovement(action,data){
     if(el("boothGachaMemo"))el("boothGachaMemo").value="";
     clearBoothGachaPreview();
     await loadBoothGachaHistory(data.event.id);
-    boothShowSuccess(isPick?"ガチャピック登録完了":"ガチャ戻り登録完了",`${data.product.name||"-"} / 数量 ${data.quantity}\nスマレジ在庫を${isPick?"減算":"加算"}しました。`);
+    boothShowSuccess(isPick?"ガチャピック登録完了":"ガチャ戻り登録完了",`${data.product.name||"-"} / 数量 ${data.quantity}\nスマレジ在庫は自動変更していません。手動修正後に履歴で確認してください。`);
     el("boothGachaBarcode")?.focus();
   }catch(e){
-    let rollbackMessage="";
-    if(smaregiAdjusted){
-      try{
-        await callBoothSmaregiStockAdjust({
-          event:data.event,
-          product:data.product,
-          delta:-delta,
-          memo:`ARICOイベント管理 ${isPick?"ガチャピック":"ガチャ戻り"} ロールバック`
-        });
-        rollbackMessage="\nスマレジ在庫は元に戻しました。";
-      }catch(rollbackError){
-        rollbackMessage="\nスマレジ在庫の自動戻しに失敗しました。手動確認してください。\n"+rollbackError.message;
-      }
-    }
     if(productUpdated){
       try{await updateBoothProductBaseStock(data.product.barcode,data.currentStock);}catch(_){}
     }
-    boothShowError(isPick?"ガチャピック登録エラー":"ガチャ戻り登録エラー",`${isPick?"ガチャピック":"ガチャ戻り"}登録に失敗しました。\n${e.message}${rollbackMessage}`);
+    if(eventShelfMoveResult){
+      try{await rollbackBoothEventShelfQty(eventShelfMoveResult);}catch(_){}
+    }
+    boothShowError(isPick?"ガチャピック登録エラー":"ガチャ戻り登録エラー",`${isPick?"ガチャピック":"ガチャ戻り"}登録に失敗しました。\n${e.message}`);
+  }finally{
+    window.__aricoBoothGachaSaving=false;
   }
 }
 
@@ -4658,14 +4727,59 @@ async function loadBoothGachaHistory(eventId){
   if(!list)return;
   try{
     list.innerHTML='<div class="booth-empty">読み込み中...</div>';
-    const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,memo,movement_type&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.gacha_prize&movement_type=in.(gacha_pick,gacha_return)&order=created_at.desc&limit=80`);
+    const [rawRows,logRows]=await Promise.all([
+      sb(`booth_stock_movements?select=id,created_at,product_name,barcode,quantity,staff,memo,movement_type&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.gacha_prize&movement_type=in.(gacha_pick,gacha_return)&order=created_at.desc&limit=80`),
+      sb(`inventory_logs?select=id,created_at,type,barcode,quantity,staff,equipment_checked,equipment_checked_by,equipment_checked_at&event_id=eq.${encodeURIComponent(eventId)}&type=in.(gacha_pick,gacha_return)&order=created_at.desc&limit=200`).catch(()=>[])
+    ]);
+    const logCandidates=Array.isArray(logRows)?logRows:[];
+    const takeMatchingLog=row=>{
+      const type=String(row.movement_type||"");
+      const barcode=String(row.barcode||"");
+      const qty=Number(row.quantity||0);
+      const staff=String(row.staff||"");
+      return logCandidates.find(log=>
+        String(log.type||"")===type
+        && String(log.barcode||"")===barcode
+        && Number(log.quantity||0)===qty
+        && String(log.staff||"")===staff
+      )||null;
+    };
+    const seenIds=new Set();
+    const seenSemantic=new Map();
+    const rows=(Array.isArray(rawRows)?rawRows:[]).filter(row=>{
+      const id=String(row.id||"");
+      if(id&&seenIds.has(id))return false;
+      if(id)seenIds.add(id);
+      const createdTime=new Date(row.created_at).getTime();
+      const semanticKey=[
+        row.event_id||eventId,
+        row.movement_type||"",
+        row.barcode||"",
+        row.quantity??"",
+        row.staff||""
+      ].join("|");
+      const previousTime=seenSemantic.get(semanticKey);
+      if(Number.isFinite(createdTime)&&Number.isFinite(previousTime)&&Math.abs(createdTime-previousTime)<=2000)return false;
+      if(Number.isFinite(createdTime))seenSemantic.set(semanticKey,createdTime);
+      return true;
+    });
     if(!Array.isArray(rows)||!rows.length){
       list.innerHTML='<div class="booth-empty">まだガチャ履歴はありません。</div>';
       return;
     }
     const typeLabel=row=>String(row.movement_type)==="gacha_return"?"戻り":"ピック";
+    const canConfirm=typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
+    const confirmCell=row=>{
+      const log=takeMatchingLog(row);
+      if(log&&(log.equipment_checked===true||String(log.equipment_checked||"").toLowerCase()==="true"||log.equipment_checked_at)){
+        return `<span class="equipment-check-status is-checked">確認済</span><small>${esc(log.equipment_checked_by||"")} / ${esc(formatBoothDateTimeShort(log.equipment_checked_at))}</small>`;
+      }
+      return canConfirm
+        ? `<button type="button" class="secondary booth-gacha-confirm-btn" data-log-id="${esc(log?.id||"")}">確認</button>`
+        : '<span class="equipment-check-status is-pending">未確認</span>';
+    };
     list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table">
-      <thead><tr><th>日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>区分</th><th>担当者</th><th>メモ</th></tr></thead>
+      <thead><tr><th>日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>区分</th><th>担当者</th><th>メモ</th><th>スマレジ手動確認</th></tr></thead>
       <tbody>${rows.map(row=>`<tr>
         <td>${esc(formatBoothDateTime(row.created_at))}</td>
         <td>${esc(row.product_name||"-")}</td>
@@ -4674,6 +4788,7 @@ async function loadBoothGachaHistory(eventId){
         <td>${esc(typeLabel(row))}</td>
         <td>${esc(row.staff||"-")}</td>
         <td>${esc(row.memo||"")}</td>
+        <td>${confirmCell(row)}</td>
       </tr>`).join("")}</tbody>
     </table></div>
     <div class="booth-history-cards">
@@ -4688,12 +4803,43 @@ async function loadBoothGachaHistory(eventId){
           <span>区分：${esc(typeLabel(row))}</span>
           <span>担当者：${esc(row.staff||"-")}</span>
           ${row.memo?`<span>メモ：${esc(row.memo)}</span>`:""}
+          <span>スマレジ手動確認：${confirmCell(row)}</span>
         </div>
       </article>`).join("")}
     </div>`;
+    list.querySelectorAll(".booth-gacha-confirm-btn").forEach(button=>{
+      button.addEventListener("click",()=>confirmBoothGachaManualCheck(button.dataset.logId,eventId));
+    });
   }catch(e){
     list.innerHTML='<div class="booth-empty">ガチャ履歴を読み込めませんでした。</div>';
     boothShowError("ガチャ履歴エラー","ガチャ履歴の読み込みに失敗しました。\n"+e.message);
+  }
+}
+
+async function confirmBoothGachaManualCheck(logId,eventId){
+  if(!logId){
+    boothShowError("スマレジ手動確認エラー","確認対象の在庫履歴が見つかりません。");
+    return;
+  }
+  if(typeof hasInventoryPrivilegedAccess==="function"&&!hasInventoryPrivilegedAccess()){
+    boothShowError("スマレジ手動確認エラー","確認は管理者ログイン時のみ実行できます。");
+    return;
+  }
+  const checkedBy=typeof getSmaregiCheckerName==="function" ? getSmaregiCheckerName() : "";
+  try{
+    await sb(`inventory_logs?id=eq.${encodeURIComponent(logId)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        equipment_checked:true,
+        equipment_checked_by:checkedBy||"管理者",
+        equipment_checked_at:new Date().toISOString()
+      })
+    });
+    boothShowSuccess("スマレジ手動確認","ガチャ履歴を確認済みにしました。");
+    await loadBoothGachaHistory(eventId);
+  }catch(e){
+    boothShowError("スマレジ手動確認エラー","確認状態の保存に失敗しました。\n"+e.message);
   }
 }
 
@@ -5277,7 +5423,7 @@ function renderBoothDiffList(rows){
       <td><span class="booth-diff-status ${esc(status.className)}">${esc(status.label)}</span></td>
       <td>${canSave?`<textarea id="boothDiffMemo_${esc(row.id)}" class="booth-diff-memo" placeholder="差異確認メモ">${esc(row.diff_memo||"")}</textarea>`:"-"}</td>
       <td>${esc(formatBoothDateTime(row.updated_at))}</td>
-      <td>${canSave?`<button type="button" class="secondary booth-diff-save-btn" data-diff-item-id="${esc(row.id)}">メモ保存</button>`:"-"}</td>
+      <td><div class="booth-diff-actions">${canSave?`<button type="button" class="secondary booth-diff-save-btn" data-diff-item-id="${esc(row.id)}">メモ保存</button>`:""}<button type="button" class="secondary booth-diff-ai-btn" data-diff-key="${esc(boothDiffRowKey(row))}">AIで原因を分析</button></div></td>
     </tr>`;
   }).join("");
   const cardRows=rows.map(row=>{
@@ -5298,6 +5444,8 @@ function renderBoothDiffList(rows){
       </div>
       ${canSave?`<textarea id="boothDiffMemoCard_${esc(row.id)}" class="booth-diff-memo" placeholder="差異確認メモ">${esc(row.diff_memo||"")}</textarea>
       <button type="button" class="secondary booth-diff-save-btn" data-diff-item-id="${esc(row.id)}">メモ保存</button>`:""}
+      <button type="button" class="secondary booth-diff-ai-btn" data-diff-key="${esc(boothDiffRowKey(row))}">AIで原因を分析</button>
+      <div class="booth-ai-result" id="boothAiResult_${esc(boothDiffRowKey(row)).replace(/[^a-zA-Z0-9_-]/g,"_")}"></div>
     </article>`;
   }).join("");
   list.innerHTML=`
@@ -5310,6 +5458,73 @@ function renderBoothDiffList(rows){
   list.querySelectorAll("[data-diff-item-id]").forEach(button=>{
     button.addEventListener("click",()=>saveBoothDiffMemo(button.dataset.diffItemId));
   });
+  window.__boothDiffRowsForAi=new Map(rows.map(row=>[boothDiffRowKey(row),row]));
+  list.querySelectorAll(".booth-diff-ai-btn").forEach(button=>{
+    button.addEventListener("click",()=>analyzeBoothDiffWithAi(button.dataset.diffKey,button));
+  });
+}
+
+async function analyzeBoothDiffWithAi(diffKey,button){
+  const row=window.__boothDiffRowsForAi?.get(diffKey);
+  if(!row){
+    boothShowError("AI分析エラー","分析対象の商品が見つかりません。");
+    return;
+  }
+  const event=getBoothCurrentEvent();
+  const resultId=`boothAiResult_${String(diffKey||"").replace(/[^a-zA-Z0-9_-]/g,"_")}`;
+  const resultEl=document.getElementById(resultId);
+  const oldText=button?.textContent;
+  try{
+    if(button){button.disabled=true;button.textContent="AI分析中...";}
+    if(resultEl)resultEl.innerHTML='<div class="message">AI分析中...</div>';
+    const response=await fetch("/api/booth-diff-ai",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        event:{
+          id:event?.id||"",
+          name:event?.name||"",
+          event_start:event?.event_start||"",
+          event_end:event?.event_end||"",
+          store_code:event?.store_code||getBoothCurrentStoreCode?.()||""
+        },
+        product:{
+          product_name:row.product_name||"",
+          barcode:row.barcode||"",
+          smaregi_product_id:row.smaregi_product_id||""
+        },
+        inventory:{
+          store_code:row.store_code||"",
+          taken_qty:row.taken_registered?row.taken_qty:"未登録",
+          sold_qty:row.sold_qty??0,
+          returned_qty:row.returned_qty??0,
+          consumed_qty:row.consumed_qty??0,
+          difference_qty:calculateBoothItemDifference(row),
+          source_flags:row.source_flags||[]
+        },
+        histories:{
+          diff_memo:row.diff_memo||"",
+          updated_at:row.updated_at||""
+        }
+      })
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||`AI API ${response.status}`);
+    const html=`<div class="booth-ai-analysis">
+      <strong>AI分析</strong>
+      <div><span>原因候補：</span>${esc(data.cause||"-")}</div>
+      <div><span>確信度：</span>${esc(data.confidence||"-")}</div>
+      <div><span>根拠：</span>${esc(data.evidence||"-")}</div>
+      <div><span>確認推奨：</span>${esc(data.recommended_check||"-")}</div>
+    </div>`;
+    if(resultEl)resultEl.innerHTML=html;
+    else boothShowSuccess("AI分析",`${data.cause||""}\n確信度：${data.confidence||""}\n確認推奨：${data.recommended_check||""}`);
+  }catch(e){
+    if(resultEl)resultEl.innerHTML=`<div class="message err">AI分析エラー：${esc(e.message)}</div>`;
+    boothShowError("AI分析エラー",e.message);
+  }finally{
+    if(button){button.disabled=false;button.textContent=oldText||"AIで原因を分析";}
+  }
 }
 
 async function saveBoothDiffMemo(itemId){
@@ -6613,7 +6828,7 @@ exportBoothEventReportCsv=async function(event){
       ["商品名","バーコード","比較店舗","持ち出し","販売","戻り","消費","差異","状態"],
       ...diffRows.map(row=>[row.product_name||"",row.barcode||"",row.store_code||"",row.taken_registered?row.taken_qty:"未登録",row.sold_qty??0,row.returned_qty??0,row.consumed_qty??0,calculateBoothItemDifference(row),row.taken_registered?"要確認":"持ち出し未登録"])
     ];
-    downloadBoothCsvFile(`イベントレポート_${boothSafeExportName(event?.name)}_${boothTodayYmd()}.csv`,rows);
+    downloadBoothCsvFile(`${boothEventExportBaseName(event,"イベントレポート")}.csv`,rows);
   }catch(e){
     boothShowError("CSV出力エラー","イベントレポートCSVの出力に失敗しました。\n"+e.message);
   }
@@ -6643,7 +6858,7 @@ exportBoothEventReportPdf=async function(event){
       ${boothPdfTable("ガチャ売上集計",["商品名","バーコード","販売数量合計","売上金額合計"],gachaProducts.map(row=>[row.product_name||"",row.barcode||"",row.quantity,boothMoney(row.amount)]))}
       ${boothPdfTable("ガチャ景品実績",["商品名","バーコード","ガチャ持ち出し数","ガチャ使用数","ガチャ戻し数","現在ガチャ残数"],data.gacha.map(row=>[row.product_name||"",row.barcode||"",row.taken_qty??0,row.consumed_qty??0,row.returned_qty??0,boothGachaItemCurrentQty(row)]))}
       ${boothPdfTable("在庫差異",["商品名","バーコード","比較店舗","持ち出し","販売","戻り","消費","差異","状態"],diffRows.map(row=>[row.product_name||"",row.barcode||"",row.store_code||"",row.taken_registered?row.taken_qty:"未登録",row.sold_qty??0,row.returned_qty??0,row.consumed_qty??0,calculateBoothItemDifference(row),row.taken_registered?"要確認":"持ち出し未登録"]))}`;
-    if(openBoothPdfWindow("イベントレポート",html))boothShowSuccess("PDF出力","イベントレポートPDFの印刷画面を開きました。");
+    if(openBoothPdfWindow(boothEventExportBaseName(event,"イベントレポート"),html))boothShowSuccess("PDF出力","イベントレポートPDFの印刷画面を開きました。");
   }catch(e){
     boothShowError("PDF出力エラー","イベントレポートPDFの出力に失敗しました。\n"+e.message);
   }

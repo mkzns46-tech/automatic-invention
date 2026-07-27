@@ -198,6 +198,33 @@
     return change?.changed_at || change?.movement_datetime || change?.updated_at_from_csv || change?.updated_at || "";
   }
 
+  function getSmaregiStockDivisionLabel(value){
+    const text=String(value||"").trim();
+    if(!text)return "";
+    const labels={
+      "01":"修正",
+      "02":"売上",
+      "03":"仕入",
+      "04":"出庫",
+      "05":"入庫",
+      "06":"レンタル",
+      "07":"取置き",
+      "08":"棚卸",
+      "09":"調整",
+      "10":"出荷",
+      "12":"返品",
+      "13":"販促品",
+      "14":"ロス",
+      "15":"スマレジAPI連携",
+      "16":"売上引当",
+      "17":"入庫欠品",
+      "18":"受注在庫引当"
+    };
+    if(labels[text])return labels[text];
+    if(/^\d+$/.test(text))return `不明（${text}）`;
+    return text;
+  }
+
   function getLastCheckTimeValue(){
     const lastCheckedAt=getLastCheckedAtSafe();
     const time=new Date(lastCheckedAt).getTime();
@@ -1017,12 +1044,13 @@
         ? window.getSavedSmaregiStockValue(change)
         : parseStockNumber(change?.stock_amount);
       const qty=parseStockNumber(change.amount ?? change.movement_quantity);
+      const beforeStock=afterStock!==null && qty!==null ? afterStock-qty : null;
       const staff=change.staff_name || change.staff || change.operator_name || change.created_by || "-";
       const memo=change.memo || change.movement_reason || change.reason || "-";
       return `<tr>
         <td>${safeText(changedAt && typeof fmt==="function" ? fmt(changedAt) : changedAt || "")}</td>
-        <td>${safeText(change.stock_division || change.movement_type || "")}</td>
-        <td>${safeText("-")}</td>
+        <td>${safeText(getSmaregiStockDivisionLabel(change.stock_division || change.movement_type || ""))}</td>
+        <td>${safeText(beforeStock===null?"-":beforeStock)}</td>
         <td class="${signedClass(qty)}">${safeText(qty===null?"-":formatSignedDisplay(qty))}</td>
         <td>${safeText(afterStock===null?"-":afterStock)}</td>
         <td>${safeText(memo)}</td>
