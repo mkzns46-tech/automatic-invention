@@ -653,7 +653,8 @@
       const differenceClass=difference<0 ? " is-negative" : " is-positive";
       const checkedAt=check?.checked_at && typeof fmt==="function" ? safeText(fmt(check.checked_at)) : "未入力";
       const showExclude=hasInventoryAdminAccessSafe();
-      return `<tr class="smaregi-diff-row">
+      const detailId=`smaregiCauseInline_${safeText(barcode).replace(/[^a-zA-Z0-9_-]/g,"_")}`;
+      return `<tr class="smaregi-diff-row" data-barcode="${safeText(barcode)}">
         <td class="smaregi-diff-product-cell">
           <div class="smaregi-diff-pc-product">${safeText(name)}<div class="smaregi-movement-note">棚番：${safeText(getProductShelfLabel(gp(getItemBarcode(item))||{location:item.location||""}))}</div><div class="smaregi-movement-note">バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</div></div>
           <div class="smaregi-diff-mobile-card">
@@ -682,6 +683,9 @@
         <td>${safeText(checkedBy||"担当者未設定")}</td>
         <td>${checkedAt}</td>
         <td>${getDiffRowActionsHtml(barcode,{includeExclude:showExclude,includeEquipment:true})}</td>
+      </tr>
+      <tr class="smaregi-cause-inline-row" data-cause-barcode="${safeText(barcode)}" hidden>
+        <td colspan="10"><div id="${detailId}" class="smaregi-cause-inline-slot"></div></td>
       </tr>`;
     }).join("");
     body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
@@ -1069,13 +1073,24 @@
       showMessage?.("原因確認は分析画面のパスワード認証後に操作できます。","err");
       return;
     }
-    const detail=typeof el==="function" ? el("smaregiCauseDetail") : document.getElementById("smaregiCauseDetail");
+    document.querySelectorAll(".smaregi-cause-inline-row").forEach(row=>{
+      if(String(row.dataset.causeBarcode||"")!==String(barcode)){
+        row.hidden=true;
+        const slot=row.querySelector(".smaregi-cause-inline-slot");
+        if(slot)slot.innerHTML="";
+      }
+    });
+    const inlineRow=[...document.querySelectorAll(".smaregi-cause-inline-row")]
+      .find(row=>String(row.dataset.causeBarcode||"")===String(barcode||""));
+    const detail=inlineRow?.querySelector(".smaregi-cause-inline-slot")
+      || (typeof el==="function" ? el("smaregiCauseDetail") : document.getElementById("smaregiCauseDetail"));
     const item=getAllMovementItems().find(row=>String(row.barcode||"")===String(barcode));
     if(!detail||!item)return;
+    if(inlineRow)inlineRow.hidden=false;
     const itemName=getItemName(item)||"商品名未設定";
     const itemBarcode=getItemBarcode(item)||barcode||"";
     showMessage?.("原因確認データを読み込み中...");
-    detail.hidden=false;
+    if(detail.id==="smaregiCauseDetail")detail.hidden=false;
     detail.innerHTML='<div class="message">原因確認データを読み込み中...</div>';
     try{
       const lastCheckTime=getLastCheckTimeValue();
@@ -1092,10 +1107,41 @@
       const storeLabel=getInventoryStoreLabelSafe();
       const actual=check?.actual_stock ?? "";
       const difference=actual===""||actual===null||actual===undefined||smaregiCompareStock===null ? "-" : Number(actual)-Number(smaregiCompareStock);
+      const aiKey=String(itemBarcode||barcode||"");
+      if(!window.__smaregiCauseAiPayloads)window.__smaregiCauseAiPayloads=new Map();
+      window.__smaregiCauseAiPayloads.set(aiKey,{
+        summary:{
+          product_name:itemName,
+          barcode:itemBarcode,
+          store:storeLabel,
+          actual_stock:actual===""?"未入力":actual,
+          smaregi_stock:smaregiStock===null?"未取得":smaregiStock,
+          difference,
+          last_checked_at:getLastCheckedAtSafe()
+        },
+        arico_logs:appLogs.slice(0,80).map(log=>({
+          created_at:log.created_at,
+          type:INVENTORY_TYPE_LABELS[String(log.type||"").trim()] || log.type || "",
+          quantity:log.quantity ?? log.qty ?? log.amount ?? "",
+          memo:log.memo || log.note || "",
+          staff:log.staff || log.staff_name || log.created_by || "",
+          smaregi_manual_checked:log.equipment_checked===true || !!log.equipment_checked_at,
+          smaregi_manual_checked_by:log.equipment_checked_by || "",
+          smaregi_manual_checked_at:log.equipment_checked_at || ""
+        })),
+        smaregi_changes:smaregiChanges.slice(0,80).map(change=>({
+          changed_at:getChangeDateValue(change),
+          type:getSmaregiStockDivisionLabel(change.stock_division || change.movement_type || ""),
+          quantity:change.amount ?? change.movement_quantity ?? "",
+          stock_after:typeof window.getSavedSmaregiStockValue==="function" ? window.getSavedSmaregiStockValue(change) : change.stock_amount,
+          memo:change.memo || change.movement_reason || change.reason || "",
+          staff:change.staff_name || change.staff || change.operator_name || change.created_by || ""
+        }))
+      });
       detail.innerHTML=`
         <div class="smaregi-cause-shell">
         <div class="smaregi-cause-header">
-          <button type="button" id="closeSmaregiCauseDetailBtn" class="secondary">← 差異一覧に戻る</button>
+          <button type="button" class="secondary close-smaregi-cause-detail-btn">閉じる</button>
           <div class="smaregi-cause-title">
             <div><strong>商品名：</strong>${safeText(itemName)}</div>
             <div><strong>棚番：</strong>${safeText(getProductShelfLabel(gp(itemBarcode)||{location:item.location||""}))}</div>
@@ -1149,15 +1195,27 @@
             <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>処理前在庫</th><th>数量</th><th>処理後在庫</th><th>備考</th><th>担当者</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
           </section>
         </div>
+        <div class="smaregi-cause-ai-panel">
+          <button type="button" class="secondary smaregi-cause-ai-btn" data-barcode="${safeText(aiKey)}">AIで原因を分析</button>
+          <div class="smaregi-cause-ai-result" id="smaregiCauseAiResult_${safeText(aiKey).replace(/[^a-zA-Z0-9_-]/g,"_")}"></div>
+        </div>
         <div class="smaregi-cause-footnote">スマレジ側の在庫は、API取得時に保存した在庫数をそのまま表示しています。</div>
         </div>
       `;
-      const closeButton=document.getElementById("closeSmaregiCauseDetailBtn");
-      if(closeButton)closeButton.onclick=()=>{detail.hidden=true;detail.innerHTML="";};
-      const saveButton=document.getElementById("saveSmaregiDifferenceReasonBtn");
+      detail.querySelectorAll(".close-smaregi-cause-detail-btn").forEach(closeButton=>{
+        closeButton.onclick=()=>{
+          if(inlineRow)inlineRow.hidden=true;
+          else detail.hidden=true;
+          detail.innerHTML="";
+        };
+      });
+      const saveButton=detail.querySelector("#saveSmaregiDifferenceReasonBtn");
       if(saveButton)saveButton.onclick=e=>{
         if(typeof saveSmaregiDifferenceReason==="function")saveSmaregiDifferenceReason(itemBarcode,e.currentTarget);
       };
+      detail.querySelectorAll(".smaregi-cause-ai-btn").forEach(button=>{
+        button.onclick=()=>analyzeSmaregiCauseWithAi(button.dataset.barcode,button);
+      });
       showMessage?.(`原因確認を表示しました：${itemName}`,"ok");
       detail.scrollIntoView({behavior:"smooth",block:"start"});
     }catch(error){
@@ -1165,6 +1223,42 @@
       showMessage?.("原因確認データ取得エラー。\n"+error.message,"err");
     }
   };
+
+  async function analyzeSmaregiCauseWithAi(barcode,button){
+    const key=String(barcode||"");
+    const payload=window.__smaregiCauseAiPayloads?.get(key);
+    const resultId=`smaregiCauseAiResult_${key.replace(/[^a-zA-Z0-9_-]/g,"_")}`;
+    const resultEl=document.getElementById(resultId);
+    if(!payload){
+      showMessage?.("AI分析対象の原因確認データが見つかりません。","err");
+      return;
+    }
+    const oldText=button?.textContent;
+    try{
+      if(button){button.disabled=true;button.textContent="AI分析中...";}
+      if(resultEl)resultEl.innerHTML='<div class="message">AI分析中...</div>';
+      const response=await fetch("/api/smaregi-cause-ai",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(payload)
+      });
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.error||`AI API ${response.status}`);
+      const html=`<div class="smaregi-cause-ai-analysis">
+        <h4>AI分析</h4>
+        <div><strong>原因候補：</strong>${safeText(data.cause||"-")}</div>
+        <div><strong>確信度：</strong>${safeText(data.confidence||"-")}</div>
+        <div><strong>根拠：</strong>${safeText(data.evidence||"-")}</div>
+        <div><strong>確認推奨：</strong>${safeText(data.recommended_check||"-")}</div>
+      </div>`;
+      if(resultEl)resultEl.innerHTML=html;
+    }catch(error){
+      if(resultEl)resultEl.innerHTML=`<div class="message err">AI分析エラー：${safeText(error.message)}</div>`;
+      showMessage?.("AI分析エラー\n"+error.message,"err");
+    }finally{
+      if(button){button.disabled=false;button.textContent=oldText||"AIで原因を分析";}
+    }
+  }
 
   window.renderSmaregiStockChecks=function(){
     const body=typeof el==="function" ? el("smaregiStockCheckBody") : document.getElementById("smaregiStockCheckBody");

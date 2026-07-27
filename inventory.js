@@ -704,6 +704,18 @@ function getGachaCurrentQty(item){
   return Math.max(0,Number(item.taken_qty||0)-Number(item.returned_qty||0));
 }
 
+async function getInventoryGachaMovementCurrentQty(eventId,barcode,fallbackItem=null){
+  try{
+    const rows=await sb(`booth_stock_movements?select=movement_type,quantity&event_id=eq.${encodeURIComponent(eventId)}&barcode=eq.${encodeURIComponent(barcode)}&item_type=eq.gacha_prize&movement_type=in.(gacha_pick,gacha_return)&limit=1000`);
+    if(Array.isArray(rows)&&rows.length){
+      const picked=rows.filter(row=>String(row.movement_type)==="gacha_pick").reduce((sum,row)=>sum+Number(row.quantity||0),0);
+      const returned=rows.filter(row=>String(row.movement_type)==="gacha_return").reduce((sum,row)=>sum+Number(row.quantity||0),0);
+      return Math.max(0,picked-returned);
+    }
+  }catch(_){}
+  return getGachaCurrentQty(fallbackItem);
+}
+
 async function patchInventoryEventItem(item,payload){
   await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
     method:"PATCH",
@@ -759,6 +771,7 @@ async function addQtyToEventShelf(event,product,qty){
 }
 
 async function upsertInventoryGachaEventItem(event,product,qty,action){
+  if(action==="return")return;
   const item=await findInventoryEventItem(event.id,product.barcode,"gacha_prize");
   if(item){
     const taken=Number(item.taken_qty||0);
@@ -856,7 +869,7 @@ async function registerGachaFromInventory({action,event,product,barcode,qty,staf
       }
     }else{
       const gachaItem=await findInventoryEventItem(event.id,barcode,"gacha_prize");
-      const currentGacha=getGachaCurrentQty(gachaItem);
+      const currentGacha=await getInventoryGachaMovementCurrentQty(event.id,barcode,gachaItem);
       if(currentGacha<qty)throw new Error(`ガチャ在庫不足：${product.name||barcode} / 現在ガチャ在庫 ${currentGacha} / 戻し ${qty}`);
       const nextStock=currentStock+qty;
       await updateProductCurrentStock(barcode,nextStock);

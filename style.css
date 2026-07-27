@@ -6201,6 +6201,144 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
     border-radius:10px !important;
   }
 }
+
+.smaregi-cause-inline-row td{
+  padding:0 !important;
+  background:#f7fcf8;
+}
+.smaregi-cause-inline-slot{
+  padding:12px;
+}
+.smaregi-cause-shell{
+  display:grid;
+  gap:12px;
+  border:1px solid #b8dfc9;
+  border-radius:10px;
+  padding:14px;
+  background:#fff;
+}
+.smaregi-cause-header{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  justify-content:space-between;
+}
+.smaregi-cause-title{
+  flex:1;
+  min-width:0;
+  color:#113b2b;
+  line-height:1.45;
+}
+.smaregi-cause-store-badge{
+  padding:6px 10px;
+  border-radius:999px;
+  background:#e1f4e9;
+  color:#0b5d3b;
+  font-weight:900;
+  white-space:nowrap;
+}
+.smaregi-cause-summary-row{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  align-items:stretch;
+}
+.smaregi-cause-summary-card{
+  border:1px solid #d6ebde;
+  border-radius:8px;
+  padding:10px;
+  background:#f8fcf9;
+}
+.smaregi-cause-summary-card strong{
+  display:block;
+  color:#527161;
+  font-size:.82rem;
+}
+.smaregi-cause-summary-card span{
+  display:block;
+  margin-top:4px;
+  color:#10251b;
+  font-size:1.15rem;
+  font-weight:900;
+  overflow-wrap:anywhere;
+}
+.smaregi-cause-summary-operator{
+  display:none;
+}
+.smaregi-reason-form{
+  display:grid;
+  grid-template-columns:minmax(180px,.7fr) minmax(240px,1.3fr) auto;
+  gap:10px;
+  align-items:end;
+}
+.smaregi-reason-form label{
+  margin:0;
+}
+.smaregi-cause-history-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.smaregi-cause-history-card{
+  min-width:0;
+  border:1px solid #d6ebde;
+  border-radius:8px;
+  padding:10px;
+  background:#fbfefc;
+}
+.smaregi-cause-history-card h3{
+  margin:0 0 4px;
+  color:#0b5d3b;
+  font-size:1rem;
+}
+.smaregi-cause-history-card .table-wrap{
+  max-height:360px;
+  overflow:auto;
+}
+.smaregi-cause-history-card table{
+  min-width:720px;
+}
+.smaregi-cause-history-card thead th{
+  position:sticky;
+  top:0;
+  z-index:1;
+}
+.smaregi-cause-ai-panel{
+  display:grid;
+  gap:10px;
+  border:1px solid #d6ebde;
+  border-radius:8px;
+  padding:10px;
+  background:#f7fcf8;
+}
+.smaregi-cause-ai-analysis{
+  display:grid;
+  gap:6px;
+  color:#10251b;
+}
+.smaregi-cause-ai-analysis h4{
+  margin:0;
+  color:#0b5d3b;
+}
+
+@media(max-width:800px){
+  .smaregi-cause-inline-row,
+  .smaregi-cause-inline-row td{
+    display:block !important;
+    width:100% !important;
+  }
+  .smaregi-cause-header{
+    display:grid;
+  }
+  .smaregi-cause-summary-row,
+  .smaregi-reason-form,
+  .smaregi-cause-history-grid{
+    grid-template-columns:1fr;
+  }
+  .smaregi-cause-history-card .table-wrap{
+    max-height:320px;
+  }
+}
 /* Shelf location registration */
 .shelf-location-card{
   display:block;
@@ -6977,6 +7115,21 @@ body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
 }
 .booth-ai-analysis span{
   font-weight:800;
+}
+.booth-gacha-return-count-panel{
+  display:grid;
+  gap:10px;
+  border:1px solid #b8dfc9;
+  border-radius:10px;
+  padding:12px;
+  background:#f7fcf8;
+}
+.booth-gacha-return-count-panel h5{
+  margin:0;
+  color:var(--main-dark);
+}
+.booth-gacha-return-count-panel .booth-product-preview{
+  margin-top:0;
 }
 .booth-work-card{
   display:grid;
