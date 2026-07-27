@@ -1133,7 +1133,7 @@
             <div><strong>バーコード：</strong>${safeText(itemBarcode||"バーコードなし")}</div>
           </div>
           <div class="smaregi-cause-header-actions">
-            <button type="button" class="smaregi-cause-ai-btn primary-cause-ai" data-barcode="${safeText(aiKey)}">AIで原因を分析</button>
+            <button type="button" class="smaregi-cause-ai-btn primary-cause-ai" data-barcode="${safeText(aiKey)}">ChatGPT用プロンプトをコピー</button>
             <button type="button" class="secondary close-smaregi-cause-detail-btn">閉じる</button>
             <div class="smaregi-cause-store-badge">店舗：${safeText(storeLabel)}</div>
           </div>
@@ -1160,10 +1160,10 @@
         </div>
         <div class="smaregi-cause-ai-panel is-prominent">
           <div>
-            <strong>AI分析</strong>
-            <span>履歴を見て原因候補を出します。押すまでAI APIは呼びません。</span>
+            <strong>ChatGPT分析</strong>
+            <span>差異情報と履歴をまとめてコピーします。ChatGPTに貼り付けて原因候補を確認してください。</span>
           </div>
-          <button type="button" class="smaregi-cause-ai-btn primary-cause-ai" data-barcode="${safeText(aiKey)}">AIで原因を分析</button>
+          <button type="button" class="smaregi-cause-ai-btn primary-cause-ai" data-barcode="${safeText(aiKey)}">ChatGPT用プロンプトをコピー</button>
           <div class="smaregi-cause-ai-result" id="smaregiCauseAiResult_${safeText(aiKey).replace(/[^a-zA-Z0-9_-]/g,"_")}"></div>
         </div>
         <div class="smaregi-cause-guide">在庫管理側の履歴とスマレジ側の在庫変動履歴を比較して、差異の原因を確認してください。</div>
@@ -1206,7 +1206,7 @@
         if(typeof saveSmaregiDifferenceReason==="function")saveSmaregiDifferenceReason(itemBarcode,e.currentTarget);
       };
       detail.querySelectorAll(".smaregi-cause-ai-btn").forEach(button=>{
-        button.onclick=()=>analyzeSmaregiCauseWithAi(button.dataset.barcode,button);
+        button.onclick=()=>copySmaregiCausePromptForChatGpt(button.dataset.barcode,button);
       });
       showMessage?.(`原因確認を表示しました：${itemName}`,"ok");
       detail.scrollIntoView({behavior:"smooth",block:"start"});
@@ -1216,39 +1216,82 @@
     }
   };
 
-  async function analyzeSmaregiCauseWithAi(barcode,button){
+  function buildSmaregiCausePrompt(payload){
+    const summary=payload?.summary||{};
+    return [
+      "ARICO在庫管理のスマレジ在庫差異について、原因候補を分析してください。",
+      "",
+      "あなたは分析のみを行ってください。ARICO在庫変更、スマレジ在庫変更、原因カテゴリ確定、確認済み変更、履歴削除は行わないでください。",
+      "",
+      "出力形式:",
+      "【原因候補】",
+      "【確信度】高 / 中 / 低",
+      "【根拠】",
+      "【確認推奨】",
+      "",
+      "差異サマリー:",
+      `商品名: ${summary.product_name||"-"}`,
+      `バーコード: ${summary.barcode||"-"}`,
+      `対象店舗: ${summary.store||"-"}`,
+      `実在庫（ARICO）: ${summary.actual_stock ?? "-"}`,
+      `スマレジ在庫: ${summary.smaregi_stock ?? "-"}`,
+      `差異: ${summary.difference ?? "-"}`,
+      `前回チェック締め日時: ${summary.last_checked_at||"-"}`,
+      "",
+      "ARICO側在庫変動履歴:",
+      JSON.stringify(payload?.arico_logs||[],null,2),
+      "",
+      "スマレジ側在庫変動履歴:",
+      JSON.stringify(payload?.smaregi_changes||[],null,2),
+      "",
+      "確認観点:",
+      "- 商品転用、ガチャ、ガチャ戻し、イベント持ち出し、入荷、出荷、棚卸修正の差分を見てください。",
+      "- 担当者、備考、スマレジ手動確認済み/未確認も参考にしてください。",
+      "- 前回チェック締め以降の履歴を優先し、必要に応じて直前の履歴も参考にしてください。"
+    ].join("\n");
+  }
+
+  async function copyTextToClipboard(text){
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    const textarea=document.createElement("textarea");
+    textarea.value=text;
+    textarea.setAttribute("readonly","");
+    textarea.style.position="fixed";
+    textarea.style.left="-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    try{
+      return document.execCommand("copy");
+    }finally{
+      textarea.remove();
+    }
+  }
+
+  async function copySmaregiCausePromptForChatGpt(barcode,button){
     const key=String(barcode||"");
     const payload=window.__smaregiCauseAiPayloads?.get(key);
     const resultId=`smaregiCauseAiResult_${key.replace(/[^a-zA-Z0-9_-]/g,"_")}`;
     const resultEl=document.getElementById(resultId);
     if(!payload){
-      showMessage?.("AI分析対象の原因確認データが見つかりません。","err");
+      showMessage?.("コピー対象の原因確認データが見つかりません。","err");
       return;
     }
     const oldText=button?.textContent;
     try{
-      if(button){button.disabled=true;button.textContent="AI分析中...";}
-      if(resultEl)resultEl.innerHTML='<div class="message">AI分析中...</div>';
-      const response=await fetch("/api/smaregi-cause-ai",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(payload)
-      });
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(data.error||`AI API ${response.status}`);
-      const html=`<div class="smaregi-cause-ai-analysis">
-        <h4>AI分析</h4>
-        <div><strong>原因候補：</strong>${safeText(data.cause||"-")}</div>
-        <div><strong>確信度：</strong>${safeText(data.confidence||"-")}</div>
-        <div><strong>根拠：</strong>${safeText(data.evidence||"-")}</div>
-        <div><strong>確認推奨：</strong>${safeText(data.recommended_check||"-")}</div>
-      </div>`;
-      if(resultEl)resultEl.innerHTML=html;
+      if(button){button.disabled=true;button.textContent="コピー中...";}
+      const prompt=buildSmaregiCausePrompt(payload);
+      const copied=await copyTextToClipboard(prompt);
+      if(!copied)throw new Error("クリップボードへコピーできませんでした。");
+      if(resultEl)resultEl.innerHTML='<div class="message ok">ChatGPT用プロンプトをコピーしました。ChatGPTを開いて貼り付けてください。</div>';
+      showMessage?.("ChatGPT用プロンプトをコピーしました。","ok");
     }catch(error){
-      if(resultEl)resultEl.innerHTML=`<div class="message err">AI分析エラー：${safeText(error.message)}</div>`;
-      showMessage?.("AI分析エラー\n"+error.message,"err");
+      if(resultEl)resultEl.innerHTML=`<div class="message err">コピーエラー：${safeText(error.message)}</div>`;
+      showMessage?.("コピーエラー\n"+error.message,"err");
     }finally{
-      if(button){button.disabled=false;button.textContent=oldText||"AIで原因を分析";}
+      if(button){button.disabled=false;button.textContent=oldText||"ChatGPT用プロンプトをコピー";}
     }
   }
 
