@@ -6202,13 +6202,6 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   }
 }
 
-.smaregi-cause-inline-row td{
-  padding:0 !important;
-  background:#f7fcf8;
-}
-.smaregi-cause-inline-slot{
-  padding:12px;
-}
 .smaregi-cause-shell{
   display:grid;
   gap:12px;
@@ -6216,6 +6209,7 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   border-radius:10px;
   padding:14px;
   background:#fff;
+  margin-top:14px;
 }
 .smaregi-cause-header{
   display:flex;
@@ -6228,6 +6222,30 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   min-width:0;
   color:#113b2b;
   line-height:1.45;
+}
+.smaregi-cause-title h3{
+  margin:0 0 8px;
+  color:#0b5d3b;
+  font-size:1.25rem;
+}
+.smaregi-cause-header-actions{
+  display:grid;
+  gap:8px;
+  justify-items:end;
+}
+.primary-cause-ai{
+  min-width:180px;
+  min-height:44px;
+  padding:10px 16px;
+  border:0;
+  border-radius:10px;
+  background:#0b5d3b;
+  color:#fff;
+  font-weight:900;
+  box-shadow:0 6px 16px rgba(13,74,49,.18);
+}
+.primary-cause-ai:hover{
+  filter:brightness(.96);
 }
 .smaregi-cause-store-badge{
   padding:6px 10px;
@@ -6305,11 +6323,31 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 }
 .smaregi-cause-ai-panel{
   display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
   gap:10px;
+  align-items:center;
   border:1px solid #d6ebde;
   border-radius:8px;
-  padding:10px;
+  padding:12px;
   background:#f7fcf8;
+}
+.smaregi-cause-ai-panel.is-prominent{
+  border-color:#8fceb0;
+  background:#eefaf3;
+}
+.smaregi-cause-ai-panel strong{
+  display:block;
+  color:#0b5d3b;
+  font-size:1rem;
+}
+.smaregi-cause-ai-panel span{
+  display:block;
+  color:#527161;
+  font-size:.88rem;
+  margin-top:2px;
+}
+.smaregi-cause-ai-result{
+  grid-column:1 / -1;
 }
 .smaregi-cause-ai-analysis{
   display:grid;
@@ -6322,17 +6360,20 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 }
 
 @media(max-width:800px){
-  .smaregi-cause-inline-row,
-  .smaregi-cause-inline-row td{
-    display:block !important;
-    width:100% !important;
-  }
   .smaregi-cause-header{
     display:grid;
   }
+  .smaregi-cause-header-actions{
+    justify-items:stretch;
+  }
+  .primary-cause-ai,
+  .smaregi-cause-header-actions button{
+    width:100%;
+  }
   .smaregi-cause-summary-row,
   .smaregi-reason-form,
-  .smaregi-cause-history-grid{
+  .smaregi-cause-history-grid,
+  .smaregi-cause-ai-panel{
     grid-template-columns:1fr;
   }
   .smaregi-cause-history-card .table-wrap{

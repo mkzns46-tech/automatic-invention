@@ -653,7 +653,6 @@
       const differenceClass=difference<0 ? " is-negative" : " is-positive";
       const checkedAt=check?.checked_at && typeof fmt==="function" ? safeText(fmt(check.checked_at)) : "未入力";
       const showExclude=hasInventoryAdminAccessSafe();
-      const detailId=`smaregiCauseInline_${safeText(barcode).replace(/[^a-zA-Z0-9_-]/g,"_")}`;
       return `<tr class="smaregi-diff-row" data-barcode="${safeText(barcode)}">
         <td class="smaregi-diff-product-cell">
           <div class="smaregi-diff-pc-product">${safeText(name)}<div class="smaregi-movement-note">棚番：${safeText(getProductShelfLabel(gp(getItemBarcode(item))||{location:item.location||""}))}</div><div class="smaregi-movement-note">バーコード：${safeText(getItemBarcode(item)||"バーコードなし")}</div></div>
@@ -683,9 +682,6 @@
         <td>${safeText(checkedBy||"担当者未設定")}</td>
         <td>${checkedAt}</td>
         <td>${getDiffRowActionsHtml(barcode,{includeExclude:showExclude,includeEquipment:true})}</td>
-      </tr>
-      <tr class="smaregi-cause-inline-row" data-cause-barcode="${safeText(barcode)}" hidden>
-        <td colspan="10"><div id="${detailId}" class="smaregi-cause-inline-slot"></div></td>
       </tr>`;
     }).join("");
     body.querySelectorAll(".smaregi-diff-save-btn").forEach(button=>{
@@ -1073,24 +1069,13 @@
       showMessage?.("原因確認は分析画面のパスワード認証後に操作できます。","err");
       return;
     }
-    document.querySelectorAll(".smaregi-cause-inline-row").forEach(row=>{
-      if(String(row.dataset.causeBarcode||"")!==String(barcode)){
-        row.hidden=true;
-        const slot=row.querySelector(".smaregi-cause-inline-slot");
-        if(slot)slot.innerHTML="";
-      }
-    });
-    const inlineRow=[...document.querySelectorAll(".smaregi-cause-inline-row")]
-      .find(row=>String(row.dataset.causeBarcode||"")===String(barcode||""));
-    const detail=inlineRow?.querySelector(".smaregi-cause-inline-slot")
-      || (typeof el==="function" ? el("smaregiCauseDetail") : document.getElementById("smaregiCauseDetail"));
+    const detail=typeof el==="function" ? el("smaregiCauseDetail") : document.getElementById("smaregiCauseDetail");
     const item=getAllMovementItems().find(row=>String(row.barcode||"")===String(barcode));
     if(!detail||!item)return;
-    if(inlineRow)inlineRow.hidden=false;
     const itemName=getItemName(item)||"商品名未設定";
     const itemBarcode=getItemBarcode(item)||barcode||"";
     showMessage?.("原因確認データを読み込み中...");
-    if(detail.id==="smaregiCauseDetail")detail.hidden=false;
+    detail.hidden=false;
     detail.innerHTML='<div class="message">原因確認データを読み込み中...</div>';
     try{
       const lastCheckTime=getLastCheckTimeValue();
@@ -1141,13 +1126,17 @@
       detail.innerHTML=`
         <div class="smaregi-cause-shell">
         <div class="smaregi-cause-header">
-          <button type="button" class="secondary close-smaregi-cause-detail-btn">閉じる</button>
           <div class="smaregi-cause-title">
+            <h3>原因確認</h3>
             <div><strong>商品名：</strong>${safeText(itemName)}</div>
             <div><strong>棚番：</strong>${safeText(getProductShelfLabel(gp(itemBarcode)||{location:item.location||""}))}</div>
             <div><strong>バーコード：</strong>${safeText(itemBarcode||"バーコードなし")}</div>
           </div>
-          <div class="smaregi-cause-store-badge">店舗：${safeText(storeLabel)}</div>
+          <div class="smaregi-cause-header-actions">
+            <button type="button" class="smaregi-cause-ai-btn primary-cause-ai" data-barcode="${safeText(aiKey)}">AIで原因を分析</button>
+            <button type="button" class="secondary close-smaregi-cause-detail-btn">閉じる</button>
+            <div class="smaregi-cause-store-badge">店舗：${safeText(storeLabel)}</div>
+          </div>
         </div>
         <div class="smaregi-cause-summary-row">
           <div class="smaregi-cause-summary-card">
@@ -1168,6 +1157,14 @@
             <strong>前回チェック締め日時</strong>
             <span>${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}</span>
           </div>
+        </div>
+        <div class="smaregi-cause-ai-panel is-prominent">
+          <div>
+            <strong>AI分析</strong>
+            <span>履歴を見て原因候補を出します。押すまでAI APIは呼びません。</span>
+          </div>
+          <button type="button" class="smaregi-cause-ai-btn primary-cause-ai" data-barcode="${safeText(aiKey)}">AIで原因を分析</button>
+          <div class="smaregi-cause-ai-result" id="smaregiCauseAiResult_${safeText(aiKey).replace(/[^a-zA-Z0-9_-]/g,"_")}"></div>
         </div>
         <div class="smaregi-cause-guide">在庫管理側の履歴とスマレジ側の在庫変動履歴を比較して、差異の原因を確認してください。</div>
         <div class="smaregi-reason-form">
@@ -1195,17 +1192,12 @@
             <div class="table-wrap"><table><thead><tr><th>日時</th><th>区分</th><th>処理前在庫</th><th>数量</th><th>処理後在庫</th><th>備考</th><th>担当者</th></tr></thead><tbody>${renderCauseSmaregiRows(smaregiChanges,itemBarcode)}</tbody></table></div>
           </section>
         </div>
-        <div class="smaregi-cause-ai-panel">
-          <button type="button" class="secondary smaregi-cause-ai-btn" data-barcode="${safeText(aiKey)}">AIで原因を分析</button>
-          <div class="smaregi-cause-ai-result" id="smaregiCauseAiResult_${safeText(aiKey).replace(/[^a-zA-Z0-9_-]/g,"_")}"></div>
-        </div>
         <div class="smaregi-cause-footnote">スマレジ側の在庫は、API取得時に保存した在庫数をそのまま表示しています。</div>
         </div>
       `;
       detail.querySelectorAll(".close-smaregi-cause-detail-btn").forEach(closeButton=>{
         closeButton.onclick=()=>{
-          if(inlineRow)inlineRow.hidden=true;
-          else detail.hidden=true;
+          detail.hidden=true;
           detail.innerHTML="";
         };
       });
