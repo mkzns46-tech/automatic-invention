@@ -3,22 +3,23 @@
 function inventoryTypeLabel(type){
   const labels={
     event_delete_return:"イベント削除戻し",
-    event_pick:"イベントピック",
+    event_pick:"イベント持ち出し",
+    event_return:"イベント戻し",
     event_close_return:"イベント締め棚戻し",
     equipment_transfer:"商品転用",
     "備品転用":"商品転用",
-    gacha_pick:"ガチャピック",
-    gacha_return:"ガチャ戻り"
+    "蛯吝刀霆｢逕ｨ":"商品転用",
+    gacha_pick:"ガチャ",
+    gacha_return:"ガチャ戻し"
   };
   return labels[type]||String(type||"");
 }
-
 function isInventoryOutType(type){
   return type==="出荷"||type==="備品転用"||type==="equipment_transfer"||type==="event_pick"||type==="gacha_pick";
 }
 
 function isInventoryInType(type){
-  if(type==="event_delete_return")return true;
+  if(type==="event_delete_return"||type==="event_return")return true;
   return type==="入荷"||type==="gacha_return"||type==="event_close_return";
 }
 
