@@ -2349,7 +2349,7 @@ function sortBoothInventoryRows(rows,sortKey){
 }
 
 async function buildBoothEventInventoryRows(eventId){
-  const items=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty,updated_at&event_id=eq.${encodeURIComponent(eventId)}&item_type=in.(normal,gacha_prize)&order=product_name.asc&limit=2000`);
+  const items=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty,updated_at&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&order=product_name.asc&limit=2000`);
   const rows=Array.isArray(items)?items:[];
   const productsByBarcode=await loadBoothProductsByBarcode(rows.map(row=>row.barcode));
   const map=new Map();
@@ -2363,14 +2363,12 @@ async function buildBoothEventInventoryRows(eventId){
       product_name:item.product_name||product.name||"",
       shelf:boothProductShelfText(product),
       updated_at:product.updated_at||item.updated_at||"",
-      eventShelfQty:0,
-      gachaQty:0
+      eventShelfQty:0
     };
-    if(item.item_type==="gacha_prize")row.gachaQty+=boothGachaItemCurrentQty(item);
-    else row.eventShelfQty+=boothEventItemCurrentQty(item);
+    row.eventShelfQty+=boothEventItemCurrentQty(item);
     map.set(barcode,row);
   });
-  return [...map.values()].map(row=>({...row,totalQty:row.eventShelfQty+row.gachaQty})).filter(row=>row.totalQty!==0);
+  return [...map.values()].filter(row=>row.eventShelfQty!==0);
 }
 
 async function renderBoothEventInventoryPanel(event){
@@ -2446,12 +2444,10 @@ async function renderBoothEventInventoryPanel(event){
         return;
       }
       listEl.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table booth-event-inventory-table">
-        <thead><tr><th>商品情報</th><th>イベント棚在庫</th><th>ガチャ在庫</th><th>合計</th></tr></thead>
+        <thead><tr><th>商品情報</th><th>現在イベント棚在庫</th></tr></thead>
         <tbody>${rows.map(row=>`<tr>
           <td>${boothProductIdentityBlock(row)}</td>
           <td>${esc(row.eventShelfQty)}</td>
-          <td>${esc(row.gachaQty)}</td>
-          <td><strong>${esc(row.totalQty)}</strong></td>
         </tr>`).join("")}</tbody>
       </table></div>
       <div class="booth-history-cards">
@@ -2459,8 +2455,6 @@ async function renderBoothEventInventoryPanel(event){
           ${boothProductIdentityBlock(row)}
           <div class="booth-history-card-meta">
             <span>イベント棚在庫：${esc(row.eventShelfQty)}</span>
-            <span>ガチャ在庫：${esc(row.gachaQty)}</span>
-            <span>イベント関連在庫合計：${esc(row.totalQty)}</span>
           </div>
         </article>`).join("")}
       </div>`;
@@ -2582,7 +2576,9 @@ async function completeBoothDepartureCount(){
   if(!ok)return;
   try{
     const items=await fetchBoothEventItems(event.id);
-    const itemMap=new Map((Array.isArray(items)?items:[]).map(item=>[String(item.barcode||""),item]));
+    const itemMap=new Map((Array.isArray(items)?items:[])
+      .filter(item=>String(item.item_type||"normal")==="normal")
+      .map(item=>[String(item.barcode||""),item]));
     const now=new Date().toISOString();
     for(const row of counts){
       const barcode=String(row.barcode||"");
@@ -2952,7 +2948,8 @@ async function buildBoothDepartureInventoryData(eventId){
       taken,
       soldQty,
       remain,
-      status:"confirmed"
+      status:"confirmed",
+      updated_at:item.updated_at||""
     };
   });
   salesByBarcode.forEach((sale,barcode)=>{
@@ -2963,7 +2960,8 @@ async function buildBoothDepartureInventoryData(eventId){
       taken:null,
       soldQty:Number(sale.quantity||0),
       remain:null,
-      status:"unconfirmed"
+      status:"unconfirmed",
+      updated_at:sale.sold_at||""
     });
   });
   const gachaRows=gachaItems.map(item=>{
@@ -2977,7 +2975,8 @@ async function buildBoothDepartureInventoryData(eventId){
       used,
       returned,
       remain:boothGachaItemCurrentQty(item),
-      counted:isBoothGachaReturnCounted(item)
+      counted:isBoothGachaReturnCounted(item),
+      updated_at:item.updated_at||""
     };
   });
   const sorter=(a,b)=>String(a.product_name||"").localeCompare(String(b.product_name||""),"ja",{numeric:true,sensitivity:"base"});
@@ -3055,8 +3054,28 @@ async function renderBoothDepartureInventoryListPanel(event){
         <button type="button" id="boothDepartureListReloadBtn" class="secondary">再読み込み</button>
       </div>
     </div>
+    <div class="booth-event-inventory-controls">
+      <label>商品検索
+        <input id="boothDepartureListSearch" autocomplete="off" placeholder="商品名・バーコードで検索">
+      </label>
+      <label>並び順
+        <select id="boothDepartureListSort">
+          <option value="name">商品名順</option>
+          <option value="barcode">バーコード順</option>
+          <option value="updated_at">最終更新順</option>
+        </select>
+      </label>
+    </div>
     <div id="boothDepartureInventoryList" class="booth-event-inventory-list"><div class="booth-empty">読み込み中...</div></div>
   </section>`;
+  const storageKey="arico_booth_departure_list_sort";
+  const sortEl=el("boothDepartureListSort");
+  if(sortEl)sortEl.value=localStorage.getItem(storageKey)||"name";
+  el("boothDepartureListSearch")?.addEventListener("input",()=>loadBoothDepartureInventoryList(event.id));
+  el("boothDepartureListSort")?.addEventListener("change",()=>{
+    localStorage.setItem(storageKey,String(el("boothDepartureListSort")?.value||"name"));
+    loadBoothDepartureInventoryList(event.id);
+  });
   el("boothDepartureListReloadBtn")?.addEventListener("click",()=>loadBoothDepartureInventoryList(event.id));
   el("boothDepartureListCsvBtn")?.addEventListener("click",()=>exportBoothDepartureInventoryCsv(event));
   el("boothDepartureListPdfBtn")?.addEventListener("click",()=>exportBoothDepartureInventoryPdf(event));
@@ -3069,11 +3088,23 @@ async function loadBoothDepartureInventoryList(eventId){
   try{
     list.innerHTML='<div class="booth-empty">読み込み中...</div>';
     const data=await buildBoothDepartureInventoryData(eventId);
-    if(!data.normalRows.length&&!data.gachaRows.length){
+    const query=String(el("boothDepartureListSearch")?.value||"").trim().toLowerCase();
+    const sortKey=String(el("boothDepartureListSort")?.value||localStorage.getItem("arico_booth_departure_list_sort")||"name");
+    const filterRows=rows=>query
+      ? rows.filter(row=>[row.product_name,row.name,row.barcode,row.shelf].some(value=>String(value||"").toLowerCase().includes(query)))
+      : rows;
+    const sortRows=rows=>sortBoothInventoryRows(rows.map(row=>({
+      ...row,
+      name:row.name||row.product_name||"",
+      updated_at:row.updated_at||""
+    })),sortKey);
+    const normalRows=sortRows(filterRows(data.normalRows));
+    const gachaRows=sortRows(filterRows(data.gachaRows));
+    if(!normalRows.length&&!gachaRows.length){
       list.innerHTML='<div class="booth-empty">持ち出し在庫・販売履歴・ガチャ在庫はありません。</div>';
       return;
     }
-    list.innerHTML=`${renderBoothDepartureNormalSection(data.normalRows)}${renderBoothDepartureGachaSection(data.gachaRows)}`;
+    list.innerHTML=`${renderBoothDepartureNormalSection(normalRows)}${renderBoothDepartureGachaSection(gachaRows)}`;
   }catch(e){
     list.innerHTML='<div class="booth-empty">持ち出し在庫一覧を読み込めませんでした。</div>';
     boothShowError("持ち出し在庫一覧エラー","持ち出し在庫一覧の読み込みに失敗しました。\n"+e.message);
@@ -3600,14 +3631,11 @@ function renderBoothEventDetail(event){
       ${adminAuthed?"":`<div class="message booth-admin-required-note">締め解除には管理者認証が必要です。</div>`}`:""}
     <div class="booth-work-menu-title">作業内容を選んでください</div>
     <div class="booth-event-menu" aria-label="イベント内メニュー">
-      <button type="button" class="booth-event-menu-btn" data-booth-menu="copy">前回イベントコピー</button>
       <button type="button" class="booth-event-menu-btn is-active" data-booth-menu="carry-out">イベント在庫棚卸</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="gacha">ガチャ管理</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="departure-list">持ち出し在庫一覧</button>
-      <button type="button" class="booth-event-menu-btn" data-booth-menu="history">持ち出し履歴</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="sales">販売取り込み</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="return">戻り在庫処理</button>
-      <button type="button" class="booth-event-menu-btn" data-booth-menu="diff">差異確認</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="report">イベントレポート</button>
       <button type="button" class="booth-event-menu-btn" data-booth-menu="close">イベント締め</button>
     </div>
@@ -3682,12 +3710,13 @@ function renderBoothEventDetail(event){
   el("boothCameraZoomRange")?.addEventListener("input",applyBoothCameraZoom);
   el("boothCarryOutBarcode")?.addEventListener("input",clearBoothProductPreview);
   el("boothCarryOutSource")?.addEventListener("change",()=>previewBoothCarryOutProduct({popupOnError:false}));
-  el("boothCsvDownloadBtn")?.addEventListener("click",showBoothReportPreparing);
-  el("boothPdfDownloadBtn")?.addEventListener("click",showBoothReportPreparing);
+  el("boothCsvDownloadBtn")?.addEventListener("click",()=>exportBoothEventReportCsv(event));
+  el("boothPdfDownloadBtn")?.addEventListener("click",()=>exportBoothEventReportPdf(event));
   el("boothReopenEventBtn")?.addEventListener("click",()=>renderBoothReopenPanel(event));
   updateBoothCameraZoomLabel();
   loadBoothCarryOutHistory(event.id);
   loadBoothPlannedItems(event.id);
+  renderBoothEventInventoryPanel(event);
 }
 
 function switchBoothEventMenu(menu){
@@ -6921,8 +6950,10 @@ buildBoothEventReportData=async function(eventId){
   const rows=Array.isArray(items)?items:[];
   const gacha=rows.filter(row=>String(row.item_type||"")==="gacha_prize");
   const salesRows=Array.isArray(imports)?imports:[];
-  const normalSales=salesRows.filter(row=>!isBoothGachaSaleRow(row));
-  const gachaSales=salesRows.filter(isBoothGachaSaleRow);
+  const gachaBarcodes=new Set(gacha.map(row=>String(row.barcode||"").trim()).filter(Boolean));
+  const isGachaSale=row=>gachaBarcodes.has(String(row?.barcode||"").trim())||isBoothGachaSaleRow(row);
+  const normalSales=salesRows.filter(row=>!isGachaSale(row));
+  const gachaSales=salesRows.filter(isGachaSale);
   const normalSummary=getBoothReportSalesSummaryRows(normalSales);
   const gachaSummary=getBoothReportSalesSummaryRows(gachaSales);
   return {
