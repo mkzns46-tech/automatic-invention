@@ -577,9 +577,10 @@
     }
     const noIssueReason=readNoIssueReason();
     if(noIssueReason===null)return false;
-    const actual=Number(check.actual_stock);
     const smaregiStock=getCsvSmaregiStock(item);
     const smaregiCompareStock=getComparableCsvSmaregiStock(item);
+    const stockBreakdown=typeof getSmaregiInventoryBreakdown==="function" ? getSmaregiInventoryBreakdown(item,check) : null;
+    const actual=Number(stockBreakdown?.comparisonStock ?? check.actual_stock);
     const difference=Number.isFinite(actual)&&Number.isFinite(smaregiCompareStock) ? actual-smaregiCompareStock : check.difference;
     const ok=confirm([
       "この差異を今回の棚卸では「問題なし」として登録します。",
@@ -587,7 +588,7 @@
       `商品：${getItemName(item)||barcode}`,
       `バーコード：${barcode}`,
       `スマレジ在庫：${Number.isFinite(smaregiStock)?smaregiStock:"-"}`,
-      `実在庫：${Number.isFinite(actual)?actual:"-"}`,
+      `比較用在庫：${Number.isFinite(actual)?actual:"-"}`,
       `差異：${Number.isFinite(difference)?difference:"-"}`,
       "",
       "登録後、この商品は差異一覧・原因確認集計・差異件数から外れます。"
@@ -602,7 +603,7 @@
         no_issue_at:noIssueAt,
         no_issue_reason:noIssueReason,
         difference:Number.isFinite(difference) ? difference : check.difference,
-        actual_stock:Number.isFinite(actual) ? actual : check.actual_stock,
+        actual_stock:Number.isFinite(Number(check.actual_stock)) ? Number(check.actual_stock) : check.actual_stock,
         excluded:false
       };
       const savedRows=await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{

@@ -1081,16 +1081,41 @@ function isInSmaregiDifferenceDateRange(value,range=getSmaregiDifferenceDateRang
   return true;
 }
 
+function getSmaregiSnapshotStoreCode(snapshot){
+  const note=String(snapshot?.note||"");
+  const match=note.match(/store_code:([^/\s]+)/);
+  return match ? normalizeSmaregiStoreCodeForStorage(match[1]) : "";
+}
+
 async function loadSmaregiHistoricalDifferenceRows(){
-  const checks=await sbAll("smaregi_stock_checks?select=*&order=checked_at.desc",1000,50000);
+  const storeCode=normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode());
+  const snapshots=await sbAll("smaregi_stock_snapshots?select=id,note&order=imported_at.desc",1000,50000).catch(()=>[]);
+  const snapshotMap=new Map((snapshots||[]).map(snapshot=>[String(snapshot.id),snapshot]));
+  const checks=(await sbAll("smaregi_stock_checks?select=*&order=checked_at.desc",1000,50000)).filter(check=>{
+    const snapshot=snapshotMap.get(String(check.snapshot_id));
+    const snapshotStoreCode=getSmaregiSnapshotStoreCode(snapshot);
+    return !snapshotStoreCode || snapshotStoreCode===storeCode;
+  });
   const items=await sbAll("smaregi_stock_items?select=*",1000,50000);
+  if(typeof loadSmaregiEventInventoryCache==="function"){
+    const barcodes=items.map(item=>item.barcode).filter(Boolean);
+    await loadSmaregiEventInventoryCache(barcodes).catch(()=>{});
+  }
   const itemMap=new Map(items.map(item=>[`${item.snapshot_id}::${item.barcode}`,item]));
   return checks.map(check=>{
-    const item=itemMap.get(`${check.snapshot_id}::${check.barcode}`)||{};
-    const difference=check.difference===null||check.difference===undefined||String(check.difference)===""
+    const item={
+      ...(itemMap.get(`${check.snapshot_id}::${check.barcode}`)||{}),
+      barcode:check.barcode
+    };
+    const stockBreakdown=typeof getSmaregiInventoryBreakdown==="function"
+      ? getSmaregiInventoryBreakdown(item,check)
+      : null;
+    const recalculatedDifference=Number(stockBreakdown?.difference);
+    const fallbackDifference=check.difference===null||check.difference===undefined||String(check.difference)===""
       ? calculateSmaregiDifference(getSavedSmaregiStockNumber(item,0),check.actual_stock)
       : Number(check.difference);
-    return {check,item,difference};
+    const difference=Number.isFinite(recalculatedDifference) ? recalculatedDifference : fallbackDifference;
+    return {check,item,difference,stockBreakdown};
   });
 }
 
