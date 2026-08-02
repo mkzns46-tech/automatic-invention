@@ -6256,21 +6256,22 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   white-space:nowrap;
 }
 .smaregi-cause-summary-row{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  max-width:640px;
-  margin:0 auto;
+  display:grid;
+  grid-template-columns:minmax(116px,1fr) 34px minmax(116px,1fr) 34px minmax(116px,1fr) 34px minmax(116px,1fr) 34px minmax(116px,1fr);
+  gap:8px;
+  align-items:stretch;
 }
 .smaregi-cause-summary-card{
+  min-height:74px;
   border:1px solid #d6ebde;
   border-radius:8px;
-  padding:12px 16px;
+  padding:10px 12px;
   background:#f8fcf9;
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
   align-items:center;
-  text-align:left;
+  text-align:center;
 }
 .smaregi-cause-summary-card strong{
   display:block;
@@ -6280,7 +6281,7 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 .smaregi-cause-summary-card span{
   display:block;
   color:#10251b;
-  font-size:1.35rem;
+  font-size:1.25rem;
   font-weight:900;
   overflow-wrap:anywhere;
 }
@@ -6288,13 +6289,9 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   display:flex;
   align-items:center;
   justify-content:center;
-  width:34px;
-  height:24px;
-  margin:0 auto;
-  border-radius:999px;
-  background:#e1f4e9;
-  color:#0b5d3b;
-  font-size:18px;
+  min-height:74px;
+  color:#334155;
+  font-size:24px;
   font-weight:900;
 }
 .smaregi-reason-form{
@@ -6384,14 +6381,30 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   .smaregi-cause-header-actions button{
     width:100%;
   }
-  .smaregi-cause-summary-row,
   .smaregi-reason-form,
   .smaregi-cause-history-grid,
   .smaregi-cause-ai-panel{
     grid-template-columns:1fr;
   }
+  .smaregi-cause-summary-row{
+    grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr);
+  }
+  .smaregi-cause-summary-operator{
+    min-height:64px;
+  }
+  .smaregi-cause-summary-card.is-last-check-card{
+    grid-column:1 / -1;
+  }
   .smaregi-cause-history-card .table-wrap{
     max-height:320px;
+  }
+}
+@media (max-width:520px){
+  .smaregi-cause-summary-row{
+    grid-template-columns:1fr;
+  }
+  .smaregi-cause-summary-operator{
+    min-height:20px;
   }
 }
 /* Shelf location registration */

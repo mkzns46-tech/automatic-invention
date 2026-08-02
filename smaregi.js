@@ -168,7 +168,8 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
   const barcodeFilter=buildSmaregiInFilter(uniqueBarcodes);
   if(!barcodeFilter)return;
 
-  const openEvents=await sbAll("booth_events?select=id,status&status=neq.closed",1000,20000);
+  const storeCode=normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode());
+  const openEvents=await sbAll(`booth_events?select=id,status,store_code&status=neq.closed&store_code=eq.${encodeURIComponent(storeCode)}`,1000,20000);
   const openEventIds=Array.isArray(openEvents)
     ? openEvents.map(event=>String(event.id||"").trim()).filter(Boolean)
     : [];
@@ -197,7 +198,6 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     });
   }
 
-  const storeCode=normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode());
   const storageRows=await sbAll(`event_storage_stocks?select=store_code,barcode,storage_qty&barcode=in.(${barcodeFilter})`,1000,50000);
   (Array.isArray(storageRows)?storageRows:[]).forEach(row=>{
     const rowStore=normalizeSmaregiStoreCodeForStorage(row.store_code);

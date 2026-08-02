@@ -1495,22 +1495,24 @@
         font-weight:700;
       }
       .smaregi-cause-summary-row{
-        display:flex;
-        flex-direction:column;
-        gap:6px;
-        margin:0 auto 14px;
-        max-width:640px;
+        display:grid;
+        grid-template-columns:minmax(116px,1fr) 34px minmax(116px,1fr) 34px minmax(116px,1fr) 34px minmax(116px,1fr) 34px minmax(116px,1fr);
+        gap:8px;
+        align-items:stretch;
+        margin:0 0 14px;
       }
       .smaregi-cause-summary-card{
+        min-height:74px;
         border:1px solid #c7eadb;
         border-radius:8px;
         background:linear-gradient(180deg,#f8fffb,#f3fbf7);
-        padding:12px 16px;
-        display:grid;
-        grid-template-columns:minmax(0,1fr) auto;
+        padding:10px 12px;
+        display:flex;
+        flex-direction:column;
+        justify-content:center;
         align-items:center;
         gap:5px;
-        text-align:left;
+        text-align:center;
       }
       .smaregi-cause-summary-card.is-comparison-card{
         background:#ecfdf5;
@@ -1524,11 +1526,11 @@
         background:#f8fafc;
       }
       .smaregi-cause-summary-card strong{
-        font-size:14px;
+        font-size:13px;
         color:#12352c;
       }
       .smaregi-cause-summary-card span{
-        font-size:24px;
+        font-size:22px;
         font-weight:800;
       }
       .smaregi-cause-summary-card .is-app-stock{
@@ -1541,14 +1543,10 @@
         display:flex;
         align-items:center;
         justify-content:center;
-        width:34px;
-        height:24px;
-        margin:0 auto;
-        border-radius:999px;
-        background:#e1f4e9;
-        font-size:18px;
+        min-height:74px;
+        font-size:24px;
         font-weight:800;
-        color:#0b5d3b;
+        color:#334155;
       }
       .smaregi-cause-guide{
         border:1px solid #93c5fd;
@@ -1761,6 +1759,17 @@
         .smaregi-cause-header{
           grid-template-columns:1fr;
         }
+        .smaregi-cause-summary-row{
+          grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr);
+        }
+        .smaregi-cause-summary-operator{
+          min-height:64px;
+        }
+        .smaregi-cause-summary-card.is-last-check-card{
+          grid-column:1 / -1;
+        }
+      }
+      @media (max-width:520px){
         .smaregi-cause-summary-row{
           grid-template-columns:1fr;
         }
