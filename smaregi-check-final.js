@@ -431,10 +431,10 @@
       const eventShelfStock=Number(breakdown?.eventShelfStock ?? (currentEventStock+eventStorageStock));
       const comparisonStock=Number(breakdown?.comparisonStock ?? actual);
       const smaregiStock=getCsvSmaregiStock(item);
-      const smaregiCompareStock=getComparableCsvSmaregiStock(item);
+      const smaregiCompareStock=Number(breakdown?.smaregiStockForComparison ?? getComparableCsvSmaregiStock(item));
       if(!Number.isFinite(actual)||!Number.isFinite(eventShelfStock)||!Number.isFinite(smaregiStock)||!Number.isFinite(smaregiCompareStock)||!Number.isFinite(comparisonStock))return null;
-      const difference=comparisonStock-smaregiCompareStock;
-      if(typeof isSmaregiAutoNoIssueCheck==="function" && isSmaregiAutoNoIssueCheck(item,check))return null;
+      const difference=Number(breakdown?.difference);
+      if(breakdown?.isNoIssue===true)return null;
       if(difference===0)return null;
       return {item,check,actual,eventShelfStock,comparisonStock,smaregiStock,smaregiCompareStock,difference};
     }).filter(Boolean);
@@ -579,10 +579,9 @@
     const noIssueReason=readNoIssueReason();
     if(noIssueReason===null)return false;
     const smaregiStock=getCsvSmaregiStock(item);
-    const smaregiCompareStock=getComparableCsvSmaregiStock(item);
     const stockBreakdown=typeof getSmaregiInventoryBreakdown==="function" ? getSmaregiInventoryBreakdown(item,check) : null;
     const actual=Number(stockBreakdown?.comparisonStock ?? check.actual_stock);
-    const difference=Number.isFinite(actual)&&Number.isFinite(smaregiCompareStock) ? actual-smaregiCompareStock : check.difference;
+    const difference=Number.isFinite(Number(stockBreakdown?.difference)) ? Number(stockBreakdown.difference) : null;
     const ok=confirm([
       "この差異を今回の棚卸では「問題なし」として登録します。",
       "",
@@ -603,7 +602,7 @@
         no_issue_by:checkedBy,
         no_issue_at:noIssueAt,
         no_issue_reason:noIssueReason,
-        difference:Number.isFinite(difference) ? difference : check.difference,
+        difference,
         actual_stock:Number.isFinite(Number(check.actual_stock)) ? Number(check.actual_stock) : check.actual_stock,
         excluded:false
       };
@@ -869,18 +868,16 @@
     try{
       button.disabled=true;
       const checkedAt=new Date().toISOString();
-      const smaregiStock=Number(getCsvSmaregiStock(item) ?? 0);
-      const smaregiCompareStock=Number(getComparableCsvSmaregiStock(item) ?? 0);
       const previousCheck=typeof getSmaregiCheck==="function" ? getSmaregiCheck(barcode) : null;
       const eventBreakdown=typeof getSmaregiInventoryBreakdown==="function"
         ? getSmaregiInventoryBreakdown(item,{...previousCheck,actual_stock:actualStock})
         : null;
-      const comparisonStock=Number(eventBreakdown?.comparisonStock ?? actualStock);
+      const calculation=eventBreakdown?.calculation||null;
       const payload={
         snapshot_id:smaregiSnapshot.id,
         barcode,
         actual_stock:actualStock,
-        difference:Number.isFinite(comparisonStock) ? comparisonStock-smaregiCompareStock : actualStock-smaregiCompareStock,
+        difference:Number.isFinite(Number(calculation?.difference)) ? Number(calculation.difference) : null,
         checked_by:checkedBy,
         checked_at:checkedAt,
         excluded:false,
@@ -1139,9 +1136,10 @@
         : null;
       const eventShelfStock=Number(breakdown?.eventShelfStock ?? 0);
       const comparisonStock=Number(breakdown?.comparisonStock ?? Number(actual||0));
-      const difference=actual===""||actual===null||actual===undefined||smaregiCompareStock===null || !Number.isFinite(comparisonStock)
-        ? "-"
-        : comparisonStock-Number(smaregiCompareStock);
+      const calculation=breakdown?.calculation||null;
+      const difference=calculation&&Number.isFinite(Number(calculation.difference))
+        ? Number(calculation.difference)
+        : "-";
       const aiKey=String(itemBarcode||barcode||"");
       if(!window.__smaregiCauseAiPayloads)window.__smaregiCauseAiPayloads=new Map();
       window.__smaregiCauseAiPayloads.set(aiKey,{
@@ -1951,12 +1949,10 @@
     const eventBreakdown=typeof getSmaregiInventoryBreakdown==="function"
       ? getSmaregiInventoryBreakdown(item,{...check,actual_stock:nextActualStock})
       : null;
-    const comparisonStock=Number(eventBreakdown?.comparisonStock ?? nextActualStock);
-    const smaregiStock=getCsvSmaregiStock(item);
-    const smaregiCompareStock=getComparableCsvSmaregiStock(item);
+    const calculation=eventBreakdown?.calculation||null;
     const payload={
       actual_stock:nextActualStock,
-      difference:Number.isFinite(comparisonStock)&&Number.isFinite(smaregiCompareStock) ? comparisonStock-smaregiCompareStock : nextActualStock-smaregiCompareStock,
+      difference:Number.isFinite(Number(calculation?.difference)) ? Number(calculation.difference) : null,
       checked_by:checkedBy||check.checked_by||"",
       checked_at:checkedAt,
       excluded:false,
