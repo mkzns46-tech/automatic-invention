@@ -192,9 +192,14 @@ function renderSmaregiStockChecks(){
     const check=getSmaregiCheck(barcode);
     const checked=!!check;
     const actual=check?.actual_stock??"";
-    const comparisonStock=getSmaregiAppStock(barcode);
+    const breakdown=typeof getSmaregiInventoryBreakdown==="function"
+      ? getSmaregiInventoryBreakdown(item,check||{actual_stock:actual})
+      : null;
+    const comparisonStock=breakdown?.comparisonStock??getSmaregiAppStock(barcode);
     const savedSmaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||0);
-    const difference=check&&actual!=="" ? calculateSmaregiDifference(savedSmaregiStock,Number(actual||0)) : "";
+    const difference=check&&actual!==""
+      ? (Number.isFinite(Number(breakdown?.difference)) ? Number(breakdown.difference) : calculateSmaregiDifference(savedSmaregiStock,Number(actual||0)))
+      : "";
     const status=checked ? "チェック済み" : "未チェック";
     return `<tr class="${checked?"is-checked":"is-unchecked"}">
       <td>${esc(status)}${check?.checked_at?`<div class="smaregi-movement-note">${fmt(check.checked_at)}</div>`:""}</td>
@@ -335,7 +340,12 @@ function renderSmaregiStockChecks(){
     const movementAmount=Number(change.amount||0);
     const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||change.stock_amount||0);
     const actualNumber=actual===""||actual===null||typeof actual==="undefined" ? null : Number(actual);
-    const diff=actualNumber===null||!Number.isFinite(actualNumber) ? "-" : actualNumber-smaregiStock;
+    const breakdown=actualNumber===null||!Number.isFinite(actualNumber)||typeof getSmaregiInventoryBreakdown!=="function"
+      ? null
+      : getSmaregiInventoryBreakdown(item,check);
+    const diff=actualNumber===null||!Number.isFinite(actualNumber)
+      ? "-"
+      : (Number.isFinite(Number(breakdown?.difference)) ? Number(breakdown.difference) : actualNumber-smaregiStock);
     const status=excluded ? "除外済み" : (checked ? "チェック済み" : "未チェック");
     const confirmDisabled=checked ? "disabled" : "";
     const excludeButton=(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())
@@ -440,16 +450,21 @@ async function saveSmaregiCountOnlyActualStock(barcode,button=null){
     if(button)button.disabled=true;
     const checkedAt=new Date().toISOString();
     const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||0);
+    const previousCheck=getSmaregiCheck(barcode);
+    const breakdown=typeof getSmaregiInventoryBreakdown==="function"
+      ? getSmaregiInventoryBreakdown(item,{...(previousCheck||{}),actual_stock:actualStock})
+      : null;
     const payload={
       snapshot_id:smaregiSnapshot.id,
       barcode,
       actual_stock:actualStock,
-      difference:calculateSmaregiDifference(smaregiStock,actualStock),
+      difference:Number.isFinite(Number(breakdown?.difference))
+        ? Number(breakdown.difference)
+        : calculateSmaregiDifference(smaregiStock,actualStock),
       checked_by:checkedBy,
       checked_at:checkedAt,
       excluded:false
     };
-    const previousCheck=getSmaregiCheck(barcode);
     if(previousCheck){
       payload.no_issue=previousCheck.no_issue===true;
       payload.no_issue_by=previousCheck.no_issue_by||null;
@@ -616,11 +631,16 @@ async function saveSmaregiCountOnlyActualStockFromButton(button){
     const checkedAt=new Date().toISOString();
     const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||0);
     const previousCheck=getSmaregiCheck(barcode);
+    const breakdown=typeof getSmaregiInventoryBreakdown==="function"
+      ? getSmaregiInventoryBreakdown(item,{...(previousCheck||{}),actual_stock:actualStock})
+      : null;
     const payload={
       snapshot_id:smaregiSnapshot.id,
       barcode,
       actual_stock:actualStock,
-      difference:calculateSmaregiDifference(smaregiStock,actualStock),
+      difference:Number.isFinite(Number(breakdown?.difference))
+        ? Number(breakdown.difference)
+        : calculateSmaregiDifference(smaregiStock,actualStock),
       checked_by:checkedBy,
       checked_at:checkedAt,
       excluded:false,
@@ -883,7 +903,10 @@ function getSmaregiDiffItems(){
     const check=getSmaregiCheck(item.barcode);
     if(!check||check.actual_stock===""||check.actual_stock===null||typeof check.actual_stock==="undefined")return null;
     const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||0);
-    const difference=calculateSmaregiDifference(smaregiStock,Number(check.actual_stock||0));
+    const breakdown=typeof getSmaregiInventoryBreakdown==="function" ? getSmaregiInventoryBreakdown(item,check) : null;
+    const difference=Number.isFinite(Number(breakdown?.difference))
+      ? Number(breakdown.difference)
+      : calculateSmaregiDifference(smaregiStock,Number(check.actual_stock||0));
     return difference ? {item,check,difference} : null;
   }).filter(Boolean);
 }
