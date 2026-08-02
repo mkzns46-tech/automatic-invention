@@ -215,13 +215,14 @@ function renderSmaregiDifferenceRanking(rows){
   if(message)message.textContent=`差異商品：${rows.length}件`;
 }
 
-async function loadSmaregiDifferenceRanking(){
+async function loadSmaregiDifferenceRanking(historical=null){
   const panel=el("smaregiDifferenceRankingPanel");
   if(!panel)return;
   const message=el("smaregiDifferenceRankingMessage");
   if(message)message.textContent="差異ランキングを集計中...";
   try{
-    renderSmaregiDifferenceRanking(getSmaregiDifferenceRankingRows(await loadSmaregiHistoricalDifferenceRows()));
+    const rows=historical || await loadSmaregiHistoricalDifferenceRows();
+    renderSmaregiDifferenceRanking(getSmaregiDifferenceRankingRows(rows));
   }catch(e){
     if(message)message.textContent="差異ランキング集計エラー。\n"+e.message;
   }
@@ -232,6 +233,19 @@ function getMonthRange(monthOffset=0){
   const from=new Date(now.getFullYear(),now.getMonth()+monthOffset,1);
   const to=new Date(now.getFullYear(),now.getMonth()+monthOffset+1,1);
   return {fromTime:from.getTime(),toTime:to.getTime()-1};
+}
+
+function getSmaregiAccuracyCurrentRange(){
+  const range=typeof getSmaregiDifferenceDateRange==="function"
+    ? getSmaregiDifferenceDateRange("smaregiRankingFromDate","smaregiRankingToDate")
+    : null;
+  return range && (Number.isFinite(range.fromTime)||Number.isFinite(range.toTime)) ? range : getMonthRange(0);
+}
+
+function getPreviousRange(range){
+  if(!range||!Number.isFinite(range.fromTime)||!Number.isFinite(range.toTime))return getMonthRange(-1);
+  const span=Math.max(0,range.toTime-range.fromTime);
+  return {fromTime:range.fromTime-span-1,toTime:range.fromTime-1};
 }
 
 function calculateSmaregiAccuracy(historical,range){
@@ -282,16 +296,17 @@ function renderSmaregiAccuracyMonthlyTrend(rows){
   list.scrollLeft=list.scrollWidth;
 }
 
-async function loadSmaregiAccuracy(){
+async function loadSmaregiAccuracy(historical=null){
   if(!inventoryAuthReady)return;
   const panel=el("smaregiAccuracyPanel");
   if(!panel)return;
   const message=el("smaregiAccuracyMessage");
   try{
-    const historical=await loadSmaregiHistoricalDifferenceRows();
-    const current=calculateSmaregiAccuracy(historical,getMonthRange(0));
-    const previous=calculateSmaregiAccuracy(historical,getMonthRange(-1));
-    renderSmaregiAccuracyMonthlyTrend(getSmaregiAccuracyMonthlyTrend(historical));
+    const rows=historical || await loadSmaregiHistoricalDifferenceRows();
+    const currentRange=getSmaregiAccuracyCurrentRange();
+    const current=calculateSmaregiAccuracy(rows,currentRange);
+    const previous=calculateSmaregiAccuracy(rows,getPreviousRange(currentRange));
+    renderSmaregiAccuracyMonthlyTrend(getSmaregiAccuracyMonthlyTrend(rows));
     const change=current.accuracy-previous.accuracy;
     if(el("smaregiAccuracyChecked"))el("smaregiAccuracyChecked").textContent=`${current.checkedCount}件`;
     if(el("smaregiAccuracyDifference"))el("smaregiAccuracyDifference").textContent=`${current.differenceCount}件`;
@@ -304,10 +319,30 @@ async function loadSmaregiAccuracy(){
       changeEl.textContent=`${change>=0?"+":""}${change.toFixed(1)}%`;
       changeEl.className=change>=0?"is-improved":"is-worse";
     }
-    if(message)message.textContent=`今月 ${formatPercent(current.accuracy)} / 先月 ${formatPercent(previous.accuracy)}`;
+    if(message)message.textContent=`指定期間 ${formatPercent(current.accuracy)} / 比較期間 ${formatPercent(previous.accuracy)}`;
   }catch(e){
     if(message)message.textContent="棚卸精度集計エラー。\n"+e.message;
   }
+}
+
+let smaregiAnalyticsRefreshTimer=null;
+
+async function refreshSmaregiAnalyticsPanels(){
+  const panel=el("smaregiAccuracyPanel");
+  if(!panel||panel.hidden)return;
+  const historical=await loadSmaregiHistoricalDifferenceRows();
+  await loadSmaregiAccuracy(historical);
+  await loadSmaregiDifferenceRanking(historical);
+}
+
+function scheduleSmaregiAnalyticsRefresh(){
+  clearTimeout(smaregiAnalyticsRefreshTimer);
+  smaregiAnalyticsRefreshTimer=setTimeout(()=>{
+    refreshSmaregiAnalyticsPanels().catch(e=>{
+      const message=el("smaregiDifferenceRankingMessage")||el("smaregiAccuracyMessage");
+      if(message)message.textContent="棚卸分析の自動更新エラー。\n"+e.message;
+    });
+  },250);
 }
 
 function renderSmaregiReasonSummary(){

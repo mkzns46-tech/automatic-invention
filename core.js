@@ -453,8 +453,11 @@ function showInventorySettingsSection(menuKey,targetId){
 function showInventoryAnalytics(){
   if(!unlockInventoryScreen("analytics"))return;
   showInventoryScreen("analytics","inventory-analytics");
-  if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();
-  if(typeof loadSmaregiDifferenceRanking==="function")loadSmaregiDifferenceRanking();
+  if(typeof refreshSmaregiAnalyticsPanels==="function")refreshSmaregiAnalyticsPanels();
+  else{
+    if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();
+    if(typeof loadSmaregiDifferenceRanking==="function")loadSmaregiDifferenceRanking();
+  }
   if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
   if(typeof showSmaregiReasonSummary==="function")showSmaregiReasonSummary({scroll:false});
 }
@@ -467,8 +470,11 @@ function showBoothAnalytics(){
 function showInventoryAnalyticsSection(menuKey,targetId){
   if(!unlockInventoryScreen("analytics"))return;
   showInventoryScreen("analytics",menuKey);
-  if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();
-  if(typeof loadSmaregiDifferenceRanking==="function")loadSmaregiDifferenceRanking();
+  if(typeof refreshSmaregiAnalyticsPanels==="function")refreshSmaregiAnalyticsPanels();
+  else{
+    if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();
+    if(typeof loadSmaregiDifferenceRanking==="function")loadSmaregiDifferenceRanking();
+  }
   if(typeof renderSmaregiDiffOnlyPanel==="function")renderSmaregiDiffOnlyPanel();
   if(typeof showSmaregiReasonSummary==="function")showSmaregiReasonSummary({scroll:false});
   scrollInventoryPanelIntoView(targetId);

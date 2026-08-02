@@ -196,7 +196,20 @@ function bindSmaregiStockCheckEvents(){
   on("completeSmaregiStockCheckBtn","click",e=>runWithSmaregiAutoRefreshPaused(completeSmaregiStockCheck,{button:e.currentTarget}));
   on("resetSmaregiCompletionBtn","click",e=>runWithSmaregiAutoRefreshPaused(resetSmaregiStockCheckCompletion,{button:e.currentTarget}));
   on("aggregateSmaregiReasonSummaryBtn","click",showSmaregiReasonSummary);
-  on("aggregateSmaregiDifferenceRankingBtn","click",loadSmaregiDifferenceRanking);
+  on("aggregateSmaregiDifferenceRankingBtn","click",()=>{
+    if(typeof refreshSmaregiAnalyticsPanels==="function")refreshSmaregiAnalyticsPanels();
+  });
+  ["smaregiRankingFromDate","smaregiRankingToDate"].forEach(id=>{
+    const input=el(id);
+    if(input){
+      input.addEventListener("change",()=>{
+        if(typeof scheduleSmaregiAnalyticsRefresh==="function")scheduleSmaregiAnalyticsRefresh();
+      });
+      input.addEventListener("input",()=>{
+        if(typeof scheduleSmaregiAnalyticsRefresh==="function")scheduleSmaregiAnalyticsRefresh();
+      });
+    }
+  });
   on("exportSmaregiDiffCardCsvBtn","click",()=>exportSmaregiCheckCsv(true));
   on("exportSmaregiReasonSummaryCsvBtn","click",exportSmaregiReasonSummaryCsv);
   on("smaregiStockSearchInput","input",renderSmaregiStockChecks);
