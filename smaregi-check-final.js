@@ -870,11 +870,15 @@
       const smaregiStock=Number(getCsvSmaregiStock(item) ?? 0);
       const smaregiCompareStock=Number(getComparableCsvSmaregiStock(item) ?? 0);
       const previousCheck=typeof getSmaregiCheck==="function" ? getSmaregiCheck(barcode) : null;
+      const eventBreakdown=typeof getSmaregiInventoryBreakdown==="function"
+        ? getSmaregiInventoryBreakdown(item,{...previousCheck,actual_stock:actualStock})
+        : null;
+      const comparisonStock=Number(eventBreakdown?.comparisonStock ?? actualStock);
       const payload={
         snapshot_id:smaregiSnapshot.id,
         barcode,
         actual_stock:actualStock,
-        difference:actualStock-smaregiCompareStock,
+        difference:Number.isFinite(comparisonStock) ? comparisonStock-smaregiCompareStock : actualStock-smaregiCompareStock,
         checked_by:checkedBy,
         checked_at:checkedAt,
         excluded:false,
@@ -1128,7 +1132,14 @@
       const smaregiCompareStock=targetStockInfo.compare;
       const storeLabel=getInventoryStoreLabelSafe();
       const actual=check?.actual_stock ?? "";
-      const difference=actual===""||actual===null||actual===undefined||smaregiCompareStock===null ? "-" : Number(actual)-Number(smaregiCompareStock);
+      const breakdown=typeof getSmaregiInventoryBreakdown==="function"
+        ? getSmaregiInventoryBreakdown(item,check)
+        : null;
+      const eventShelfStock=Number(breakdown?.eventShelfStock ?? 0);
+      const comparisonStock=Number(breakdown?.comparisonStock ?? Number(actual||0));
+      const difference=actual===""||actual===null||actual===undefined||smaregiCompareStock===null || !Number.isFinite(comparisonStock)
+        ? "-"
+        : comparisonStock-Number(smaregiCompareStock);
       const aiKey=String(itemBarcode||barcode||"");
       if(!window.__smaregiCauseAiPayloads)window.__smaregiCauseAiPayloads=new Map();
       window.__smaregiCauseAiPayloads.set(aiKey,{
@@ -1137,6 +1148,8 @@
           barcode:itemBarcode,
           store:storeLabel,
           actual_stock:actual===""?"未入力":actual,
+          event_shelf_stock:Number.isFinite(eventShelfStock)?eventShelfStock:"未取得",
+          comparison_stock:Number.isFinite(comparisonStock)?comparisonStock:"未取得",
           smaregi_stock:smaregiStock===null?"未取得":smaregiStock,
           difference,
           last_checked_at:getLastCheckedAtSafe()
@@ -1179,6 +1192,16 @@
           <div class="smaregi-cause-summary-card">
             <strong>実在庫（アプリ）</strong>
             <span class="is-app-stock">${safeText(actual===""?"未入力":actual)}</span>
+          </div>
+          <div class="smaregi-cause-summary-operator">+</div>
+          <div class="smaregi-cause-summary-card">
+            <strong>イベント棚在庫</strong>
+            <span>${safeText(Number.isFinite(eventShelfStock)?eventShelfStock:"未取得")}</span>
+          </div>
+          <div class="smaregi-cause-summary-operator">=</div>
+          <div class="smaregi-cause-summary-card">
+            <strong>比較用在庫</strong>
+            <span class="is-app-stock">${safeText(Number.isFinite(comparisonStock)?comparisonStock:"未取得")}</span>
           </div>
           <div class="smaregi-cause-summary-operator">−</div>
           <div class="smaregi-cause-summary-card">
@@ -1271,6 +1294,8 @@
       `バーコード: ${summary.barcode||"-"}`,
       `対象店舗: ${summary.store||"-"}`,
       `実在庫（ARICO）: ${summary.actual_stock ?? "-"}`,
+      `イベント棚在庫: ${summary.event_shelf_stock ?? "-"}`,
+      `比較用在庫（実在庫 + イベント棚在庫）: ${summary.comparison_stock ?? "-"}`,
       `スマレジ在庫: ${summary.smaregi_stock ?? "-"}`,
       `差異: ${summary.difference ?? "-"}`,
       `前回チェック締め日時: ${summary.last_checked_at||"-"}`,
