@@ -425,13 +425,14 @@
       const actual=Number(breakdown?.actualStock ?? check.actual_stock);
       const currentEventStock=Number(breakdown?.currentEventStock ?? 0);
       const eventStorageStock=Number(breakdown?.eventStorageStock ?? 0);
+      const eventShelfStock=Number(breakdown?.eventShelfStock ?? (currentEventStock+eventStorageStock));
       const comparisonStock=Number(breakdown?.comparisonStock ?? actual);
       const smaregiStock=getCsvSmaregiStock(item);
       const smaregiCompareStock=getComparableCsvSmaregiStock(item);
-      if(!Number.isFinite(actual)||!Number.isFinite(smaregiStock)||!Number.isFinite(smaregiCompareStock)||!Number.isFinite(comparisonStock))return null;
+      if(!Number.isFinite(actual)||!Number.isFinite(eventShelfStock)||!Number.isFinite(smaregiStock)||!Number.isFinite(smaregiCompareStock)||!Number.isFinite(comparisonStock))return null;
       const difference=comparisonStock-smaregiCompareStock;
       if(difference===0)return null;
-      return {item,check,actual,currentEventStock,eventStorageStock,comparisonStock,smaregiStock,smaregiCompareStock,difference};
+      return {item,check,actual,eventShelfStock,comparisonStock,smaregiStock,smaregiCompareStock,difference};
     }).filter(Boolean);
   }
 
@@ -631,6 +632,10 @@
     const body=typeof el==="function" ? el("smaregiDiffOnlyBody") : document.getElementById("smaregiDiffOnlyBody");
     const summary=typeof el==="function" ? el("smaregiDiffSummary") : document.getElementById("smaregiDiffSummary");
     if(!panel||!body)return;
+    const headerRow=body.closest("table")?.querySelector("thead tr");
+    if(headerRow){
+      headerRow.innerHTML="<th>商品名</th><th>実在庫</th><th>イベント棚在庫</th><th>比較用在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th>";
+    }
     const stats=getSmaregiStats();
     bindSmaregiDiffProductSearchControls();
     const allRows=getDiffRows();
@@ -639,14 +644,14 @@
     if(summary)summary.textContent=`差異：${allRows.length}件 / 表示：${rows.length}件 / チェック済み：${stats.completed||0}件 / 未チェック：${stats.unchecked||0}件 / 除外：${stats.excluded||0}件`;
     const hasMovementData=getAllMovementItems().length>0;
     if(!hasMovementData){
-      body.innerHTML='<tr><td colspan="10" class="smaregi-empty">スマレジ変動API未取得です。</td></tr>';
+      body.innerHTML='<tr><td colspan="9" class="smaregi-empty">スマレジ変動API未取得です。</td></tr>';
       return;
     }
     if(!rows.length){
-      body.innerHTML='<tr><td colspan="10" class="smaregi-empty">差異のある商品はありません。</td></tr>';
+      body.innerHTML='<tr><td colspan="9" class="smaregi-empty">差異のある商品はありません。</td></tr>';
       return;
     }
-    body.innerHTML=rows.map(({item,check,actual,currentEventStock,eventStorageStock,comparisonStock,smaregiStock,difference})=>{
+    body.innerHTML=rows.map(({item,check,actual,eventShelfStock,comparisonStock,smaregiStock,difference})=>{
       const barcode=String(item?.barcode||"");
       const name=getItemName(item)||"商品名未設定";
       const checkedBy=typeof getSmaregiDisplayCheckedBy==="function" ? getSmaregiDisplayCheckedBy(check) : (check?.checked_by||"");
@@ -664,8 +669,7 @@
               <label>実在庫<input type="number" class="smaregi-diff-actual-input smaregi-diff-mobile-actual-input" data-barcode="${safeText(barcode)}" min="0" step="1" inputmode="numeric" value="${safeText(actual)}"></label>
               <div><span>スマレジ在庫</span><strong>${displayNumber(smaregiStock)}</strong></div>
               <div><span>通常棚</span><strong>${displayNumber(actual)}</strong></div>
-              <div><span>イベント保管</span><strong>${displayNumber(eventStorageStock)}</strong></div>
-              <div><span>今回イベント</span><strong>${displayNumber(currentEventStock)}</strong></div>
+              <div><span>イベント棚在庫</span><strong>${displayNumber(eventShelfStock)}</strong></div>
               <div><span>比較用在庫</span><strong>${displayNumber(comparisonStock)}</strong></div>
               <div class="smaregi-diff-mobile-difference"><span>差異</span><strong class="smaregi-difference${differenceClass}">${difference}</strong></div>
               <div><span>最終更新日時</span><strong>${checkedAt}</strong></div>
@@ -674,8 +678,7 @@
           </div>
         </td>
         <td><input type="number" class="smaregi-diff-actual-input smaregi-diff-pc-actual-input" data-barcode="${safeText(barcode)}" min="0" step="1" inputmode="numeric" value="${safeText(actual)}"></td>
-        <td>${displayNumber(currentEventStock)}</td>
-        <td>${displayNumber(eventStorageStock)}</td>
+        <td>${displayNumber(eventShelfStock)}</td>
         <td>${displayNumber(comparisonStock)}</td>
         <td>${displayNumber(smaregiStock)}</td>
         <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>

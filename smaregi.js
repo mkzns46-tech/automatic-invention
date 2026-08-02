@@ -134,19 +134,25 @@ function getSmaregiEventStorageStock(barcode){
   return Number(smaregiEventStorageStockByBarcode.get(String(barcode||"").trim())||0);
 }
 
+function getSmaregiEventShelfStock(barcode){
+  return getSmaregiCurrentEventStock(barcode)+getSmaregiEventStorageStock(barcode);
+}
+
 function getSmaregiInventoryBreakdown(item,check=getSmaregiCheck(item?.barcode)){
   const actualStock=check&&check.actual_stock!==null&&check.actual_stock!==undefined&&String(check.actual_stock)!==""
     ? Number(check.actual_stock||0)
     : null;
   const currentEventStock=getSmaregiCurrentEventStock(item?.barcode);
   const eventStorageStock=getSmaregiEventStorageStock(item?.barcode);
-  const comparisonStock=actualStock===null ? null : actualStock+currentEventStock+eventStorageStock;
+  const eventShelfStock=currentEventStock+eventStorageStock;
+  const comparisonStock=actualStock===null ? null : actualStock+eventShelfStock;
   const smaregiStock=getSavedSmaregiStockNumber(item,0);
   const difference=comparisonStock===null ? null : calculateSmaregiDifference(smaregiStock,comparisonStock);
   return {
     actualStock,
     currentEventStock,
     eventStorageStock,
+    eventShelfStock,
     comparisonStock,
     smaregiStock,
     difference
@@ -166,6 +172,7 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
   const openEventIds=Array.isArray(openEvents)
     ? openEvents.map(event=>String(event.id||"").trim()).filter(Boolean)
     : [];
+  const eventItemStorageStockByBarcode=new Map();
   if(openEventIds.length){
     const eventFilter=buildSmaregiInFilter(openEventIds);
     const [eventItems,departureLogs]=await Promise.all([
@@ -182,6 +189,7 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
         -Number(row.event_storage_qty||0)
         -Number(row.consumed_qty||0);
       addSmaregiMapValue(smaregiCurrentEventStockByBarcode,row.barcode,qty);
+      addSmaregiMapValue(eventItemStorageStockByBarcode,row.barcode,row.event_storage_qty);
     });
   }
 
@@ -191,6 +199,10 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     const rowStore=normalizeSmaregiStoreCodeForStorage(row.store_code);
     if(rowStore!==storeCode)return;
     addSmaregiMapValue(smaregiEventStorageStockByBarcode,row.barcode,row.storage_qty);
+  });
+  eventItemStorageStockByBarcode.forEach((qty,barcode)=>{
+    const current=Number(smaregiEventStorageStockByBarcode.get(barcode)||0);
+    if(Number(qty||0)>current)smaregiEventStorageStockByBarcode.set(barcode,Number(qty||0));
   });
 }
 
@@ -219,7 +231,7 @@ function scrollToSmaregiDiffPanel(){
 function getSmaregiAppStock(barcode){
   const product=gp(barcode);
   if(!product)return "";
-  return Number(product.base_stock||0)+getSmaregiCurrentEventStock(barcode)+getSmaregiEventStorageStock(barcode);
+  return Number(product.base_stock||0)+getSmaregiEventShelfStock(barcode);
 }
 
 function getSmaregiCheckerName(){
@@ -472,8 +484,7 @@ function renderSmaregiDiffOnlyPanel(){
     return `<tr>
       <td>${esc(item.product_name||"")}</td>
       <td><input type="number" class="smaregi-diff-actual-input" data-barcode="${esc(item.barcode)}" min="0" step="1" inputmode="numeric" value="${esc(check?.actual_stock??"")}"/>${check?.actual_corrected===true?'<span class="smaregi-corrected-badge">修正済</span>':""}</td>
-      <td>${stockBreakdown.currentEventStock}</td>
-      <td>${stockBreakdown.eventStorageStock}</td>
+      <td>${stockBreakdown.eventShelfStock}</td>
       <td>${stockBreakdown.comparisonStock}</td>
       <td>${stockBreakdown.smaregiStock}</td>
       <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
