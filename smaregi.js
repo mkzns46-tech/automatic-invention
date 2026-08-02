@@ -83,6 +83,21 @@ function isSmaregiNoIssueCheck(check){
     || Boolean(String(check.no_issue_reason||"").trim());
 }
 
+function isSmaregiAutoNoIssueCheck(item,check=getSmaregiCheck(item?.barcode)){
+  if(!item||!check||isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check))return false;
+  const breakdown=getSmaregiInventoryBreakdown(item,check);
+  return Number.isFinite(breakdown.comparisonStock)
+    && Number.isFinite(breakdown.smaregiStock)
+    && breakdown.difference===0;
+}
+
+function isSmaregiEffectiveNoIssueCheck(item,check=getSmaregiCheck(item?.barcode)){
+  return isSmaregiNoIssueCheck(check)||isSmaregiAutoNoIssueCheck(item,check);
+}
+
+window.isSmaregiAutoNoIssueCheck=isSmaregiAutoNoIssueCheck;
+window.isSmaregiEffectiveNoIssueCheck=isSmaregiEffectiveNoIssueCheck;
+
 function getSmaregiDisplayCheckedBy(check){
   return String(check?.checked_by||"").replace(/^除外:/,"");
 }
@@ -94,7 +109,7 @@ function getSmaregiSheetDifference(item){
 
 function getSmaregiActualDifference(item){
   const check=getSmaregiCheck(item.barcode);
-  if(!check||isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check))return null;
+  if(!check||isSmaregiExcludedCheck(check)||isSmaregiEffectiveNoIssueCheck(item,check))return null;
   if(check.actual_stock===null||check.actual_stock===undefined||String(check.actual_stock)==="")return null;
 
   return getSmaregiInventoryBreakdown(item,check).difference;
@@ -232,7 +247,7 @@ function getSmaregiDiffItems(){
   return smaregiStockItems.filter(item=>{
     const check=getSmaregiCheck(item.barcode);
     if(!check||isSmaregiExcludedCheck(check))return false;
-    if(isSmaregiNoIssueCheck(check))return false;
+    if(isSmaregiEffectiveNoIssueCheck(item,check))return false;
     if(keyword&&!String(item.product_name||"").toLowerCase().includes(keyword))return false;
     const stockBreakdown=getSmaregiInventoryBreakdown(item,check);
     const difference=stockBreakdown.difference;
@@ -1038,12 +1053,11 @@ async function openHistoryFromSmaregi(barcode){
   el("productHistoryCard")?.scrollIntoView({behavior:"smooth",block:"start"});
 }
 
-function getSmaregiCsvStatus(check,difference){
+function getSmaregiCsvStatus(check,difference,item=null){
   if(!check)return "未チェック";
   if(isSmaregiExcludedCheck(check))return "除外";
-  if(isSmaregiNoIssueCheck(check))return "問題なし";
+  if(isSmaregiEffectiveNoIssueCheck(item,check)||difference===0)return "問題なし";
   if(check.actual_corrected===true)return "修正済";
-  if(difference===0)return "正常";
   return "チェック済み";
 }
 
@@ -1053,7 +1067,7 @@ function smaregiCsvRows(differenceOnly=false){
     const check=getSmaregiCheck(item.barcode);
     const difference=check ? getSmaregiDifference(item) : "";
     if(differenceOnly&&isSmaregiExcludedCheck(check))return;
-    if(differenceOnly&&isSmaregiNoIssueCheck(check))return;
+    if(differenceOnly&&isSmaregiEffectiveNoIssueCheck(item,check))return;
     if(differenceOnly&&difference===0)return;
     if(differenceOnly&&!check)return;
     rows.push([
@@ -1065,7 +1079,7 @@ function smaregiCsvRows(differenceOnly=false){
       difference,
       getSmaregiDisplayCheckedBy(check),
       check?.checked_at ? fmt(check.checked_at) : "",
-    getSmaregiCsvStatus(check,difference),
+    getSmaregiCsvStatus(check,difference,item),
     check?.difference_reason_category||"",
     check?.difference_reason_memo||"",
     check?.difference_reason_by||"",
@@ -1147,7 +1161,7 @@ async function smaregiHistoricalDifferenceCsvRows(){
       check.actual_stock??"",
       difference,
       getSmaregiDisplayCheckedBy(check),
-      getSmaregiCsvStatus(check,difference),
+      getSmaregiCsvStatus(check,difference,item),
       check.difference_reason_category||"",
       check.difference_reason_memo||"",
       check.difference_reason_by||"",

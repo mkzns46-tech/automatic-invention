@@ -434,6 +434,7 @@
       const smaregiCompareStock=getComparableCsvSmaregiStock(item);
       if(!Number.isFinite(actual)||!Number.isFinite(eventShelfStock)||!Number.isFinite(smaregiStock)||!Number.isFinite(smaregiCompareStock)||!Number.isFinite(comparisonStock))return null;
       const difference=comparisonStock-smaregiCompareStock;
+      if(typeof isSmaregiAutoNoIssueCheck==="function" && isSmaregiAutoNoIssueCheck(item,check))return null;
       if(difference===0)return null;
       return {item,check,actual,eventShelfStock,comparisonStock,smaregiStock,smaregiCompareStock,difference};
     }).filter(Boolean);
