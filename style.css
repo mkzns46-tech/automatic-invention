@@ -6256,16 +6256,21 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   white-space:nowrap;
 }
 .smaregi-cause-summary-row{
-  display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:8px;
-  align-items:stretch;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  max-width:640px;
+  margin:0 auto;
 }
 .smaregi-cause-summary-card{
   border:1px solid #d6ebde;
   border-radius:8px;
-  padding:10px;
+  padding:12px 16px;
   background:#f8fcf9;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  text-align:left;
 }
 .smaregi-cause-summary-card strong{
   display:block;
@@ -6274,14 +6279,23 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 }
 .smaregi-cause-summary-card span{
   display:block;
-  margin-top:4px;
   color:#10251b;
-  font-size:1.15rem;
+  font-size:1.35rem;
   font-weight:900;
   overflow-wrap:anywhere;
 }
 .smaregi-cause-summary-operator{
-  display:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:34px;
+  height:24px;
+  margin:0 auto;
+  border-radius:999px;
+  background:#e1f4e9;
+  color:#0b5d3b;
+  font-size:18px;
+  font-weight:900;
 }
 .smaregi-reason-form{
   display:grid;

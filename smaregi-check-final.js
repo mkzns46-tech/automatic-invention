@@ -1189,22 +1189,22 @@
           </div>
         </div>
         <div class="smaregi-cause-summary-row">
-          <div class="smaregi-cause-summary-card">
+          <div class="smaregi-cause-summary-card is-formula-input">
             <strong>実在庫（アプリ）</strong>
             <span class="is-app-stock">${safeText(actual===""?"未入力":actual)}</span>
           </div>
           <div class="smaregi-cause-summary-operator">+</div>
-          <div class="smaregi-cause-summary-card">
+          <div class="smaregi-cause-summary-card is-formula-input">
             <strong>イベント棚在庫</strong>
             <span>${safeText(Number.isFinite(eventShelfStock)?eventShelfStock:"未取得")}</span>
           </div>
           <div class="smaregi-cause-summary-operator">=</div>
-          <div class="smaregi-cause-summary-card">
+          <div class="smaregi-cause-summary-card is-comparison-card">
             <strong>比較用在庫</strong>
             <span class="is-app-stock">${safeText(Number.isFinite(comparisonStock)?comparisonStock:"未取得")}</span>
           </div>
           <div class="smaregi-cause-summary-operator">−</div>
-          <div class="smaregi-cause-summary-card">
+          <div class="smaregi-cause-summary-card is-formula-input">
             <strong>スマレジ在庫（${safeText(storeLabel)}）</strong>
             <span class="is-smaregi-stock">${safeText(smaregiStock===null?"未取得":smaregiStock)}</span>
           </div>
@@ -1213,7 +1213,7 @@
             <strong>差異</strong>
             <span class="smaregi-difference${Number(difference)<0 ? " is-negative" : (Number(difference)>0 ? " is-positive" : " is-zero")}">${safeText(difference)}</span>
           </div>
-          <div class="smaregi-cause-summary-card">
+          <div class="smaregi-cause-summary-card is-last-check-card">
             <strong>前回チェック締め日時</strong>
             <span>${safeText(typeof fmt==="function" ? fmt(getLastCheckedAtSafe()) : getLastCheckedAtSafe())}</span>
           </div>
@@ -1495,30 +1495,40 @@
         font-weight:700;
       }
       .smaregi-cause-summary-row{
-        display:grid;
-        grid-template-columns:minmax(0,1.4fr) auto minmax(0,1.4fr) auto minmax(120px,.8fr) minmax(220px,1.2fr);
-        gap:8px;
-        align-items:stretch;
-        margin-bottom:14px;
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+        margin:0 auto 14px;
+        max-width:640px;
       }
       .smaregi-cause-summary-card{
-        min-height:72px;
         border:1px solid #c7eadb;
         border-radius:8px;
         background:linear-gradient(180deg,#f8fffb,#f3fbf7);
-        padding:10px 12px;
-        display:flex;
-        flex-direction:column;
-        justify-content:center;
+        padding:12px 16px;
+        display:grid;
+        grid-template-columns:minmax(0,1fr) auto;
+        align-items:center;
         gap:5px;
-        text-align:center;
+        text-align:left;
+      }
+      .smaregi-cause-summary-card.is-comparison-card{
+        background:#ecfdf5;
+        border-color:#86efac;
+      }
+      .smaregi-cause-summary-card.is-difference-card{
+        background:#fff7ed;
+        border-color:#fdba74;
+      }
+      .smaregi-cause-summary-card.is-last-check-card{
+        background:#f8fafc;
       }
       .smaregi-cause-summary-card strong{
-        font-size:13px;
+        font-size:14px;
         color:#12352c;
       }
       .smaregi-cause-summary-card span{
-        font-size:22px;
+        font-size:24px;
         font-weight:800;
       }
       .smaregi-cause-summary-card .is-app-stock{
@@ -1531,9 +1541,14 @@
         display:flex;
         align-items:center;
         justify-content:center;
-        font-size:24px;
+        width:34px;
+        height:24px;
+        margin:0 auto;
+        border-radius:999px;
+        background:#e1f4e9;
+        font-size:18px;
         font-weight:800;
-        color:#334155;
+        color:#0b5d3b;
       }
       .smaregi-cause-guide{
         border:1px solid #93c5fd;
