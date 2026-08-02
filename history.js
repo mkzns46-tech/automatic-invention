@@ -98,6 +98,51 @@ function getProductUpdatedTime(product){
   return Number.isFinite(time) ? time : 0;
 }
 
+function normalizeShelfSortText(value){
+  return String(value||"")
+    .normalize("NFKC")
+    .toUpperCase()
+    .trim()
+    .replace(/[ー－―−ｰ–—]/g,"-")
+    .replace(/\s+/g,"");
+}
+
+function getProductShelfSortValue(product){
+  return product?.location||product?.shelf_code||product?.shelf||product?.shelf_no||"";
+}
+
+function getShelfSortKey(value){
+  const raw=String(value||"").trim();
+  if(!raw)return {empty:1,type:9,group:999,column:999,raw:""};
+
+  const text=normalizeShelfSortText(raw);
+  const first=text.split(/[、,／/]/)[0]||text;
+  const match=first.match(/^([1-9]|1[0-5]|[A-Z])-([1-9]|[12][0-9]|30)$/);
+  if(match){
+    const group=match[1];
+    const isNumeric=/^\d+$/.test(group);
+    return {
+      empty:0,
+      type:isNumeric?0:1,
+      group:isNumeric?Number(group):group.charCodeAt(0)-64,
+      column:Number(match[2]),
+      raw:first
+    };
+  }
+
+  return {empty:0,type:2,group:999,column:999,raw:text};
+}
+
+function compareShelfSortValues(a,b,collator){
+  const ak=getShelfSortKey(a);
+  const bk=getShelfSortKey(b);
+  return (ak.empty-bk.empty)
+    || (ak.type-bk.type)
+    || (ak.group-bk.group)
+    || (ak.column-bk.column)
+    || collator.compare(ak.raw,bk.raw);
+}
+
 function sortProductsForDisplay(rows,mode="name"){
   const collator=new Intl.Collator("ja-JP",{numeric:true,sensitivity:"base"});
   return [...(Array.isArray(rows)?rows:[])].sort((a,b)=>{
@@ -105,11 +150,8 @@ function sortProductsForDisplay(rows,mode="name"){
       return collator.compare(String(a?.barcode||""),String(b?.barcode||""));
     }
     if(mode==="location"){
-      const al=String(a?.location||a?.shelf||a?.shelf_no||"").trim();
-      const bl=String(b?.location||b?.shelf||b?.shelf_no||"").trim();
-      if(!al&&bl)return 1;
-      if(al&&!bl)return -1;
-      return collator.compare(al,bl)||collator.compare(String(a?.name||""),String(b?.name||""));
+      return compareShelfSortValues(getProductShelfSortValue(a),getProductShelfSortValue(b),collator)
+        || collator.compare(String(a?.name||""),String(b?.name||""));
     }
     if(mode==="updated"){
       return getProductUpdatedTime(b)-getProductUpdatedTime(a)||collator.compare(String(a?.name||""),String(b?.name||""));
@@ -119,6 +161,7 @@ function sortProductsForDisplay(rows,mode="name"){
 }
 
 window.sortProductsForDisplay=sortProductsForDisplay;
+window.compareShelfSortValues=compareShelfSortValues;
 
 function getProductSearchHaystack(product){
   const fields=[
