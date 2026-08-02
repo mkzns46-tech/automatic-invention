@@ -1170,15 +1170,22 @@ function getSmaregiCsvStatus(check,difference,item=null){
   return "チェック済み";
 }
 
+function isSmaregiDifferenceCsvRow({check,item=null,difference,snapshotValues=null,calculation=null}={}){
+  if(!check||isSmaregiExcludedCheck(check))return false;
+  if(isSmaregiNoIssueCheck(check))return false;
+  if(snapshotValues?.isAutoNoIssue===true)return false;
+  if(calculation?.isNoIssue===true)return false;
+  if(!snapshotValues&&item&&isSmaregiEffectiveNoIssueCheck(item,check))return false;
+  const numericDifference=Number(difference);
+  return Number.isFinite(numericDifference)&&numericDifference!==0;
+}
+
 function smaregiCsvRows(differenceOnly=false){
   const rows=[["商品コード","商品名","スマレジ在庫数","シート在庫数","実在庫数","スマレジ差異","担当者","チェック日時","チェック済み状態","原因カテゴリ","原因メモ","原因記入者","原因記入日時"]];
   smaregiStockItems.forEach(item=>{
     const check=getSmaregiCheck(item.barcode);
     const difference=check ? getSmaregiDifference(item) : "";
-    if(differenceOnly&&isSmaregiExcludedCheck(check))return;
-    if(differenceOnly&&isSmaregiEffectiveNoIssueCheck(item,check))return;
-    if(differenceOnly&&difference===0)return;
-    if(differenceOnly&&!check)return;
+    if(differenceOnly&&!isSmaregiDifferenceCsvRow({check,item,difference}))return;
     rows.push([
       item.barcode,
       item.product_name||"",
@@ -1362,7 +1369,7 @@ async function smaregiHistoricalDifferenceCsvRows(){
   const historical=await loadSmaregiHistoricalDifferenceRows();
   const rows=[["チェック日時","商品名","バーコード","アプリ在庫","イベント棚在庫","比較用在庫","スマレジ在庫","差異","期間内チェック回数","担当者","状態","原因カテゴリ","原因メモ","原因記入者","原因記入日時"]];
   getSmaregiHistoricalRowsInRange(historical,range).forEach(({check,item,difference,calculation,snapshotValues,checkCount})=>{
-    if(isSmaregiExcludedCheck(check)||snapshotValues?.isAutoNoIssue||calculation?.isNoIssue===true||difference===0||!Number.isFinite(difference))return;
+    if(!isSmaregiDifferenceCsvRow({check,item,difference,snapshotValues,calculation}))return;
     rows.push([
       check.checked_at ? fmt(check.checked_at) : "",
       item.product_name||item.productName||"",

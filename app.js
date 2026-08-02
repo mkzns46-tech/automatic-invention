@@ -192,7 +192,7 @@ function bindSmaregiStockCheckEvents(){
   on("syncSmaregiStockBtn","click",e=>runWithSmaregiAutoRefreshPaused(syncSmaregiStockFromApi,{button:e.currentTarget}));
   on("smaregiStockCsvFile","change",e=>importSmaregiStockCsvFile(e.target.files&&e.target.files[0]));
   on("refreshSmaregiChecksBtn","click",loadLatestSmaregiSnapshot);
-  on("exportSmaregiCheckCsvBtn","click",()=>exportSmaregiCheckCsv(false));
+  on("exportSmaregiCheckCsvBtn","click",()=>exportSmaregiCheckCsv(true));
   on("completeSmaregiStockCheckBtn","click",e=>runWithSmaregiAutoRefreshPaused(completeSmaregiStockCheck,{button:e.currentTarget}));
   on("resetSmaregiCompletionBtn","click",e=>runWithSmaregiAutoRefreshPaused(resetSmaregiStockCheckCompletion,{button:e.currentTarget}));
   on("aggregateSmaregiReasonSummaryBtn","click",showSmaregiReasonSummary);
