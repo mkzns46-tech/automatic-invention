@@ -6725,7 +6725,7 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 }
 .shelf-priority-table{
   width:100%;
-  min-width:860px;
+  min-width:980px;
   border-collapse:collapse;
   table-layout:fixed;
 }
@@ -6750,11 +6750,28 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
 .shelf-priority-table th:nth-child(3){width:90px;}
 .shelf-priority-table th:nth-child(4),
 .shelf-priority-table th:nth-child(5){width:120px;}
-.shelf-priority-table th:nth-child(6){width:130px;}
+.shelf-priority-table th:nth-child(6){width:230px;}
 .shelf-priority-stock{
   color:#0b5d3b;
   font-weight:900;
   text-align:right;
+}
+.shelf-priority-inline-cell{
+  display:grid;
+  grid-template-columns:minmax(92px,1fr) auto;
+  gap:8px;
+  align-items:center;
+}
+.shelf-priority-code-input{
+  min-height:38px;
+  margin:0;
+  padding:8px 10px;
+  font-weight:900;
+  text-transform:uppercase;
+}
+.shelf-priority-inline-cell button{
+  min-height:38px;
+  padding:7px 12px;
 }
 .shelf-priority-cards{
   display:none;
@@ -6866,6 +6883,12 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   .shelf-priority-card span{
     color:#315b48;
     font-weight:800;
+  }
+  .shelf-priority-card-input{
+    display:grid;
+    gap:5px;
+    color:#0b5d3b;
+    font-weight:900;
   }
   .shelf-priority-card button{
     width:100%;

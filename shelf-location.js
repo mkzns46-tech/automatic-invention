@@ -356,6 +356,9 @@
     }
     return sorted;
   }
+  function priorityRowInputId(product,suffix=""){
+    return `shelfPriorityCode_${priorityProductKey(product).replace(/[^a-zA-Z0-9_-]/g,"_")}_${suffix}`;
+  }
   function buildInFilter(values){
     return values.map(value=>`"${String(value).replace(/"/g,'\\"')}"`).join(",");
   }
@@ -422,7 +425,10 @@
           <td class="shelf-priority-stock">${safe(priorityStock(product))}</td>
           <td>${safe(primary)}</td>
           <td>${safe(subs)}</td>
-          <td><button type="button" class="secondary" data-shelf-priority-select="${safe(priorityProductKey(product))}">棚番登録</button></td>
+          <td class="shelf-priority-inline-cell">
+            <input id="${safe(priorityRowInputId(product,"table"))}" class="shelf-priority-code-input" data-shelf-priority-input="${safe(priorityProductKey(product))}" autocomplete="off" placeholder="例：3-1 / A-12">
+            <button type="button" class="secondary" data-shelf-priority-register="${safe(priorityProductKey(product))}" data-input-id="${safe(priorityRowInputId(product,"table"))}">登録</button>
+          </td>
         </tr>`;
     }).join("");
     const cardRows=rows.map(product=>{
@@ -436,7 +442,10 @@
           <span>現在庫：${safe(priorityStock(product))}</span>
           <span>主棚番：${safe(primary)}</span>
           <span>サブ棚番：${safe(subs)}</span>
-          <button type="button" class="secondary" data-shelf-priority-select="${safe(priorityProductKey(product))}">棚番登録</button>
+          <label class="shelf-priority-card-input">棚番
+            <input id="${safe(priorityRowInputId(product,"card"))}" class="shelf-priority-code-input" data-shelf-priority-input="${safe(priorityProductKey(product))}" autocomplete="off" placeholder="例：3-1 / A-12">
+          </label>
+          <button type="button" class="secondary" data-shelf-priority-register="${safe(priorityProductKey(product))}" data-input-id="${safe(priorityRowInputId(product,"card"))}">登録</button>
         </article>`;
     }).join("");
     box.innerHTML=`
@@ -447,15 +456,21 @@
         </table>
       </div>
       <div class="shelf-priority-cards">${cardRows}</div>`;
-    box.querySelectorAll("[data-shelf-priority-select]").forEach(btn=>{
+    box.querySelectorAll("[data-shelf-priority-input]").forEach(input=>{
+      input.addEventListener("keydown",event=>{
+        if(event.key==="Enter"){
+          event.preventDefault();
+          registerPriorityShelfFromList(input.dataset.shelfPriorityInput,input.id);
+        }
+      });
+      input.addEventListener("change",()=>{
+        const normalized=normalizeShelfCode(input.value);
+        if(normalized)input.value=normalized;
+      });
+    });
+    box.querySelectorAll("[data-shelf-priority-register]").forEach(btn=>{
       btn.onclick=async()=>{
-        const key=btn.dataset.shelfPrioritySelect;
-        const product=state.priorityProducts.find(row=>priorityProductKey(row)===key);
-        if(!product)return;
-        await selectProduct(product);
-        showShelfMessage(`${product.name||product.barcode} を棚番登録フォームに選択しました。棚・列・担当者を確認して登録してください。`,"ok");
-        $("shelfLocationShelf")?.focus();
-        document.querySelector(".shelf-location-input-grid")?.scrollIntoView({behavior:"smooth",block:"start"});
+        await registerPriorityShelfFromList(btn.dataset.shelfPriorityRegister,btn.dataset.inputId,btn);
       };
     });
   }
@@ -487,6 +502,69 @@
     $("shelfPrioritySort")?.addEventListener("change",e=>{localStorage.setItem(STORAGE.prioritySort,e.target.value); renderShelfPriorityList();});
     $("shelfPriorityOnlyMissing")?.addEventListener("change",renderShelfPriorityList);
     $("shelfPriorityReloadBtn")?.addEventListener("click",()=>loadShelfPriorityProducts());
+  }
+  async function registerPriorityShelfFromList(productKeyValue,inputId,button=null){
+    const product=state.priorityProducts.find(row=>priorityProductKey(row)===String(productKeyValue||""));
+    const input=$(inputId);
+    if(!product||!input){
+      showShelfMessage("登録対象の商品が見つかりません。再取得してください。","err");
+      return;
+    }
+    const staff=staffName();
+    if(!staff){
+      showShelfMessage("担当者を選択してください","err");
+      $("shelfLocationStaff")?.focus();
+      return;
+    }
+    const normalized=normalizeShelfCode(input.value);
+    if(!normalized){
+      showShelfMessage("棚番は「3-1」「A-12」の形式で入力してください。棚は1〜15またはA〜Z、列は1〜30です。","err");
+      input.focus();
+      return;
+    }
+    input.value=normalized;
+    const [shelf,column]=normalized.split("-");
+    if(button)button.disabled=true;
+    try{
+      const locations=await loadProductLocations(product);
+      if(locations.some(loc=>loc.shelf_code===normalized && !loc.deleted_at)){
+        showShelfMessage(`この商品はすでに${normalized}へ登録されています`,"err");
+        return;
+      }
+      const isFirst=locations.filter(loc=>!loc.deleted_at).length===0 && !String(product.location||"").trim();
+      const inserted=await upsertLocation({
+        product_id:product.id||null,
+        barcode:product.barcode,
+        shelf_code:normalized,
+        shelf_group:shelf,
+        shelf_column:Number(column),
+        is_primary:isFirst,
+        created_by:staff,
+        updated_by:staff
+      });
+      if(!inserted){
+        showShelfMessage(`この商品はすでに${normalized}へ登録されています`,"err");
+        return;
+      }
+      if(isFirst)await patchProductLocation(product,normalized);
+      await insertLocationLog({
+        product_id:product.id||null,
+        barcode:product.barcode,
+        product_name:product.name||"",
+        action_type:"棚番追加",
+        before_shelf_code:"",
+        after_shelf_code:normalized,
+        staff
+      });
+      await loadShelfLocationLogs();
+      resetProductOnly();
+      await loadShelfPriorityProducts({silent:true});
+      showShelfMessage(`${product.name||product.barcode}を${normalized}へ登録しました`,"ok");
+    }catch(error){
+      showShelfMessage("棚番登録エラー。\n"+error.message,"err");
+    }finally{
+      if(button)button.disabled=false;
+    }
   }
   async function insertLocationLog(payload){
     const rows=await sb("product_location_logs?select=*",{
