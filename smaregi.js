@@ -1278,6 +1278,14 @@ function getSmaregiHistoricalSnapshotValues(check,item,snapshot){
     || String(check?.is_auto_no_issue_at_check||"").toLowerCase()==="true"
     || difference===0
     || isSmaregiNoIssueCheck(check);
+  // 既存チェックにはイベント棚スナップショット列がないため、
+  // 保存済みのアプリ在庫・スマレジ在庫・差異から当時値を逆算する。
+  // 現在のイベント棚在庫Mapは過去チェックへ適用しない。
+  if(eventShelfStock===null&&comparisonStock===null
+    &&appStock!==null&&smaregiStock!==null&&difference!==null){
+    comparisonStock=smaregiStock+difference;
+    eventShelfStock=comparisonStock-appStock;
+  }
   return {
     appStock,
     eventShelfStock,
