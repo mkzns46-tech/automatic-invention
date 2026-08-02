@@ -4,13 +4,17 @@
     staff:"arico_shelf_location_staff",
     shelf:"arico_shelf_location_shelf",
     column:"arico_shelf_location_column",
-    sort:"arico_product_search_sort_shelf_location"
+    sort:"arico_product_search_sort_shelf_location",
+    prioritySort:"arico_shelf_priority_sort"
   };
   const state={
     product:null,
     locations:[],
     logs:[],
     historyMode:"today",
+    priorityProducts:[],
+    priorityLocationMap:new Map(),
+    priorityLoaded:false,
     camera:{stream:null,reader:null,running:false,lastCode:"",lastAt:0}
   };
 
@@ -293,6 +297,192 @@
       };
     });
   }
+  function priorityProductKey(product){
+    return String(product?.barcode||product?.smaregi_product_id||product?.id||"").trim();
+  }
+  function priorityStock(product){
+    const value=Number(product?.base_stock||0);
+    return Number.isFinite(value)?value:0;
+  }
+  function activePriorityLocations(product){
+    const key=priorityProductKey(product);
+    return (state.priorityLocationMap.get(key)||[]).filter(loc=>!loc.deleted_at);
+  }
+  function priorityPrimaryShelf(product,locations=activePriorityLocations(product)){
+    const fromProduct=String(product?.location||"").trim();
+    const primary=locations.find(loc=>loc.is_primary);
+    return String(fromProduct||primary?.shelf_code||"").trim();
+  }
+  function prioritySubShelves(product,locations=activePriorityLocations(product)){
+    return locations
+      .filter(loc=>!loc.is_primary && String(loc.shelf_code||"").trim())
+      .map(loc=>String(loc.shelf_code).trim());
+  }
+  function isPriorityMissingShelf(product){
+    const locations=activePriorityLocations(product);
+    return priorityStock(product)>=1 && !priorityPrimaryShelf(product,locations) && prioritySubShelves(product,locations).length===0;
+  }
+  function prioritySearchText(product){
+    return [
+      product?.name,
+      product?.product_name,
+      product?.barcode,
+      product?.smaregi_product_id,
+      product?.product_code,
+      product?.code,
+      product?.sku,
+      product?.item_number,
+      product?.product_number,
+      product?.part_number,
+      product?.model,
+      product?.model_number,
+      product?.jan_code,
+      product?.color,
+      product?.size
+    ].map(v=>String(v||"").toLowerCase()).join(" ");
+  }
+  function sortPriorityProducts(rows){
+    const mode=$("shelfPrioritySort")?.value||localStorage.getItem(STORAGE.prioritySort)||"stock_desc";
+    const sorted=[...rows];
+    if(mode==="name"){
+      sorted.sort((a,b)=>String(a.name||a.product_name||"").localeCompare(String(b.name||b.product_name||""),"ja",{numeric:true}));
+    }else{
+      sorted.sort((a,b)=>priorityStock(b)-priorityStock(a)||String(a.name||"").localeCompare(String(b.name||""),"ja",{numeric:true}));
+    }
+    return sorted;
+  }
+  function buildInFilter(values){
+    return values.map(value=>`"${String(value).replace(/"/g,'\\"')}"`).join(",");
+  }
+  async function loadPriorityLocationsForProducts(products){
+    const map=new Map();
+    const barcodes=[...new Set(products.map(priorityProductKey).filter(Boolean))];
+    for(let i=0;i<barcodes.length;i+=80){
+      const chunk=barcodes.slice(i,i+80);
+      const rows=await sbAll(`product_locations?select=*&barcode=in.(${buildInFilter(chunk)})`,1000,5000).catch(()=>[]);
+      (Array.isArray(rows)?rows:[]).forEach(loc=>{
+        const key=String(loc.barcode||"").trim();
+        if(!key)return;
+        if(!map.has(key))map.set(key,[]);
+        map.get(key).push(loc);
+      });
+    }
+    state.priorityLocationMap=map;
+  }
+  async function loadShelfPriorityProducts({silent=false}={}){
+    const box=$("shelfPriorityStockList");
+    if(box&&!silent)box.innerHTML='<div class="message">在庫あり・棚番未登録の商品を取得しています...</div>';
+    const rows=await sbAll("products?select=*&base_stock=gt.0&order=name.asc",1000,10000).catch(error=>{
+      if(box)box.innerHTML=`<div class="message err">在庫あり・棚番未登録一覧を取得できませんでした。${safe(error.message)}</div>`;
+      return [];
+    });
+    const stockProducts=(Array.isArray(rows)?rows:[]).filter(product=>priorityStock(product)>=1);
+    await loadPriorityLocationsForProducts(stockProducts);
+    state.priorityProducts=stockProducts;
+    state.priorityLoaded=true;
+    renderShelfPriorityList();
+  }
+  function filteredPriorityProducts(){
+    const keyword=String($("shelfPrioritySearch")?.value||"").trim().toLowerCase();
+    const onlyMissing=$("shelfPriorityOnlyMissing")?.checked!==false;
+    return sortPriorityProducts(state.priorityProducts.filter(product=>{
+      if(onlyMissing && !isPriorityMissingShelf(product))return false;
+      if(keyword && !prioritySearchText(product).includes(keyword))return false;
+      return priorityStock(product)>=1;
+    }));
+  }
+  function renderShelfPriorityList(){
+    const box=$("shelfPriorityStockList");
+    const summary=$("shelfPrioritySummary");
+    if(!box)return;
+    const rows=filteredPriorityProducts();
+    const missingCount=state.priorityProducts.filter(isPriorityMissingShelf).length;
+    if(summary)summary.textContent=`対象 ${missingCount}件 / 表示 ${rows.length}件`;
+    if(!state.priorityLoaded){
+      box.innerHTML='<div class="message">一覧を取得していません。</div>';
+      return;
+    }
+    if(!rows.length){
+      box.innerHTML='<div class="message ok">条件に一致する商品はありません。</div>';
+      return;
+    }
+    const tableRows=rows.map(product=>{
+      const locations=activePriorityLocations(product);
+      const primary=priorityPrimaryShelf(product,locations)||"-";
+      const subs=prioritySubShelves(product,locations).join(" / ")||"-";
+      return `
+        <tr>
+          <td>${safe(product.name||product.product_name||"")}</td>
+          <td>${safe(product.barcode||"-")}</td>
+          <td class="shelf-priority-stock">${safe(priorityStock(product))}</td>
+          <td>${safe(primary)}</td>
+          <td>${safe(subs)}</td>
+          <td><button type="button" class="secondary" data-shelf-priority-select="${safe(priorityProductKey(product))}">棚番登録</button></td>
+        </tr>`;
+    }).join("");
+    const cardRows=rows.map(product=>{
+      const locations=activePriorityLocations(product);
+      const primary=priorityPrimaryShelf(product,locations)||"-";
+      const subs=prioritySubShelves(product,locations).join(" / ")||"-";
+      return `
+        <article class="shelf-priority-card">
+          <strong>${safe(product.name||product.product_name||"")}</strong>
+          <span>バーコード：${safe(product.barcode||"-")}</span>
+          <span>現在庫：${safe(priorityStock(product))}</span>
+          <span>主棚番：${safe(primary)}</span>
+          <span>サブ棚番：${safe(subs)}</span>
+          <button type="button" class="secondary" data-shelf-priority-select="${safe(priorityProductKey(product))}">棚番登録</button>
+        </article>`;
+    }).join("");
+    box.innerHTML=`
+      <div class="shelf-priority-table-wrap">
+        <table class="shelf-priority-table">
+          <thead><tr><th>商品名</th><th>バーコード</th><th>現在庫</th><th>主棚番</th><th>サブ棚番</th><th>操作</th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+      <div class="shelf-priority-cards">${cardRows}</div>`;
+    box.querySelectorAll("[data-shelf-priority-select]").forEach(btn=>{
+      btn.onclick=async()=>{
+        const key=btn.dataset.shelfPrioritySelect;
+        const product=state.priorityProducts.find(row=>priorityProductKey(row)===key);
+        if(!product)return;
+        await selectProduct(product);
+        showShelfMessage(`${product.name||product.barcode} を棚番登録フォームに選択しました。棚・列・担当者を確認して登録してください。`,"ok");
+        $("shelfLocationShelf")?.focus();
+        document.querySelector(".shelf-location-input-grid")?.scrollIntoView({behavior:"smooth",block:"start"});
+      };
+    });
+  }
+  function ensureShelfPriorityPanel(){
+    if($("shelfPriorityStockList"))return;
+    const historyBlock=$("shelfLocationHistoryBody")?.closest(".shelf-location-block");
+    const panel=document.createElement("section");
+    panel.className="shelf-location-block shelf-priority-block";
+    panel.innerHTML=`
+      <div class="section-title">
+        <div>
+          <h3>在庫あり・棚番未登録</h3>
+          <p class="section-note">現在庫が1以上あり、主棚番とサブ棚番がどちらも未登録の商品だけを棚番登録できます。</p>
+        </div>
+        <div id="shelfPrioritySummary" class="badge muted">対象 0件</div>
+      </div>
+      <div class="shelf-priority-controls">
+        <label>商品検索<input id="shelfPrioritySearch" autocomplete="off" placeholder="商品名・バーコード・商品コード・品番・カラー・サイズ"></label>
+        <label>並び順<select id="shelfPrioritySort"><option value="stock_desc">在庫数順</option><option value="name">商品名順</option></select></label>
+        <label class="shelf-priority-check"><input id="shelfPriorityOnlyMissing" type="checkbox" checked> 未登録のみ表示</label>
+        <button type="button" id="shelfPriorityReloadBtn" class="secondary">再取得</button>
+      </div>
+      <div id="shelfPriorityStockList" class="shelf-priority-list"></div>`;
+    if(historyBlock&&historyBlock.parentNode)historyBlock.parentNode.insertBefore(panel,historyBlock);
+    else $("shelfLocationPanel")?.appendChild(panel);
+    const sort=$("shelfPrioritySort");
+    if(sort)sort.value=localStorage.getItem(STORAGE.prioritySort)||"stock_desc";
+    $("shelfPrioritySearch")?.addEventListener("input",renderShelfPriorityList);
+    $("shelfPrioritySort")?.addEventListener("change",e=>{localStorage.setItem(STORAGE.prioritySort,e.target.value); renderShelfPriorityList();});
+    $("shelfPriorityOnlyMissing")?.addEventListener("change",renderShelfPriorityList);
+    $("shelfPriorityReloadBtn")?.addEventListener("click",()=>loadShelfPriorityProducts());
+  }
   async function insertLocationLog(payload){
     const rows=await sb("product_location_logs?select=*",{
       method:"POST",
@@ -359,6 +549,7 @@
     showPopup?.("棚番登録完了",`${product.name||product.barcode}を${code}へ登録しました`);
     showShelfMessage(`${product.name||product.barcode}を${code}へ登録しました`,"ok");
     resetProductOnly();
+    await loadShelfPriorityProducts({silent:true});
   }
   async function setPrimaryLocation(locationId){
     if(!requireAdmin())return;
@@ -652,6 +843,7 @@
     if(message)showShelfMessage("カメラを停止しました。","ok");
   }
   function bindShelfLocationEvents(){
+    ensureShelfPriorityPanel();
     renderStaffSelect();
     renderShelfOptions();
     renderCurrentShelfCode();
@@ -670,13 +862,17 @@
     $("shelfLocationShowTodayBtn")?.addEventListener("click",()=>{state.historyMode="today"; renderHistory();});
     $("shelfLocationShowAllBtn")?.addEventListener("click",()=>{state.historyMode="all"; renderHistory();});
     loadShelfLocationLogs();
+    loadShelfPriorityProducts();
   }
   function renderShelfLocation(){
+    ensureShelfPriorityPanel();
     renderStaffSelect();
     renderShelfOptions();
     renderCurrentShelfCode();
     renderProductInfo();
     loadShelfLocationLogs();
+    if(!state.priorityLoaded)loadShelfPriorityProducts();
+    else renderShelfPriorityList();
   }
   window.bindShelfLocationEvents=bindShelfLocationEvents;
   window.renderShelfLocation=renderShelfLocation;
