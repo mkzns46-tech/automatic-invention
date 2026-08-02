@@ -420,7 +420,7 @@
       const check=typeof getSmaregiCheck==="function" ? getSmaregiCheck(barcode) : null;
       if(!hasActualStock(check))return null;
       if(isExcludedCheck(check))return null;
-      if(check?.no_issue===true)return null;
+      if(typeof isSmaregiNoIssueCheck==="function" ? isSmaregiNoIssueCheck(check) : check?.no_issue===true)return null;
       if(check?.difference_reason_category || check?.difference_reason_memo || check?.difference_reason_by || check?.difference_reason_at)return null;
       const breakdown=typeof getSmaregiInventoryBreakdown==="function"
         ? getSmaregiInventoryBreakdown(item,check)
@@ -883,7 +883,7 @@
         checked_by:checkedBy,
         checked_at:checkedAt,
         excluded:false,
-        no_issue:previousCheck?.no_issue===true,
+        no_issue:typeof isSmaregiNoIssueCheck==="function" ? isSmaregiNoIssueCheck(previousCheck) : previousCheck?.no_issue===true,
         no_issue_by:previousCheck?.no_issue_by||null,
         no_issue_at:previousCheck?.no_issue_at||null,
         no_issue_reason:previousCheck?.no_issue_reason||"",

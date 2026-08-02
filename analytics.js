@@ -168,7 +168,7 @@ function getSmaregiReasonSummaryRows(historical,range=getSmaregiDifferenceDateRa
   const grouped=new Map();
   historical.forEach(({check,difference})=>{
     if(!isInSmaregiDifferenceDateRange(check.checked_at,range))return;
-    if(isSmaregiExcludedCheck(check)||check.no_issue===true||difference===0||!Number.isFinite(difference))return;
+    if(isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check)||difference===0||!Number.isFinite(difference))return;
     const category=String(check.difference_reason_category||"未分類");
     const current=grouped.get(category)||{category,count:0,differenceTotal:0};
     current.count+=1;
@@ -182,7 +182,7 @@ function getSmaregiDifferenceRankingRows(historical,range=getSmaregiDifferenceDa
   const grouped=new Map();
   historical.forEach(({check,item,difference})=>{
     if(!isInSmaregiDifferenceDateRange(check.checked_at,range))return;
-    if(isSmaregiExcludedCheck(check)||check.no_issue===true||difference===0||!Number.isFinite(difference))return;
+    if(isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check)||difference===0||!Number.isFinite(difference))return;
     const barcode=String(check.barcode||item.barcode||"");
     if(!barcode)return;
     const current=grouped.get(barcode)||{
@@ -251,7 +251,7 @@ function getPreviousRange(range){
 function calculateSmaregiAccuracy(historical,range){
   const rows=historical.filter(({check})=>isInSmaregiDifferenceDateRange(check.checked_at,range)&&!isSmaregiExcludedCheck(check));
   const checkedCount=rows.length;
-  const differenceCount=rows.filter(({check,difference})=>check.no_issue!==true&&Number.isFinite(difference)&&difference!==0).length;
+  const differenceCount=rows.filter(({check,difference})=>!isSmaregiNoIssueCheck(check)&&Number.isFinite(difference)&&difference!==0).length;
   const differenceRate=checkedCount?differenceCount/checkedCount*100:0;
   const accuracy=checkedCount?(checkedCount-differenceCount)/checkedCount*100:0;
   return {checkedCount,differenceCount,differenceRate,accuracy};
@@ -306,7 +306,10 @@ async function loadSmaregiAccuracy(historical=null){
     const currentRange=getSmaregiAccuracyCurrentRange();
     const current=calculateSmaregiAccuracy(rows,currentRange);
     const previous=calculateSmaregiAccuracy(rows,getPreviousRange(currentRange));
-    renderSmaregiAccuracyMonthlyTrend(getSmaregiAccuracyMonthlyTrend(rows));
+    const trendRows=typeof loadSmaregiHistoricalDifferenceRows==="function"
+      ? await loadSmaregiHistoricalDifferenceRows({recalculateEventStock:false}).catch(()=>rows)
+      : rows;
+    renderSmaregiAccuracyMonthlyTrend(getSmaregiAccuracyMonthlyTrend(trendRows));
     const change=current.accuracy-previous.accuracy;
     if(el("smaregiAccuracyChecked"))el("smaregiAccuracyChecked").textContent=`${current.checkedCount}件`;
     if(el("smaregiAccuracyDifference"))el("smaregiAccuracyDifference").textContent=`${current.differenceCount}件`;
