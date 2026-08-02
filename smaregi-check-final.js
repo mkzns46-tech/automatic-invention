@@ -1,6 +1,9 @@
 ﻿(function(){
   "use strict";
 
+  let smaregiDiffAutoLoadPromise=null;
+  let smaregiDiffAutoLoadedKey="";
+
   function safeText(value){
     return typeof esc==="function" ? esc(value) : String(value ?? "")
       .replace(/&/g,"&amp;")
@@ -627,6 +630,36 @@
 
   window.markSmaregiDifferenceNoIssue=markSmaregiDifferenceNoIssue;
 
+  function getSmaregiDiffAutoLoadKey(){
+    try{
+      const context=typeof getSmaregiApiStoreContextForCheck==="function" ? getSmaregiApiStoreContextForCheck() : {};
+      return String(context.storeCode||window.currentStore||"tokyo").trim().toLowerCase()||"tokyo";
+    }catch(_){
+      return String(window.currentStore||"tokyo").trim().toLowerCase()||"tokyo";
+    }
+  }
+
+  function ensureSmaregiDiffDataLoaded(body,summary){
+    const hasData=!!smaregiSnapshot || (Array.isArray(smaregiStockItems)&&smaregiStockItems.length>0);
+    const loadKey=getSmaregiDiffAutoLoadKey();
+    if(hasData || smaregiDiffAutoLoadedKey===loadKey)return false;
+    if(typeof loadLatestSmaregiSnapshot!=="function")return false;
+
+    if(summary)summary.textContent="スマレジAPIデータを読み込み中...";
+    if(body)body.innerHTML='<tr><td colspan="9" class="smaregi-empty">スマレジAPIデータを読み込み中...</td></tr>';
+    if(!smaregiDiffAutoLoadPromise){
+      smaregiDiffAutoLoadPromise=Promise.resolve()
+        .then(()=>loadLatestSmaregiSnapshot())
+        .catch(error=>showMessage?.(`スマレジAPIデータ取得エラー\n${error.message}`,"err"))
+        .finally(()=>{
+          smaregiDiffAutoLoadedKey=loadKey;
+          smaregiDiffAutoLoadPromise=null;
+          setTimeout(()=>window.renderSmaregiDiffOnlyPanel?.(),0);
+        });
+    }
+    return true;
+  }
+
   window.renderSmaregiDiffOnlyPanel=function(){
     const panel=typeof el==="function" ? el("smaregiDiffOnlyPanel") : document.getElementById("smaregiDiffOnlyPanel");
     const body=typeof el==="function" ? el("smaregiDiffOnlyBody") : document.getElementById("smaregiDiffOnlyBody");
@@ -636,6 +669,7 @@
     if(headerRow){
       headerRow.innerHTML="<th>商品名</th><th>実在庫</th><th>イベント棚在庫</th><th>比較用在庫</th><th>スマレジ在庫</th><th>差異</th><th>担当者</th><th>チェック日時</th><th>操作</th>";
     }
+    if(ensureSmaregiDiffDataLoaded(body,summary))return;
     const stats=getSmaregiStats();
     bindSmaregiDiffProductSearchControls();
     const allRows=getDiffRows();
