@@ -182,12 +182,14 @@ function getSmaregiCurrentEventStock(barcode){
 }
 
 function getSmaregiEventStorageStock(barcode){
-  if(smaregiEventInventoryStoreCode!==normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode()))return 0;
-  return Number(smaregiEventStorageStockByBarcode.get(String(barcode||"").trim())||0);
+  // event_storage_stocks is maintained as a separate operational view. It is
+  // intentionally not added here because booth_event_items is the canonical
+  // per-event source used to calculate the current event shelf quantity.
+  return 0;
 }
 
 function getSmaregiEventShelfStock(barcode){
-  return getSmaregiCurrentEventStock(barcode)+getSmaregiEventStorageStock(barcode);
+  return getSmaregiCurrentEventStock(barcode);
 }
 
 function getSmaregiInventoryBreakdown(item,check=getSmaregiCheck(item?.barcode)){
@@ -195,8 +197,8 @@ function getSmaregiInventoryBreakdown(item,check=getSmaregiCheck(item?.barcode))
     ? Number(check.actual_stock||0)
     : null;
   const currentEventStock=getSmaregiCurrentEventStock(item?.barcode);
-  const eventStorageStock=getSmaregiEventStorageStock(item?.barcode);
-  const eventShelfStock=currentEventStock+eventStorageStock;
+  const eventStorageStock=0;
+  const eventShelfStock=currentEventStock;
   const savedSmaregiStock=getSavedSmaregiStockValue(item);
   const smaregiStock=savedSmaregiStock===null ? null : savedSmaregiStock;
   const smaregiStockForComparison=smaregiStock===null ? null : getComparableSmaregiStockNumber(item,0);
@@ -220,6 +222,64 @@ function getSmaregiInventoryBreakdown(item,check=getSmaregiCheck(item?.barcode))
   };
 }
 
+function getSmaregiMovementQuantity(row){
+  return Math.max(0,normalizeInventoryQuantity(row?.quantity));
+}
+
+function sumSmaregiMovementQuantities(rows,predicate){
+  const seenIds=new Set();
+  return (Array.isArray(rows)?rows:[]).reduce((sum,row)=>{
+    if(!predicate(row))return sum;
+    const id=String(row?.id||"").trim();
+    if(id&&seenIds.has(id))return sum;
+    if(id)seenIds.add(id);
+    return sum+getSmaregiMovementQuantity(row);
+  },0);
+}
+
+function getSmaregiEventShelfCurrentQty(item,movements=[],salesQty=null){
+  const eventPickQty=sumSmaregiMovementQuantities(movements,row=>{
+    const type=String(row?.movement_type||"").trim();
+    return String(row?.item_type||"normal")==="normal"
+      && (type==="event_pick"||type==="take_out");
+  });
+  const legacyDepartureQty=eventPickQty>0 ? 0 : sumSmaregiMovementQuantities(movements,row=>{
+    return String(row?.item_type||"normal")==="normal"
+      && String(row?.movement_type||"").trim()==="departure_count";
+  });
+  const fallbackTakeoutQty=normalizeInventoryQuantity(item?.normal_takeout_qty)
+    +normalizeInventoryQuantity(item?.storage_takeout_qty);
+  const movementTakeoutQty=eventPickQty>0 ? eventPickQty : legacyDepartureQty;
+  const eventTakeoutQty=movementTakeoutQty>0
+    ? movementTakeoutQty
+    : (fallbackTakeoutQty>0 ? fallbackTakeoutQty : normalizeInventoryQuantity(item?.taken_qty));
+
+  // A normal-shelf return is explicit when the return workflow has recorded
+  // shelf_return_qty. Storage returns remain event stock and are not removed.
+  const returnedQty=normalizeInventoryQuantity(item?.returned_qty);
+  const storageReturnedQty=normalizeInventoryQuantity(item?.event_storage_qty);
+  const shelfReturnQty=normalizeInventoryQuantity(item?.shelf_return_qty)>0
+    ? normalizeInventoryQuantity(item?.shelf_return_qty)
+    : Math.max(0,returnedQty-storageReturnedQty);
+  const sold= salesQty===null
+    ? normalizeInventoryQuantity(item?.sold_qty)
+    : normalizeInventoryQuantity(salesQty);
+
+  // Only a move from the event shelf to gacha reduces the event shelf. A
+  // gacha_return never restores the event shelf under the current workflow.
+  const eventGachaPickQty=sumSmaregiMovementQuantities(movements,row=>{
+    const type=String(row?.movement_type||"").trim();
+    const source=String(row?.takeout_source||"").trim().toLowerCase();
+    return type==="gacha_pick"
+      && String(row?.item_type||"")==="gacha_prize"
+      && ["event_shelf","event_storage","storage"].includes(source);
+  });
+
+  return Math.max(0,eventTakeoutQty-sold-shelfReturnQty-eventGachaPickQty);
+}
+
+window.calculateSmaregiEventShelfCurrentQty=getSmaregiEventShelfCurrentQty;
+
 async function loadSmaregiEventInventoryCache(barcodes=[]){
   smaregiCurrentEventStockByBarcode=new Map();
   smaregiEventStorageStockByBarcode=new Map();
@@ -232,20 +292,19 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
 
   const storeCode=normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode());
   smaregiEventInventoryStoreCode=storeCode;
-  const openEvents=await sbAll(`booth_events?select=id,status,store_code&status=neq.closed&store_code=eq.${encodeURIComponent(storeCode)}`,1000,20000);
-  const openEventIds=Array.isArray(openEvents)
-    ? openEvents
-      .filter(event=>!new Set(["closed","cancelled","canceled","invalid"]).has(String(event.status||"").trim().toLowerCase()))
+  const events=await sbAll(`booth_events?select=id,status,store_code&store_code=eq.${encodeURIComponent(storeCode)}`,1000,50000);
+  const validEventIds=Array.isArray(events)
+    ? events
+      .filter(event=>!new Set(["cancelled","canceled","invalid","deleted"]).has(String(event.status||"").trim().toLowerCase()))
       .map(event=>String(event.id||"").trim()).filter(Boolean)
     : [];
-  const eventItemStorageStockByBarcode=new Map();
-  if(openEventIds.length){
-    const eventFilter=buildSmaregiInFilter(openEventIds);
-    const [eventItems,departureLogs]=await Promise.all([
-      sbAll(`booth_event_items?select=id,event_id,barcode,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,event_storage_qty,consumed_qty,updated_at&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&item_type=eq.normal`,1000,50000),
-      sbAll(`booth_stock_movements?select=event_id,barcode,movement_type&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&movement_type=in.(departure_count,take_out,event_pick)&item_type=eq.normal`,1000,50000).catch(()=>[])
+  if(validEventIds.length){
+    const eventFilter=buildSmaregiInFilter(validEventIds);
+    const [eventItems,movementRows,salesRows]=await Promise.all([
+      sbAll(`booth_event_items?select=id,event_id,barcode,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,shelf_return_qty,event_storage_qty,consumed_qty,updated_at&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&item_type=eq.normal`,1000,50000),
+      sbAll(`booth_stock_movements?select=id,event_id,barcode,movement_type,item_type,quantity,takeout_source&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&movement_type=in.(departure_count,take_out,event_pick,return,event_close_return,gacha_pick,gacha_return)`,1000,50000).catch(()=>[]),
+      sbAll(`event_sales_imports?select=id,event_id,barcode,quantity,import_status&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&import_status=eq.confirmed`,1000,50000).catch(()=>[])
     ]);
-    const confirmedDepartureKeys=new Set((Array.isArray(departureLogs)?departureLogs:[]).map(row=>`${row.event_id}::${row.barcode}`));
     const eventItemByKey=new Map();
     (Array.isArray(eventItems)?eventItems:[]).forEach(row=>{
       if(String(row.item_type||"normal")!=="normal")return;
@@ -255,42 +314,35 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
         eventItemByKey.set(key,row);
       }
     });
+    const movementByKey=new Map();
+    (Array.isArray(movementRows)?movementRows:[]).forEach(row=>{
+      const key=`${row.event_id}::${row.barcode}`;
+      const rows=movementByKey.get(key)||[];
+      rows.push(row);
+      movementByKey.set(key,rows);
+    });
+    const confirmedSalesByKey=new Map();
+    (Array.isArray(salesRows)?salesRows:[]).forEach(row=>{
+      const key=`${row.event_id}::${row.barcode}`;
+      const rows=confirmedSalesByKey.get(key)||[];
+      rows.push(row);
+      confirmedSalesByKey.set(key,rows);
+    });
     eventItemByKey.forEach(row=>{
-      const hasEventQuantity=Number(row.taken_qty||0)>0
-        || Number(row.normal_takeout_qty||0)>0
-        || Number(row.storage_takeout_qty||0)>0
-        || Number(row.event_storage_qty||0)>0;
-      if(!hasEventQuantity && !confirmedDepartureKeys.has(`${row.event_id}::${row.barcode}`))return;
-      const qty=Number(row.taken_qty||0)
-        -Number(row.sold_qty||0)
-        -Number(row.returned_qty||0)
-        -Number(row.event_storage_qty||0)
-        -Number(row.consumed_qty||0);
+      const key=`${row.event_id}::${row.barcode}`;
+      const movements=movementByKey.get(key)||[];
+      const confirmedSales=confirmedSalesByKey.get(key)||[];
+      const savedSoldQty=normalizeInventoryQuantity(row.sold_qty);
+      const importedSoldQty=confirmedSales.reduce((sum,sale)=>sum+normalizeInventoryQuantity(sale.quantity),0);
+      // booth_event_items.sold_qty is updated when a sale import is applied.
+      // Use confirmed imports only for older rows where that denormalized
+      // value has not been written yet, avoiding a double subtraction.
+      const salesQty=savedSoldQty>0 ? savedSoldQty : (importedSoldQty>0 ? importedSoldQty : 0);
+      const qty=getSmaregiEventShelfCurrentQty(row,movements,salesQty);
+      if(qty<=0)return;
       addSmaregiMapValue(smaregiCurrentEventStockByBarcode,row.barcode,qty);
-      addSmaregiMapValue(eventItemStorageStockByBarcode,row.barcode,row.event_storage_qty);
     });
   }
-
-  const storageRows=await sbAll(`event_storage_stocks?select=store_code,barcode,storage_qty,updated_at&barcode=in.(${barcodeFilter})`,1000,50000);
-  const storageRowByBarcode=new Map();
-  (Array.isArray(storageRows)?storageRows:[]).forEach(row=>{
-    const rowStore=normalizeSmaregiStoreCodeForStorage(row.store_code);
-    if(rowStore!==storeCode)return;
-    const barcode=String(row.barcode||"").trim();
-    if(!barcode)return;
-    const existing=storageRowByBarcode.get(barcode);
-    if(!existing||new Date(row.updated_at||0).getTime()>=new Date(existing.updated_at||0).getTime()){
-      storageRowByBarcode.set(barcode,row);
-    }
-  });
-  storageRowByBarcode.forEach((row,barcode)=>{
-    smaregiEventStorageStockByBarcode.set(barcode,normalizeInventoryQuantity(row.storage_qty));
-  });
-  eventItemStorageStockByBarcode.forEach((qty,barcode)=>{
-    if(!storageRowByBarcode.has(barcode)){
-      smaregiEventStorageStockByBarcode.set(barcode,normalizeInventoryQuantity(qty));
-    }
-  });
 }
 
 function getSmaregiDifference(item){
