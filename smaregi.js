@@ -106,6 +106,20 @@ function buildSmaregiInFilter(values){
     .join(",");
 }
 
+function normalizeSmaregiStoreCodeForStorage(value){
+  const text=String(value||"").trim();
+  if(!text)return "";
+  if(typeof getStoreCodeFromName==="function"){
+    const fromName=getStoreCodeFromName(text);
+    if(fromName)return fromName;
+  }
+  const lower=text.toLowerCase();
+  if(lower==="tokyo"||lower==="東京"||lower==="tokyo店")return "tokyo";
+  if(lower==="aichi"||lower==="愛知"||lower==="aichi店")return "aichi";
+  if(lower==="nagano"||lower==="長野"||lower==="nagano店")return "nagano";
+  return lower;
+}
+
 function addSmaregiMapValue(map,barcode,value){
   const key=String(barcode||"").trim();
   if(!key)return;
@@ -171,9 +185,11 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     });
   }
 
-  const storeCode=getSmaregiCurrentStoreCode();
-  const storageRows=await sbAll(`event_storage_stocks?select=store_code,barcode,storage_qty&store_code=eq.${encodeURIComponent(storeCode)}&barcode=in.(${barcodeFilter})`,1000,50000);
+  const storeCode=normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode());
+  const storageRows=await sbAll(`event_storage_stocks?select=store_code,barcode,storage_qty&barcode=in.(${barcodeFilter})`,1000,50000);
   (Array.isArray(storageRows)?storageRows:[]).forEach(row=>{
+    const rowStore=normalizeSmaregiStoreCodeForStorage(row.store_code);
+    if(rowStore!==storeCode)return;
     addSmaregiMapValue(smaregiEventStorageStockByBarcode,row.barcode,row.storage_qty);
   });
 }
@@ -202,7 +218,8 @@ function scrollToSmaregiDiffPanel(){
 
 function getSmaregiAppStock(barcode){
   const product=gp(barcode);
-  return product ? Number(product.base_stock||0) : "";
+  if(!product)return "";
+  return Number(product.base_stock||0)+getSmaregiCurrentEventStock(barcode)+getSmaregiEventStorageStock(barcode);
 }
 
 function getSmaregiCheckerName(){
