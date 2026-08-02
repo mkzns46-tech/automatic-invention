@@ -166,9 +166,11 @@ async function saveSmaregiDifferenceReason(barcode,button=null){
 
 function getSmaregiReasonSummaryRows(historical,range=getSmaregiDifferenceDateRange("smaregiReasonFromDate","smaregiReasonToDate")){
   const grouped=new Map();
-  historical.forEach(({check,difference,calculation})=>{
-    if(!isInSmaregiDifferenceDateRange(check.checked_at,range))return;
-    if(isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check)||calculation?.isNoIssue===true||difference===0||!Number.isFinite(difference))return;
+  const latestRows=typeof getSmaregiHistoricalRowsInRange==="function"
+    ? getSmaregiHistoricalRowsInRange(historical,range)
+    : (historical||[]).filter(({check})=>isInSmaregiDifferenceDateRange(check.checked_at,range));
+  latestRows.forEach(({check,difference,calculation,snapshotValues})=>{
+    if(isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check)||snapshotValues?.isAutoNoIssue||calculation?.isNoIssue===true||difference===0||!Number.isFinite(difference))return;
     const category=String(check.difference_reason_category||"未分類");
     const current=grouped.get(category)||{category,count:0,differenceTotal:0};
     current.count+=1;
@@ -180,37 +182,37 @@ function getSmaregiReasonSummaryRows(historical,range=getSmaregiDifferenceDateRa
 
 function getSmaregiDifferenceRankingRows(historical,range=getSmaregiDifferenceDateRange("smaregiRankingFromDate","smaregiRankingToDate")){
   const grouped=new Map();
-  historical.forEach(({check,item,difference,calculation})=>{
-    if(!isInSmaregiDifferenceDateRange(check.checked_at,range))return;
-    if(isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check)||calculation?.isNoIssue===true||difference===0||!Number.isFinite(difference))return;
+  const latestRows=typeof getSmaregiHistoricalRowsInRange==="function"
+    ? getSmaregiHistoricalRowsInRange(historical,range)
+    : (historical||[]).filter(({check})=>isInSmaregiDifferenceDateRange(check.checked_at,range));
+  latestRows.forEach(({check,item,difference,calculation,snapshotValues,checkCount,groupKey})=>{
+    if(isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check)||snapshotValues?.isAutoNoIssue||calculation?.isNoIssue===true||difference===0||!Number.isFinite(difference))return;
     const barcode=String(check.barcode||item.barcode||"");
     if(!barcode)return;
-    const current=grouped.get(barcode)||{
+    const key=groupKey||`${snapshotValues?.storeKey||"unknown"}::${barcode}`;
+    const current=grouped.get(key)||{
       barcode,
       productName:String(item.product_name||item.productName||gp(barcode)?.name||""),
-      differenceCount:0,
-      differenceTotal:0,
-      reasonCounts:new Map()
+      checkCount:Number(checkCount||1),
+      latestDifference:difference,
+      reason:String(check.difference_reason_category||"未分類")
     };
-    const category=String(check.difference_reason_category||"未分類");
-    current.differenceCount+=1;
-    current.differenceTotal+=Math.abs(difference);
-    current.reasonCounts.set(category,(current.reasonCounts.get(category)||0)+1);
-    grouped.set(barcode,current);
+    grouped.set(key,current);
   });
-  return [...grouped.values()].map(row=>{
-    const mainReason=[...row.reasonCounts.entries()]
-      .sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"ja"))[0]?.[0]||"未分類";
-    return {...row,mainReason};
-  }).sort((a,b)=>b.differenceCount-a.differenceCount||b.differenceTotal-a.differenceTotal||a.productName.localeCompare(b.productName,"ja"));
+  return [...grouped.values()]
+    .map(row=>({...row,mainReason:row.reason}))
+    .sort((a,b)=>Math.abs(b.latestDifference)-Math.abs(a.latestDifference)||a.productName.localeCompare(b.productName,"ja"));
 }
 
 function renderSmaregiDifferenceRanking(rows){
   const body=el("smaregiDifferenceRankingBody");
   const message=el("smaregiDifferenceRankingMessage");
   if(!body)return;
+  const headers=document.querySelectorAll("#smaregiDifferenceRankingPanel thead th");
+  if(headers[3])headers[3].textContent="チェック回数";
+  if(headers[4])headers[4].textContent="最新差異";
   body.innerHTML=rows.length
-    ? rows.map((row,index)=>`<tr><td><strong>${index+1}位</strong></td><td>${esc(row.barcode)}</td><td>${esc(row.productName)}</td><td>${row.differenceCount}件</td><td>${row.differenceTotal}</td><td>${esc(row.mainReason)}</td></tr>`).join("")
+    ? rows.map((row,index)=>`<tr><td><strong>${index+1}位</strong></td><td>${esc(row.barcode)}</td><td>${esc(row.productName)}</td><td>${row.checkCount}回</td><td>${row.latestDifference}</td><td>${esc(row.mainReason)}</td></tr>`).join("")
     : '<tr><td colspan="6" class="smaregi-empty">指定期間内の差異商品はありません。</td></tr>';
   if(message)message.textContent=`差異商品：${rows.length}件`;
 }
@@ -249,9 +251,12 @@ function getPreviousRange(range){
 }
 
 function calculateSmaregiAccuracy(historical,range){
-  const rows=historical.filter(({check,calculation})=>isInSmaregiDifferenceDateRange(check.checked_at,range)&&!isSmaregiExcludedCheck(check)&&calculation&&Number.isFinite(Number(calculation.difference)));
+  const latestRows=typeof getSmaregiHistoricalRowsInRange==="function"
+    ? getSmaregiHistoricalRowsInRange(historical,range)
+    : (historical||[]).filter(({check})=>isInSmaregiDifferenceDateRange(check.checked_at,range));
+  const rows=latestRows.filter(({check,calculation})=>!isSmaregiExcludedCheck(check)&&calculation&&Number.isFinite(Number(calculation.difference)));
   const checkedCount=rows.length;
-  const differenceCount=rows.filter(({check,calculation})=>!isSmaregiNoIssueCheck(check)&&calculation.isNoIssue!==true&&Number(calculation.difference)!==0).length;
+  const differenceCount=rows.filter(({check,calculation,snapshotValues})=>!isSmaregiNoIssueCheck(check)&&snapshotValues?.isAutoNoIssue!==true&&calculation.isNoIssue!==true&&Number(calculation.difference)!==0).length;
   const differenceRate=checkedCount?differenceCount/checkedCount*100:0;
   const accuracy=checkedCount?(checkedCount-differenceCount)/checkedCount*100:0;
   return {checkedCount,differenceCount,differenceRate,accuracy};
