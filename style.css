@@ -6454,6 +6454,25 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   color:#0b5d3b;
   font-size:1.65rem;
 }
+.shelf-location-direct-code{
+  display:grid;
+  gap:4px;
+}
+.shelf-location-direct-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+}
+.shelf-location-direct-code input{
+  font-weight:900;
+  text-transform:uppercase;
+}
+.shelf-location-direct-code small{
+  color:#4b6657;
+  font-size:.78rem;
+  font-weight:800;
+  line-height:1.35;
+}
 .shelf-location-summary{
   display:grid;
   grid-template-columns:minmax(220px,1.3fr) repeat(4,minmax(150px,1fr));
@@ -6898,7 +6917,7 @@ body[data-inventory-screen="shelf-location"] .shelf-location-summary .shelf-summ
   line-height:1;
 }
 body[data-inventory-screen="shelf-location"] .shelf-location-condition-grid{
-  grid-template-columns:minmax(220px,1.1fr) minmax(86px,.35fr) minmax(86px,.35fr) minmax(140px,.55fr);
+  grid-template-columns:minmax(210px,1.05fr) minmax(80px,.32fr) minmax(80px,.32fr) minmax(190px,.8fr) minmax(130px,.55fr);
   gap:8px;
 }
 body[data-inventory-screen="shelf-location"] .shelf-location-block:nth-of-type(1) > .button-row{

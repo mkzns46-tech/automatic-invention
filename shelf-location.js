@@ -134,6 +134,10 @@
     const col=Number($("shelfLocationColumn")?.value||localStorage.getItem(STORAGE.column)||1);
     return `${shelf}-${Math.max(1,Math.min(30,Number.isFinite(col)?col:1))}`;
   }
+  function syncDirectShelfInput(){
+    const input=$("shelfLocationDirectCode");
+    if(input && document.activeElement!==input)input.value=shelfCode();
+  }
   function setColumn(value){
     const next=Math.max(1,Math.min(30,Number(value)||1));
     const select=$("shelfLocationColumn");
@@ -147,6 +151,7 @@
     if(current)current.textContent=code;
     const target=$("shelfLocationProductTarget");
     if(target)target.textContent=code;
+    syncDirectShelfInput();
     renderSummary();
     return code;
   }
@@ -512,6 +517,7 @@
     if(!staff){showShelfMessage("担当者を選択してください","err"); return;}
     const product=state.product;
     if(!product){showShelfMessage("商品を選択してください","err"); return;}
+    if(!applyDirectShelfCodeInput({showError:true,showSuccess:false}))return;
     const code=shelfCode();
     await loadProductLocations(product);
     if(state.locations.some(loc=>loc.shelf_code===code && !loc.deleted_at)){
@@ -691,9 +697,60 @@
     if(state.product)await selectProduct(state.product);
   }
   function normalizeShelfCode(value){
-    const text=String(value||"").normalize("NFKC").toUpperCase().replace(/\s+/g,"").replace(/[ー－―]/g,"-");
-    const m=text.match(/^([1-9]|1[0-5]|[A-Z])-([1-9]|[12][0-9]|30)$/);
+    const text=String(value||"").normalize("NFKC").toUpperCase().trim().replace(/[ー－―−ｰ―–—]/g,"-");
+    const m=text.match(/^([1-9]|1[0-5]|[A-Z])[\s\-_/／]+([1-9]|[12][0-9]|30)$/);
     return m ? `${m[1]}-${Number(m[2])}` : "";
+  }
+  function applyDirectShelfCodeInput({showError=true,showSuccess=true}={}){
+    const input=$("shelfLocationDirectCode");
+    const raw=String(input?.value||"").trim();
+    if(!raw)return true;
+    const normalized=normalizeShelfCode(raw);
+    if(!normalized){
+      if(showError)showShelfMessage("棚番は「3-1」「A-12」の形式で入力してください。棚は1〜15またはA〜Z、列は1〜30です。","err");
+      input?.focus();
+      return false;
+    }
+    const [shelf,column]=normalized.split("-");
+    const shelfSelect=$("shelfLocationShelf");
+    const columnSelect=$("shelfLocationColumn");
+    if(shelfSelect)shelfSelect.value=shelf;
+    if(columnSelect)columnSelect.value=String(Number(column));
+    localStorage.setItem(STORAGE.shelf,shelf);
+    localStorage.setItem(STORAGE.column,String(Number(column)));
+    if(input)input.value=normalized;
+    renderCurrentShelfCode();
+    renderProductInfo();
+    if(showSuccess)showShelfMessage(`登録先を${normalized}に設定しました`,"ok");
+    return true;
+  }
+  function ensureDirectShelfCodeInput(){
+    if($("shelfLocationDirectCode"))return;
+    const grid=document.querySelector(".shelf-location-condition-grid");
+    const current=document.querySelector(".shelf-location-current");
+    if(!grid)return;
+    const wrap=document.createElement("div");
+    wrap.className="shelf-location-direct-code";
+    wrap.innerHTML=`
+      <label>棚番直接入力
+        <span class="shelf-location-direct-row">
+          <input id="shelfLocationDirectCode" inputmode="text" autocomplete="off" placeholder="例：3-1 / A-12">
+          <button type="button" id="shelfLocationDirectApplyBtn" class="secondary">反映</button>
+        </span>
+      </label>
+      <small>保存値は正規化済みの「棚-列」に統一します。</small>`;
+    if(current)grid.insertBefore(wrap,current);
+    else grid.appendChild(wrap);
+    $("shelfLocationDirectCode")?.addEventListener("keydown",event=>{
+      if(event.key==="Enter"){
+        event.preventDefault();
+        applyDirectShelfCodeInput();
+        $("shelfLocationBarcode")?.focus();
+      }
+    });
+    $("shelfLocationDirectCode")?.addEventListener("change",()=>applyDirectShelfCodeInput());
+    $("shelfLocationDirectApplyBtn")?.addEventListener("click",()=>applyDirectShelfCodeInput());
+    syncDirectShelfInput();
   }
   async function loadShelfLocationLogs(){
     const params=["select=*","order=created_at.desc","limit=500"];
@@ -843,6 +900,7 @@
     if(message)showShelfMessage("カメラを停止しました。","ok");
   }
   function bindShelfLocationEvents(){
+    ensureDirectShelfCodeInput();
     ensureShelfPriorityPanel();
     renderStaffSelect();
     renderShelfOptions();
@@ -865,6 +923,7 @@
     loadShelfPriorityProducts();
   }
   function renderShelfLocation(){
+    ensureDirectShelfCodeInput();
     ensureShelfPriorityPanel();
     renderStaffSelect();
     renderShelfOptions();
