@@ -768,7 +768,7 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
 }
 .booth-return-scan-controls{
   display:grid;
-  grid-template-columns:auto auto minmax(220px,1fr) auto;
+  grid-template-columns:auto auto minmax(220px,1fr);
   align-items:end;
   gap:10px;
   margin:14px 0 8px;
@@ -785,6 +785,60 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   grid-template-columns:minmax(180px,.6fr) minmax(220px,1.4fr);
   gap:10px;
   margin:10px 0;
+}
+.booth-return-product-search{
+  position:relative;
+  margin:10px 0 14px;
+}
+.booth-return-product-search-label{
+  display:grid;
+  gap:5px;
+  font-weight:700;
+}
+.booth-return-product-search-label input{
+  width:100%;
+  min-height:42px;
+}
+.booth-return-product-search-results{
+  display:grid;
+  gap:0;
+  max-height:260px;
+  overflow-y:auto;
+  margin-top:8px;
+  border:1px solid #cfe6d7;
+  border-radius:8px;
+  background:#fff;
+}
+.booth-return-product-search-results[hidden]{display:none}
+.booth-return-search-result{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:12px;
+  align-items:center;
+  width:100%;
+  padding:11px 12px;
+  border:0;
+  border-bottom:1px solid #e5f2ea;
+  border-radius:0;
+  background:#fff;
+  color:#123c2b;
+  text-align:left;
+  cursor:pointer;
+}
+.booth-return-search-result:last-child{border-bottom:0}
+.booth-return-search-result:hover{background:#edf8f1}
+.booth-return-search-copy{min-width:0}
+.booth-return-search-copy strong,
+.booth-return-search-copy small{display:block;overflow-wrap:anywhere}
+.booth-return-search-copy small{
+  margin-top:3px;
+  color:#587267;
+  font-size:.86em;
+}
+.booth-return-search-action{
+  color:#126b4d;
+  font-weight:800;
+  white-space:nowrap;
 }
 .booth-return-draft-list{
   display:grid;
@@ -851,6 +905,10 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   .booth-return-scan-controls > button,
   .booth-return-apply-btn{
     width:100%;
+  }
+  .booth-return-search-result{
+    grid-template-columns:1fr;
+    gap:4px;
   }
   .booth-return-draft-controls{
     justify-content:stretch;

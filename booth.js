@@ -20,6 +20,7 @@ let boothReturnDraftEventId="";
 let boothReturnDraftDestination="";
 let boothReturnDraftDestinationEventId="";
 let boothReturnDraftItems=new Map();
+let boothReturnSearchRequestId=0;
 let boothGachaReturnDraftEventId="";
 let boothGachaReturnDraftItems=new Map();
 
@@ -4175,7 +4176,7 @@ function setBoothReturnDestination(destination){
     boothShowError("戻し先変更エラー","入力済みの商品があります。入力分を反映するか、カードを削除してから戻し先を変更してください。");
     return false;
   }
-  boothReturnDraftDestination=destination==="event"?"event":"shelf";
+  boothReturnDraftDestination=destination==="event"||destination==="keep"?"event":"shelf";
   boothReturnDraftDestinationEventId="";
   document.querySelectorAll("[data-booth-return-destination]").forEach(button=>{
     button.classList.toggle("is-selected",button.dataset.boothReturnDestination===boothReturnDraftDestination);
@@ -4538,7 +4539,12 @@ function renderBoothReturnPanel(event){
         <label class="booth-return-barcode-label">バーコード
           <input id="boothReturnBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力してEnter" ${closed?"disabled":""}>
         </label>
-        <button type="button" id="boothReturnScanBtn" class="secondary" ${closed?"disabled":""}>商品を追加</button>
+      </div>
+      <div class="booth-return-product-search">
+        <label class="booth-return-product-search-label">商品名検索
+          <input id="boothReturnProductSearch" autocomplete="off" placeholder="商品名で検索" ${closed?"disabled":""}>
+        </label>
+        <div id="boothReturnProductSearchResults" class="booth-return-product-search-results" hidden></div>
       </div>
       <div class="camera-area booth-camera-area">
         <video id="boothCarryOutVideo" muted playsinline></video>
@@ -4559,7 +4565,7 @@ function renderBoothReturnPanel(event){
   const barcodeInput=el("boothReturnBarcode");
   const add=()=>addBoothReturnDraftFromBarcode(barcodeInput?.value);
   barcodeInput?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();add();}});
-  el("boothReturnScanBtn")?.addEventListener("click",add);
+  bindBoothReturnProductSearch(event);
   document.querySelectorAll("[data-booth-return-destination]").forEach(button=>button.addEventListener("click",()=>setBoothReturnDestination(button.dataset.boothReturnDestination)));
   el("boothReturnDestinationEvent")?.addEventListener("change",()=>{boothReturnDraftDestinationEventId=String(el("boothReturnDestinationEvent")?.value||"");});
   el("boothReturnDraftList")?.addEventListener("click",event=>{
@@ -7875,7 +7881,12 @@ function renderBoothReturnPanel(event){
         <label class="booth-return-barcode-label">\u30d0\u30fc\u30b3\u30fc\u30c9
           <input id="boothReturnBarcode" autocomplete="off" inputmode="numeric" placeholder="\u30d0\u30fc\u30b3\u30fc\u30c9\u3092\u5165\u529b\u3057\u3066Enter" ${closed?"disabled":""}>
         </label>
-        <button type="button" id="boothReturnScanBtn" class="secondary" ${closed?"disabled":""}>\u5546\u54c1\u3092\u8ffd\u52a0</button>
+      </div>
+      <div class="booth-return-product-search">
+        <label class="booth-return-product-search-label">\u5546\u54c1\u540d\u691c\u7d22
+          <input id="boothReturnProductSearch" autocomplete="off" placeholder="\u5546\u54c1\u540d\u3067\u691c\u7d22" ${closed?"disabled":""}>
+        </label>
+        <div id="boothReturnProductSearchResults" class="booth-return-product-search-results" hidden></div>
       </div>
       <div class="camera-area booth-camera-area">
         <video id="boothCarryOutVideo" muted playsinline></video>
@@ -7896,7 +7907,7 @@ function renderBoothReturnPanel(event){
   const barcodeInput=el("boothReturnBarcode");
   const add=()=>addBoothReturnDraftFromBarcode(barcodeInput?.value);
   barcodeInput?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();add();}});
-  el("boothReturnScanBtn")?.addEventListener("click",add);
+  bindBoothReturnProductSearch(event);
   document.querySelectorAll("[data-booth-return-destination]").forEach(button=>button.addEventListener("click",()=>setBoothReturnDestination(button.dataset.boothReturnDestination)));
   el("boothReturnDraftList")?.addEventListener("click",event=>{
     const button=event.target.closest("[data-booth-return-action]");
@@ -7942,6 +7953,82 @@ function updateBoothReturnDraftQuantityWhileTyping(input){
   if(!entry||!/^[0-9]+$/.test(text))return;
   const quantity=Number(text);
   if(quantity<=entry.currentQty)entry.quantity=quantity;
+}
+
+async function loadBoothReturnProductSearch(event,rawQuery){
+  const results=el("boothReturnProductSearchResults");
+  const query=String(rawQuery||"").trim().toLowerCase();
+  if(!results)return;
+  if(!query){
+    results.hidden=true;
+    results.innerHTML="";
+    return;
+  }
+  const requestId=++boothReturnSearchRequestId;
+  results.hidden=false;
+  results.innerHTML='<div class="booth-empty">\u691c\u7d22\u4e2d...</div>';
+  try{
+    const [items,storageRows]=await Promise.all([
+      sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty&event_id=eq.${encodeURIComponent(event.id)}&item_type=eq.normal&order=product_name.asc&limit=3000`),
+      sb(`event_storage_stocks?select=barcode,product_name,storage_qty&store_code=eq.${encodeURIComponent(getBoothCurrentStoreCode())}&storage_qty=gt.0&limit=3000`).catch(()=>[])
+    ]);
+    if(requestId!==boothReturnSearchRequestId)return;
+    const storageByBarcode=new Map((Array.isArray(storageRows)?storageRows:[]).map(row=>[String(row.barcode||""),row]));
+    const seen=new Set();
+    const matches=(Array.isArray(items)?items:[]).filter(item=>{
+      const barcode=String(item?.barcode||"");
+      if(!barcode||seen.has(barcode))return false;
+      const storage=storageByBarcode.get(barcode)||null;
+      const availability=getBoothReturnAvailability(item,storage);
+      if(availability.quantity<=0)return false;
+      const name=String(item?.product_name||storage?.product_name||"");
+      if(!`${name} ${barcode}`.toLowerCase().includes(query))return false;
+      seen.add(barcode);
+      return true;
+    }).slice(0,30);
+    if(!matches.length){
+      results.innerHTML='<div class="booth-empty">\u8a72\u5f53\u3059\u308b\u623b\u308a\u5bfe\u8c61\u5546\u54c1\u304c\u3042\u308a\u307e\u305b\u3093\u3002</div>';
+      return;
+    }
+    results.innerHTML=matches.map(item=>{
+      const barcode=String(item.barcode||"");
+      const storage=storageByBarcode.get(barcode)||null;
+      const availability=getBoothReturnAvailability(item,storage);
+      return `<button type="button" class="booth-return-search-result" data-booth-return-search-barcode="${esc(barcode)}">
+        <span class="booth-return-search-copy"><strong>${esc(item.product_name||storage?.product_name||barcode)}</strong><small>\u30d0\u30fc\u30b3\u30fc\u30c9: ${esc(barcode)} / \u623b\u308a\u53ef\u80fd: ${esc(availability.quantity)}</small></span>
+        <span class="booth-return-search-action">\u9078\u629e</span>
+      </button>`;
+    }).join("");
+  }catch(error){
+    if(requestId!==boothReturnSearchRequestId)return;
+    results.innerHTML=`<div class="booth-error-message">${esc(error?.message||"\u5546\u54c1\u691c\u7d22\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002")}</div>`;
+  }
+}
+
+function bindBoothReturnProductSearch(event){
+  const input=el("boothReturnProductSearch");
+  const results=el("boothReturnProductSearchResults");
+  if(!input||!results)return;
+  let timer=null;
+  input.addEventListener("input",()=>{
+    clearTimeout(timer);
+    timer=setTimeout(()=>loadBoothReturnProductSearch(event,input.value),180);
+  });
+  input.addEventListener("keydown",inputEvent=>{
+    if(inputEvent.key==="Escape"){
+      input.value="";
+      results.hidden=true;
+      results.innerHTML="";
+    }
+  });
+  results.addEventListener("click",inputEvent=>{
+    const button=inputEvent.target.closest("[data-booth-return-search-barcode]");
+    if(!button)return;
+    input.value="";
+    results.hidden=true;
+    results.innerHTML="";
+    void addBoothReturnDraftFromBarcode(button.dataset.boothReturnSearchBarcode||"");
+  });
 }
 
 async function addBoothReturnDraftFromBarcode(rawBarcode){
@@ -8623,7 +8710,10 @@ function renderBoothCloseReturnControls(event){
       '<button type="button" id="boothReturnStartCameraBtn">カメラ読取</button>'+
       '<button type="button" id="boothReturnStopCameraBtn" class="secondary">停止</button>'+
       '<label class="booth-return-barcode-label">バーコード<input id="boothReturnBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力"></label>'+
-      '<button type="button" id="boothReturnScanBtn" class="secondary">商品を追加</button>'+
+    '</div>'+
+    '<div class="booth-return-product-search">'+
+      '<label class="booth-return-product-search-label">商品名検索<input id="boothReturnProductSearch" autocomplete="off" placeholder="商品名で検索"></label>'+
+      '<div id="boothReturnProductSearchResults" class="booth-return-product-search-results" hidden></div>'+
     '</div>'+
     '<div class="booth-return-form-grid">'+
       '<label>担当者<span class="required">必須</span><select id="boothReturnStaff">'+staffOptions+'</select></label>'+
@@ -8677,7 +8767,7 @@ function renderBoothCloseConfirmPanel(event,summary){
   const barcodeInput=el("boothReturnBarcode");
   const add=()=>addBoothReturnDraftFromBarcode(barcodeInput?.value);
   barcodeInput?.addEventListener("keydown",inputEvent=>{if(inputEvent.key==="Enter"){inputEvent.preventDefault();add();}});
-  el("boothReturnScanBtn")?.addEventListener("click",add);
+  bindBoothReturnProductSearch(event);
   document.querySelectorAll("[data-booth-return-destination]").forEach(button=>button.addEventListener("click",()=>setBoothReturnDestination(button.dataset.boothReturnDestination)));
   el("boothReturnDraftList")?.addEventListener("click",inputEvent=>{
     const button=inputEvent.target.closest("[data-booth-return-action]");
