@@ -1388,7 +1388,7 @@ async function buildBoothEventReportData(eventId){
   const rows=Array.isArray(items)?items:[];
   const normal=rows.filter(row=>String(row.item_type||"normal")==="normal");
   const gacha=rows.filter(row=>String(row.item_type||"")==="gacha_prize");
-  const salesRows=Array.isArray(imports)?imports:[];
+  const salesRows=dedupeBoothSalesRows(imports);
   const normalSales=salesRows.filter(row=>!isBoothGachaSaleRow(row));
   const gachaSales=salesRows.filter(isBoothGachaSaleRow);
   return {
@@ -6028,9 +6028,9 @@ async function buildBoothDiffUniverseRows(eventId){
   ]);
   const eventStoreCode=String((Array.isArray(eventRows)&&eventRows[0]?.store_code)||getBoothCurrentStoreCode?.()||"").toLowerCase();
   const map=new Map();
-  const itemRows=Array.isArray(items)?items:[];
-  const salesRows=Array.isArray(sales)?sales:[];
-  const movementRows=Array.isArray(movements)?movements:[];
+  const itemRows=(Array.isArray(items)?items:[]).filter(row=>String(row.item_type||"normal")==="normal");
+  const salesRows=dedupeBoothSalesRows(sales).filter(row=>!isBoothGachaSaleRow(row));
+  const movementRows=(Array.isArray(movements)?movements:[]).filter(row=>String(row.item_type||"normal")!=="gacha_prize");
   const productIds=[...new Set(salesRows.map(row=>String(row.smaregi_product_id||"").trim()).filter(Boolean))];
   const saleProducts=await fetchBoothProductsBySmaregiProductIds(productIds).catch(()=>[]);
   const productBySmaregiId=new Map((saleProducts||[]).map(product=>[String(product.smaregi_product_id||""),product]));
@@ -6829,6 +6829,23 @@ async function updateBoothStorageHistorySplit(itemId){
 
 function getBoothSalesImportKey(row){
   return `${String(row?.smaregi_transaction_id||"").trim()}::${String(row?.smaregi_detail_id||"").trim()}`;
+}
+
+function getBoothSalesRowTimestamp(row){
+  return Date.parse(String(row?.updated_at||row?.imported_at||row?.sold_at||""))||0;
+}
+
+function dedupeBoothSalesRows(rows){
+  const map=new Map();
+  (Array.isArray(rows)?rows:[]).forEach(row=>{
+    const status=String(row?.import_status||"").trim().toLowerCase();
+    if(status&&!["pending","confirmed"].includes(status))return;
+    const key=getBoothSalesImportKey(row);
+    if(key==="::")return;
+    const current=map.get(key);
+    if(!current||getBoothSalesRowTimestamp(row)>=getBoothSalesRowTimestamp(current))map.set(key,row);
+  });
+  return [...map.values()].sort((a,b)=>String(a?.sold_at||"").localeCompare(String(b?.sold_at||"")));
 }
 
 function normalizeBoothSalesIdentity(value){
@@ -8059,7 +8076,7 @@ function isBoothGachaSaleRow(row){
 function aggregateBoothSalesByProduct(rows){
   const map=new Map();
   (Array.isArray(rows)?rows:[]).forEach(row=>{
-    const key=String(row.smaregi_product_id||row.barcode||row.product_name||"").trim();
+    const key=String(row.barcode||row.smaregi_product_id||row.product_name||"").trim();
     if(!key)return;
     const current=map.get(key)||{
       product_name:row.product_name||"",
@@ -8099,7 +8116,7 @@ buildBoothEventReportData=async function(eventId){
   ]);
   const rows=Array.isArray(items)?items:[];
   const gacha=rows.filter(row=>String(row.item_type||"")==="gacha_prize");
-  const salesRows=Array.isArray(imports)?imports:[];
+  const salesRows=dedupeBoothSalesRows(imports);
   const isGachaSale=row=>isBoothGachaSaleRow(row);
   const normalSales=salesRows.filter(row=>!isGachaSale(row));
   const gachaSales=salesRows.filter(isGachaSale);
