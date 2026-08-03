@@ -1368,6 +1368,205 @@ function getSmaregiHistoricalNumericValue(objects,keys){
   return null;
 }
 
+function getSmaregiHistoricalCheckKey(check){
+  const id=String(check?.id||"").trim();
+  if(id)return id;
+  return [check?.snapshot_id,check?.barcode,check?.checked_at].map(value=>String(value||"")).join("::");
+}
+
+function getSmaregiHistoricalEventTime(row,field="created_at"){
+  const time=new Date(row?.[field]||"").getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+function getSmaregiHistoricalMovementType(row){
+  return String(row?.movement_type||"").trim().toLowerCase();
+}
+
+function getSmaregiHistoricalMovementItemType(row){
+  return String(row?.item_type||"normal").trim().toLowerCase();
+}
+
+function getSmaregiHistoricalMovementSource(row){
+  return String(row?.takeout_source||"").trim().toLowerCase();
+}
+
+function getSmaregiHistoricalMovementQty(row){
+  return Math.max(0,normalizeInventoryQuantity(row?.quantity));
+}
+
+function sumSmaregiHistoricalRows(rows,predicate){
+  const seenIds=new Set();
+  return (Array.isArray(rows)?rows:[]).reduce((sum,row)=>{
+    const id=String(row?.id||"").trim();
+    if(id&&seenIds.has(id))return sum;
+    if(id)seenIds.add(id);
+    return predicate(row) ? sum+getSmaregiHistoricalMovementQty(row) : sum;
+  },0);
+}
+
+function calculateSmaregiHistoricalEventShelfQty({normalItems=[],movements=[],sales=[]}={},checkedAt){
+  const checkedTime=new Date(checkedAt||"").getTime();
+  if(!Number.isFinite(checkedTime))return {eventShelfStock:null,isReliable:false,reason:"invalid_check_time"};
+
+  const itemByKey=new Map();
+  (Array.isArray(normalItems)?normalItems:[]).forEach(row=>{
+    if(String(row?.item_type||"normal").trim().toLowerCase()!=="normal")return;
+    const key=`${row?.event_id||""}::${row?.barcode||""}`;
+    if(key.endsWith("::"))return;
+    const previous=itemByKey.get(key);
+    const previousTime=getSmaregiHistoricalEventTime(previous,"updated_at")??-1;
+    const currentTime=getSmaregiHistoricalEventTime(row,"updated_at")??-1;
+    if(!previous||currentTime>=previousTime)itemByKey.set(key,row);
+  });
+
+  const movementByKey=new Map();
+  (Array.isArray(movements)?movements:[]).forEach(row=>{
+    const type=getSmaregiHistoricalMovementType(row);
+    const itemType=getSmaregiHistoricalMovementItemType(row);
+    const isNormal= itemType==="normal"
+      && ["event_pick","take_out","departure_count","return","event_close_return"].includes(type);
+    const isEventGacha=type==="gacha_pick"
+      && itemType==="gacha_prize"
+      && ["event_shelf","event_storage","storage"].includes(getSmaregiHistoricalMovementSource(row));
+    if(!isNormal&&!isEventGacha)return;
+    const key=`${row?.event_id||""}::${row?.barcode||""}`;
+    if(key.endsWith("::"))return;
+    const rows=movementByKey.get(key)||[];
+    rows.push(row);
+    movementByKey.set(key,rows);
+  });
+
+  const salesByKey=new Map();
+  (Array.isArray(sales)?sales:[]).forEach(row=>{
+    if(String(row?.import_status||"").trim().toLowerCase()!=="confirmed")return;
+    const key=`${row?.event_id||""}::${row?.barcode||""}`;
+    if(key.endsWith("::"))return;
+    const rows=salesByKey.get(key)||[];
+    rows.push(row);
+    salesByKey.set(key,rows);
+  });
+
+  let eventShelfStock=0;
+  let isReliable=true;
+  const keys=new Set([...itemByKey.keys()]);
+  movementByKey.forEach((rows,key)=>{
+    if(itemByKey.has(key))keys.add(key);
+    else if(rows.some(row=>getSmaregiHistoricalMovementItemType(row)==="normal"))isReliable=false;
+  });
+  salesByKey.forEach((rows,key)=>{
+    if(itemByKey.has(key))keys.add(key);
+    else if(rows.some(row=>Number(row?.quantity||0)!==0))isReliable=false;
+  });
+
+  keys.forEach(key=>{
+    const item=itemByKey.get(key)||{};
+    const rows=movementByKey.get(key)||[];
+    const beforeRows=[];
+    rows.forEach(row=>{
+      const type=getSmaregiHistoricalMovementType(row);
+      const time=getSmaregiHistoricalEventTime(row);
+      if(time===null){
+        isReliable=false;
+        return;
+      }
+      if(time<=checkedTime)beforeRows.push(row);
+    });
+
+    const normalRows=beforeRows.filter(row=>getSmaregiHistoricalMovementItemType(row)==="normal");
+    const eventPickRows=normalRows.filter(row=>["event_pick","take_out"].includes(getSmaregiHistoricalMovementType(row)));
+    const departureRows=normalRows.filter(row=>getSmaregiHistoricalMovementType(row)==="departure_count");
+    const picked=eventPickRows.length
+      ? sumSmaregiHistoricalRows(eventPickRows,()=>true)
+      : sumSmaregiHistoricalRows(departureRows,()=>true);
+    const normalReturnQty=sumSmaregiHistoricalRows(normalRows,row=>[
+      "return","event_close_return"
+    ].includes(getSmaregiHistoricalMovementType(row)));
+    const gachaPickQty=sumSmaregiHistoricalRows(beforeRows,row=>{
+      return getSmaregiHistoricalMovementType(row)==="gacha_pick"
+        && getSmaregiHistoricalMovementItemType(row)==="gacha_prize"
+        && ["event_shelf","event_storage","storage"].includes(getSmaregiHistoricalMovementSource(row));
+    });
+
+    const itemTaken=normalizeInventoryQuantity(item?.taken_qty);
+    if(itemTaken>0&&!eventPickRows.length&&!departureRows.length)isReliable=false;
+    const itemUpdatedTime=getSmaregiHistoricalEventTime(item,"updated_at");
+    if(itemTaken>0&&itemUpdatedTime===null)isReliable=false;
+
+    let soldQty=0;
+    (salesByKey.get(key)||[]).forEach(sale=>{
+      const soldTime=getSmaregiHistoricalEventTime(sale,"sold_at");
+      if(soldTime===null){
+        isReliable=false;
+        return;
+      }
+      if(soldTime<=checkedTime) soldQty+=Number(sale?.quantity||0);
+    });
+
+    eventShelfStock+=Math.max(0,picked-soldQty-normalReturnQty-gachaPickQty);
+  });
+
+  return {
+    eventShelfStock:isReliable?Math.max(0,eventShelfStock):null,
+    isReliable,
+    reason:isReliable?"event_history":"incomplete_event_history"
+  };
+}
+
+window.calculateSmaregiHistoricalEventShelfQty=calculateSmaregiHistoricalEventShelfQty;
+
+async function loadSmaregiHistoricalEventShelfReconstruction(checks,itemMap,storeCode){
+  const targets=(checks||[]).filter(check=>{
+    const item=itemMap.get(`${check.snapshot_id}::${check.barcode}`)||{};
+    const hasSnapshot=[
+      check.app_stock_at_check,
+      check.event_shelf_stock_at_check,
+      check.comparison_stock_at_check,
+      check.smaregi_stock_at_check,
+      check.difference_at_check
+    ].every(value=>value!==null&&value!==undefined&&String(value).trim()!=="")
+      && (check.snapshot_version===null||check.snapshot_version===undefined||Number(check.snapshot_version)>=2);
+    const appStock=getSmaregiHistoricalNumericValue([check],["actual_stock","app_stock_at_check"]);
+    const smaregiStock=getSmaregiHistoricalNumericValue([check,item],["smaregi_stock_at_check","smaregi_stock","stock_amount","stock_quantity"]);
+    return !hasSnapshot&&appStock!==null&&smaregiStock!==null&&String(check.barcode||"").trim()!=="";
+  });
+  const result=new Map();
+  if(!targets.length)return result;
+  const barcodes=[...new Set(targets.map(check=>String(check.barcode||"").trim()).filter(Boolean))];
+  const barcodeFilter=buildSmaregiInFilter(barcodes);
+  if(!barcodeFilter)return result;
+
+  try{
+    const events=await sbAll(`booth_events?select=id,status,store_code&store_code=eq.${encodeURIComponent(storeCode)}`,1000,50000);
+    const validEventIds=(Array.isArray(events)?events:[])
+      .filter(event=>!new Set(["cancelled","canceled","invalid","deleted"]).has(String(event?.status||"").trim().toLowerCase()))
+      .map(event=>String(event?.id||"").trim()).filter(Boolean);
+    if(!validEventIds.length){
+      targets.forEach(check=>result.set(getSmaregiHistoricalCheckKey(check),{
+        eventShelfStock:0,isReliable:true,reason:"no_valid_events"
+      }));
+      return result;
+    }
+    const eventFilter=buildSmaregiInFilter(validEventIds);
+    const [eventItems,movementRows,salesRows]=await Promise.all([
+      sbAll(`booth_event_items?select=id,event_id,barcode,item_type,taken_qty,updated_at&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&item_type=eq.normal`,1000,50000),
+      sbAll(`booth_stock_movements?select=id,event_id,barcode,movement_type,item_type,quantity,takeout_source,created_at&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&movement_type=in.(departure_count,take_out,event_pick,return,event_close_return,gacha_pick,gacha_return)`,1000,50000),
+      sbAll(`event_sales_imports?select=id,event_id,barcode,quantity,import_status,sold_at,created_at&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&import_status=eq.confirmed`,1000,50000)
+    ]);
+    targets.forEach(check=>{
+      const barcode=String(check.barcode||"").trim();
+      const normalItems=(Array.isArray(eventItems)?eventItems:[]).filter(row=>String(row?.barcode||"").trim()===barcode);
+      const movements=(Array.isArray(movementRows)?movementRows:[]).filter(row=>String(row?.barcode||"").trim()===barcode);
+      const sales=(Array.isArray(salesRows)?salesRows:[]).filter(row=>String(row?.barcode||"").trim()===barcode);
+      const calculation=calculateSmaregiHistoricalEventShelfQty({normalItems,movements,sales},check.checked_at);
+      result.set(getSmaregiHistoricalCheckKey(check),calculation);
+    });
+  }catch(error){
+    console.warn("[Smaregi historical event reconstruction skipped]",error);
+  }
+  return result;
+}
+
 function getSmaregiHistoricalStoreKey(check,item,snapshot){
   const snapshotNote=String(snapshot?.note||"");
   const snapshotStoreId=snapshotNote.match(/store_id:([^/\s]+)/)?.[1];
@@ -1380,12 +1579,13 @@ function getSmaregiHistoricalStoreKey(check,item,snapshot){
   return storeId ? normalizeSmaregiStoreCodeForStorage(storeId) : `snapshot:${String(check?.snapshot_id||"unknown")}`;
 }
 
-function getSmaregiHistoricalSnapshotValues(check,item,snapshot){
+function getSmaregiHistoricalSnapshotValues(check,item,snapshot,reconstructed=null){
   const appStock=getSmaregiHistoricalNumericValue([check],["app_stock_at_check"])
     ?? getSmaregiHistoricalNumericValue([check],["actual_stock"]);
   const eventShelfStock=getSmaregiHistoricalNumericValue([check],["event_shelf_stock_at_check"]);
   const comparisonStock=getSmaregiHistoricalNumericValue([check],["comparison_stock_at_check"]);
-  const smaregiStock=getSmaregiHistoricalNumericValue([check],["smaregi_stock_at_check"]);
+  const smaregiStock=getSmaregiHistoricalNumericValue([check],["smaregi_stock_at_check"])
+    ?? getSmaregiHistoricalNumericValue([item],["smaregi_stock","stock_amount","stock_quantity"]);
   const savedDifference=getSmaregiHistoricalNumericValue([check],["difference"]);
   const snapshotDifference=getSmaregiHistoricalNumericValue([check],["difference_at_check"]);
   const snapshotVersion=getSmaregiHistoricalNumericValue([check],["snapshot_version"]);
@@ -1401,6 +1601,27 @@ function getSmaregiHistoricalSnapshotValues(check,item,snapshot){
   const manualNoIssue=check?.is_manual_no_issue===true
     || String(check?.is_manual_no_issue||"").toLowerCase()==="true"
     || isSmaregiNoIssueCheck(check);
+  if(!hasSnapshot&&appStock!==null&&smaregiStock!==null&&reconstructed?.isReliable===true){
+    const calculation=calculateInventoryDifference({
+      aricoStock:appStock,
+      eventNormalStock:reconstructed.eventShelfStock,
+      smaregiStock
+    });
+    return {
+      appStock,
+      eventShelfStock:reconstructed.eventShelfStock,
+      comparisonStock:calculation.comparisonStock,
+      smaregiStock,
+      difference:calculation.difference,
+      savedDifference,
+      isAutoNoIssue:calculation.isNoIssue===true,
+      manualNoIssue,
+      isReliable:true,
+      dataState:"event_history_reconstructed",
+      storeKey:getSmaregiHistoricalStoreKey(check,item,snapshot),
+      snapshotId:String(check?.snapshot_id||snapshot?.id||"")
+    };
+  }
   return {
     appStock,
     eventShelfStock,
@@ -1462,6 +1683,11 @@ async function loadSmaregiHistoricalDifferenceRows(){
     const rowStoreKey=getSmaregiHistoricalStoreKey(check,item,snapshot);
     return currentStoreKeys.size===0||currentStoreKeys.has(rowStoreKey);
   });
+  const historicalReconstruction=await loadSmaregiHistoricalEventShelfReconstruction(
+    checks,
+    itemMap,
+    storeCode
+  );
   return checks.map(check=>{
     const snapshot=snapshotMap.get(String(check.snapshot_id));
     const item={
@@ -1471,7 +1697,12 @@ async function loadSmaregiHistoricalDifferenceRows(){
       product_name:check.product_name ?? itemMap.get(`${check.snapshot_id}::${check.barcode}`)?.product_name,
       store_id:check.store_id ?? itemMap.get(`${check.snapshot_id}::${check.barcode}`)?.store_id
     };
-    const snapshotValues=getSmaregiHistoricalSnapshotValues(check,item,snapshot);
+    const snapshotValues=getSmaregiHistoricalSnapshotValues(
+      check,
+      item,
+      snapshot,
+      historicalReconstruction.get(getSmaregiHistoricalCheckKey(check))||null
+    );
     const calculation=snapshotValues.difference===null ? null : {
       aricoStock:snapshotValues.appStock,
       eventNormalStock:snapshotValues.eventShelfStock,
