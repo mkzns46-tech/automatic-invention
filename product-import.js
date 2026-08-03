@@ -4,7 +4,7 @@ function updateSmaregiProductImportControl(){
   const button=el("importSmaregiProductsBtn");
   if(!button)return;
   button.disabled=false;
-  button.textContent="スマレジ商品マスター取込";
+  button.textContent="商品マスター取り込み";
   ensureProductMasterImportNotice();
 }
 
@@ -58,7 +58,7 @@ function ensureProductMasterImportNotice(){
     </style>
     <strong>ℹ️ 【商品マスター取込について】</strong>
     <div class="product-master-import-notice-grid">
-      <div><p>■ 通常の取込</p><ul><li>「スマレジAPIから取得」を使用します</li><li>全ページの商品情報を取得します</li></ul></div>
+      <div><p>■ 通常の取込</p><ul><li>「商品マスター取り込み」を使用します</li><li>全ページの商品情報を取得します</li></ul></div>
       <div><p>■ CSV予備取込</p><ul><li>API障害時のみ「CSVから取込」を使用します</li><li>CSVを最新API取得済みとして扱いません</li></ul></div>
       <div><p>■ 新規商品の扱い</p><ul><li>新規商品は登録されます</li><li>初期アプリ在庫は「0」で登録されます</li></ul></div>
       <div><p>■ 既存商品の扱い</p><ul><li>バーコードが一致する商品は商品名のみ更新します</li><li>アプリ在庫は変更しません</li></ul></div>
@@ -80,78 +80,6 @@ async function upsertProducts(rows){
     headers:{Prefer:"resolution=merge-duplicates,return=minimal"},
     body:JSON.stringify(rows)
   });
-}
-
-async function importSmaregiProducts(){
-  if(!requireInventoryPrivilegedAccess())return;
-  showMessage("現在はCSV運用中です。スマレジAPIには接続しません。商品マスターCSVを選択してください。","ok");
-  const csvInput=el("csvFile");
-  if(csvInput){
-    csvInput.value="";
-    csvInput.click();
-  }
-  return;
-  const smaregiContext=typeof getSmaregiRequestContext==="function" ? getSmaregiRequestContext() : {};
-  if(typeof confirmAppAction==="function"){
-    const ok=await confirmAppAction(
-      "商品マスター取込確認",
-      typeof getSmaregiOperationContextText==="function"
-        ? getSmaregiOperationContextText("スマレジの商品マスターを取得し、商品情報を更新します。\n在庫数は変更しません。")
-        : "スマレジの商品マスターを取得し、商品情報を更新します。在庫数は変更しません。",
-      {okText:"取込"}
-    );
-    if(!ok)return;
-  }
-  try{
-    console.log("[Smaregi product master import] start");
-    showMessage("スマレジ商品マスターを取り込み中...");
-    console.log("[Smaregi product master import] context",smaregiContext);
-    const res=await fetch("about:blank",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(smaregiContext)
-    });
-    const data=await res.json().catch(()=>({}));
-    if(!res.ok)throw new Error(data.error||`APIエラー ${res.status}`);
-    const rows=Array.isArray(data.products)?data.products:[];
-    const existingRows=await sbAll("products?select=barcode,name,category,genre,department,location,smaregi_product_id,price",1000,50000);
-    const existingBarcodes=new Set((existingRows||[]).map(row=>String(row.barcode||"")));
-    const existingProductsByBarcode=new Map((existingRows||[]).map(row=>[String(row.barcode||""),row]));
-    const normalizeProductInfo=(row,current={})=>({
-      barcode:String(row.barcode||""),
-      name:String(row.name||current.name||""),
-      category:String(row.category||current.category||""),
-      genre:String(row.genre||current.genre||""),
-      department:String(row.department||current.department||""),
-      location:String(row.location||current.location||""),
-      smaregi_product_id:String(row.smaregi_product_id||current.smaregi_product_id||"").trim()||null,
-      price:Number(row.price||current.price||0)
-    });
-    const existingProductRows=[];
-    const newProductRows=[];
-    rows.forEach(row=>{
-      const productInfo=normalizeProductInfo(row,existingProductsByBarcode.get(String(row.barcode||"")));
-      if(existingBarcodes.has(productInfo.barcode)){
-        existingProductRows.push(productInfo);
-      }else{
-        newProductRows.push({...productInfo,base_stock:0});
-      }
-    });
-    const payloadSampleRows=[...existingProductRows,...newProductRows];
-    console.log("[Smaregi Product Master Upsert Payload Sample]",payloadSampleRows.slice(0,3));
-    for(const payloadRows of [existingProductRows,newProductRows]){
-      for(let i=0;i<payloadRows.length;i+=500){
-        await upsertProducts(payloadRows.slice(i,i+500));
-      }
-    }
-    products=[];
-    console.log("[Smaregi product master import] success",{count:rows.length});
-    showMessage(`スマレジ商品マスター取込完了：${rows.length}件。在庫数は変更していません。`,"ok");
-    showPopup("スマレジ商品マスター取込完了",`商品情報を更新しました。\n取込件数：${rows.length}件\n在庫数は変更していません。`);
-  }catch(e){
-    console.error("[Smaregi product master import] error",e);
-    showMessage("スマレジ商品マスター取込エラー："+e.message,"err");
-  }
 }
 
 function mojibakeScore(text){
@@ -375,7 +303,7 @@ function updateSmaregiProductImportControl(){
   const button=el("importSmaregiProductsBtn");
   if(!button)return;
   button.disabled=false;
-  button.textContent="スマレジAPIから取得";
+  button.textContent="商品マスター取り込み";
   button.title="スマレジAPIから商品マスターを取得します";
   ensureProductMasterImportNotice();
 }
@@ -438,9 +366,9 @@ async function importSmaregiProducts(){
   if(!requireInventoryPrivilegedAccess())return;
   const context=typeof getSmaregiRequestContext==="function"?getSmaregiRequestContext():{};
   if(typeof confirmAppAction==="function"){
-    const ok=await confirmAppAction("スマレジ商品マスター取込",typeof getSmaregiOperationContextText==="function"
+    const ok=await confirmAppAction("商品マスター取り込み",typeof getSmaregiOperationContextText==="function"
       ?getSmaregiOperationContextText("スマレジAPIから商品情報を取得し、商品名・コード・価格などのAPI管理項目だけを更新します。ARICO在庫・棚番・履歴は変更しません。")
-      :"スマレジAPIから商品情報を取得します。ARICO在庫・棚番・履歴は変更しません。",{okText:"APIから取得"});
+      :"スマレジAPIから商品情報を取得します。ARICO在庫・棚番・履歴は変更しません。",{okText:"商品マスター取り込み"});
     if(!ok)return;
   }
   const startedAt=new Date().toISOString();

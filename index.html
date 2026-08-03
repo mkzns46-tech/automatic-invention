@@ -63,11 +63,11 @@
   </div>
 </section>
 
-<section class="card csv-admin-section" id="productImportCard" data-inventory-screen="settings" hidden><h2>データ取り込み</h2><p class="section-note">商品マスターはスマレジAPIから取得します。API障害時のみCSVを使用できます。</p>
-<button type="button" id="importSmaregiProductsBtn">スマレジAPIから取得</button><button type="button" id="importProductsCsvBtn" class="secondary">CSVから取込</button>
+<section class="card csv-admin-section" id="productImportCard" data-inventory-screen="settings" hidden><h2>データ取り込み</h2><p class="section-note">商品マスター取り込みでスマレジの商品情報を取得します。API障害時のみCSVを使用できます。</p>
+<button type="button" id="importSmaregiProductsBtn">商品マスター取り込み</button><button type="button" id="importProductsCsvBtn" class="secondary">CSVから取込</button>
 <button type="button" id="syncSmaregiStockBtn">スマレジ在庫変動API取得</button>
 <input type="file" id="smaregiStockCsvFile" accept=".csv,text/csv" hidden>
-<div class="message csv-mode-message">商品マスター：スマレジAPIを通常使用／CSVは予備取込。スマレジ在庫変動チェック：API取得。</div>
+<div class="message csv-mode-message">商品マスター取り込み：スマレジAPIを通常使用／CSVは予備取込。スマレジ在庫変動チェック：API取得。</div>
 <div id="productImportMessage" class="message"></div>
 <details class="csv-admin-details">
   <summary>管理者向け機能</summary>
