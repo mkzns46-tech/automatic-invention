@@ -7929,18 +7929,43 @@ async function confirmBoothSalesImport(){
   finally{window.__aricoBoothSalesConfirming=false;}
 }
 
-async function buildBoothDepartureInventoryData(){
-  const [stockRows,gachaRows]=await Promise.all([
-    sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(getBoothCurrentStoreCode())}&storage_qty=gt.0&order=product_name.asc&limit=3000`).catch(()=>[]),
-    sb(`booth_event_items?select=barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,updated_at&event_id=eq.${encodeURIComponent(boothCurrentEventId)}&item_type=eq.gacha_prize&order=product_name.asc&limit=3000`).catch(()=>[])
+async function buildBoothDepartureInventoryData(eventId){
+  const storeCode=getBoothCurrentStoreCode();
+  const selectedEventId=String(eventId||boothCurrentEventId||"").trim();
+  const [stockRows,gachaRows,eventNormalRows]=await Promise.all([
+    sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(storeCode)}&storage_qty=gt.0&order=product_name.asc&limit=3000`).catch(()=>[]),
+    selectedEventId
+      ? sb(`booth_event_items?select=barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,updated_at&event_id=eq.${encodeURIComponent(selectedEventId)}&item_type=eq.gacha_prize&order=product_name.asc&limit=3000`).catch(()=>[])
+      : Promise.resolve([]),
+    selectedEventId
+      ? sb(`booth_event_items?select=barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,updated_at&event_id=eq.${encodeURIComponent(selectedEventId)}&item_type=eq.normal&order=product_name.asc&limit=3000`).catch(()=>[])
+      : Promise.resolve([])
   ]);
   const stocks=Array.isArray(stockRows)?stockRows:[];
-  const products=await loadBoothProductsByBarcode(stocks.map(row=>row.barcode));
-  const normalRows=stocks.map(row=>{
-    const product=products.get(String(row.barcode||""))||{};
+  const eventItems=Array.isArray(eventNormalRows)?eventNormalRows:[];
+  const barcodes=[...new Set([
+    ...stocks.map(row=>String(row.barcode||"").trim()),
+    ...eventItems.map(row=>String(row.barcode||"").trim())
+  ].filter(Boolean))];
+  const products=await loadBoothProductsByBarcode(barcodes);
+  const normalByBarcode=new Map();
+  stocks.forEach(row=>{
+    const barcode=String(row.barcode||"").trim();
+    if(!barcode)return;
+    const product=products.get(barcode)||{};
     const quantity=Number(row.storage_qty||0);
-    return {product_name:row.product_name||product.name||"",name:product.name||row.product_name||"",barcode:row.barcode||"",shelf:boothProductShelfText(product),commonShelfQty:quantity,taken:quantity,soldQty:null,remain:quantity,updated_at:row.updated_at||""};
+    normalByBarcode.set(barcode,{product_name:row.product_name||product.name||"",name:product.name||row.product_name||"",barcode,shelf:boothProductShelfText(product),commonShelfQty:quantity,taken:quantity,soldQty:null,remain:quantity,updated_at:row.updated_at||""});
   });
+  // The selected event's normal takeout is not in event_storage_stocks until it is moved to the common shelf.
+  // Use the event item balance for those barcodes and keep the common-shelf row as the fallback.
+  eventItems.forEach(item=>{
+    const barcode=String(item.barcode||"").trim();
+    const current=boothEventItemCurrentQty(item);
+    if(!barcode||current<=0)return;
+    const product=products.get(barcode)||{};
+    normalByBarcode.set(barcode,{product_name:item.product_name||product.name||"",name:product.name||item.product_name||"",barcode,shelf:boothProductShelfText(product),commonShelfQty:current,taken:Number(item.taken_qty||0),soldQty:Number(item.sold_qty||0),remain:current,updated_at:item.updated_at||""});
+  });
+  const normalRows=[...normalByBarcode.values()];
   const gacha=Array.isArray(gachaRows)?gachaRows:[];
   const gachaRowsData=gacha.map(item=>({product_name:item.product_name||"",barcode:item.barcode||"",taken:Number(item.taken_qty||0),returned:boothGachaReturnActualQty(item),used:boothGachaUsedQty(item),remain:boothGachaItemCurrentQty(item),counted:isBoothGachaReturnCounted(item),updated_at:item.updated_at||""}));
   return {normalRows,gachaRows:gachaRowsData};
