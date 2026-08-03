@@ -170,7 +170,7 @@ function getSmaregiReasonSummaryRows(historical,range=getSmaregiDifferenceDateRa
     ? getSmaregiHistoricalRowsInRange(historical,range)
     : (historical||[]).filter(({check})=>isInSmaregiDifferenceDateRange(check.checked_at,range));
   latestRows.forEach(({check,difference,calculation,snapshotValues})=>{
-    if(isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check)||snapshotValues?.isAutoNoIssue||calculation?.isNoIssue===true||difference===0||!Number.isFinite(difference))return;
+    if(isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check)||snapshotValues?.isReliable===false||snapshotValues?.isAutoNoIssue||calculation?.isNoIssue===true||difference===0||!Number.isFinite(difference))return;
     const category=String(check.difference_reason_category||"未分類");
     const current=grouped.get(category)||{category,count:0,differenceTotal:0};
     current.count+=1;
@@ -186,7 +186,7 @@ function getSmaregiDifferenceRankingRows(historical,range=getSmaregiDifferenceDa
     ? getSmaregiHistoricalRowsInRange(historical,range)
     : (historical||[]).filter(({check})=>isInSmaregiDifferenceDateRange(check.checked_at,range));
   latestRows.forEach(({check,item,difference,calculation,snapshotValues,checkCount,groupKey})=>{
-    if(isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check)||snapshotValues?.isAutoNoIssue||calculation?.isNoIssue===true||difference===0||!Number.isFinite(difference))return;
+    if(isSmaregiExcludedCheck(check)||isSmaregiNoIssueCheck(check)||snapshotValues?.isReliable===false||snapshotValues?.isAutoNoIssue||calculation?.isNoIssue===true||difference===0||!Number.isFinite(difference))return;
     const barcode=String(check.barcode||item.barcode||"");
     if(!barcode)return;
     const key=groupKey||`${snapshotValues?.storeKey||"unknown"}::${barcode}`;
@@ -217,6 +217,13 @@ function renderSmaregiDifferenceRanking(rows){
   if(message)message.textContent=`差異商品：${rows.length}件`;
 }
 
+function countSmaregiUnreliableRows(historical,range){
+  const rows=typeof getSmaregiHistoricalRowsInRange==="function"
+    ? getSmaregiHistoricalRowsInRange(historical,range)
+    : (historical||[]).filter(({check})=>isInSmaregiDifferenceDateRange(check.checked_at,range));
+  return rows.filter(row=>row?.snapshotValues?.isReliable===false).length;
+}
+
 async function loadSmaregiDifferenceRanking(historical=null){
   const panel=el("smaregiDifferenceRankingPanel");
   if(!panel)return;
@@ -224,7 +231,10 @@ async function loadSmaregiDifferenceRanking(historical=null){
   if(message)message.textContent="差異ランキングを集計中...";
   try{
     const rows=historical || await loadSmaregiHistoricalDifferenceRows();
+    const rankingRange=getSmaregiDifferenceDateRange("smaregiRankingFromDate","smaregiRankingToDate");
+    const excludedCount=countSmaregiUnreliableRows(rows,rankingRange);
     renderSmaregiDifferenceRanking(getSmaregiDifferenceRankingRows(rows));
+    if(message&&excludedCount)message.textContent+=` / イベント棚在庫未保存で除外: ${excludedCount}件`;
   }catch(e){
     if(message)message.textContent="差異ランキング集計エラー。\n"+e.message;
   }
@@ -254,12 +264,13 @@ function calculateSmaregiAccuracy(historical,range){
   const latestRows=typeof getSmaregiHistoricalRowsInRange==="function"
     ? getSmaregiHistoricalRowsInRange(historical,range)
     : (historical||[]).filter(({check})=>isInSmaregiDifferenceDateRange(check.checked_at,range));
-  const rows=latestRows.filter(({check,calculation})=>!isSmaregiExcludedCheck(check)&&calculation&&Number.isFinite(Number(calculation.difference)));
+  const rows=latestRows.filter(({check,calculation,snapshotValues})=>!isSmaregiExcludedCheck(check)&&snapshotValues?.isReliable!==false&&calculation&&Number.isFinite(Number(calculation.difference)));
+  const legacyExcludedCount=latestRows.filter(({snapshotValues})=>snapshotValues?.isReliable===false).length;
   const checkedCount=rows.length;
   const differenceCount=rows.filter(({check,calculation,snapshotValues})=>!isSmaregiNoIssueCheck(check)&&snapshotValues?.isAutoNoIssue!==true&&calculation.isNoIssue!==true&&Number(calculation.difference)!==0).length;
   const differenceRate=checkedCount?differenceCount/checkedCount*100:0;
   const accuracy=checkedCount?(checkedCount-differenceCount)/checkedCount*100:0;
-  return {checkedCount,differenceCount,differenceRate,accuracy};
+  return {checkedCount,differenceCount,differenceRate,accuracy,legacyExcludedCount};
 }
 
 function formatPercent(value,digits=1){
@@ -325,7 +336,7 @@ async function loadSmaregiAccuracy(historical=null){
       changeEl.textContent=`${change>=0?"+":""}${change.toFixed(1)}%`;
       changeEl.className=change>=0?"is-improved":"is-worse";
     }
-    if(message)message.textContent=`指定期間 ${formatPercent(current.accuracy)} / 比較期間 ${formatPercent(previous.accuracy)}`;
+    if(message)message.textContent=`指定期間 ${formatPercent(current.accuracy)} / 比較期間 ${formatPercent(previous.accuracy)}${current.legacyExcludedCount?` / イベント棚在庫未保存で除外: ${current.legacyExcludedCount}件`:""}`;
   }catch(e){
     if(message)message.textContent="棚卸精度集計エラー。\n"+e.message;
   }

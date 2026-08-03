@@ -604,13 +604,16 @@
         no_issue_reason:noIssueReason,
         difference,
         actual_stock:Number.isFinite(Number(check.actual_stock)) ? Number(check.actual_stock) : check.actual_stock,
-        excluded:false
+        excluded:false,
+        is_manual_no_issue:true
       };
-      const savedRows=await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
-        method:"PATCH",
-        headers:{Prefer:"return=representation"},
-        body:JSON.stringify(payload)
-      });
+      const savedRows=typeof window.patchSmaregiCheckRecord==="function"
+        ? await window.patchSmaregiCheckRecord({snapshotId:smaregiSnapshot.id,barcode,payload})
+        : await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+          method:"PATCH",
+          headers:{Prefer:"return=representation"},
+          body:JSON.stringify(payload)
+        });
       const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : {...check,...payload};
       smaregiStockChecks=smaregiStockChecks.filter(row=>String(row.barcode)!==String(barcode));
       smaregiStockChecks.push({...savedRow,snapshot_id:smaregiSnapshot.id,barcode});
@@ -873,6 +876,14 @@
         ? getSmaregiInventoryBreakdown(item,{...previousCheck,actual_stock:actualStock})
         : null;
       const calculation=eventBreakdown?.calculation||null;
+      const snapshotFields=window.getSmaregiSnapshotFields?.({
+        item,
+        barcode,
+        appStock:actualStock,
+        eventShelfStock:eventBreakdown?.eventShelfStock,
+        smaregiStock:eventBreakdown?.smaregiStock,
+        manualNoIssue:typeof isSmaregiNoIssueCheck==="function" ? isSmaregiNoIssueCheck(previousCheck) : previousCheck?.no_issue===true
+      })||{};
       const payload={
         snapshot_id:smaregiSnapshot.id,
         barcode,
@@ -891,16 +902,13 @@
         difference_reason_at:previousCheck?.difference_reason_at||null,
         actual_corrected:markCorrected||previousCheck?.actual_corrected===true,
         actual_corrected_by:markCorrected ? checkedBy : (previousCheck?.actual_corrected_by||null),
-        actual_corrected_at:markCorrected ? checkedAt : (previousCheck?.actual_corrected_at||null)
+        actual_corrected_at:markCorrected ? checkedAt : (previousCheck?.actual_corrected_at||null),
+        ...snapshotFields
       };
-      await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
-        method:"DELETE",
-        headers:{Prefer:"return=minimal"}
-      });
-      const savedRows=await sb("smaregi_stock_checks",{
-        method:"POST",
-        headers:{Prefer:"return=representation"},
-        body:JSON.stringify([payload])
+      const {rows:savedRows}=await window.persistSmaregiCheckRecord({
+        snapshotId:smaregiSnapshot.id,
+        barcode,
+        payload
       });
       const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : payload;
       smaregiStockChecks=smaregiStockChecks.filter(row=>String(row.barcode)!==barcode);
@@ -1968,11 +1976,24 @@
       actual_corrected_by:checkedBy||check.actual_corrected_by||null,
       actual_corrected_at:checkedAt
     };
-    const savedRows=await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
-      method:"PATCH",
-      headers:{Prefer:"return=representation"},
-      body:JSON.stringify(payload)
-    });
+    const snapshotFields=typeof window.getSmaregiSnapshotFields==="function"
+      ? window.getSmaregiSnapshotFields({
+        item,
+        barcode,
+        appStock:nextActualStock,
+        eventShelfStock:eventBreakdown?.eventShelfStock,
+        smaregiStock:eventBreakdown?.smaregiStock,
+        manualNoIssue:true
+      })
+      : {};
+    Object.assign(payload,snapshotFields);
+    const savedRows=typeof window.patchSmaregiCheckRecord==="function"
+      ? await window.patchSmaregiCheckRecord({snapshotId:smaregiSnapshot.id,barcode,payload})
+      : await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify(payload)
+      });
     const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : {...check,...payload};
     smaregiStockChecks=smaregiStockChecks.filter(row=>String(row.barcode)!==String(barcode));
     smaregiStockChecks.push({...savedRow,snapshot_id:smaregiSnapshot.id,barcode});

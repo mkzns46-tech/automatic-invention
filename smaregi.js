@@ -77,10 +77,122 @@ function calculateInventoryDifference({aricoStock,eventNormalStock,smaregiStock}
   };
 }
 
+function createSmaregiDifferenceSnapshot({appStock,eventShelfStock,smaregiStock}={}){
+  const calculation=calculateInventoryDifference({
+    aricoStock:appStock,
+    eventNormalStock:eventShelfStock,
+    smaregiStock
+  });
+  return {
+    appStockAtCheck:calculation.aricoStock,
+    eventShelfStockAtCheck:calculation.eventNormalStock,
+    comparisonStockAtCheck:calculation.comparisonStock,
+    smaregiStockAtCheck:calculation.smaregiStock,
+    differenceAtCheck:calculation.difference,
+    isAutoNoIssueAtCheck:calculation.isNoIssue===true,
+    snapshotVersion:2
+  };
+}
+
+function getSmaregiSnapshotFields({item,barcode,appStock,eventShelfStock,smaregiStock,manualNoIssue=false}={}){
+  const snapshot=createSmaregiDifferenceSnapshot({appStock,eventShelfStock,smaregiStock});
+  const product=typeof gp==="function" ? (gp(barcode)||{}) : {};
+  const context=typeof getSmaregiRequestContext==="function" ? getSmaregiRequestContext() : {};
+  const currentStoreCode=typeof getSmaregiCurrentStoreCode==="function" ? getSmaregiCurrentStoreCode() : null;
+  const rawStoreId=item?.store_id ?? context?.storeId ?? context?.store_id ?? currentStoreCode;
+  return {
+    store_id:rawStoreId===undefined||rawStoreId===null||String(rawStoreId).trim()==="" ? null : String(rawStoreId),
+    product_id:item?.product_id ?? product?.product_id ?? product?.id ?? null,
+    product_name:item?.product_name ?? product?.product_name ?? product?.name ?? null,
+    app_stock_at_check:snapshot.appStockAtCheck,
+    event_shelf_stock_at_check:snapshot.eventShelfStockAtCheck,
+    comparison_stock_at_check:snapshot.comparisonStockAtCheck,
+    smaregi_stock_at_check:snapshot.smaregiStockAtCheck,
+    difference_at_check:snapshot.differenceAtCheck,
+    is_auto_no_issue_at_check:snapshot.isAutoNoIssueAtCheck,
+    is_manual_no_issue:manualNoIssue===true,
+    snapshot_version:snapshot.snapshotVersion
+  };
+}
+
+const SMAREGI_SNAPSHOT_FIELDS=[
+  "store_id","product_id","product_name","app_stock_at_check",
+  "event_shelf_stock_at_check","comparison_stock_at_check",
+  "smaregi_stock_at_check","difference_at_check",
+  "is_auto_no_issue_at_check","is_manual_no_issue","snapshot_version"
+];
+
+function isMissingSmaregiSnapshotColumnError(error){
+  const message=String(error?.message||error||"");
+  return /column .* does not exist|could not find the .* column|schema cache|PGRST204|unknown field/i.test(message);
+}
+
+function removeSmaregiSnapshotFields(payload){
+  const legacy={...(payload||{})};
+  SMAREGI_SNAPSHOT_FIELDS.forEach(field=>delete legacy[field]);
+  return legacy;
+}
+
+async function persistSmaregiCheckRecord({snapshotId,barcode,payload}={}){
+  await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(snapshotId)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+    method:"DELETE",
+    headers:{Prefer:"return=minimal"}
+  });
+  try{
+    const rows=await sb("smaregi_stock_checks",{
+      method:"POST",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify([payload])
+    });
+    return {rows,usedSnapshot:true};
+  }catch(error){
+    if(!SMAREGI_SNAPSHOT_FIELDS.some(field=>Object.prototype.hasOwnProperty.call(payload||{},field))
+      || !isMissingSmaregiSnapshotColumnError(error))throw error;
+    console.warn("[Smaregi snapshot columns are not applied]",error);
+    const legacyPayload=removeSmaregiSnapshotFields(payload);
+    const rows=await sb("smaregi_stock_checks",{
+      method:"POST",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify([legacyPayload])
+    });
+    if(typeof showMessage==="function"){
+      showMessage("チェック時点スナップショット用SQLが未適用のため、旧形式で保存しました。SQL適用後に新規チェックを保存してください。","warn");
+    }
+    return {rows,usedSnapshot:false};
+  }
+}
+
+async function patchSmaregiCheckRecord({snapshotId,barcode,payload}={}){
+  const endpoint=`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(snapshotId)}&barcode=eq.${encodeURIComponent(barcode)}`;
+  try{
+    return await sb(endpoint,{
+      method:"PATCH",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify(payload||{})
+    });
+  }catch(error){
+    if(!SMAREGI_SNAPSHOT_FIELDS.some(field=>Object.prototype.hasOwnProperty.call(payload||{},field))
+      || !isMissingSmaregiSnapshotColumnError(error))throw error;
+    const rows=await sb(endpoint,{
+      method:"PATCH",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify(removeSmaregiSnapshotFields(payload))
+    });
+    if(typeof showMessage==="function"){
+      showMessage("チェック時点スナップショット用SQLが未適用のため、旧形式で更新しました。SQL適用後に新規チェックを保存してください。","warn");
+    }
+    return rows;
+  }
+}
+
 window.getSavedSmaregiStockValue=getSavedSmaregiStockValue;
 window.getSavedSmaregiStockNumber=getSavedSmaregiStockNumber;
 window.getComparableSmaregiStockNumber=getComparableSmaregiStockNumber;
 window.calculateInventoryDifference=calculateInventoryDifference;
+window.createSmaregiDifferenceSnapshot=createSmaregiDifferenceSnapshot;
+window.getSmaregiSnapshotFields=getSmaregiSnapshotFields;
+window.persistSmaregiCheckRecord=persistSmaregiCheckRecord;
+window.patchSmaregiCheckRecord=patchSmaregiCheckRecord;
 
 function getSmaregiCheck(barcode){
   const matches=(smaregiStockChecks||[]).filter(c=>String(c.barcode)===String(barcode));
@@ -695,22 +807,34 @@ async function markSmaregiDifferenceNoIssue(barcode,button=null){
   }
   if(!smaregiSnapshot||!confirm("この差異を問題なしとして処理しますか？"))return;
   await runWithSmaregiAutoRefreshPaused(async()=>{
-   const checkedBy=getSmaregiCheckerName();
-   const no_issue_at=new Date().toISOString();
-   try{
-    await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
-      method:"PATCH",
-      headers:{Prefer:"return=minimal"},
-      body:JSON.stringify({no_issue:true,no_issue_by:checkedBy,no_issue_at,no_issue_reason:""})
-    });
-    smaregiStockChecks.forEach(check=>{
-      if(String(check.barcode)===String(barcode)){
-        check.no_issue=true;
+    const checkedBy=getSmaregiCheckerName();
+    const no_issue_at=new Date().toISOString();
+    try{
+     const manualNoIssuePayload={no_issue:true,no_issue_by:checkedBy,no_issue_at,no_issue_reason:"",is_manual_no_issue:true};
+     try{
+       await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+         method:"PATCH",
+         headers:{Prefer:"return=minimal"},
+         body:JSON.stringify(manualNoIssuePayload)
+       });
+     }catch(error){
+       if(!isMissingSmaregiSnapshotColumnError(error))throw error;
+       await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
+         method:"PATCH",
+         headers:{Prefer:"return=minimal"},
+         body:JSON.stringify(removeSmaregiSnapshotFields(manualNoIssuePayload))
+       });
+       showMessage("手動問題なしは保存しました。スナップショットSQL適用後に新規チェックを保存してください。","warn");
+     }
+     smaregiStockChecks.forEach(check=>{
+       if(String(check.barcode)===String(barcode)){
+         check.no_issue=true;
         check.no_issue_by=checkedBy;
-        check.no_issue_at=no_issue_at;
-        check.no_issue_reason="";
-      }
-    });
+         check.no_issue_at=no_issue_at;
+         check.no_issue_reason="";
+         check.is_manual_no_issue=true;
+       }
+     });
     renderSmaregiStockChecks();
     showMessage("差異を問題なしとして処理しました。","ok");
   }catch(e){
@@ -994,6 +1118,14 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
     }
     const checked_at=new Date().toISOString();
     const correctedNow=markCorrected||isUpdate;
+    const snapshotFields=getSmaregiSnapshotFields({
+      item,
+      barcode,
+      appStock:actual_stock,
+      eventShelfStock:stockBreakdown?.eventShelfStock,
+      smaregiStock:stockBreakdown?.smaregiStock,
+      manualNoIssue:isSmaregiNoIssueCheck(previousCheck)
+    });
     const payload={
       snapshot_id:smaregiSnapshot.id,
       barcode,
@@ -1012,20 +1144,16 @@ async function saveSmaregiActualStock(barcode,value,{markCorrected=false}={}){
       difference_reason_at:previousCheck?.difference_reason_at||null,
       actual_corrected:correctedNow||previousCheck?.actual_corrected===true,
       actual_corrected_by:correctedNow ? checked_by : (previousCheck?.actual_corrected_by||null),
-      actual_corrected_at:correctedNow ? checked_at : (previousCheck?.actual_corrected_at||null)
+      actual_corrected_at:correctedNow ? checked_at : (previousCheck?.actual_corrected_at||null),
+      ...snapshotFields
     };
 
     // 保存済みの実在庫も確実に更新できるよう、同じ snapshot_id + barcode の旧チェックを削除してから登録します。
     // unique 制約が無いSupabase環境でも、古い実在庫が残って表示される問題を防ぎます。
-    await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
-      method:"DELETE",
-      headers:{Prefer:"return=minimal"}
-    });
-
-    const savedRows=await sb("smaregi_stock_checks",{
-      method:"POST",
-      headers:{Prefer:"return=representation"},
-      body:JSON.stringify([payload])
+    const {rows:savedRows}=await persistSmaregiCheckRecord({
+      snapshotId:smaregiSnapshot.id,
+      barcode,
+      payload
     });
 
     const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : payload;
@@ -1097,14 +1225,10 @@ async function excludeSmaregiStockItem(barcode){
       actual_corrected_by:old?.actual_corrected_by||null,
       actual_corrected_at:old?.actual_corrected_at||null
     };
-    await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
-      method:"DELETE",
-      headers:{Prefer:"return:minimal"}
-    });
-    await sb("smaregi_stock_checks",{
-      method:"POST",
-      headers:{Prefer:"return=representation"},
-      body:JSON.stringify([next])
+    await persistSmaregiCheckRecord({
+      snapshotId:smaregiSnapshot.id,
+      barcode,
+      payload:next
     });
     smaregiStockChecks=smaregiStockChecks.filter(c=>String(c.barcode)!==String(barcode));
     smaregiStockChecks.push(next);
@@ -1176,7 +1300,9 @@ function isSmaregiDifferenceCsvRow({check,item=null,difference,snapshotValues=nu
   if(snapshotValues?.isAutoNoIssue===true)return false;
   if(calculation?.isNoIssue===true)return false;
   if(!snapshotValues&&item&&isSmaregiEffectiveNoIssueCheck(item,check))return false;
-  const numericDifference=Number(difference);
+  const numericDifference=Number.isFinite(Number(difference))
+    ? Number(difference)
+    : Number(snapshotValues?.savedDifference);
   return Number.isFinite(numericDifference)&&numericDifference!==0;
 }
 
@@ -1255,44 +1381,37 @@ function getSmaregiHistoricalStoreKey(check,item,snapshot){
 }
 
 function getSmaregiHistoricalSnapshotValues(check,item,snapshot){
-  const appStock=getSmaregiHistoricalNumericValue([check,item],[
-    "app_stock_at_check","app_stock","actual_stock"
-  ]);
-  let eventShelfStock=getSmaregiHistoricalNumericValue([check,item],[
-    "event_shelf_stock_at_check","event_normal_stock_at_check","event_stock_at_check",
-    "event_shelf_stock","event_normal_stock"
-  ]);
-  const smaregiStock=getSmaregiHistoricalNumericValue([check,item],[
-    "smaregi_stock_at_check","smaregi_stock"
-  ]);
-  let comparisonStock=getSmaregiHistoricalNumericValue([check,item],[
-    "comparison_stock_at_check","comparison_stock"
-  ]);
-  if(comparisonStock===null&&appStock!==null&&eventShelfStock!==null){
-    comparisonStock=appStock+eventShelfStock;
-  }
-  const difference=getSmaregiHistoricalNumericValue([check],[
-    "difference_at_check","difference","saved_difference"
-  ]);
-  const isAutoNoIssue=check?.is_auto_no_issue_at_check===true
+  const appStock=getSmaregiHistoricalNumericValue([check],["app_stock_at_check"])
+    ?? getSmaregiHistoricalNumericValue([check],["actual_stock"]);
+  const eventShelfStock=getSmaregiHistoricalNumericValue([check],["event_shelf_stock_at_check"]);
+  const comparisonStock=getSmaregiHistoricalNumericValue([check],["comparison_stock_at_check"]);
+  const smaregiStock=getSmaregiHistoricalNumericValue([check],["smaregi_stock_at_check"]);
+  const savedDifference=getSmaregiHistoricalNumericValue([check],["difference"]);
+  const snapshotDifference=getSmaregiHistoricalNumericValue([check],["difference_at_check"]);
+  const snapshotVersion=getSmaregiHistoricalNumericValue([check],["snapshot_version"]);
+  const hasSnapshot=[appStock,eventShelfStock,comparisonStock,smaregiStock,snapshotDifference]
+    .every(value=>value!==null)
+    && (snapshotVersion===null||snapshotVersion>=2);
+  const difference=hasSnapshot ? snapshotDifference : null;
+  const isAutoNoIssue=hasSnapshot && (
+    check?.is_auto_no_issue_at_check===true
     || String(check?.is_auto_no_issue_at_check||"").toLowerCase()==="true"
-    || difference===0
+    || snapshotDifference===0
+  );
+  const manualNoIssue=check?.is_manual_no_issue===true
+    || String(check?.is_manual_no_issue||"").toLowerCase()==="true"
     || isSmaregiNoIssueCheck(check);
-  // 既存チェックにはイベント棚スナップショット列がないため、
-  // 保存済みのアプリ在庫・スマレジ在庫・差異から当時値を逆算する。
-  // 現在のイベント棚在庫Mapは過去チェックへ適用しない。
-  if(eventShelfStock===null&&comparisonStock===null
-    &&appStock!==null&&smaregiStock!==null&&difference!==null){
-    comparisonStock=smaregiStock+difference;
-    eventShelfStock=comparisonStock-appStock;
-  }
   return {
     appStock,
     eventShelfStock,
     comparisonStock,
     smaregiStock,
     difference,
+    savedDifference,
     isAutoNoIssue,
+    manualNoIssue,
+    isReliable:hasSnapshot,
+    dataState:hasSnapshot ? "保存済みスナップショット" : "イベント棚在庫未保存",
     storeKey:getSmaregiHistoricalStoreKey(check,item,snapshot),
     snapshotId:String(check?.snapshot_id||snapshot?.id||"")
   };
@@ -1347,7 +1466,10 @@ async function loadSmaregiHistoricalDifferenceRows(){
     const snapshot=snapshotMap.get(String(check.snapshot_id));
     const item={
       ...(itemMap.get(`${check.snapshot_id}::${check.barcode}`)||{}),
-      barcode:check.barcode
+      barcode:check.barcode,
+      product_id:check.product_id ?? itemMap.get(`${check.snapshot_id}::${check.barcode}`)?.product_id,
+      product_name:check.product_name ?? itemMap.get(`${check.snapshot_id}::${check.barcode}`)?.product_name,
+      store_id:check.store_id ?? itemMap.get(`${check.snapshot_id}::${check.barcode}`)?.store_id
     };
     const snapshotValues=getSmaregiHistoricalSnapshotValues(check,item,snapshot);
     const calculation=snapshotValues.difference===null ? null : {
@@ -1375,25 +1497,25 @@ async function loadSmaregiHistoricalDifferenceRows(){
 async function smaregiHistoricalDifferenceCsvRows(){
   const range=getSmaregiDifferenceDateRange("smaregiDiffCsvFromDate","smaregiDiffCsvToDate");
   const historical=await loadSmaregiHistoricalDifferenceRows();
-  const rows=[["チェック日時","商品名","バーコード","アプリ在庫","イベント棚在庫","比較用在庫","スマレジ在庫","差異","期間内チェック回数","担当者","状態","原因カテゴリ","原因メモ","原因記入者","原因記入日時"]];
-  getSmaregiHistoricalRowsInRange(historical,range).forEach(({check,item,difference,calculation,snapshotValues,checkCount})=>{
-    if(!isSmaregiDifferenceCsvRow({check,item,difference,snapshotValues,calculation}))return;
+  const rows=[["チェック日時","店舗","商品名","バーコード","アプリ在庫","イベント棚在庫","比較用在庫","スマレジ在庫","差異","自動問題なし","手動問題なし","データ状態"]];
+  getSmaregiHistoricalRowsInRange(historical,range).forEach(({check,item,difference,calculation,snapshotValues})=>{
+    const csvDifference=snapshotValues?.isReliable===false
+      ? (snapshotValues.savedDifference===null ? "不明" : snapshotValues.savedDifference)
+      : difference;
+    if(!isSmaregiDifferenceCsvRow({check,item,difference:csvDifference,snapshotValues,calculation}))return;
     rows.push([
       check.checked_at ? fmt(check.checked_at) : "",
+      snapshotValues?.storeKey||"",
       item.product_name||item.productName||"",
       check.barcode||"",
       snapshotValues?.appStock??"",
-      snapshotValues?.eventShelfStock??"",
-      snapshotValues?.comparisonStock??"",
+      snapshotValues?.isReliable===false ? "不明" : (snapshotValues?.eventShelfStock??""),
+      snapshotValues?.isReliable===false ? "不明" : (snapshotValues?.comparisonStock??""),
       snapshotValues?.smaregiStock??getSavedSmaregiStockValue(item)??"",
-      difference,
-      checkCount||1,
-      getSmaregiDisplayCheckedBy(check),
-      getSmaregiCsvStatus(check,difference,item),
-      check.difference_reason_category||"",
-      check.difference_reason_memo||"",
-      check.difference_reason_by||"",
-      check.difference_reason_at ? fmt(check.difference_reason_at) : ""
+      csvDifference,
+      snapshotValues?.isAutoNoIssue ? "はい" : "いいえ",
+      snapshotValues?.manualNoIssue ? "はい" : "いいえ",
+      snapshotValues?.dataState||"イベント棚在庫未保存"
     ]);
   });
   return rows;

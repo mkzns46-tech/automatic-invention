@@ -454,6 +454,16 @@ async function saveSmaregiCountOnlyActualStock(barcode,button=null){
     const breakdown=typeof getSmaregiInventoryBreakdown==="function"
       ? getSmaregiInventoryBreakdown(item,{...(previousCheck||{}),actual_stock:actualStock})
       : null;
+    const snapshotFields=typeof getSmaregiSnapshotFields==="function"
+      ? getSmaregiSnapshotFields({
+        item,
+        barcode,
+        appStock:actualStock,
+        eventShelfStock:breakdown?.eventShelfStock,
+        smaregiStock:breakdown?.smaregiStock,
+        manualNoIssue:previousCheck?.no_issue===true
+      })
+      : {};
     const payload={
       snapshot_id:smaregiSnapshot.id,
       barcode,
@@ -463,7 +473,8 @@ async function saveSmaregiCountOnlyActualStock(barcode,button=null){
         : calculateSmaregiDifference(smaregiStock,actualStock),
       checked_by:checkedBy,
       checked_at:checkedAt,
-      excluded:false
+      excluded:false,
+      ...snapshotFields
     };
     if(previousCheck){
       payload.no_issue=previousCheck.no_issue===true;
@@ -475,15 +486,14 @@ async function saveSmaregiCountOnlyActualStock(barcode,button=null){
       payload.difference_reason_by=previousCheck.difference_reason_by||null;
       payload.difference_reason_at=previousCheck.difference_reason_at||null;
     }
-    await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
-      method:"DELETE",
-      headers:{Prefer:"return=minimal"}
-    });
-    const savedRows=await sb("smaregi_stock_checks",{
-      method:"POST",
-      headers:{Prefer:"return=representation"},
-      body:JSON.stringify([payload])
-    });
+    const savedResult=typeof persistSmaregiCheckRecord==="function"
+      ? await persistSmaregiCheckRecord({snapshotId:smaregiSnapshot.id,barcode,payload})
+      : {rows:await sb("smaregi_stock_checks",{
+        method:"POST",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify([payload])
+      })};
+    const savedRows=savedResult.rows;
     const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : payload;
     smaregiStockChecks=smaregiStockChecks.filter(c=>String(c.barcode)!==String(barcode));
     smaregiStockChecks.push({...savedRow,snapshot_id:smaregiSnapshot.id,barcode,actual_stock:actualStock,checked_by:checkedBy,checked_at:checkedAt});
@@ -634,6 +644,16 @@ async function saveSmaregiCountOnlyActualStockFromButton(button){
     const breakdown=typeof getSmaregiInventoryBreakdown==="function"
       ? getSmaregiInventoryBreakdown(item,{...(previousCheck||{}),actual_stock:actualStock})
       : null;
+    const snapshotFields=typeof getSmaregiSnapshotFields==="function"
+      ? getSmaregiSnapshotFields({
+        item,
+        barcode,
+        appStock:actualStock,
+        eventShelfStock:breakdown?.eventShelfStock,
+        smaregiStock:breakdown?.smaregiStock,
+        manualNoIssue:previousCheck?.no_issue===true
+      })
+      : {};
     const payload={
       snapshot_id:smaregiSnapshot.id,
       barcode,
@@ -651,17 +671,17 @@ async function saveSmaregiCountOnlyActualStockFromButton(button){
       difference_reason_category:previousCheck?.difference_reason_category||null,
       difference_reason_memo:previousCheck?.difference_reason_memo||"",
       difference_reason_by:previousCheck?.difference_reason_by||null,
-      difference_reason_at:previousCheck?.difference_reason_at||null
+      difference_reason_at:previousCheck?.difference_reason_at||null,
+      ...snapshotFields
     };
-    await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
-      method:"DELETE",
-      headers:{Prefer:"return=minimal"}
-    });
-    const savedRows=await sb("smaregi_stock_checks",{
-      method:"POST",
-      headers:{Prefer:"return=representation"},
-      body:JSON.stringify([payload])
-    });
+    const savedResult=typeof persistSmaregiCheckRecord==="function"
+      ? await persistSmaregiCheckRecord({snapshotId:smaregiSnapshot.id,barcode,payload})
+      : {rows:await sb("smaregi_stock_checks",{
+        method:"POST",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify([payload])
+      })};
+    const savedRows=savedResult.rows;
     const savedRow=Array.isArray(savedRows)&&savedRows[0] ? savedRows[0] : payload;
     smaregiStockChecks=smaregiStockChecks.filter(c=>String(c.barcode)!==barcode);
     smaregiStockChecks.push({...savedRow,snapshot_id:smaregiSnapshot.id,barcode,actual_stock:actualStock,checked_by:checkedBy,checked_at:checkedAt});
