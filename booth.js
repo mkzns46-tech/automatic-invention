@@ -4576,6 +4576,10 @@ function renderBoothReturnPanel(event){
     const input=event.target.closest("[data-booth-return-qty]");
     if(input)setBoothReturnDraftQuantity(input.dataset.boothReturnQty,input.value);
   });
+  el("boothReturnDraftList")?.addEventListener("input",event=>{
+    const input=event.target.closest("[data-booth-return-qty]");
+    if(input)updateBoothReturnDraftQuantityWhileTyping(input);
+  });
   el("boothReturnApplyBtn")?.addEventListener("click",applyBoothReturnDraft);
   el("reloadBoothReturnHistoryBtn")?.addEventListener("click",()=>loadBoothReturnHistory(event.id));
   el("boothReturnStartCameraBtn")?.addEventListener("click",()=>{boothScanTarget="return";startBoothCarryOutCamera();});
@@ -7931,6 +7935,15 @@ function setBoothReturnDestination(destination){
   return true;
 }
 
+function updateBoothReturnDraftQuantityWhileTyping(input){
+  const barcode=String(input?.dataset?.boothReturnQty||"");
+  const entry=boothReturnDraftItems.get(barcode);
+  const text=String(input?.value||"").trim();
+  if(!entry||!/^[0-9]+$/.test(text))return;
+  const quantity=Number(text);
+  if(quantity<=entry.currentQty)entry.quantity=quantity;
+}
+
 async function addBoothReturnDraftFromBarcode(rawBarcode){
   const event=getBoothCurrentEvent();
   const barcode=String(rawBarcode||"").trim();
@@ -7954,11 +7967,10 @@ async function addBoothReturnDraftFromBarcode(rawBarcode){
     }
     const items=getBoothReturnDraft(event);
     const existing=items.get(barcode);
-    if(existing&&existing.quantity>=currentQty){
-      boothShowError("\u623b\u3057\u6570\u91cf\u30a8\u30e9\u30fc",`\u623b\u3057\u6570\u91cf\u306f\u73fe\u5728\u5eab\u6570(${currentQty})\u3092\u8d85\u3048\u3089\u308c\u307e\u305b\u3093\u3002`);
-      return;
-    }
-    items.set(barcode,{barcode,productName:item.product_name||product?.name||"",item,currentQty,source:availability.source,quantity:Math.min(currentQty,Number(existing?.quantity||0)+1)});
+    // Scanning selects the product. The quantity field is authoritative, so
+    // scanning the same product again does not silently add another unit.
+    const quantity=existing ? Math.min(currentQty,Math.max(0,Number(existing.quantity||0))) : 1;
+    items.set(barcode,{barcode,productName:item.product_name||product?.name||"",item,currentQty,source:availability.source,quantity});
     renderBoothReturnDraftCards(event);
     const quantityInput=[...document.querySelectorAll("[data-booth-return-qty]")]
       .find(input=>input.dataset.boothReturnQty===barcode);
@@ -8679,6 +8691,10 @@ function renderBoothCloseConfirmPanel(event,summary){
   el("boothReturnDraftList")?.addEventListener("change",inputEvent=>{
     const input=inputEvent.target.closest("[data-booth-return-qty]");
     if(input)setBoothReturnDraftQuantity(input.dataset.boothReturnQty,input.value);
+  });
+  el("boothReturnDraftList")?.addEventListener("input",inputEvent=>{
+    const input=inputEvent.target.closest("[data-booth-return-qty]");
+    if(input)updateBoothReturnDraftQuantityWhileTyping(input);
   });
   el("boothReturnApplyBtn")?.addEventListener("click",async()=>{
     const staff=el("boothReturnStaff")?.value||"";
