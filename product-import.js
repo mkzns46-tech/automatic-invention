@@ -56,9 +56,10 @@ function ensureProductMasterImportNotice(){
         }
       }
     </style>
-    <strong>ℹ️ 【商品マスターCSV取込について】</strong>
+    <strong>ℹ️ 【商品マスター取込について】</strong>
     <div class="product-master-import-notice-grid">
-      <div><p>■ 取込対象</p><ul><li>バーコード</li><li>商品名</li></ul></div>
+      <div><p>■ 通常の取込</p><ul><li>「スマレジAPIから取得」を使用します</li><li>全ページの商品情報を取得します</li></ul></div>
+      <div><p>■ CSV予備取込</p><ul><li>API障害時のみ「CSVから取込」を使用します</li><li>CSVを最新API取得済みとして扱いません</li></ul></div>
       <div><p>■ 新規商品の扱い</p><ul><li>新規商品は登録されます</li><li>初期アプリ在庫は「0」で登録されます</li></ul></div>
       <div><p>■ 既存商品の扱い</p><ul><li>バーコードが一致する商品は商品名のみ更新します</li><li>アプリ在庫は変更しません</li></ul></div>
       <div><p>■ 更新しない項目</p><ul><li>アプリ在庫</li><li>棚番</li><li>価格</li><li>部門</li><li>商品区分</li><li>イベント在庫</li><li>棚卸履歴</li><li>原因確認履歴</li></ul></div>
