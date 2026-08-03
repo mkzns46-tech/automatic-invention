@@ -7091,7 +7091,12 @@ async function importBoothSalesDraft(){
       addCandidate(productByBarcode,barcode,product);
       addCandidate(productByCode,productCode,product);
     });
-    const productIds=[...itemByProductId.keys()];
+    // Gacha products are not normal event-shelf items, but their sales are
+    // part of the event report and must be fetched with booth sales.
+    const productIds=[...new Set([
+      ...itemByProductId.keys(),
+      ...BOOTH_GACHA_SMAREGI_PRODUCT_IDS
+    ])];
     const missingProductIds=items.filter(item=>{
       const productList=itemByBarcode.get(normalizeBoothSalesIdentity(item.barcode))||[];
       return !productList.some(product=>String(product.smaregi_product_id||"").trim());
@@ -7162,11 +7167,12 @@ async function importBoothSalesDraft(){
       if(!item&&product)item=(itemByBarcode.get(normalizeBoothSalesIdentity(product.barcode))||[])[0];
       if(!item&&barcode)item=(itemByBarcode.get(barcode)||[])[0];
       if(!item&&productCode)item=(itemByProductCode.get(productCode)||[])[0];
-      if(!item){
+      const isGachaSale=isBoothGachaSaleRow(sale);
+      if(!item&&!isGachaSale){
         unmatched.push({sale,reason:smaregiProductId?"イベント商品未登録":"スマレジ商品IDなし"});
         return;
       }
-      const rowBarcode=String(item.barcode||product?.barcode||barcode||"").trim();
+      const rowBarcode=String(item?.barcode||product?.barcode||barcode||"").trim();
       const quantity=Number(sale.quantity||0);
       if(!rowBarcode||!quantity){
         unmatched.push({sale,reason:!rowBarcode?"バーコードなし":"数量0"});
@@ -7178,7 +7184,7 @@ async function importBoothSalesDraft(){
         smaregi_detail_id:String(sale.smaregi_detail_id||""),
         smaregi_product_id:smaregiProductId,
         barcode:rowBarcode,
-        product_name:item.product_name||product?.name||sale.product_name||"",
+        product_name:item?.product_name||product?.name||sale.product_name||"",
         quantity,
         unit_price:Number(sale.unit_price||0),
         amount:Number(sale.amount||0),
@@ -7266,14 +7272,19 @@ async function refreshBoothOngoingSalesCache(apiContext={}){
     let detailCount=0;
     for(const event of activeEvents){
       const items=(await fetchBoothEventItems(event.id)).filter(item=>String(item.item_type||"normal")==="normal");
-      const products=await fetchBoothProductsForItems(items);
+      const normalProducts=await fetchBoothProductsForItems(items);
+      const gachaProducts=await fetchBoothProductsBySmaregiProductIds([...BOOTH_GACHA_SMAREGI_PRODUCT_IDS]).catch(()=>[]);
+      const products=[...normalProducts,...gachaProducts];
       const itemByBarcode=new Map(items.map(item=>[normalizeBoothSalesIdentity(item.barcode),item]));
       const productById=new Map();
       products.forEach(product=>{
         const id=normalizeBoothSalesIdentity(product.smaregi_product_id);
         if(id&&!productById.has(id))productById.set(id,product);
       });
-      const productIds=[...productById.keys()];
+      const productIds=[...new Set([
+        ...productById.keys(),
+        ...BOOTH_GACHA_SMAREGI_PRODUCT_IDS
+      ])];
       if(!productIds.length)throw new Error(`${event.name||"開催中イベント"}の商品にスマレジ商品IDが設定されていません。`);
       const fromDate=String(event.event_start||today).slice(0,10);
       const toDate=String(event.event_end||today).slice(0,10);
@@ -7307,15 +7318,16 @@ async function refreshBoothOngoingSalesCache(apiContext={}){
         activeKeys.add(key);
         const product=saleProductById.get(normalizeBoothSalesIdentity(sale.smaregi_product_id))||productById.get(normalizeBoothSalesIdentity(sale.smaregi_product_id));
         const item=itemByBarcode.get(normalizeBoothSalesIdentity(product?.barcode));
+        const isGachaSale=isBoothGachaSaleRow(sale);
         const quantity=Number(sale.quantity||0);
-        if(!item||!product||!quantity)return;
+        if((!item&&!isGachaSale)||!product||!quantity)return;
         rows.push({
           event_id:event.id,
           smaregi_transaction_id:String(sale.smaregi_transaction_id||""),
           smaregi_detail_id:String(sale.smaregi_detail_id||""),
           smaregi_product_id:String(sale.smaregi_product_id||""),
-          barcode:String(item.barcode||product.barcode||""),
-          product_name:item.product_name||product.name||sale.product_name||"",
+          barcode:String(item?.barcode||product.barcode||""),
+          product_name:item?.product_name||product.name||sale.product_name||"",
           quantity,
           unit_price:Number(sale.unit_price||0),
           amount:Number(sale.amount||0),
@@ -8215,6 +8227,12 @@ loadBoothEventReport=async function(eventId){
   try{
     body.innerHTML='<div class="booth-empty">読み込み中...</div>';
     const event=getBoothCurrentEvent();
+    // Keep an open event report in sync with the latest booth-sales cache.
+    // Closed events continue to use saved imports and do not trigger another
+    // sales API request.
+    if(event&&String(event.id)===String(eventId)&&!isBoothEventClosed(event)&&typeof window.refreshBoothOngoingSalesCache==="function"){
+      await window.refreshBoothOngoingSalesCache().catch(error=>console.warn("[booth report sales refresh skipped]",error));
+    }
     const data=await buildBoothEventReportData(eventId);
     body.innerHTML=`
       ${renderBoothReportOverview(event,data)}
