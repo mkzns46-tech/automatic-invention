@@ -1258,7 +1258,7 @@ function getSmaregiHistoricalSnapshotValues(check,item,snapshot){
   const appStock=getSmaregiHistoricalNumericValue([check,item],[
     "app_stock_at_check","app_stock","actual_stock"
   ]);
-  const eventShelfStock=getSmaregiHistoricalNumericValue([check,item],[
+  let eventShelfStock=getSmaregiHistoricalNumericValue([check,item],[
     "event_shelf_stock_at_check","event_normal_stock_at_check","event_stock_at_check",
     "event_shelf_stock","event_normal_stock"
   ]);
