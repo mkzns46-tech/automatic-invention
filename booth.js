@@ -8026,7 +8026,8 @@ function getBoothSaleAmount(row){
 }
 
 function isBoothGachaSaleRow(row){
-  return String(row?.product_name||"").includes("ガチャ");
+  const productName=String(row?.product_name||"").normalize("NFKC").replace(/\s+/g,"");
+  return productName==="ガチャガチャ";
 }
 
 function aggregateBoothSalesByProduct(rows){
@@ -8073,8 +8074,7 @@ buildBoothEventReportData=async function(eventId){
   const rows=Array.isArray(items)?items:[];
   const gacha=rows.filter(row=>String(row.item_type||"")==="gacha_prize");
   const salesRows=Array.isArray(imports)?imports:[];
-  const gachaBarcodes=new Set(gacha.map(row=>String(row.barcode||"").trim()).filter(Boolean));
-  const isGachaSale=row=>gachaBarcodes.has(String(row?.barcode||"").trim())||isBoothGachaSaleRow(row);
+  const isGachaSale=row=>isBoothGachaSaleRow(row);
   const normalSales=salesRows.filter(row=>!isGachaSale(row));
   const gachaSales=salesRows.filter(isGachaSale);
   const normalSummary=getBoothReportSalesSummaryRows(normalSales);
