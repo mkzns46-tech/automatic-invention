@@ -7618,3 +7618,25 @@ body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
     padding:8px;
   }
 }
+/* Ver 2.38 event close return controls */
+.booth-close-return-controls{
+  margin:14px 0;
+  padding:14px;
+  border:1px solid #b7dec9;
+  border-radius:10px;
+  background:#f7fcf9;
+}
+.booth-close-return-controls h5{margin:0 0 5px}
+.booth-return-form-grid{
+  display:grid;
+  grid-template-columns:minmax(180px,280px) minmax(220px,1fr);
+  gap:10px;
+  margin:10px 0;
+}
+.booth-return-form-grid label{display:grid;gap:5px;font-weight:700}
+.booth-close-table-wrap{max-height:430px;overflow:auto}
+@media (max-width:800px){
+  .booth-return-form-grid{grid-template-columns:1fr}
+  .booth-close-return-controls{padding:10px}
+  .booth-close-table{min-width:920px}
+}

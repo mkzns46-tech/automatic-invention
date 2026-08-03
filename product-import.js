@@ -287,6 +287,7 @@ function csvToRows(text){
 }
 
 async function importCsvFile(file){
+  const startedAt=new Date().toISOString();
   try{
     if(!requireInventoryPrivilegedAccess())return;
     if(!file)return;
@@ -333,8 +334,10 @@ async function importCsvFile(file){
     }
 
     showMessage(`CSV取り込み完了：${rows.length}件の商品を登録・更新しました。既存商品の在庫数は変更していません。`,"ok");
+    saveSmaregiProductImportHistory({source:"csv",started_at:startedAt,finished_at:new Date().toISOString(),new_count:newRows.length,updated_count:existingRows.length,unchanged_count:0,failure_count:0,store_code:""});
     render();
   }catch(e){
+    saveSmaregiProductImportHistory({source:"csv",started_at:startedAt,finished_at:new Date().toISOString(),result:"failure",failure_count:1,failures:[{reason:e.message||"CSV取込失敗"}],store_code:""});
     showMessage("CSV取り込みエラー。\n"+e.message,"err");
   }finally{
     const input=el("csvFile");
@@ -354,22 +357,168 @@ function downloadSampleCsv(){
   URL.revokeObjectURL(a.href);
 }
 
-/* CSV operation mode: Smaregi product API is disabled. */
+function getSmaregiProductImportHistory(){
+  try{
+    const value=JSON.parse(localStorage.getItem("arico_smaregi_product_import_history")||"[]");
+    return Array.isArray(value)?value:[];
+  }catch(_){return [];}
+}
+
+function saveSmaregiProductImportHistory(entry){
+  const history=getSmaregiProductImportHistory();
+  history.unshift({created_at:new Date().toISOString(),...entry});
+  try{localStorage.setItem("arico_smaregi_product_import_history",JSON.stringify(history.slice(0,30)));}catch(_){ }
+}
+
 function updateSmaregiProductImportControl(){
   const button=el("importSmaregiProductsBtn");
   if(!button)return;
   button.disabled=false;
-  button.textContent="商品マスターCSV取込";
-  button.title="API停止中／CSV運用中：スマレジAPIには接続しません";
+  button.textContent="スマレジAPIから取得";
+  button.title="スマレジAPIから商品マスターを取得します";
   ensureProductMasterImportNotice();
+}
+
+function getSmaregiImportMatch(row,existingById,existingByBarcode,existingByCode){
+  const id=String(row.smaregi_product_id||"").trim();
+  const barcode=String(row.barcode||"").trim();
+  const code=String(row.product_code||"").trim();
+  return (id&&existingById.get(id))
+    || (barcode&&existingByBarcode.get(barcode))
+    || (code&&existingByCode.get(code))
+    || null;
+}
+
+function buildSmaregiProductPayload(row,current,isNew){
+  const payload={
+    barcode:String(row.barcode||current?.barcode||"").trim(),
+    name:String(row.name||current?.name||"").trim()
+  };
+  const apiFields=[
+    ["smaregi_product_id",row.smaregi_product_id],
+    ["product_code",row.product_code],
+    ["product_type",row.product_type],
+    ["color",row.color],
+    ["size",row.size],
+    ["price",row.price],
+    ["cost",row.cost],
+    ["category",row.category],
+    ["genre",row.genre],
+    ["department",row.department],
+    ["smaregi_active",row.smaregi_active],
+    ["smaregi_updated_at",row.smaregi_updated_at]
+  ];
+  apiFields.forEach(([key,value])=>{
+    if(value!==undefined&&value!==null&&value!=="")payload[key]=value;
+  });
+  if(isNew)payload.base_stock=0;
+  return payload;
+}
+
+async function upsertSmaregiProductRows(rows){
+  if(!rows.length)return;
+  try{
+    await upsertProducts(rows);
+    return;
+  }catch(firstError){
+    // 古いDBに未追加の任意項目があっても、商品名・バーコード取込は継続する。
+    const legacyKeys=["barcode","name","smaregi_product_id","price","category","genre","department","base_stock"];
+    const legacyRows=rows.map(row=>Object.fromEntries(legacyKeys.filter(key=>Object.prototype.hasOwnProperty.call(row,key)).map(key=>[key,row[key]])));
+    try{
+      await upsertProducts(legacyRows);
+    }catch(secondError){
+      const minimal=rows.map(row=>({barcode:row.barcode,name:row.name,...(row.base_stock===0?{base_stock:0}:{})}));
+      try{await upsertProducts(minimal);}catch(_){throw secondError||firstError;}
+    }
+  }
 }
 
 async function importSmaregiProducts(){
   if(!requireInventoryPrivilegedAccess())return;
-  showMessage("現在はCSV運用中です。スマレジAPIには接続しません。商品マスターCSVを選択してください。","ok");
-  const input=el("csvFile");
-  if(input){
-    input.value="";
-    input.click();
+  const context=typeof getSmaregiRequestContext==="function"?getSmaregiRequestContext():{};
+  if(typeof confirmAppAction==="function"){
+    const ok=await confirmAppAction("スマレジ商品マスター取込",typeof getSmaregiOperationContextText==="function"
+      ?getSmaregiOperationContextText("スマレジAPIから商品情報を取得し、商品名・コード・価格などのAPI管理項目だけを更新します。ARICO在庫・棚番・履歴は変更しません。")
+      :"スマレジAPIから商品情報を取得します。ARICO在庫・棚番・履歴は変更しません。",{okText:"APIから取得"});
+    if(!ok)return;
   }
+  const startedAt=new Date().toISOString();
+  try{
+    showMessage("スマレジ商品マスターを取得しています…");
+    const response=await fetch("/api/smaregi-products",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(context)
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data.ok===false)throw new Error(data.error||`APIエラー (${response.status})`);
+    const rows=Array.isArray(data.products)?data.products:[];
+    const existingRows=typeof sbAll==="function"
+      ?await sbAll("products?select=*",1000,50000)
+      :await sb("products?select=*&limit=50000");
+    const existing=Array.isArray(existingRows)?existingRows:[];
+    const byId=new Map(existing.filter(row=>String(row.smaregi_product_id||"").trim()).map(row=>[String(row.smaregi_product_id).trim(),row]));
+    const byBarcode=new Map(existing.filter(row=>String(row.barcode||"").trim()).map(row=>[String(row.barcode).trim(),row]));
+    const byCode=new Map(existing.filter(row=>String(row.product_code||"").trim()).map(row=>[String(row.product_code).trim(),row]));
+    const duplicateBarcodes=new Set((data.warnings||[]).map(w=>String(w.barcode||"")).filter(Boolean));
+    const seenIds=new Set();
+    const updates=[];
+    const inserts=[];
+    let unchanged=0;
+    const failures=[];
+    const comparisonFields=["barcode","name","smaregi_product_id","product_code","product_type","color","size","price","cost","category","genre","department","smaregi_active","smaregi_updated_at"];
+    rows.forEach(row=>{
+      const barcode=String(row.barcode||"").trim();
+      if(!barcode||!String(row.name||"").trim()){
+        failures.push({name:row.name||"",id:row.smaregi_product_id||"",reason:"バーコードまたは商品名がありません"});
+        return;
+      }
+      const id=String(row.smaregi_product_id||"").trim();
+      if(id&&seenIds.has(id))return;
+      if(id)seenIds.add(id);
+      if(duplicateBarcodes.has(barcode)){
+        failures.push({name:row.name,id,reason:"同一バーコードに複数の商品IDがあるため自動統合しません"});
+        return;
+      }
+      const current=getSmaregiImportMatch(row,byId,byBarcode,byCode);
+      const payload=buildSmaregiProductPayload(row,current,!current);
+      if(current&&comparisonFields.every(key=>String(current[key]??"")===String(payload[key]??""))){
+        unchanged++;
+      }else{
+        (current?updates:inserts).push(payload);
+      }
+    });
+    const ok=typeof confirmAppAction==="function"
+      ?await confirmAppAction("商品マスター更新確認",`新規 ${inserts.length}件 / 更新 ${updates.length}件 / 変更なし ${unchanged}件 / 要確認 ${failures.length}件`,{okText:"保存"})
+      :true;
+    if(!ok)return;
+    for(const batch of [updates,inserts])for(let i=0;i<batch.length;i+=500)await upsertSmaregiProductRows(batch.slice(i,i+500));
+    const returnedIds=new Set(rows.map(row=>String(row.smaregi_product_id||"").trim()).filter(Boolean));
+    let inactiveCount=0;
+    for(const current of existing){
+      const id=String(current.smaregi_product_id||"").trim();
+      if(id&&returnedIds.size&&!returnedIds.has(id)&&Object.prototype.hasOwnProperty.call(current,"smaregi_active")){
+        try{
+          await sb(`products?barcode=eq.${encodeURIComponent(current.barcode)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({smaregi_active:false})});
+          inactiveCount++;
+        }catch(_){ }
+      }
+    }
+    saveSmaregiProductImportHistory({source:"api",started_at:startedAt,finished_at:new Date().toISOString(),page_count:Number(data.page_count||0),new_count:inserts.length,updated_count:updates.length,unchanged_count:unchanged,inactive_count:inactiveCount,failure_count:failures.length,failures:warningsToHistory(failures,data.warnings||[]),store_code:context.storeCode||"",contract_id:context.contractId||""});
+    if(typeof loadProducts==="function")await loadProducts();
+    else if(typeof render==="function")render();
+    const warningCount=failures.length+(Array.isArray(data.warnings)?data.warnings.length:0);
+    showMessage(`スマレジAPI取込完了：新規${inserts.length}件／更新${updates.length}件／変更なし${unchanged}件／停止${inactiveCount}件${warningCount?`／要確認${warningCount}件`:""}`,"ok");
+    if(warningCount&&typeof showPopup==="function"){
+      const details=warningsToHistory(failures,data.warnings||[]).slice(0,20).map(item=>`${item.name||item.id||"商品"}：${item.reason}`).join("\n");
+      showPopup("商品マスター取込の要確認",details||`${warningCount}件の確認が必要です。`);
+    }
+  }catch(error){
+    saveSmaregiProductImportHistory({source:"api",started_at:startedAt,finished_at:new Date().toISOString(),result:"failure",failure_count:1,failures:[{reason:error.message||"API取込失敗"}],store_code:context.storeCode||"",contract_id:context.contractId||""});
+    showMessage(`スマレジAPI取込失敗：${error.message||"取得できませんでした"}`,"err");
+  }
+}
+
+function warningsToHistory(failures,warnings){
+  return [...failures,...warnings.map(w=>({name:w.name||"",id:w.product_id||w.smaregi_product_id||"",reason:w.reason||"同一バーコードの商品が複数あります"}))].slice(0,100);
 }

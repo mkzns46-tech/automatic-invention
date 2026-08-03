@@ -67,6 +67,7 @@ function bindEvents(){
   on("csvFile","change",e=>importCsvFile(e.target.files&&e.target.files[0]));
   on("downloadSampleCsvBtn","click",downloadSampleCsv);
   on("importSmaregiProductsBtn","click",importSmaregiProducts);
+  on("importProductsCsvBtn","click",()=>el("csvFile")?.click());
   ["historyTypeFilter","historyProductFilter","historyStaffFilter","historyMemoFilter"].forEach(id=>on(id,"input",renderGlobalHistory));
   on("clearFilterBtn","click",()=>{
     ["historyTypeFilter","historyProductFilter","historyStaffFilter","historyMemoFilter"].forEach(id=>{
