@@ -289,28 +289,27 @@ function addSmaregiMapValue(map,barcode,value){
 }
 
 function getSmaregiCurrentEventStock(barcode){
-  if(smaregiEventInventoryStoreCode!==normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode()))return 0;
-  return Number(smaregiCurrentEventStockByBarcode.get(String(barcode||"").trim())||0);
-}
-
-function getSmaregiEventStorageStock(barcode){
-  // event_storage_stocks is maintained as a separate operational view. It is
-  // intentionally not added here because booth_event_items is the canonical
-  // per-event source used to calculate the current event shelf quantity.
+  // The event shelf is store-common. Keep this legacy accessor at zero so
+  // old event-specific data cannot be added a second time.
   return 0;
 }
 
+function getSmaregiEventStorageStock(barcode){
+  if(smaregiEventInventoryStoreCode!==normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode()))return 0;
+  return Number(smaregiEventStorageStockByBarcode.get(String(barcode||"").trim())||0);
+}
+
 function getSmaregiEventShelfStock(barcode){
-  return getSmaregiCurrentEventStock(barcode);
+  return getSmaregiEventStorageStock(barcode);
 }
 
 function getSmaregiInventoryBreakdown(item,check=getSmaregiCheck(item?.barcode)){
   const actualStock=check&&check.actual_stock!==null&&check.actual_stock!==undefined&&String(check.actual_stock)!==""
     ? Number(check.actual_stock||0)
     : null;
-  const currentEventStock=getSmaregiCurrentEventStock(item?.barcode);
-  const eventStorageStock=0;
-  const eventShelfStock=currentEventStock;
+  const currentEventStock=0;
+  const eventStorageStock=getSmaregiEventStorageStock(item?.barcode);
+  const eventShelfStock=eventStorageStock;
   const savedSmaregiStock=getSavedSmaregiStockValue(item);
   const smaregiStock=savedSmaregiStock===null ? null : savedSmaregiStock;
   const smaregiStockForComparison=smaregiStock===null ? null : getComparableSmaregiStockNumber(item,0);
@@ -404,6 +403,18 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
 
   const storeCode=normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode());
   smaregiEventInventoryStoreCode=storeCode;
+  // event_storage_stocks is the one current-stock row per store + barcode.
+  // Do not rebuild the current shelf by summing event-specific rows.
+  try{
+    const commonStocks=await sbAll(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(storeCode)}&barcode=in.(${barcodeFilter})`,1000,50000);
+    (Array.isArray(commonStocks)?commonStocks:[]).forEach(row=>{
+      if(normalizeSmaregiStoreCodeForStorage(row.store_code)!==storeCode)return;
+      smaregiEventStorageStockByBarcode.set(String(row.barcode||"").trim(),Number(row.storage_qty||0));
+    });
+    return;
+  }catch(error){
+    console.warn("[Smaregi common event shelf lookup failed]",error);
+  }
   const events=await sbAll(`booth_events?select=id,status,store_code&store_code=eq.${encodeURIComponent(storeCode)}`,1000,50000);
   const validEventIds=Array.isArray(events)
     ? events
@@ -1515,7 +1526,7 @@ function calculateSmaregiHistoricalEventShelfQty({normalItems=[],movements=[],sa
 
 window.calculateSmaregiHistoricalEventShelfQty=calculateSmaregiHistoricalEventShelfQty;
 
-async function loadSmaregiHistoricalEventShelfReconstruction(checks,itemMap,storeCode){
+async function loadSmaregiLegacyHistoricalEventShelfReconstruction(checks,itemMap,storeCode){
   const targets=(checks||[]).filter(check=>{
     const item=itemMap.get(`${check.snapshot_id}::${check.barcode}`)||{};
     const hasSnapshot=[
@@ -1564,6 +1575,98 @@ async function loadSmaregiHistoricalEventShelfReconstruction(checks,itemMap,stor
   }catch(error){
     console.warn("[Smaregi historical event reconstruction skipped]",error);
   }
+  return result;
+}
+
+// Ver 2.37: reconstruct the shared event shelf by store + barcode.  The
+// event id is retained only as an audit reference on each movement.
+async function loadSmaregiHistoricalEventShelfReconstruction(checks,itemMap,storeCode){
+  const targets=(checks||[]).filter(check=>{
+    const item=itemMap.get(`${check.snapshot_id}::${check.barcode}`)||{};
+    const hasSnapshot=[
+      check.app_stock_at_check,
+      check.event_shelf_stock_at_check,
+      check.comparison_stock_at_check,
+      check.smaregi_stock_at_check,
+      check.difference_at_check
+    ].every(value=>value!==null&&value!==undefined&&String(value).trim()!=="")
+      && (check.snapshot_version===null||check.snapshot_version===undefined||Number(check.snapshot_version)>=2);
+    const appStock=getSmaregiHistoricalNumericValue([check], ["actual_stock","app_stock_at_check"]);
+    const smaregiStock=getSmaregiHistoricalNumericValue([check,item], ["smaregi_stock_at_check","smaregi_stock","stock_amount","stock_quantity"]);
+    return !hasSnapshot&&appStock!==null&&smaregiStock!==null&&String(check.barcode||"").trim()!=="";
+  });
+  const result=new Map();
+  if(!targets.length)return result;
+  const barcodes=[...new Set(targets.map(check=>String(check.barcode||"").trim()).filter(Boolean))];
+  const barcodeFilter=buildSmaregiInFilter(barcodes);
+  if(!barcodeFilter)return result;
+
+  let commonRows=[];
+  try{
+    const storeFilter=encodeURIComponent(String(storeCode||""));
+    commonRows=await sbAll(`event_storage_movements?select=id,store_code,barcode,movement_type,quantity,memo,created_at&store_code=eq.${storeFilter}&barcode=in.(${barcodeFilter})&order=created_at.asc`,1000,50000);
+  }catch(error){
+    console.warn("[Smaregi shared event shelf history lookup failed]",error);
+  }
+
+  const currentStore=normalizeSmaregiStoreCodeForStorage(storeCode);
+  const rowsByBarcode=new Map();
+  (Array.isArray(commonRows)?commonRows:[]).forEach(row=>{
+    const rowStore=normalizeSmaregiStoreCodeForStorage(row?.store_code||"");
+    const barcode=String(row?.barcode||"").trim();
+    if(!barcode||rowStore!==currentStore)return;
+    const rows=rowsByBarcode.get(barcode)||[];
+    rows.push(row);
+    rowsByBarcode.set(barcode,rows);
+  });
+
+  const legacyTargets=targets.filter(check=>!rowsByBarcode.has(String(check.barcode||"").trim()));
+  const legacy=legacyTargets.length
+    ? await loadSmaregiLegacyHistoricalEventShelfReconstruction(legacyTargets,itemMap,storeCode)
+    : new Map();
+
+  targets.forEach(check=>{
+    const key=getSmaregiHistoricalCheckKey(check);
+    const barcode=String(check.barcode||"").trim();
+    const rows=rowsByBarcode.get(barcode)||[];
+    if(!rows.length){
+      const fallback=legacy.get(key);
+      result.set(key,fallback||{eventShelfStock:0,isReliable:true,reason:"no_shared_event_shelf_history"});
+      return;
+    }
+
+    const checkedTime=new Date(check.checked_at||"").getTime();
+    if(!Number.isFinite(checkedTime)){
+      result.set(key,{eventShelfStock:null,isReliable:false,reason:"invalid_check_time"});
+      return;
+    }
+    let stock=0;
+    let isReliable=true;
+    const seenIds=new Set();
+    rows.forEach(row=>{
+      const id=String(row?.id||"").trim();
+      if(id&&seenIds.has(id))return;
+      if(id)seenIds.add(id);
+      const createdTime=getSmaregiHistoricalEventTime(row);
+      if(createdTime===null){isReliable=false;return;}
+      if(createdTime>checkedTime)return;
+      const type=getSmaregiHistoricalMovementType(row);
+      const quantity=Math.abs(Number(row?.quantity||0));
+      if(!Number.isFinite(quantity)){isReliable=false;return;}
+      if(type==="storage_in")stock+=quantity;
+      else if(type==="storage_out")stock-=quantity;
+      else if(type==="adjustment"){
+        const match=String(row?.memo||"").match(/(-?\d+)\s*->\s*(-?\d+)/);
+        if(!match){isReliable=false;return;}
+        stock+=Number(match[2])-Number(match[1]);
+      }
+    });
+    result.set(key,{
+      eventShelfStock:Math.max(0,stock),
+      isReliable,
+      reason:isReliable?"shared_event_shelf_history":"incomplete_shared_event_shelf_history"
+    });
+  });
   return result;
 }
 

@@ -3457,7 +3457,7 @@ async function upsertBoothEventItem(event,product,qty){
 }
 
 function getBoothCarryOutSource(){
-  const value=String(el("boothCarryOutSource")?.value||"storage");
+  const value=String(el("boothCarryOutSource")?.value||"normal");
   return value==="storage"?"storage":"normal";
 }
 
@@ -3478,6 +3478,30 @@ function getBoothCurrentStoreCode(){
 async function findBoothEventStorageStock(storeCode,barcode){
   const rows=await sb(`event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty&store_code=eq.${encodeURIComponent(storeCode)}&barcode=eq.${encodeURIComponent(barcode)}&limit=1`);
   return Array.isArray(rows)&&rows[0]?rows[0]:null;
+}
+
+async function restoreBoothEventStorageStock(storeCode,item,previousStock){
+  const current=await findBoothEventStorageStock(storeCode,item?.barcode);
+  if(previousStock){
+    if(!current)throw new Error("event_storage_stocks rollback row not found");
+    await sb(`event_storage_stocks?id=eq.${encodeURIComponent(current.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        product_name:previousStock.product_name||item?.product_name||"",
+        storage_qty:Number(previousStock.storage_qty||0),
+        updated_at:new Date().toISOString()
+      })
+    });
+    return;
+  }
+  if(current){
+    await sb(`event_storage_stocks?id=eq.${encodeURIComponent(current.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({storage_qty:0,updated_at:new Date().toISOString()})
+    });
+  }
 }
 
 async function applyBoothStorageOut(event,product,quantity,staff,memo){
@@ -3677,8 +3701,8 @@ function renderBoothEventDetail(event){
             <input id="boothCarryOutQty" type="number" min="1" step="1" placeholder="数量" ${closed?"disabled":""}>
           </label>
           <label>持ち出し元
-            <input id="boothCarryOutSource" type="hidden" value="storage">
-            <div class="booth-fixed-field">イベント保管在庫</div>
+            <input id="boothCarryOutSource" type="hidden" value="normal">
+            <div class="booth-fixed-field">通常棚</div>
           </label>
           <label>担当者<span class="required">必須</span>
             <select id="boothCarryOutStaff" ${closed?"disabled":""}>${staffOptions}</select>
@@ -4566,6 +4590,94 @@ async function registerBoothCarryOut(){
   }
 }
 
+// Ver 2.37: a carry-out moves stock from the normal shelf into the one
+// store-wide event shelf. The event id is kept only on the audit rows.
+async function registerBoothCarryOut(){
+  const event=getBoothCurrentEvent();
+  if(!event){
+    boothShowError("持ち出し登録エラー","イベントを開いてから持ち出し登録してください。");
+    return;
+  }
+  if(isBoothEventClosed(event)){showBoothClosedError();return;}
+  const barcode=String(el("boothCarryOutBarcode")?.value||"").trim();
+  const qtyText=String(el("boothCarryOutQty")?.value||"").trim();
+  const staff=String(el("boothCarryOutStaff")?.value||"").trim();
+  const memo=String(el("boothCarryOutMemo")?.value||"").trim();
+  if(!barcode){boothShowError("持ち出し登録エラー","バーコードを入力してください。","boothCarryOutBarcode");return;}
+  if(!/^[1-9]\d*$/.test(qtyText)){boothShowError("持ち出し登録エラー","数量は1以上の整数で入力してください。","boothCarryOutQty");return;}
+  const quantity=Number(qtyText);
+  if(!staff){boothShowError("持ち出し登録エラー","担当者を選択してください。","boothCarryOutStaff");return;}
+  if(!validateBoothStaffStore(staff,"店舗確認エラー","boothCarryOutStaff"))return;
+  let movement=null;
+  let storageMovement=null;
+  let baseBefore=null;
+  let previousStorage=null;
+  const storeCode=getBoothCurrentStoreCode();
+  try{
+    const product=await findBoothProductByBarcode(barcode);
+    if(!product){boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");return;}
+    baseBefore=Number(product.base_stock||0);
+    if(baseBefore<quantity){
+      boothShowError("持ち出し登録エラー",`通常棚在庫が不足しています。現在庫 ${baseBefore} / 持ち出し ${quantity}`,"boothCarryOutQty");
+      return;
+    }
+    previousStorage=await findBoothEventStorageStock(storeCode,product.barcode);
+    await updateBoothProductBaseStock(product.barcode,baseBefore-quantity);
+    await upsertBoothEventStorageStock(storeCode,product,quantity);
+    const movementRows=await sb("booth_stock_movements",{
+      method:"POST",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify([{
+        event_id:event.id,
+        barcode:product.barcode,
+        product_name:product.name||"",
+        item_type:"normal",
+        movement_type:"take_out",
+        quantity,
+        staff,
+        memo,
+        takeout_source:"normal",
+        affects_smaregi:false,
+        smaregi_delta:0
+      }])
+    });
+    movement=Array.isArray(movementRows)&&movementRows[0]?movementRows[0]:null;
+    const storageMovementRows=await sb("event_storage_movements",{
+      method:"POST",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify([{
+        event_id:event.id,
+        store_code:storeCode,
+        smaregi_product_id:product.smaregi_product_id?String(product.smaregi_product_id):null,
+        barcode:product.barcode,
+        product_name:product.name||"",
+        movement_type:"storage_in",
+        quantity,
+        staff,
+        memo
+      }])
+    });
+    storageMovement=Array.isArray(storageMovementRows)&&storageMovementRows[0]?storageMovementRows[0]:null;
+    await upsertBoothEventItem(event,product,quantity);
+    el("boothCarryOutBarcode").value="";
+    el("boothCarryOutQty").value="";
+    if(el("boothCarryOutMemo"))el("boothCarryOutMemo").value="";
+    const preview=el("boothProductPreview");
+    if(preview){preview.hidden=true;preview.innerHTML="";}
+    await loadBoothCarryOutHistory(event.id);
+    boothShowSuccess("持ち出し登録完了","通常棚から共通イベント棚へ登録しました。");
+    el("boothCarryOutBarcode")?.focus();
+  }catch(error){
+    try{
+      if(movement?.id)await sb(`booth_stock_movements?id=eq.${encodeURIComponent(movement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+      if(storageMovement?.id)await sb(`event_storage_movements?id=eq.${encodeURIComponent(storageMovement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+      if(previousStorage||baseBefore!==null)await restoreBoothEventStorageStock(storeCode,{barcode},previousStorage);
+      if(baseBefore!==null)await updateBoothProductBaseStock(barcode,baseBefore);
+    }catch(rollbackError){console.warn("[booth carry-out rollback failed]",rollbackError);}
+    boothShowError("持ち出し登録エラー","持ち出し登録に失敗しました。\n"+error.message);
+  }
+}
+
 async function loadBoothReturnHistory(eventId){
   const list=el("boothReturnHistoryList");
   if(!list)return;
@@ -4892,8 +5004,9 @@ async function patchBoothEventItem(item,payload){
 
 async function moveBoothEventShelfQtyToGacha(event,product,quantity){
   const item=await findBoothEventItemByBarcode(event.id,product.barcode);
-  const current=getBoothEventShelfCurrentQty(item);
-  if(!item||current<quantity)return null;
+  const stock=await findBoothEventStorageStock(getBoothCurrentStoreCode(),product.barcode);
+  const current=Number(stock?.storage_qty||0);
+  if(!item||!stock||current<quantity)return null;
   const normal=Math.max(0,Number(item.normal_takeout_qty||0));
   const storage=Math.max(0,Number(item.storage_takeout_qty||0));
   const useNormal=Math.min(normal,quantity);
@@ -4908,12 +5021,16 @@ async function moveBoothEventShelfQtyToGacha(event,product,quantity){
     normal_takeout_qty:normal-useNormal,
     storage_takeout_qty:storage-useStorage
   });
-  return {item,previous};
+  await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),product,-quantity);
+  return {item,previous,storageBefore:stock};
 }
 
 async function rollbackBoothEventShelfQty(moveResult){
   if(!moveResult?.item||!moveResult?.previous)return;
   await patchBoothEventItem(moveResult.item,moveResult.previous);
+  if(moveResult.storageBefore){
+    await restoreBoothEventStorageStock(getBoothCurrentStoreCode(),moveResult.item,moveResult.storageBefore);
+  }
 }
 
 function renderBoothGachaPreview(product,smaregiStock,summary){
@@ -5206,11 +5323,12 @@ async function validateBoothGachaForm(action){
   }
   const quantity=Number(qtyText);
   const currentStock=Number(product.base_stock||0);
-  const [summary,eventShelfItem]=await Promise.all([
+  const [summary,eventShelfItem,eventShelfStock]=await Promise.all([
     getBoothGachaSummary(event.id,barcode),
-    findBoothEventItemByBarcode(event.id,barcode).catch(()=>null)
+    findBoothEventItemByBarcode(event.id,barcode).catch(()=>null),
+    findBoothEventStorageStock(getBoothCurrentStoreCode(),barcode).catch(()=>null)
   ]);
-  const eventShelfCurrent=getBoothEventShelfCurrentQty(eventShelfItem);
+  const eventShelfCurrent=Number(eventShelfStock?.storage_qty||0);
   if(action==="pick"&&eventShelfCurrent<quantity&&currentStock-quantity<0){
     boothShowError("ガチャ登録エラー",`イベント棚在庫・通常棚在庫が不足しています。\nイベント棚在庫：${eventShelfCurrent}\n通常棚在庫：${currentStock}\n登録数：${quantity}`,"boothGachaQty");
     return null;
@@ -7196,6 +7314,411 @@ renderBoothEventReportPanel=async function(event){
   el("boothEventReportPdfBtn")?.addEventListener("click",()=>exportBoothEventReportPdf(event));
   loadBoothEventReport(event.id);
 };
+
+// Ver 2.37: the event shelf is shared by store and barcode. Event ids remain
+// on audit rows only, so a later event can use the same shelf stock.
+function getBoothExplicitReturnProcessType(item){
+  const value=String(item?.return_process_type||"").toLowerCase().trim();
+  return ["storage","shelf","event","keep"].includes(value)?value:"";
+}
+
+function getBoothReturnProcessLabel(type){
+  const value=String(type||"");
+  if(value==="storage")return "\u30a4\u30d9\u30f3\u30c8\u68da";
+  if(value==="keep")return "\u30a4\u30d9\u30f3\u30c8\u68da\u306b\u6b8b\u3059";
+  if(value==="event")return "\u30a4\u30d9\u30f3\u30c8\u68da";
+  return "\u901a\u5e38\u68da\u3078\u623b\u3059";
+}
+
+function renderBoothReturnPanel(event){
+  const area=el("boothEventWorkArea");
+  if(!area)return;
+  const closed=isBoothEventClosed(event);
+  getBoothReturnDraft(event);
+  const staffOptions=getBoothStaffOptions();
+  area.innerHTML=`
+    <section class="booth-work-card booth-return-card">
+      <h4>\u623b\u308a\u5728\u5eab\u51e6\u7406</h4>
+      <p class="section-note">\u5546\u54c1\u3092\u30b9\u30ad\u30e3\u30f3\u3057\u3001\u623b\u3057\u5148\u3092\u5168\u4f53\u3067\u9078\u629e\u3057\u3066\u767b\u9332\u3057\u307e\u3059\u3002\u30a4\u30d9\u30f3\u30c8\u68da\u306f\u5e97\u8217\u5171\u901a\u3067\u3059\u3002</p>
+      <div class="booth-return-destination-options" role="group" aria-label="\u623b\u3057\u5148">
+        <button type="button" class="booth-return-destination-btn" data-booth-return-destination="shelf" aria-pressed="false" ${closed?"disabled":""}>\u901a\u5e38\u68da\u3078\u623b\u3059</button>
+        <button type="button" class="booth-return-destination-btn" data-booth-return-destination="keep" aria-pressed="false" ${closed?"disabled":""}>\u30a4\u30d9\u30f3\u30c8\u68da\u306b\u6b8b\u3059</button>
+      </div>
+      <div class="booth-return-scan-controls">
+        <button type="button" id="boothReturnStartCameraBtn" ${closed?"disabled":""}>\u30ab\u30e1\u30e9\u8aad\u53d6</button>
+        <button type="button" id="boothReturnStopCameraBtn" class="secondary">\u505c\u6b62</button>
+        <label class="booth-return-barcode-label">\u30d0\u30fc\u30b3\u30fc\u30c9
+          <input id="boothReturnBarcode" autocomplete="off" inputmode="numeric" placeholder="\u30d0\u30fc\u30b3\u30fc\u30c9\u3092\u5165\u529b\u3057\u3066Enter" ${closed?"disabled":""}>
+        </label>
+        <button type="button" id="boothReturnScanBtn" class="secondary" ${closed?"disabled":""}>\u5546\u54c1\u3092\u8ffd\u52a0</button>
+      </div>
+      <div class="camera-area booth-camera-area">
+        <video id="boothCarryOutVideo" muted playsinline></video>
+        <div id="boothCameraGuideOverlay" class="camera-guide-overlay"><div class="camera-guide-box"><div class="camera-guide-line"></div></div><div class="camera-guide-text">\u30d0\u30fc\u30b3\u30fc\u30c9\u3092\u30ab\u30e1\u30e9\u306b\u5408\u308f\u305b\u3066\u304f\u3060\u3055\u3044</div></div>
+      </div>
+      <div class="booth-return-common-fields">
+        <label>\u62c5\u5f53\u8005<span class="required">\u5fc5\u9808</span><select id="boothReturnStaff" ${closed?"disabled":""}>${staffOptions}</select></label>
+        <label>\u30e1\u30e2<input id="boothReturnMemo" autocomplete="off" placeholder="\u4efb\u610f\u30e1\u30e2" ${closed?"disabled":""}></label>
+      </div>
+      <div id="boothReturnDraftList" class="booth-return-draft-list"><div class="booth-empty">\u30d0\u30fc\u30b3\u30fc\u30c9\u3092\u8aad\u307f\u53d6\u308b\u3068\u3053\u3053\u306b\u5bfe\u8c61\u5546\u54c1\u304c\u8ffd\u52a0\u3055\u308c\u307e\u3059\u3002</div></div>
+      <button type="button" id="boothReturnApplyBtn" class="booth-return-apply-btn" ${closed?"disabled":""}>\u5165\u529b\u5206\u3092\u4e00\u62ec\u53cd\u6620</button>
+    </section>
+    <section class="booth-work-card booth-return-history-card">
+      <div class="booth-list-header"><h4>\u623b\u308a\u5728\u5eab\u5c65\u6b74</h4><button type="button" id="reloadBoothReturnHistoryBtn" class="secondary">\u518d\u8aad\u307f\u8fbc\u307f</button></div>
+      <div id="boothReturnHistoryList" class="booth-carry-history-list"><div class="booth-empty">\u8aad\u307f\u8fbc\u307f\u4e2d...</div></div>
+    </section>`;
+  if(boothReturnDraftDestination)setBoothReturnDestination(boothReturnDraftDestination);
+  const barcodeInput=el("boothReturnBarcode");
+  const add=()=>addBoothReturnDraftFromBarcode(barcodeInput?.value);
+  barcodeInput?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();add();}});
+  el("boothReturnScanBtn")?.addEventListener("click",add);
+  document.querySelectorAll("[data-booth-return-destination]").forEach(button=>button.addEventListener("click",()=>setBoothReturnDestination(button.dataset.boothReturnDestination)));
+  el("boothReturnDraftList")?.addEventListener("click",event=>{
+    const button=event.target.closest("[data-booth-return-action]");
+    if(!button)return;
+    const barcode=button.dataset.boothReturnBarcode||"";
+    if(button.dataset.boothReturnAction==="remove")boothReturnDraftItems.delete(barcode);
+    else if(button.dataset.boothReturnAction==="increase")changeBoothReturnDraftQuantity(barcode,1);
+    else if(button.dataset.boothReturnAction==="decrease")changeBoothReturnDraftQuantity(barcode,-1);
+    renderBoothReturnDraftCards(getBoothCurrentEvent());
+  });
+  el("boothReturnDraftList")?.addEventListener("change",event=>{
+    const input=event.target.closest("[data-booth-return-qty]");
+    if(input)setBoothReturnDraftQuantity(input.dataset.boothReturnQty,input.value);
+  });
+  el("boothReturnApplyBtn")?.addEventListener("click",applyBoothReturnDraft);
+  el("reloadBoothReturnHistoryBtn")?.addEventListener("click",()=>loadBoothReturnHistory(event.id));
+  el("boothReturnStartCameraBtn")?.addEventListener("click",()=>{boothScanTarget="return";startBoothCarryOutCamera();});
+  el("boothReturnStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
+  renderBoothReturnDraftCards(event);
+  loadBoothReturnHistory(event.id);
+}
+
+function setBoothReturnDestination(destination){
+  if(boothReturnDraftItems.size&&destination!==boothReturnDraftDestination){
+    boothShowError("\u623b\u3057\u5148\u5909\u66f4\u30a8\u30e9\u30fc","\u8ffd\u52a0\u6e08\u307f\u5546\u54c1\u3092\u524a\u9664\u3057\u3066\u304b\u3089\u623b\u3057\u5148\u3092\u5909\u66f4\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
+    return false;
+  }
+  const next=destination==="keep"?"keep":"shelf";
+  boothReturnDraftDestination=next;
+  boothReturnDraftDestinationEventId="";
+  document.querySelectorAll("[data-booth-return-destination]").forEach(button=>{
+    const selected=button.dataset.boothReturnDestination===next;
+    button.classList.toggle("is-selected",selected);
+    button.setAttribute("aria-pressed",selected?"true":"false");
+  });
+  return true;
+}
+
+async function addBoothReturnDraftFromBarcode(rawBarcode){
+  const event=getBoothCurrentEvent();
+  const barcode=String(rawBarcode||"").trim();
+  if(!event||!barcode)return;
+  if(isBoothEventClosed(event)){showBoothClosedError();return;}
+  if(!boothReturnDraftDestination){
+    boothShowError("\u623b\u3057\u5148\u672a\u9078\u629e","\u5148\u306b\u300c\u901a\u5e38\u68da\u3078\u623b\u3059\u300d\u307e\u305f\u306f\u300c\u30a4\u30d9\u30f3\u30c8\u68da\u306b\u6b8b\u3059\u300d\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
+    return;
+  }
+  try{
+    const [item,stock]=await Promise.all([
+      findBoothEventItemByBarcode(event.id,barcode),
+      findBoothEventStorageStock(getBoothCurrentStoreCode(),barcode)
+    ]);
+    const currentQty=Number(stock?.storage_qty||0);
+    if(!item||currentQty<=0){
+      boothShowError("\u5bfe\u8c61\u5916\u5546\u54c1","\u5e97\u8217\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u306b\u6b8b\u6570\u304c\u3042\u308b\u5546\u54c1\u306e\u307f\u5bfe\u8c61\u3067\u3059\u3002");
+      return;
+    }
+    const items=getBoothReturnDraft(event);
+    const existing=items.get(barcode);
+    if(existing&&existing.quantity>=currentQty){
+      boothShowError("\u623b\u3057\u6570\u91cf\u30a8\u30e9\u30fc",`\u623b\u3057\u6570\u91cf\u306f\u73fe\u5728\u5eab\u6570(${currentQty})\u3092\u8d85\u3048\u3089\u308c\u307e\u305b\u3093\u3002`);
+      return;
+    }
+    items.set(barcode,{barcode,productName:item.product_name||"",item,currentQty,quantity:Math.min(currentQty,Number(existing?.quantity||0)+1)});
+    renderBoothReturnDraftCards(event);
+    const barcodeInput=el("boothReturnBarcode");
+    if(barcodeInput){barcodeInput.value="";barcodeInput.focus();}
+  }catch(error){
+    boothShowError("\u623b\u308a\u5728\u5eab\u5546\u54c1\u30a8\u30e9\u30fc",error.message||"\u5546\u54c1\u3092\u78ba\u8a8d\u3067\u304d\u307e\u305b\u3093\u3002");
+  }
+}
+
+async function insertBoothCommonEventMovement(event,item,quantity,staff,memo,movementType){
+  const rows=await sb("event_storage_movements",{
+    method:"POST",
+    headers:{Prefer:"return=representation"},
+    body:JSON.stringify([{
+      event_id:event?.id||boothCurrentEventId||null,
+      store_code:getBoothCurrentStoreCode(),
+      smaregi_product_id:item?.smaregi_product_id?String(item.smaregi_product_id):null,
+      barcode:item?.barcode||"",
+      product_name:item?.product_name||item?.name||"",
+      movement_type:movementType,
+      quantity:Math.abs(Number(quantity||0)),
+      staff,
+      memo:memo||""
+    }])
+  });
+  return Array.isArray(rows)&&rows[0]?rows[0]:null;
+}
+
+async function applyBoothReturnDraft(){
+  if(window.__aricoBoothReturnSaving)return;
+  const event=getBoothCurrentEvent();
+  const destination=boothReturnDraftDestination;
+  const staff=String(el("boothReturnStaff")?.value||"").trim();
+  const memo=String(el("boothReturnMemo")?.value||"").trim();
+  const entries=[...getBoothReturnDraft(event).values()].filter(entry=>Number(entry.quantity||0)>0);
+  if(!event||isBoothEventClosed(event)){showBoothClosedError();return;}
+  if(!["shelf","keep"].includes(destination)){
+    boothShowError("\u623b\u3057\u5148\u672a\u9078\u629e","\u623b\u3057\u5148\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
+    return;
+  }
+  if(!entries.length){boothShowError("\u5bfe\u8c61\u672a\u5165\u529b","\u5546\u54c1\u3092\u30b9\u30ad\u30e3\u30f3\u3057\u3066\u304f\u3060\u3055\u3044\u3002");return;}
+  if(!staff){boothShowError("\u62c5\u5f53\u8005\u672a\u9078\u629e","\u62c5\u5f53\u8005\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044\u3002");return;}
+  if(!validateBoothStaffStore(staff,"\u5e97\u8217\u78ba\u8a8d\u30a8\u30e9\u30fc","boothReturnStaff"))return;
+  const checked=[];
+  try{
+    for(const entry of entries){
+      const [item,stock,product]=await Promise.all([
+        findBoothEventItemByBarcode(event.id,entry.barcode),
+        findBoothEventStorageStock(getBoothCurrentStoreCode(),entry.barcode),
+        findBoothProductByBarcode(entry.barcode)
+      ]);
+      const quantity=Number(entry.quantity||0);
+      const currentQty=Number(stock?.storage_qty||0);
+      if(!item||!stock||currentQty<quantity)throw new Error(`${entry.productName||entry.barcode}: \u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u306e\u6b8b\u6570(${currentQty})\u304c\u4e0d\u8db3\u3057\u3066\u3044\u307e\u3059\u3002`);
+      if(!product)throw new Error(`${entry.barcode}: \u5546\u54c1\u30de\u30b9\u30bf\u30fc\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3002`);
+      checked.push({item,stock,product,quantity});
+    }
+    const ok=typeof confirmAppAction==="function"?await confirmAppAction("\u623b\u308a\u5728\u5eab\u3092\u53cd\u6620",checked.map(row=>`${row.product.name||row.item.product_name}: ${row.quantity}`).join("\n"),{okText:"\u53cd\u6620"}):true;
+    if(!ok)return;
+    window.__aricoBoothReturnSaving=true;
+    const applied=[];
+    try{
+      for(const row of checked){
+        const operation={row,baseBefore:null,storageBefore:{...row.stock},inventoryLog:null,sourceMovement:null,storageMovement:null};
+        applied.push(operation);
+        if(destination==="shelf"){
+          operation.baseBefore=Number(row.product.base_stock||0);
+          await updateBoothProductBaseStock(row.product.barcode,operation.baseBefore+row.quantity);
+          await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),row.product,-row.quantity);
+          operation.inventoryLog=await insertBoothEventReturnInventoryLog(event,row.item,row.quantity,staff,memo,"event_return");
+          operation.sourceMovement=await insertBoothReturnMovement(event,row.item,row.quantity,staff,memo,"return");
+          operation.storageMovement=await insertBoothCommonEventMovement(event,row.product,row.quantity,staff,memo,"storage_out");
+        }else{
+          operation.inventoryLog=await insertBoothEventReturnInventoryLog(event,row.item,row.quantity,staff,memo,"event_stock_confirm");
+          operation.sourceMovement=await insertBoothReturnMovement(event,row.item,row.quantity,staff,memo,"event_stock_confirm");
+        }
+        await applyBoothReturnSourceItem(row.item,row.quantity,destination,staff);
+      }
+    }catch(error){
+      for(const done of applied.reverse()){
+        try{
+          if(done.baseBefore!==null)await updateBoothProductBaseStock(done.row.product.barcode,done.baseBefore);
+          if(destination==="shelf")await restoreBoothEventStorageStock(getBoothCurrentStoreCode(),done.row.product,done.storageBefore);
+          if(done.inventoryLog?.id)await sb(`inventory_logs?id=eq.${encodeURIComponent(done.inventoryLog.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+          if(done.sourceMovement?.id)await sb(`booth_stock_movements?id=eq.${encodeURIComponent(done.sourceMovement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+          if(done.storageMovement?.id)await sb(`event_storage_movements?id=eq.${encodeURIComponent(done.storageMovement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+          await restoreBoothReturnSourceItem({item:done.item});
+        }catch(rollbackError){console.warn("[booth return rollback failed]",rollbackError);}
+      }
+      throw error;
+    }
+    boothReturnDraftItems.clear();
+    renderBoothReturnDraftCards(event);
+    await refreshBoothEventRelatedViews(event.id);
+    boothShowSuccess("\u623b\u308a\u5728\u5eab\u53cd\u6620\u5b8c\u4e86",`${checked.length}\u5546\u54c1\u3092${destination==="shelf"?"\u901a\u5e38\u68da":"\u30a4\u30d9\u30f3\u30c8\u68da"}\u3068\u3057\u3066\u53cd\u6620\u3057\u307e\u3057\u305f\u3002`);
+  }catch(error){
+    boothShowError("\u623b\u308a\u5728\u5eab\u53cd\u6620\u30a8\u30e9\u30fc",error.message||"\u623b\u308a\u5728\u5eab\u306e\u53cd\u6620\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002");
+  }finally{window.__aricoBoothReturnSaving=false;}
+}
+
+async function reflectBoothShelfReturnsOnClose(summary,staff){
+  const now=new Date().toISOString();
+  for(const item of summary.returnPendingRows||summary.shelfReturnPendingRows||[]){
+    const processType=getBoothCloseReturnProcessType(item);
+    const effectiveQty=getBoothReturnReflectQty(item);
+    const delta=getBoothReturnReflectDelta(item);
+    if(delta===0||!item.id||!item.barcode)continue;
+    if(!processType)throw new Error("\u623b\u308a\u5148\u304c\u672a\u9078\u629e\u306e\u5546\u54c1\u304c\u3042\u308a\u307e\u3059\u3002");
+    if(processType==="storage"){
+      await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),item,delta);
+      await insertBoothCommonEventMovement({id:item.event_id||boothCurrentEventId},item,delta,staff,"\u30a4\u30d9\u30f3\u30c8\u68da\u3078\u53cd\u6620","storage_in");
+    }else if(processType==="shelf"){
+      await adjustBoothProductBaseStock(item.barcode,delta);
+      await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),item,-delta);
+      await insertBoothCommonEventMovement({id:item.event_id||boothCurrentEventId},item,delta,staff,"\u901a\u5e38\u68da\u3078\u623b\u3057","storage_out");
+    }else if(processType==="keep"){
+      // The count is recorded, but the shared shelf stock does not move.
+    }else if(processType!=="event"){
+      await adjustBoothProductBaseStock(item.barcode,delta);
+    }
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({
+      return_process_type:processType,
+      return_reflected:effectiveQty>0,
+      return_reflected_qty:effectiveQty,
+      return_reflected_at:effectiveQty>0?now:null,
+      return_reflected_by:effectiveQty>0?staff:null,
+      shelf_return_qty:processType==="shelf"?effectiveQty:0,
+      event_storage_qty:processType==="storage"?effectiveQty:0,
+      shelf_return_reflected:processType==="shelf"&&effectiveQty>0,
+      shelf_return_reflected_qty:processType==="shelf"?effectiveQty:0,
+      shelf_return_reflected_at:processType==="shelf"&&effectiveQty>0?now:null,
+      shelf_return_reflected_by:processType==="shelf"&&effectiveQty>0?staff:null,
+      updated_at:now
+    })});
+  }
+}
+
+async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
+  const now=new Date().toISOString();
+  const reflectedRows=await loadBoothReflectedShelfReturnRows(eventId);
+  for(const item of reflectedRows){
+    const processType=getBoothReturnProcessType(item)||"shelf";
+    const qty=getBoothReturnReflectedQty(item);
+    if(qty>0&&item.barcode&&processType==="storage"){
+      await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),item,-qty);
+      await insertBoothCommonEventMovement({id:eventId},item,qty,staff,"\u30c1\u30a7\u30c3\u30af\u89e3\u9664","storage_out");
+    }else if(qty>0&&item.barcode&&processType==="shelf"){
+      await adjustBoothProductBaseStock(item.barcode,-qty);
+      await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),item,qty);
+      await insertBoothCommonEventMovement({id:eventId},item,qty,staff,"\u30c1\u30a7\u30c3\u30af\u89e3\u9664","storage_in");
+    }else if(qty>0&&item.barcode&&processType!=="keep"){
+      await adjustBoothProductBaseStock(item.barcode,-qty);
+    }
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({return_reflected:false,return_reflected_qty:0,return_reflected_at:null,return_reflected_by:null,shelf_return_reflected:false,shelf_return_reflected_qty:0,shelf_return_reflected_at:null,shelf_return_reflected_by:null,updated_at:now})});
+  }
+  return reflectedRows.reduce((sum,row)=>sum+getBoothReturnReflectedQty(row),0);
+}
+
+async function moveBoothEventShelfQtyToGacha(event,product,quantity){
+  const stock=await findBoothEventStorageStock(getBoothCurrentStoreCode(),product.barcode);
+  const current=Number(stock?.storage_qty||0);
+  if(!stock||current<quantity)return null;
+  const item=await findBoothEventItemByBarcode(event.id,product.barcode);
+  const previous=item?{taken_qty:Number(item.taken_qty||0),normal_takeout_qty:Number(item.normal_takeout_qty||0),storage_takeout_qty:Number(item.storage_takeout_qty||0)}:null;
+  if(item){
+    const normal=Math.max(0,Number(item.normal_takeout_qty||0));
+    const storage=Math.max(0,Number(item.storage_takeout_qty||0));
+    const useNormal=Math.min(normal,quantity);
+    await patchBoothEventItem(item,{taken_qty:Math.max(0,Number(item.taken_qty||0)-quantity),normal_takeout_qty:normal-useNormal,storage_takeout_qty:Math.max(0,storage-(quantity-useNormal))});
+  }
+  await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),product,-quantity);
+  const storageMovement=await insertBoothCommonEventMovement(event,product,quantity,"","\u30ac\u30c1\u30e3\u3078\u79fb\u52d5","storage_out");
+  return {item,previous,storageBefore:stock,storageMovement};
+}
+
+async function rollbackBoothEventShelfQty(moveResult){
+  if(!moveResult)return;
+  if(moveResult.item&&moveResult.previous)await patchBoothEventItem(moveResult.item,moveResult.previous);
+  if(moveResult.storageBefore)await restoreBoothEventStorageStock(getBoothCurrentStoreCode(),moveResult.item||{barcode:moveResult.storageBefore.barcode,product_name:moveResult.storageBefore.product_name},moveResult.storageBefore);
+  if(moveResult.storageMovement?.id)await sb(`event_storage_movements?id=eq.${encodeURIComponent(moveResult.storageMovement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+}
+
+async function confirmBoothSalesImport(){
+  const form=validateBoothSalesForm();
+  if(!form)return;
+  const {event,fromDate,toDate,staff}=form;
+  try{
+    const pending=await sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(event.id)}&import_status=eq.pending&order=sold_at.asc&limit=500`);
+    const rows=Array.isArray(pending)?pending:[];
+    if(!rows.length){boothShowError("\u8ca9\u58f2\u78ba\u5b9a\u30a8\u30e9\u30fc","\u672a\u78ba\u8a8d\u306e\u8ca9\u58f2\u30c7\u30fc\u30bf\u304c\u3042\u308a\u307e\u305b\u3093\u3002");return;}
+    const ok=typeof confirmAppAction==="function"?await confirmAppAction("\u8ca9\u58f2\u3092\u78ba\u5b9a",`${getBoothSalesContextSummary(event,fromDate,toDate)}\n\n${rows.length}\u4ef6\u3092\u78ba\u5b9a\u3057\u307e\u3059\u3002`,{okText:"\u78ba\u5b9a"}):true;
+    if(!ok)return;
+    const items=await fetchBoothEventItems(event.id);
+    const itemByBarcode=new Map(items.map(item=>[String(item.barcode||""),item]));
+    const addByBarcode=new Map();
+    rows.forEach(row=>{const barcode=String(row.barcode||"").trim();if(barcode)addByBarcode.set(barcode,(addByBarcode.get(barcode)||0)+Number(row.quantity||0));});
+    const applied=[];
+    try{
+      for(const [barcode,addQty] of addByBarcode.entries()){
+        const item=itemByBarcode.get(barcode);
+        if(!item)continue;
+        const product=await findBoothProductByBarcode(barcode)||{barcode, name:item.product_name||""};
+        const stock=await findBoothEventStorageStock(getBoothCurrentStoreCode(),barcode);
+        const storageBefore=stock?{...stock}:null;
+        await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),product,-addQty);
+        const storageMovement=await insertBoothCommonEventMovement(event,product,addQty,staff,"\u30a4\u30d9\u30f3\u30c8\u8ca9\u58f2","storage_out");
+        const nextSold=Number(item.sold_qty||0)+Number(addQty||0);
+        await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({sold_qty:nextSold,difference_qty:calculateBoothItemDifference({...item,sold_qty:nextSold}),updated_at:new Date().toISOString()})});
+        applied.push({item,product,storageBefore,storageMovement});
+      }
+      await sb(`event_sales_imports?event_id=eq.${encodeURIComponent(event.id)}&import_status=eq.pending`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({import_status:"confirmed",confirmed_by:staff,confirmed_at:new Date().toISOString(),updated_at:new Date().toISOString()})});
+    }catch(error){
+      for(const row of applied.reverse()){
+        try{await restoreBoothEventStorageStock(getBoothCurrentStoreCode(),row.product,row.storageBefore);if(row.storageMovement?.id)await sb(`event_storage_movements?id=eq.${encodeURIComponent(row.storageMovement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});await patchBoothEventItem(row.item,{sold_qty:row.item.sold_qty,difference_qty:row.item.difference_qty});}catch(rollbackError){console.warn("[booth sales rollback failed]",rollbackError);}
+      }
+      throw error;
+    }
+    await loadBoothSalesImports(event.id);
+    boothShowSuccess("\u8ca9\u58f2\u78ba\u5b9a\u5b8c\u4e86","\u8ca9\u58f2\u6570\u91cf\u3092\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u304b\u3089\u6e1b\u7b97\u3057\u307e\u3057\u305f\u3002");
+  }catch(error){boothShowError("\u8ca9\u58f2\u78ba\u5b9a\u30a8\u30e9\u30fc",error.message||"\u8ca9\u58f2\u306e\u78ba\u5b9a\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002");}
+}
+
+async function buildBoothDepartureInventoryData(){
+  const [stockRows,gachaRows]=await Promise.all([
+    sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(getBoothCurrentStoreCode())}&storage_qty=gt.0&order=product_name.asc&limit=3000`).catch(()=>[]),
+    sb(`booth_event_items?select=barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,updated_at&event_id=eq.${encodeURIComponent(boothCurrentEventId)}&item_type=eq.gacha_prize&order=product_name.asc&limit=3000`).catch(()=>[])
+  ]);
+  const stocks=Array.isArray(stockRows)?stockRows:[];
+  const products=await loadBoothProductsByBarcode(stocks.map(row=>row.barcode));
+  const normalRows=stocks.map(row=>{
+    const product=products.get(String(row.barcode||""))||{};
+    const quantity=Number(row.storage_qty||0);
+    return {product_name:row.product_name||product.name||"",name:product.name||row.product_name||"",barcode:row.barcode||"",shelf:boothProductShelfText(product),commonShelfQty:quantity,taken:quantity,soldQty:null,remain:quantity,updated_at:row.updated_at||""};
+  });
+  const gacha=Array.isArray(gachaRows)?gachaRows:[];
+  const gachaRowsData=gacha.map(item=>({product_name:item.product_name||"",barcode:item.barcode||"",taken:Number(item.taken_qty||0),returned:boothGachaReturnActualQty(item),used:boothGachaUsedQty(item),remain:boothGachaItemCurrentQty(item),counted:isBoothGachaReturnCounted(item),updated_at:item.updated_at||""}));
+  return {normalRows,gachaRows:gachaRowsData};
+}
+
+function renderBoothDepartureNormalSection(rows){
+  const body=rows.length?rows.map(row=>`<tr><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.commonShelfQty??0)}</td><td>${esc(formatBoothDateTime(row.updated_at))}</td></tr>`).join(""):"<tr><td colspan=\"4\">\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u306e\u5728\u5eab\u306f\u3042\u308a\u307e\u305b\u3093\u3002</td></tr>";
+  const cards=rows.map(row=>`<article class="booth-history-card booth-departure-card"><div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong></div><div class="booth-history-card-meta"><span>\u30d0\u30fc\u30b3\u30fc\u30c9: ${esc(row.barcode||"-")}</span><span>\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u73fe\u5728\u5eab: ${esc(row.commonShelfQty??0)}</span><span>\u6700\u7d42\u66f4\u65b0: ${esc(formatBoothDateTime(row.updated_at))}</span></div></article>`).join("");
+  return `<section class="booth-split-list-section"><h5>\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u5728\u5eab</h5><div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table booth-departure-list-table"><thead><tr><th>\u5546\u54c1\u540d</th><th>\u30d0\u30fc\u30b3\u30fc\u30c9</th><th>\u73fe\u5728\u5eab</th><th>\u6700\u7d42\u66f4\u65b0</th></tr></thead><tbody>${body}</tbody></table></div><div class="booth-history-cards booth-scroll-cards">${cards}</div></section>`;
+}
+
+async function loadBoothReturnHistory(eventId){
+  const list=el("boothReturnHistoryList");
+  if(!list)return;
+  try{
+    const rows=await sb(`booth_stock_movements?select=id,created_at,product_name,barcode,quantity,staff,memo,movement_type&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(return,event_transfer,event_stock_confirm)&item_type=eq.normal&order=created_at.desc&limit=100`);
+    const values=Array.isArray(rows)?rows:[];
+    list.innerHTML=values.length?`<div class="booth-history-table-wrap"><table class="booth-history-table"><thead><tr><th>\u65e5\u6642</th><th>\u5546\u54c1\u540d</th><th>\u30d0\u30fc\u30b3\u30fc\u30c9</th><th>\u6570\u91cf</th><th>\u51e6\u7406</th><th>\u62c5\u5f53\u8005</th></tr></thead><tbody>${values.map(row=>`<tr><td>${esc(formatBoothDateTime(row.created_at))}</td><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.quantity??0)}</td><td>${esc(row.movement_type==="event_stock_confirm"?"\u30a4\u30d9\u30f3\u30c8\u68da\u306b\u6b8b\u3059":"\u901a\u5e38\u68da\u3078\u623b\u3059")}</td><td>${esc(row.staff||"-")}</td></tr>`).join("")}</tbody></table></div>`:"<div class=\"booth-empty\">\u623b\u308a\u5728\u5eab\u5c65\u6b74\u306f\u3042\u308a\u307e\u305b\u3093\u3002</div>";
+  }catch(error){list.innerHTML=`<div class="booth-empty">${esc(error.message||"\u623b\u308a\u5c65\u6b74\u3092\u8aad\u307f\u8fbc\u3081\u307e\u305b\u3093\u3002")}</div>`;}
+}
+
+async function exportBoothDepartureInventoryCsv(event){
+  try{
+    const data=await buildBoothDepartureInventoryData(event?.id);
+    const rows=[
+      ["\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u5728\u5eab"],
+      ["\u5546\u54c1\u540d","\u30d0\u30fc\u30b3\u30fc\u30c9","\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u73fe\u5728\u5eab","\u6700\u7d42\u66f4\u65b0"],
+      ...data.normalRows.map(row=>[row.product_name||"",row.barcode||"",row.commonShelfQty??0,row.updated_at||""]),
+      [],
+      ["\u30ac\u30c1\u30e3\u6301\u3061\u51fa\u3057\u5728\u5eab"],
+      ["\u5546\u54c1\u540d","\u30d0\u30fc\u30b3\u30fc\u30c9","\u30ac\u30c1\u30e3\u6301\u3061\u51fa\u3057\u6570","\u623b\u308a\u5b9f\u6570","\u4f7f\u7528\u6570","\u73fe\u5728\u30ac\u30c1\u30e3\u5728\u5eab"],
+      ...data.gachaRows.map(row=>[row.product_name||"",row.barcode||"",row.taken,boothGachaDisplayQty(row.returned),boothGachaDisplayQty(row.used),row.remain])
+    ];
+    downloadBoothCsvFile(`${boothEventExportBaseName(event,"\u6301\u3061\u51fa\u3057\u5728\u5eab\u4e00\u89a7")}.csv`,rows);
+  }catch(error){
+    boothShowError("CSV\u51fa\u529b\u30a8\u30e9\u30fc",error.message||"\u6301\u3061\u51fa\u3057\u5728\u5eab\u4e00\u89a7CSV\u306e\u51fa\u529b\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002");
+  }
+}
+
+async function exportBoothDepartureInventoryPdf(event){
+  try{
+    const data=await buildBoothDepartureInventoryData(event?.id);
+    const html=`<h1>\u6301\u3061\u51fa\u3057\u5728\u5eab\u4e00\u89a7</h1>
+      ${boothPdfTable("\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u5728\u5eab",["\u5546\u54c1\u540d","\u30d0\u30fc\u30b3\u30fc\u30c9","\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u73fe\u5728\u5eab","\u6700\u7d42\u66f4\u65b0"],data.normalRows.map(row=>[row.product_name||"",row.barcode||"",row.commonShelfQty??0,formatBoothDateTime(row.updated_at)]))}
+      ${boothPdfTable("\u30ac\u30c1\u30e3\u6301\u3061\u51fa\u3057\u5728\u5eab",["\u5546\u54c1\u540d","\u30d0\u30fc\u30b3\u30fc\u30c9","\u30ac\u30c1\u30e3\u6301\u3061\u51fa\u3057\u6570","\u623b\u308a\u5b9f\u6570","\u4f7f\u7528\u6570","\u73fe\u5728\u30ac\u30c1\u30e3\u5728\u5eab"],data.gachaRows.map(row=>[row.product_name||"",row.barcode||"",row.taken,boothGachaDisplayQty(row.returned),boothGachaDisplayQty(row.used),row.remain]))}`;
+    if(openBoothPdfWindow(boothEventExportBaseName(event,"\u6301\u3061\u51fa\u3057\u5728\u5eab\u4e00\u89a7"),html))boothShowSuccess("PDF\u51fa\u529b","\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u5728\u5eab\u306ePDF\u3092\u958b\u304d\u307e\u3057\u305f\u3002");
+  }catch(error){
+    boothShowError("PDF\u51fa\u529b\u30a8\u30e9\u30fc",error.message||"\u6301\u3061\u51fa\u3057\u5728\u5eab\u4e00\u89a7PDF\u306e\u51fa\u529b\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002");
+  }
+}
 
 loadBoothEventReport=async function(eventId){
   const body=el("boothEventReportBody");
