@@ -17,7 +17,14 @@ let lastScanAt=0;
 let zxingReader=null;
 let zxingRunning=false;
 
+function removeLegacyGachaInventoryOptions(){
+  document.querySelectorAll('#type option[value="gacha"],#type option[value="gacha_return"]').forEach(option=>option.remove());
+}
+
+removeLegacyGachaInventoryOptions();
+
 function render(){
+  removeLegacyGachaInventoryOptions();
   renderStaffOptions();
   ensureEventPickSourceControl();
   renderEventPickOptions();
@@ -725,6 +732,7 @@ async function patchInventoryEventItem(item,payload){
 }
 
 async function moveEventShelfQtyToGacha(event,product,qty){
+  return false;
   const item=await findInventoryEventItem(event.id,product.barcode,"normal");
   const current=getEventShelfCurrentQty(item);
   if(!item||current<qty)return false;
@@ -841,6 +849,8 @@ async function insertInventoryGachaMovement(event,product,qty,staff,memo,movemen
 }
 
 async function registerGachaFromInventory({action,event,product,barcode,qty,staff,memo,currentStock}){
+  throw new Error("ガチャ数量は在庫変動登録から変更できません。イベント管理の戻りカウントだけで登録してください。");
+  /* Legacy path intentionally disabled: gacha stock is not a normal inventory movement. */
   if(window.__aricoInventoryGachaSaving){
     showMessage("ガチャ登録処理中です。完了までお待ちください。","err");
     return;
@@ -966,6 +976,10 @@ async function registerBarcode(barcode){
     const isEventPick=type==="event_pick";
     const isGacha=type==="gacha";
     const isGachaReturn=type==="gacha_return";
+    if(isGacha||isGachaReturn){
+      showMessage("ガチャ数量は在庫変動登録から変更できません。イベント管理の戻りカウントだけで登録してください。","err");
+      return;
+    }
     const requiresEvent=isEventPick||isGacha||isGachaReturn;
     const isStockOut=type==="\u51fa\u8377";
     const canChooseSource=isStockOut;

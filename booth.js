@@ -2214,10 +2214,9 @@ function boothEventItemCurrentQty(item){
 }
 
 function boothGachaItemCurrentQty(item){
-  const taken=Number(item?.taken_qty||0);
-  const returned=Number(item?.returned_qty||0);
-  if(isBoothGachaReturnCounted(item))return Math.max(0,returned);
-  return Math.max(0,taken-returned);
+  const returned=boothGachaReturnActualQty(item);
+  if(returned===null)return Math.max(0,Number(item?.taken_qty||0));
+  return Math.max(0,returned);
 }
 
 function isBoothGachaReturnCounted(item){
@@ -2856,7 +2855,7 @@ async function loadBoothDepartureInventoryList(eventId){
       sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=eq.confirmed&order=sold_at.asc&limit=2000`).catch(()=>[])
     ]);
     const normalItems=Array.isArray(items)?items:[];
-    const confirmedSales=Array.isArray(salesRows)?salesRows:[];
+    const confirmedSales=(Array.isArray(salesRows)?salesRows:[]).filter(row=>!isBoothGachaSaleRow(row));
     const hasSalesImport=confirmedSales.length>0;
     const salesByBarcode=new Map();
     confirmedSales.forEach(row=>{
@@ -2935,7 +2934,7 @@ async function buildBoothDepartureInventoryData(eventId){
     sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=eq.confirmed&order=sold_at.asc&limit=3000`).catch(()=>[])
   ]);
   const itemRows=Array.isArray(items)?items:[];
-  const confirmedSales=Array.isArray(salesRows)?salesRows:[];
+  const confirmedSales=(Array.isArray(salesRows)?salesRows:[]).filter(row=>!isBoothGachaSaleRow(row));
   const salesByBarcode=new Map();
   confirmedSales.forEach(row=>{
     const barcode=String(row.barcode||"").trim();
@@ -4965,12 +4964,22 @@ async function getBoothLatestSmaregiStock(barcode){
 }
 
 async function findBoothGachaEventItem(eventId,barcode){
-  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty&event_id=eq.${encodeURIComponent(eventId)}&barcode=eq.${encodeURIComponent(barcode)}&item_type=eq.gacha_prize&limit=1`);
+  const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo&event_id=eq.${encodeURIComponent(eventId)}&barcode=eq.${encodeURIComponent(barcode)}&item_type=eq.gacha_prize&limit=1`);
   return Array.isArray(rows)&&rows[0]?rows[0]:null;
 }
 
 async function getBoothGachaSummary(eventId,barcode){
   const item=await findBoothGachaEventItem(eventId,barcode);
+  const picked=Number(item?.taken_qty||0);
+  const countedReturn=boothGachaReturnActualQty(item);
+  return {
+    item,
+    picked,
+    returned:countedReturn,
+    current:boothGachaItemCurrentQty(item),
+    consumed:boothGachaUsedQty(item)
+  };
+  /*
   let picked=Number(item?.taken_qty||0);
   let returned=0;
   try{
@@ -4987,6 +4996,7 @@ async function getBoothGachaSummary(eventId,barcode){
     current: picked-returned,
     consumed: picked-returned
   };
+  */
 }
 
 function getBoothEventShelfCurrentQty(item){
@@ -5007,6 +5017,7 @@ async function patchBoothEventItem(item,payload){
 }
 
 async function moveBoothEventShelfQtyToGacha(event,product,quantity){
+  return null;
   const item=await findBoothEventItemByBarcode(event.id,product.barcode);
   const stock=await findBoothEventStorageStock(getBoothCurrentStoreCode(),product.barcode);
   const current=Number(stock?.storage_qty||0);
@@ -5141,8 +5152,8 @@ async function insertBoothGachaInventoryLog(event,product,quantity,staff,memo,ty
       quantity,
       memo,
       event_id:event.id,
-      affects_smaregi:true,
-      smaregi_delta:delta,
+       affects_smaregi:false,
+       smaregi_delta:0,
       equipment_checked:false
     })
   });
@@ -5164,16 +5175,17 @@ async function insertBoothGachaMovement(event,product,quantity,staff,memo,moveme
       staff,
       memo,
       takeout_source:safeSource,
-      affects_smaregi:true,
-      smaregi_delta:delta
+       affects_smaregi:false,
+       smaregi_delta:0
     }])
   });
 }
 
 async function upsertBoothGachaEventItem(event,product,quantity,action){
+  if(action!=="pick")throw new Error("ガチャ戻りは専用の戻りカウントで登録してください。");
   const eventId=encodeURIComponent(event.id);
   const barcode=encodeURIComponent(product.barcode);
-  const rows=await sb(`booth_event_items?select=id,taken_qty,returned_qty&event_id=eq.${eventId}&barcode=eq.${barcode}&item_type=eq.gacha_prize&limit=1`);
+  const rows=await sb(`booth_event_items?select=id,taken_qty,returned_qty,consumed_qty&event_id=eq.${eventId}&barcode=eq.${barcode}&item_type=eq.gacha_prize&limit=1`);
   const now=new Date().toISOString();
   if(Array.isArray(rows)&&rows[0]){
     const currentTaken=Number(rows[0].taken_qty||0);
@@ -5187,15 +5199,13 @@ async function upsertBoothGachaEventItem(event,product,quantity,action){
         product_name:product.name||"",
         taken_qty:nextTaken,
         returned_qty:nextReturned,
-        consumed_qty:Math.max(0,nextTaken-nextReturned),
+        consumed_qty:Number(rows[0].consumed_qty||0),
         difference_qty:0,
         updated_at:now
       })
     });
     return;
   }
-  const taken=action==="pick"?quantity:0;
-  const returned=action==="return"?quantity:0;
   await sb("booth_event_items",{
     method:"POST",
     headers:{Prefer:"return=minimal"},
@@ -5204,9 +5214,9 @@ async function upsertBoothGachaEventItem(event,product,quantity,action){
       barcode:product.barcode,
       product_name:product.name||"",
       item_type:"gacha_prize",
-      taken_qty:taken,
-      returned_qty:returned,
-      consumed_qty:Math.max(0,taken-returned),
+      taken_qty:quantity,
+      returned_qty:0,
+      consumed_qty:0,
       difference_qty:0,
       updated_at:now
     }])
@@ -5218,6 +5228,7 @@ function getBoothGachaStaffOptions(){
 }
 
 function renderBoothGachaPanel(event){
+  return renderBoothGachaListPanel(event);
   const area=el("boothEventWorkArea");
   if(!area)return;
   const closed=isBoothEventClosed(event);
@@ -5299,6 +5310,10 @@ async function validateBoothGachaForm(action){
     showBoothClosedError();
     return null;
   }
+  if(action!=="pick"){
+    boothShowError("ガチャ戻り登録エラー","戻り実数はイベント管理のガチャ戻りカウントだけで登録してください。");
+    return null;
+  }
   const barcode=String(el("boothGachaBarcode")?.value||"").trim();
   const qtyText=String(el("boothGachaQty")?.value||"").trim();
   const staff=String(el("boothGachaStaff")?.value||"").trim();
@@ -5364,6 +5379,8 @@ async function confirmBoothGachaPick(){
 }
 
 async function confirmBoothGachaReturn(){
+  boothShowError("ガチャ戻り登録は使用できません","戻り実数はイベント管理のガチャ戻りカウントだけで登録してください。");
+  return;
   const data=await validateBoothGachaForm("return");
   if(!data)return;
   const body=[
@@ -5381,6 +5398,10 @@ async function confirmBoothGachaReturn(){
 }
 
 async function registerBoothGachaMovement(action,data){
+  if(action!=="pick"){
+    boothShowError("ガチャ戻り登録エラー","戻り実数はイベント管理のガチャ戻りカウントだけで登録してください。");
+    return;
+  }
   if(window.__aricoBoothGachaSaving){
     boothShowError("ガチャ登録エラー","ガチャ登録処理中です。完了までお待ちください。");
     return;
@@ -5393,7 +5414,7 @@ async function registerBoothGachaMovement(action,data){
   let eventShelfMoveResult=null;
   let movementSource="normal";
   try{
-    if(isPick){
+    if(false&&isPick){
       eventShelfMoveResult=await moveBoothEventShelfQtyToGacha(data.event,data.product,data.quantity);
       if(eventShelfMoveResult){
         movementSource="storage";
@@ -5404,7 +5425,7 @@ async function registerBoothGachaMovement(action,data){
         productUpdated=true;
         movementSource="normal";
       }
-    }else{
+    }else if(!isPick){
       const nextStock=data.currentStock+data.quantity;
       await updateBoothProductBaseStock(data.product.barcode,nextStock);
       productUpdated=true;
@@ -7365,7 +7386,7 @@ async function confirmBoothSalesImport(){
   const {event,fromDate,toDate,staff}=form;
   try{
     const pending=await sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(event.id)}&import_status=eq.pending&order=sold_at.asc&limit=500`);
-    const rows=Array.isArray(pending)?pending:[];
+    const rows=(Array.isArray(pending)?pending:[]).filter(row=>!isBoothGachaSaleRow(row));
     if(!rows.length){
       boothShowError("販売取り込みエラー","確定待ちの仮取り込みデータがありません。");
       return;
@@ -7892,6 +7913,7 @@ async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
 }
 
 async function moveBoothEventShelfQtyToGacha(event,product,quantity){
+  return null;
   const stock=await findBoothEventStorageStock(getBoothCurrentStoreCode(),product.barcode);
   const current=Number(stock?.storage_qty||0);
   if(!stock||current<quantity)return null;
@@ -7923,7 +7945,7 @@ async function confirmBoothSalesImport(){
   const {event,fromDate,toDate,staff}=form;
   try{
     const pending=await sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(event.id)}&import_status=eq.pending&order=sold_at.asc&limit=500`);
-    const rows=Array.isArray(pending)?pending:[];
+    const rows=(Array.isArray(pending)?pending:[]).filter(row=>!isBoothGachaSaleRow(row));
     if(!rows.length){boothShowError("\u8ca9\u58f2\u78ba\u5b9a\u30a8\u30e9\u30fc","\u672a\u78ba\u8a8d\u306e\u8ca9\u58f2\u30c7\u30fc\u30bf\u304c\u3042\u308a\u307e\u305b\u3093\u3002");return;}
     const ok=typeof confirmAppAction==="function"?await confirmAppAction("\u8ca9\u58f2\u3092\u78ba\u5b9a",`${getBoothSalesContextSummary(event,fromDate,toDate)}\n\n${rows.length}\u4ef6\u3092\u78ba\u5b9a\u3057\u307e\u3059\u3002`,{okText:"\u78ba\u5b9a"}):true;
     if(!ok)return;
