@@ -732,6 +732,131 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   }
 }
 
+.booth-return-destination-options{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  margin:12px 0;
+}
+.booth-return-destination-btn{
+  min-height:48px;
+  border:2px solid var(--line,#b8dcc9);
+  border-radius:8px;
+  background:#eef8f2;
+  color:#0b4b33;
+  font-weight:800;
+  cursor:pointer;
+}
+.booth-return-destination-btn.is-selected{
+  background:#0b6846;
+  border-color:#0b6846;
+  color:#fff;
+}
+.booth-return-target-event{
+  padding:12px;
+  border:1px solid #b8dcc9;
+  border-radius:8px;
+  background:#f5fbf7;
+}
+.booth-return-target-event[hidden]{display:none}
+.booth-return-target-event select,
+.booth-return-common-fields input,
+.booth-return-common-fields select,
+.booth-return-barcode-label input{
+  width:100%;
+  min-height:42px;
+}
+.booth-return-scan-controls{
+  display:grid;
+  grid-template-columns:auto auto minmax(220px,1fr) auto;
+  align-items:end;
+  gap:10px;
+  margin:14px 0 8px;
+}
+.booth-return-scan-controls > button{min-height:42px}
+.booth-return-barcode-label,
+.booth-return-common-fields label{
+  display:grid;
+  gap:5px;
+  font-weight:700;
+}
+.booth-return-common-fields{
+  display:grid;
+  grid-template-columns:minmax(180px,.6fr) minmax(220px,1.4fr);
+  gap:10px;
+  margin:10px 0;
+}
+.booth-return-draft-list{
+  display:grid;
+  gap:10px;
+  max-height:55vh;
+  overflow-y:auto;
+  padding:2px;
+}
+.booth-return-draft-item{
+  border:1px solid #b8dcc9;
+  border-radius:8px;
+  padding:12px;
+  background:#fbfffc;
+}
+.booth-return-draft-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.booth-return-draft-head strong{overflow-wrap:anywhere}
+.booth-return-draft-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px 14px;
+  margin:8px 0;
+  color:#315d4c;
+  font-size:.9em;
+}
+.booth-return-draft-controls{
+  display:grid;
+  grid-template-columns:48px minmax(90px,140px) 48px;
+  justify-content:end;
+  gap:8px;
+  align-items:center;
+}
+.booth-return-draft-controls input{
+  width:100%;
+  min-height:42px;
+  text-align:center;
+  font-size:1.1em;
+  font-weight:800;
+}
+.booth-return-draft-controls button{min-height:42px;font-size:1.2em}
+.booth-return-apply-btn{
+  width:100%;
+  min-height:50px;
+  margin-top:12px;
+  font-size:1.05em;
+  font-weight:900;
+}
+
+@media(max-width:800px){
+  .booth-return-destination-options,
+  .booth-return-common-fields{
+    grid-template-columns:1fr;
+  }
+  .booth-return-scan-controls{
+    grid-template-columns:1fr 1fr;
+  }
+  .booth-return-barcode-label{
+    grid-column:1 / -1;
+  }
+  .booth-return-scan-controls > button,
+  .booth-return-apply-btn{
+    width:100%;
+  }
+  .booth-return-draft-controls{
+    justify-content:stretch;
+  }
+}
+
 
 /* スマホでは現場用のスキャン登録だけ表示 */
 @media(max-width:800px){
