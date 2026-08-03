@@ -3647,6 +3647,16 @@ async function findBoothEventStorageStock(storeCode,barcode){
   return Array.isArray(rows)&&rows[0]?rows[0]:null;
 }
 
+// Older event rows were created before the store-wide event shelf table was
+// introduced. Prefer the explicit common-shelf balance, with a legacy
+// event-item fallback for those rows so their return can still be completed.
+function getBoothReturnAvailability(item,storageStock){
+  if(storageStock){
+    return {quantity:Math.max(0,Number(storageStock.storage_qty||0)),source:"common-event-shelf"};
+  }
+  return {quantity:getBoothEventShelfCurrentQty(item),source:"legacy-event-item"};
+}
+
 async function restoreBoothEventStorageStock(storeCode,item,previousStock){
   const current=await findBoothEventStorageStock(storeCode,item?.barcode);
   if(previousStock){
@@ -7924,13 +7934,15 @@ async function addBoothReturnDraftFromBarcode(rawBarcode){
     return;
   }
   try{
-    const [item,stock]=await Promise.all([
+    const [item,stock,product]=await Promise.all([
       findBoothEventItemByBarcode(event.id,barcode),
-      findBoothEventStorageStock(getBoothCurrentStoreCode(),barcode)
+      findBoothEventStorageStock(getBoothCurrentStoreCode(),barcode),
+      findBoothProductByBarcode(barcode)
     ]);
-    const currentQty=Number(stock?.storage_qty||0);
+    const availability=getBoothReturnAvailability(item,stock);
+    const currentQty=availability.quantity;
     if(!item||currentQty<=0){
-      boothShowError("\u5bfe\u8c61\u5916\u5546\u54c1","\u5e97\u8217\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u306b\u6b8b\u6570\u304c\u3042\u308b\u5546\u54c1\u306e\u307f\u5bfe\u8c61\u3067\u3059\u3002");
+      boothShowError("\u623b\u308a\u5bfe\u8c61\u5916\u5546\u54c1",`${product?.name||barcode}\n\u901a\u5e38\u68da\u5728\u5eab: ${Number(product?.base_stock||0)}\n\u3053\u306e\u30a4\u30d9\u30f3\u30c8\u306e\u623b\u308a\u53ef\u80fd数: ${currentQty}\n\u6301\u3061出し\u6b8b\u6570または\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u6b8b\u6570がある\u5546\u54c1を\u8aad\u307f取ってください。`);
       return;
     }
     const items=getBoothReturnDraft(event);
@@ -7939,7 +7951,7 @@ async function addBoothReturnDraftFromBarcode(rawBarcode){
       boothShowError("\u623b\u3057\u6570\u91cf\u30a8\u30e9\u30fc",`\u623b\u3057\u6570\u91cf\u306f\u73fe\u5728\u5eab\u6570(${currentQty})\u3092\u8d85\u3048\u3089\u308c\u307e\u305b\u3093\u3002`);
       return;
     }
-    items.set(barcode,{barcode,productName:item.product_name||"",item,currentQty,quantity:Math.min(currentQty,Number(existing?.quantity||0)+1)});
+    items.set(barcode,{barcode,productName:item.product_name||product?.name||"",item,currentQty,source:availability.source,quantity:Math.min(currentQty,Number(existing?.quantity||0)+1)});
     renderBoothReturnDraftCards(event);
     const barcodeInput=el("boothReturnBarcode");
     if(barcodeInput){barcodeInput.value="";barcodeInput.focus();}
@@ -7991,10 +8003,11 @@ async function applyBoothReturnDraft(){
         findBoothProductByBarcode(entry.barcode)
       ]);
       const quantity=Number(entry.quantity||0);
-      const currentQty=Number(stock?.storage_qty||0);
-      if(!item||!stock||currentQty<quantity)throw new Error(`${entry.productName||entry.barcode}: \u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u306e\u6b8b\u6570(${currentQty})\u304c\u4e0d\u8db3\u3057\u3066\u3044\u307e\u3059\u3002`);
+      const availability=getBoothReturnAvailability(item,stock);
+      const currentQty=availability.quantity;
+      if(!item||currentQty<quantity)throw new Error(`${entry.productName||entry.barcode}: \u623b\u308a\u53ef\u80fd\u6570(${currentQty})\u304c\u4e0d\u8db3\u3057\u3066\u3044\u307e\u3059\u3002\u901a\u5e38\u68da\u5728\u5eab\u306f\u623b\u308a\u53ef\u80fd\u6570\u306b\u306f\u542b\u307e\u308c\u307e\u305b\u3093\u3002`);
       if(!product)throw new Error(`${entry.barcode}: \u5546\u54c1\u30de\u30b9\u30bf\u30fc\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3002`);
-      checked.push({item,stock,product,quantity});
+      checked.push({item,stock,product,quantity,source:availability.source});
     }
     const ok=typeof confirmAppAction==="function"?await confirmAppAction("\u623b\u308a\u5728\u5eab\u3092\u53cd\u6620",checked.map(row=>`${row.product.name||row.item.product_name}: ${row.quantity}`).join("\n"),{okText:"\u53cd\u6620"}):true;
     if(!ok)return;
@@ -8007,13 +8020,17 @@ async function applyBoothReturnDraft(){
         if(destination==="shelf"){
           operation.baseBefore=Number(row.product.base_stock||0);
           await updateBoothProductBaseStock(row.product.barcode,operation.baseBefore+row.quantity);
-          await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),row.product,-row.quantity);
+          if(row.source==="common-event-shelf"){
+            await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),row.product,-row.quantity);
+          }
           operation.inventoryLog=await insertBoothEventReturnInventoryLog(event,row.item,row.quantity,staff,memo,"event_return");
           if(!operation.inventoryLog?.id)throw new Error(`${row.product.name||row.product.barcode}: 戻り履歴を保存できませんでした。`);
           operation.sourceMovement=await insertBoothReturnMovement(event,row.item,row.quantity,staff,memo,"return");
           if(!operation.sourceMovement?.id)throw new Error(`${row.product.name||row.product.barcode}: 戻り移動履歴を保存できませんでした。`);
-          operation.storageMovement=await insertBoothCommonEventMovement(event,row.product,row.quantity,staff,memo,"storage_out");
-          if(!operation.storageMovement?.id)throw new Error(`${row.product.name||row.product.barcode}: イベント棚移動履歴を保存できませんでした。`);
+          if(row.source==="common-event-shelf"){
+            operation.storageMovement=await insertBoothCommonEventMovement(event,row.product,row.quantity,staff,memo,"storage_out");
+            if(!operation.storageMovement?.id)throw new Error(`${row.product.name||row.product.barcode}: イベント棚移動履歴を保存できませんでした。`);
+          }
         }else{
           operation.inventoryLog=await insertBoothEventReturnInventoryLog(event,row.item,row.quantity,staff,memo,"event_stock_confirm");
           if(!operation.inventoryLog?.id)throw new Error(`${row.product.name||row.product.barcode}: 確認履歴を保存できませんでした。`);
@@ -8026,7 +8043,7 @@ async function applyBoothReturnDraft(){
       for(const done of applied.reverse()){
         try{
           if(done.baseBefore!==null)await updateBoothProductBaseStock(done.row.product.barcode,done.baseBefore);
-          if(destination==="shelf")await restoreBoothEventStorageStock(getBoothCurrentStoreCode(),done.row.product,done.storageBefore);
+          if(destination==="shelf"&&done.row.source==="common-event-shelf")await restoreBoothEventStorageStock(getBoothCurrentStoreCode(),done.row.product,done.storageBefore);
           if(done.inventoryLog?.id)await sb(`inventory_logs?id=eq.${encodeURIComponent(done.inventoryLog.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
           if(done.sourceMovement?.id)await sb(`booth_stock_movements?id=eq.${encodeURIComponent(done.sourceMovement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
           if(done.storageMovement?.id)await sb(`event_storage_movements?id=eq.${encodeURIComponent(done.storageMovement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
