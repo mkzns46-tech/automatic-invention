@@ -4931,16 +4931,23 @@ async function updateBoothReturnedQty(item,quantity){
 }
 
 async function insertBoothEventReturnInventoryLog(event,item,quantity,staff,memo,type="event_return"){
+  // inventory_logs.type is shared with the app inventory screen and is
+  // constrained to the four inventory operation types. Keep the event
+  // operation detail in memo while storing a valid inventory type.
+  const inventoryType=type==="event_stock_confirm" ? "\u5728\u5eab\u4fee\u6b63" : "\u5165\u8377";
+  const operationMemo=type==="event_stock_confirm"
+    ? ["\u30a4\u30d9\u30f3\u30c8\u68da\u306b\u6b8b\u3059\u78ba\u8a8d",memo].filter(Boolean).join(" / ")
+    : ["\u30a4\u30d9\u30f3\u30c8\u623b\u3057\uff08\u901a\u5e38\u68da\uff09",memo].filter(Boolean).join(" / ");
   const inserted=await sb("inventory_logs",{
     method:"POST",
     headers:{Prefer:"return=representation"},
     body:JSON.stringify({
-      type,
+      type:inventoryType,
       staff,
       barcode:item.barcode,
       product_name:item.product_name||"",
       quantity,
-      memo,
+      memo:operationMemo,
       event_id:event.id,
       affects_smaregi:false,
       smaregi_delta:0
@@ -7953,8 +7960,12 @@ async function addBoothReturnDraftFromBarcode(rawBarcode){
     }
     items.set(barcode,{barcode,productName:item.product_name||product?.name||"",item,currentQty,source:availability.source,quantity:Math.min(currentQty,Number(existing?.quantity||0)+1)});
     renderBoothReturnDraftCards(event);
+    const quantityInput=[...document.querySelectorAll("[data-booth-return-qty]")]
+      .find(input=>input.dataset.boothReturnQty===barcode);
     const barcodeInput=el("boothReturnBarcode");
-    if(barcodeInput){barcodeInput.value="";barcodeInput.focus();}
+    if(barcodeInput)barcodeInput.value="";
+    if(quantityInput){quantityInput.focus();quantityInput.select();}
+    else barcodeInput?.focus();
   }catch(error){
     boothShowError("\u623b\u308a\u5728\u5eab\u5546\u54c1\u30a8\u30e9\u30fc",error.message||"\u5546\u54c1\u3092\u78ba\u8a8d\u3067\u304d\u307e\u305b\u3093\u3002");
   }
