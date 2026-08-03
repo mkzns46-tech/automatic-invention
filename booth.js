@@ -8102,9 +8102,24 @@ function getBoothSaleAmount(row){
 }
 
 const BOOTH_GACHA_SMAREGI_PRODUCT_IDS=new Set(["18485","11274"]);
+const BOOTH_NON_GACHA_DISCOUNT_RATE=0.1;
 
 function isBoothGachaSaleRow(row){
   return BOOTH_GACHA_SMAREGI_PRODUCT_IDS.has(String(row?.smaregi_product_id||"").trim());
+}
+
+function getBoothReportSaleAmount(row){
+  const amount=getBoothSaleAmount(row);
+  if(isBoothGachaSaleRow(row))return amount;
+  const discount=Math.floor(Math.abs(amount)*BOOTH_NON_GACHA_DISCOUNT_RATE);
+  return amount>=0?amount-discount:amount+discount;
+}
+
+function prepareBoothReportSalesRows(rows){
+  return (Array.isArray(rows)?rows:[]).map(row=>({
+    ...row,
+    amount:getBoothReportSaleAmount(row)
+  }));
 }
 
 function aggregateBoothSalesByProduct(rows){
@@ -8154,16 +8169,18 @@ buildBoothEventReportData=async function(eventId){
   const isGachaSale=row=>isBoothGachaSaleRow(row);
   const normalSales=salesRows.filter(row=>!isGachaSale(row));
   const gachaSales=salesRows.filter(isGachaSale);
-  const normalSummary=getBoothReportSalesSummaryRows(normalSales);
-  const gachaSummary=getBoothReportSalesSummaryRows(gachaSales);
+  const reportNormalSales=prepareBoothReportSalesRows(normalSales);
+  const reportGachaSales=prepareBoothReportSalesRows(gachaSales);
+  const normalSummary=getBoothReportSalesSummaryRows(reportNormalSales);
+  const gachaSummary=getBoothReportSalesSummaryRows(reportGachaSales);
   return {
     normal:rows.filter(row=>String(row.item_type||"normal")==="normal"),
     gacha,
-    salesRows,
-    normalSales,
-    gachaSales,
-    normalSalesProducts:aggregateBoothSalesByProduct(normalSales),
-    gachaSalesProducts:aggregateBoothSalesByProduct(gachaSales),
+    salesRows:[...reportNormalSales,...reportGachaSales],
+    normalSales:reportNormalSales,
+    gachaSales:reportGachaSales,
+    normalSalesProducts:aggregateBoothSalesByProduct(reportNormalSales),
+    gachaSalesProducts:aggregateBoothSalesByProduct(reportGachaSales),
     movements:Array.isArray(movements)?movements:[],
     diffRows:Array.isArray(diffRows)?diffRows:[],
     totals:{
