@@ -264,6 +264,15 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
   return sales;
 }
 
+function dedupeSales(sales) {
+  const latestByDetail = new Map();
+  (sales || []).forEach(sale => {
+    const key = `${String(sale.smaregi_transaction_id || "").trim()}::${String(sale.smaregi_detail_id || "").trim()}`;
+    if (key !== "::") latestByDetail.set(key, sale);
+  });
+  return [...latestByDetail.values()];
+}
+
 async function fetchTransactions(apiBase, token, context, fromDateTime, toDateTime) {
   const rows = [];
   let pageCount = 0;
@@ -318,7 +327,7 @@ module.exports = async function handler(req, res) {
     const result = await fetchTransactions(apiBase, token, context, fromDateTime, toDateTime);
     const transactions = result.rows;
     const productIdSet = new Set(productIds);
-    const sales = normalizeSales(transactions, productIdSet, context.targetTerminalId);
+    const sales = dedupeSales(normalizeSales(transactions, productIdSet, context.targetTerminalId));
 
     return res.status(200).json({
       sales,

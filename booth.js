@@ -5772,8 +5772,8 @@ function renderBoothSalesPanel(event){
   const storeBadge=context.storeCode==="aichi"?"AICHI":"TOKYO";
   area.innerHTML=`
     <section class="booth-work-card booth-sales-card">
-      <h4>販売取り込み</h4>
-      <p class="section-note">スマレジ販売データを仮取り込みし、確認後にイベント販売数へ反映します。在庫数は変更しません。</p>
+      <h4>開催中販売状況</h4>
+      <p class="section-note">スマレジから最新販売を取得して表示します。取得時は在庫数を変更せず、販売確定時だけイベント棚へ反映します。</p>
       <div class="booth-sales-context">
         <div><span>接続先</span><strong>${esc(context.accountName||"スマレジ本番接続")}</strong></div>
         <div><span>店舗</span><strong>${esc(context.storeName||"-")} / ${esc(storeBadge)}</strong></div>
@@ -5794,15 +5794,15 @@ function renderBoothSalesPanel(event){
         <label>担当者<span class="required">必須</span>
           <select id="boothSalesStaff" ${closed?"disabled":""}>${getBoothSalesStaffOptions()}</select>
         </label>
-        <button type="button" id="boothSalesDraftImportBtn" ${closed?"disabled":""}>仮取り込み</button>
+        <button type="button" id="boothSalesDraftImportBtn" ${closed?"disabled":""}>最新販売を取得</button>
         <button type="button" id="boothSalesConfirmBtn" class="secondary" ${closed?"disabled":""}>確定して販売数へ反映</button>
         <button type="button" id="reloadBoothSalesImportBtn" class="secondary">再読み込み</button>
       </div>
       <div id="boothSalesImportList" class="booth-sales-import-list">
-        <div class="booth-empty">仮取り込み一覧を読み込み中...</div>
+         <div class="booth-empty">開催中販売状況を読み込み中...</div>
       </div>
       <div id="boothSalesRegisterStatus" class="message"></div>
-      <p class="section-note booth-sales-register-note">店舗IDだけでは取り込みません。イベント販売用レジIDが未設定の場合、仮取り込みは実行できません。</p>
+       <p class="section-note booth-sales-register-note">店舗IDだけでは取得しません。イベント販売用レジIDが未設定の場合、販売取得は実行できません。</p>
     </section>`;
 
   el("boothSalesDraftImportBtn")?.addEventListener("click",importBoothSalesDraft);
@@ -5829,14 +5829,16 @@ function buildInFilter(values){
 async function fetchBoothProductsForItems(items){
   const barcodes=[...new Set(items.map(item=>String(item.barcode||"").trim()).filter(Boolean))];
   if(!barcodes.length)return [];
-  const rows=await sb(`products?select=id,barcode,name,smaregi_product_id&barcode=in.(${buildInFilter(barcodes)})`);
+  // The production products table uses barcode as its primary key. Do not
+  // request the optional id column: it is not present in the live schema.
+  const rows=await sb(`products?select=*&barcode=in.(${buildInFilter(barcodes)})`);
   return Array.isArray(rows)?rows:[];
 }
 
 async function fetchBoothProductsBySmaregiProductIds(productIds){
   const ids=[...new Set((productIds||[]).map(id=>String(id||"").trim()).filter(Boolean))];
   if(!ids.length)return [];
-  const rows=await sb(`products?select=barcode,name,smaregi_product_id&smaregi_product_id=in.(${buildInFilter(ids)})&limit=2000`);
+  const rows=await sb(`products?select=*&smaregi_product_id=in.(${buildInFilter(ids)})&limit=2000`);
   return Array.isArray(rows)?rows:[];
 }
 
@@ -6826,11 +6828,23 @@ async function updateBoothStorageHistorySplit(itemId){
 }
 
 function getBoothSalesImportKey(row){
-  return `${row.smaregi_transaction_id}::${row.smaregi_detail_id}`;
+  return `${String(row?.smaregi_transaction_id||"").trim()}::${String(row?.smaregi_detail_id||"").trim()}`;
+}
+
+function normalizeBoothSalesIdentity(value){
+  return String(value??"").trim().toLowerCase();
+}
+
+function setBoothSalesImportSummary(message,className="message"){
+  const status=el("boothSalesRegisterStatus");
+  if(!status)return;
+  status.className=className;
+  status.style.whiteSpace="pre-wrap";
+  status.textContent=message;
 }
 
 async function fetchExistingBoothSalesImportMap(eventId){
-  const rows=await sb(`event_sales_imports?select=id,smaregi_transaction_id,smaregi_detail_id,quantity,unit_price,amount,import_status&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed)`);
+  const rows=await sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed,cancelled)&limit=5000`);
   const map=new Map();
   (Array.isArray(rows)?rows:[]).forEach(row=>{
     map.set(getBoothSalesImportKey(row),row);
@@ -6839,9 +6853,14 @@ async function fetchExistingBoothSalesImportMap(eventId){
 }
 
 async function saveBoothSalesImportRows(rows,existingMap){
+  const uniqueRows=new Map();
+  (Array.isArray(rows)?rows:[]).forEach(row=>{
+    const key=getBoothSalesImportKey(row);
+    if(key!=="::")uniqueRows.set(key,row);
+  });
   const insertRows=[];
   const updateRows=[];
-  rows.forEach(row=>{
+  uniqueRows.forEach(row=>{
     const existing=existingMap.get(getBoothSalesImportKey(row));
     if(existing)updateRows.push({existing,row});
     else insertRows.push(row);
@@ -6854,14 +6873,49 @@ async function saveBoothSalesImportRows(rows,existingMap){
     });
   }
   for(const {existing,row} of updateRows){
-    const {import_status,...update}=row;
+    const {event_id,smaregi_transaction_id,smaregi_detail_id,import_status,...update}=row;
+    // A confirmed sale has already changed the event shelf. Re-fetching the
+    // same API detail must never turn it back into an unconfirmed sale.
+    update.import_status=existing.import_status==="confirmed"?"confirmed":"pending";
+    if(existing.import_status==="confirmed"&&Number(existing.quantity||0)!==Number(row.quantity||0)){
+      // Do not silently apply a second stock movement for a changed confirmed
+      // detail. Keep the confirmed quantity until a human reviews it.
+      update.quantity=existing.quantity;
+      update.unit_price=existing.unit_price;
+      update.amount=existing.amount;
+    }
     await sb(`event_sales_imports?id=eq.${encodeURIComponent(existing.id)}`,{
       method:"PATCH",
       headers:{Prefer:"return=minimal"},
       body:JSON.stringify(update)
     });
   }
-  return {inserted:insertRows.length,updated:updateRows.length};
+  return {inserted:insertRows.length,updated:updateRows.length,unique:uniqueRows.size};
+}
+
+async function cancelMissingBoothSalesImports(eventId,existingMap,activeKeys,form){
+  const from=Date.parse(`${form.fromDate}T00:00:00+09:00`);
+  const to=Date.parse(`${form.toDate}T23:59:59+09:00`);
+  const registerCode=normalizeBoothSalesIdentity(form.register?.code);
+  const terminalId=normalizeBoothSalesIdentity(form.register?.terminalId||form.register?.registerId);
+  const now=new Date().toISOString();
+  for(const existing of existingMap.values()){
+    if(!["pending","confirmed"].includes(existing.import_status))continue;
+    if(registerCode&&normalizeBoothSalesIdentity(existing.target_register_code)!==registerCode)continue;
+    const existingTerminal=normalizeBoothSalesIdentity(existing.smaregi_terminal_id||existing.smaregi_register_id);
+    if(terminalId&&existingTerminal&&existingTerminal!==terminalId)continue;
+    const soldAt=Date.parse(String(existing.sold_at||""));
+    if(Number.isFinite(soldAt)&&((Number.isFinite(from)&&soldAt<from)||(Number.isFinite(to)&&soldAt>to)))continue;
+    if(activeKeys.has(getBoothSalesImportKey(existing)))continue;
+    // Keep the row for auditability, but remove it from the pending quantity.
+    // Confirmed rows are marked cancelled for human review; no automatic shelf
+    // restoration is performed from a preview refresh.
+    await sb(`event_sales_imports?id=eq.${encodeURIComponent(existing.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({import_status:"cancelled",updated_at:now})
+    });
+  }
 }
 
 async function loadBoothSalesImports(eventId){
@@ -6870,7 +6924,7 @@ async function loadBoothSalesImports(eventId){
   try{
     list.innerHTML='<div class="booth-empty">仮取り込み一覧を読み込み中...</div>';
     const [imports,items]=await Promise.all([
-      sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=eq.pending&order=sold_at.asc&limit=500`),
+      sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed,cancelled)&order=sold_at.asc&limit=2000`),
       fetchBoothEventItems(eventId)
     ]);
     renderBoothSalesImports(Array.isArray(imports)?imports:[],items);
@@ -6893,6 +6947,7 @@ function renderBoothSalesImports(rows,items){
     const hasItem=Boolean(item.id);
     const imported=Number(row.quantity||0);
     const diff=hasItem?getBoothSalesDifference(item,imported):"持ち出し未確定";
+    const statusLabel=row.import_status==="confirmed"?"確定済み":row.import_status==="cancelled"?"取消・変更":"未確定";
     return `<tr>
       <td>${esc(formatBoothDateTime(row.sold_at))}</td>
       <td>${esc(row.product_name||"-")}</td>
@@ -6903,6 +6958,7 @@ function renderBoothSalesImports(rows,items){
       <td>${esc(imported)}</td>
       <td>${hasItem?esc(item.returned_qty??0):"-"}</td>
       <td>${esc(diff)}</td>
+      <td>${esc(statusLabel)}</td>
       <td>${esc(row.smaregi_transaction_id||"-")} / ${esc(row.smaregi_detail_id||"-")}</td>
     </tr>`;
   }).join("");
@@ -6911,6 +6967,7 @@ function renderBoothSalesImports(rows,items){
     const hasItem=Boolean(item.id);
     const imported=Number(row.quantity||0);
     const diff=hasItem?getBoothSalesDifference(item,imported):"持ち出し未確定";
+    const statusLabel=row.import_status==="confirmed"?"確定済み":row.import_status==="cancelled"?"取消・変更":"未確定";
     return `<article class="booth-history-card booth-sales-card-row">
       <div class="booth-history-card-top">
         <strong>${esc(row.product_name||"-")}</strong>
@@ -6922,14 +6979,18 @@ function renderBoothSalesImports(rows,items){
         <span>対象レジ：${esc(row.target_register_name||"-")}</span>
         <span>持ち出し：${esc(item.taken_qty??0)} / 販売候補：${esc(imported)} / 戻り：${esc(item.returned_qty??0)}</span>
         <span>差異見込み：${esc(diff)}</span>
+        <span>状態：${esc(statusLabel)}</span>
         <span>取引：${esc(row.smaregi_transaction_id||"-")} / ${esc(row.smaregi_detail_id||"-")}</span>
       </div>
     </article>`;
   }).join("");
+  const pendingCount=rows.filter(row=>row.import_status==="pending").length;
+  const confirmedCount=rows.filter(row=>row.import_status==="confirmed").length;
+  const cancelledCount=rows.filter(row=>row.import_status==="cancelled").length;
   list.innerHTML=`
-    <div class="booth-sales-import-summary">未確定 ${esc(rows.length)} 行。確認後に「確定して販売数へ反映」を押してください。</div>
+    <div class="booth-sales-import-summary">未確定 ${esc(pendingCount)} 件 / 確定済み ${esc(confirmedCount)} 件 / 取消・変更 ${esc(cancelledCount)} 件。未確定分だけを販売確定できます。</div>
     <div class="booth-history-table-wrap"><table class="booth-history-table booth-sales-table">
-      <thead><tr><th>販売日時</th><th>商品名</th><th>バーコード</th><th>商品ID</th><th>対象レジ</th><th>持ち出し</th><th>販売候補</th><th>戻り</th><th>差異見込み</th><th>取引ID</th></tr></thead>
+      <thead><tr><th>販売日時</th><th>商品名</th><th>バーコード</th><th>商品ID</th><th>対象レジ</th><th>持ち出し</th><th>販売候補</th><th>戻り</th><th>差異見込み</th><th>状態</th><th>取引ID</th></tr></thead>
       <tbody>${tableRows}</tbody>
     </table></div>
     <div class="booth-history-cards">${cardRows}</div>`;
@@ -6978,21 +7039,52 @@ async function importBoothSalesDraft(){
   const {event,fromDate,toDate,staff,register}=form;
   const context=getBoothSalesContext();
   const ok=typeof confirmAppAction==="function"
-    ? await confirmAppAction("販売データ仮取り込み確認",`${getBoothSalesContextSummary(event,fromDate,toDate)}\n\nこの条件で販売データを取得します。`,{okText:"仮取り込み"})
+    ? await confirmAppAction("開催中販売の最新取得確認",`${getBoothSalesContextSummary(event,fromDate,toDate)}\n\nこの条件で最新販売を取得します。在庫数は変更しません。`,{okText:"最新販売を取得"})
     : true;
   if(!ok)return;
 
   try{
     const items=await fetchBoothEventItems(event.id);
     const products=await fetchBoothProductsForItems(items);
-    const itemByBarcode=new Map(items.map(item=>[String(item.barcode||""),item]));
+    const itemByBarcode=new Map();
+    const itemByProductCode=new Map();
     const itemByProductId=new Map();
+    const productBySmaregiId=new Map();
+    const productByBarcode=new Map();
+    const productByCode=new Map();
+    const addCandidate=(map,key,value)=>{
+      if(!key)return;
+      const list=map.get(key)||[];
+      if(!list.some(candidate=>String(candidate?.barcode||"")===String(value?.barcode||"")))list.push(value);
+      map.set(key,list);
+    };
+    items.forEach(item=>{
+      addCandidate(itemByBarcode,normalizeBoothSalesIdentity(item.barcode),item);
+      addCandidate(itemByProductCode,normalizeBoothSalesIdentity(item.product_code||item.productCode||item.code),item);
+    });
     products.forEach(product=>{
       const productId=String(product.smaregi_product_id||"").trim();
-      const item=itemByBarcode.get(String(product.barcode||""));
-      if(productId&&item)itemByProductId.set(productId,{...item,smaregi_product_id:productId,product_name:item.product_name||product.name||""});
+      const barcode=normalizeBoothSalesIdentity(product.barcode);
+      const productCode=normalizeBoothSalesIdentity(product.product_code||product.productCode||product.code);
+      const item=(itemByBarcode.get(barcode)||[])[0];
+      if(productId){
+        addCandidate(productBySmaregiId,normalizeBoothSalesIdentity(productId),product);
+        if(item)addCandidate(itemByProductId,normalizeBoothSalesIdentity(productId),{...item,smaregi_product_id:productId,product_name:item.product_name||product.name||""});
+      }
+      addCandidate(productByBarcode,barcode,product);
+      addCandidate(productByCode,productCode,product);
     });
     const productIds=[...itemByProductId.keys()];
+    const missingProductIds=items.filter(item=>{
+      const productList=itemByBarcode.get(normalizeBoothSalesIdentity(item.barcode))||[];
+      return !productList.some(product=>String(product.smaregi_product_id||"").trim());
+    });
+    if(!productIds.length){
+      const message=`販売データは取得しましたが、商品マスター照合用のスマレジ商品IDがありません。\n取得明細：0件\n未照合：${items.length}件\n商品を自動作成せず、商品マスターのスマレジ商品IDを確認してください。`;
+      setBoothSalesImportSummary(message,"message warn");
+      await loadBoothSalesImports(event.id);
+      return;
+    }
 
     const fromDateTime=String(event.event_start||"").includes("T")?event.event_start:null;
     const toDateTime=String(event.event_end||"").includes("T")?event.event_end:null;
@@ -7010,29 +7102,67 @@ async function importBoothSalesDraft(){
         toDate,
         fromDateTime,
         toDateTime,
-        smaregiProductIds:[]
+        smaregiProductIds:productIds
       })
     });
     const body=await response.json().catch(()=>null);
     if(!response.ok)throw new Error(body?.error||`スマレジ販売データ取得エラー ${response.status}`);
 
-    const existingMap=await fetchExistingBoothSalesImportMap(event.id);
     const salesProductIds=[...new Set((body.sales||[]).map(sale=>String(sale.smaregi_product_id||"").trim()).filter(Boolean))];
     const saleProducts=await fetchBoothProductsBySmaregiProductIds(salesProductIds);
-    const productBySmaregiId=new Map((saleProducts||[]).map(product=>[String(product.smaregi_product_id||""),product]));
+    (saleProducts||[]).forEach(product=>{
+      const productId=normalizeBoothSalesIdentity(product.smaregi_product_id);
+      if(productId)addCandidate(productBySmaregiId,productId,product);
+      addCandidate(productByBarcode,normalizeBoothSalesIdentity(product.barcode),product);
+      addCandidate(productByCode,normalizeBoothSalesIdentity(product.product_code||product.productCode||product.code),product);
+    });
+
+    const uniqueSales=new Map();
+    (body.sales||[]).forEach(sale=>{
+      const key=getBoothSalesImportKey(sale);
+      if(key!=="::")uniqueSales.set(key,sale);
+    });
+    const activeKeys=new Set(uniqueSales.keys());
+    const unmatched=[];
+    const duplicateMatches=[];
+    const rows=[];
     const now=new Date().toISOString();
-    const rows=(body.sales||[]).map(sale=>{
-      const smaregiProductId=String(sale.smaregi_product_id||"");
-      const item=itemByProductId.get(smaregiProductId)||productBySmaregiId.get(smaregiProductId)||{};
-      const barcode=String(item.barcode||smaregiProductId||"").trim();
-      return {
+    uniqueSales.forEach(sale=>{
+      const smaregiProductId=String(sale.smaregi_product_id||"").trim();
+      const productCode=normalizeBoothSalesIdentity(sale.product_code||sale.productCode||sale.code);
+      const barcode=normalizeBoothSalesIdentity(sale.barcode);
+      const productCandidates=[...(productBySmaregiId.get(normalizeBoothSalesIdentity(smaregiProductId))||[])];
+      const itemCandidates=[...(itemByProductId.get(normalizeBoothSalesIdentity(smaregiProductId))||[])];
+      if(!productCandidates.length&&barcode)productCandidates.push(...(productByBarcode.get(barcode)||[]));
+      if(!productCandidates.length&&productCode)productCandidates.push(...(productByCode.get(productCode)||[]));
+      const product=productCandidates[0];
+      if(productCandidates.length>1){
+        duplicateMatches.push({sale,productCandidates});
+        unmatched.push({sale,reason:"商品マスターが複数件一致"});
+        return;
+      }
+      let item=itemCandidates[0];
+      if(!item&&product)item=(itemByBarcode.get(normalizeBoothSalesIdentity(product.barcode))||[])[0];
+      if(!item&&barcode)item=(itemByBarcode.get(barcode)||[])[0];
+      if(!item&&productCode)item=(itemByProductCode.get(productCode)||[])[0];
+      if(!item){
+        unmatched.push({sale,reason:smaregiProductId?"イベント商品未登録":"スマレジ商品IDなし"});
+        return;
+      }
+      const rowBarcode=String(item.barcode||product?.barcode||barcode||"").trim();
+      const quantity=Number(sale.quantity||0);
+      if(!rowBarcode||!quantity){
+        unmatched.push({sale,reason:!rowBarcode?"バーコードなし":"数量0"});
+        return;
+      }
+      rows.push({
         event_id:event.id,
         smaregi_transaction_id:String(sale.smaregi_transaction_id||""),
         smaregi_detail_id:String(sale.smaregi_detail_id||""),
         smaregi_product_id:smaregiProductId,
-        barcode,
-        product_name:item.product_name||item.name||sale.product_name||"",
-        quantity:Number(sale.quantity||0),
+        barcode:rowBarcode,
+        product_name:item.product_name||product?.name||sale.product_name||"",
+        quantity,
         unit_price:Number(sale.unit_price||0),
         amount:Number(sale.amount||0),
         sold_at:sale.sold_at||null,
@@ -7044,10 +7174,30 @@ async function importBoothSalesDraft(){
         smaregi_terminal_id:sale.smaregi_terminal_id||body.context?.targetTerminalId||null,
         import_status:"pending",
         imported_by:staff,
-        imported_at:now,
+        imported_at:body.fetchedAt||now,
         updated_at:now
-      };
-    }).filter(row=>row&&row.smaregi_transaction_id&&row.smaregi_detail_id&&row.quantity!==0);
+      });
+    });
+
+    const salesTotalQty=rows.reduce((sum,row)=>sum+Number(row.quantity||0),0);
+    const salesTotalAmount=rows.reduce((sum,row)=>sum+Number(row.amount||0),0);
+    const unmatchedLines=unmatched.slice(0,10).map(({sale,reason})=>`${sale.smaregi_transaction_id||"-"}/${sale.smaregi_detail_id||"-"}: ${reason}`);
+    const summary=[
+      `最新取得：${Number(body.transactionsCount||0)}取引 / ${uniqueSales.size}明細`,
+      `照合済み：${rows.length}明細 / 販売数量：${salesTotalQty}個 / 売上：${salesTotalAmount}`,
+      `未照合：${unmatched.length}明細 / 商品IDなし：${missingProductIds.length}商品`,
+      `取得日時：${body.fetchedAt||now}`
+    ];
+    if(unmatchedLines.length)summary.push(`未照合明細（先頭${unmatchedLines.length}件）：\n${unmatchedLines.join("\n")}`);
+    if(duplicateMatches.length){
+      summary.unshift("商品マスター重複のため保存を中止しました。重複を解消してから再取得してください。");
+      setBoothSalesImportSummary(summary.join("\n"),"message err");
+      await loadBoothSalesImports(event.id);
+      return;
+    }
+
+    const existingMap=await fetchExistingBoothSalesImportMap(event.id);
+    await cancelMissingBoothSalesImports(event.id,existingMap,activeKeys,form);
 
     if(rows.length){
       try{
@@ -7059,11 +7209,126 @@ async function importBoothSalesDraft(){
       }
     }
     await loadBoothSalesImports(event.id);
-    boothShowSuccess("販売データ仮取り込み完了",`仮取り込み ${rows.length} 行を保存しました。確定するまで販売数には反映されません。`);
+    setBoothSalesImportSummary(summary.join("\n"),unmatched.length?"message warn":"message ok");
+    boothShowSuccess("販売データ取得完了",`最新販売を ${rows.length} 明細へ更新しました。DB在庫は変更していません。`);
   }catch(e){
-    boothShowError("販売取り込みエラー","販売データの仮取り込みに失敗しました。\n"+e.message);
+    boothShowError("販売取得エラー","開催中販売の取得に失敗しました。\n"+e.message);
   }
 }
+
+async function refreshBoothOngoingSalesCache(apiContext={}){
+  const context={
+    ...(typeof getSmaregiRequestContext==="function"?getSmaregiRequestContext():{}),
+    ...(apiContext||{})
+  };
+  const storeCode=String(context.storeCode||window.currentStore||"tokyo").trim().toLowerCase()||"tokyo";
+  const today=new Date().toISOString().slice(0,10);
+  try{
+    const events=await sb(`booth_events?select=*&store_code=eq.${encodeURIComponent(storeCode)}&limit=1000`);
+    const activeEvents=(Array.isArray(events)?events:[]).filter(event=>{
+      if(String(event.status||"").toLowerCase()==="closed")return false;
+      const start=String(event.event_start||"").slice(0,10);
+      const end=String(event.event_end||event.event_start||"").slice(0,10);
+      return (!start||today>=start)&&(!end||today<=end);
+    });
+    if(!activeEvents.length){
+      window.__smaregiOngoingSalesState={ok:true,hasOngoingEvent:false,fetchedAt:new Date().toISOString()};
+      return window.__smaregiOngoingSalesState;
+    }
+    const settings=await sb(`event_register_settings?select=*&store_code=eq.${encodeURIComponent(storeCode)}&limit=1`).catch(()=>[]);
+    const setting=Array.isArray(settings)&&settings[0]?settings[0]:{};
+    const register={
+      code:"event",
+      name:setting.register_name||`${storeCode}イベントレジ`,
+      registerId:String(setting.register_id||""),
+      terminalId:String(setting.terminal_id||setting.register_id||"")
+    };
+    if(!register.terminalId)throw new Error(`${storeCode}店のイベント販売用端末IDが未設定です。`);
+
+    let fetchedAt="";
+    let detailCount=0;
+    for(const event of activeEvents){
+      const items=(await fetchBoothEventItems(event.id)).filter(item=>String(item.item_type||"normal")==="normal");
+      const products=await fetchBoothProductsForItems(items);
+      const itemByBarcode=new Map(items.map(item=>[normalizeBoothSalesIdentity(item.barcode),item]));
+      const productById=new Map();
+      products.forEach(product=>{
+        const id=normalizeBoothSalesIdentity(product.smaregi_product_id);
+        if(id&&!productById.has(id))productById.set(id,product);
+      });
+      const productIds=[...productById.keys()];
+      if(!productIds.length)throw new Error(`${event.name||"開催中イベント"}の商品にスマレジ商品IDが設定されていません。`);
+      const fromDate=String(event.event_start||today).slice(0,10);
+      const toDate=String(event.event_end||today).slice(0,10);
+      const response=await fetch("./api/smaregi-event-sales",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          ...context,
+          storeCode,
+          targetRegisterCode:register.code,
+          targetRegisterName:register.name,
+          targetRegisterId:register.registerId,
+          targetTerminalId:register.terminalId,
+          fromDate,
+          toDate,
+          smaregiProductIds:productIds
+        })
+      });
+      const body=await response.json().catch(()=>null);
+      if(!response.ok)throw new Error(body?.error||`イベント販売API ${response.status}`);
+      fetchedAt=body?.fetchedAt||new Date().toISOString();
+      const sales=Array.isArray(body?.sales)?body.sales:[];
+      const saleProductIds=[...new Set(sales.map(sale=>String(sale.smaregi_product_id||"").trim()).filter(Boolean))];
+      const saleProducts=await fetchBoothProductsBySmaregiProductIds(saleProductIds);
+      const saleProductById=new Map((saleProducts||[]).map(product=>[normalizeBoothSalesIdentity(product.smaregi_product_id),product]));
+      const rows=[];
+      const activeKeys=new Set();
+      sales.forEach(sale=>{
+        const key=getBoothSalesImportKey(sale);
+        if(key==="::")return;
+        activeKeys.add(key);
+        const product=saleProductById.get(normalizeBoothSalesIdentity(sale.smaregi_product_id))||productById.get(normalizeBoothSalesIdentity(sale.smaregi_product_id));
+        const item=itemByBarcode.get(normalizeBoothSalesIdentity(product?.barcode));
+        const quantity=Number(sale.quantity||0);
+        if(!item||!product||!quantity)return;
+        rows.push({
+          event_id:event.id,
+          smaregi_transaction_id:String(sale.smaregi_transaction_id||""),
+          smaregi_detail_id:String(sale.smaregi_detail_id||""),
+          smaregi_product_id:String(sale.smaregi_product_id||""),
+          barcode:String(item.barcode||product.barcode||""),
+          product_name:item.product_name||product.name||sale.product_name||"",
+          quantity,
+          unit_price:Number(sale.unit_price||0),
+          amount:Number(sale.amount||0),
+          sold_at:sale.sold_at||null,
+          store_code:storeCode,
+          smaregi_store_id:body.context?.storeId||null,
+          target_register_code:body.context?.targetRegisterCode||register.code,
+          target_register_name:body.context?.targetRegisterName||register.name,
+          smaregi_register_id:body.context?.targetRegisterId||register.registerId||register.terminalId,
+          smaregi_terminal_id:sale.smaregi_terminal_id||register.terminalId,
+          import_status:"pending",
+          imported_by:"smaregi-sync",
+          imported_at:fetchedAt,
+          updated_at:new Date().toISOString()
+        });
+      });
+      const existingMap=await fetchExistingBoothSalesImportMap(event.id);
+      await cancelMissingBoothSalesImports(event.id,existingMap,activeKeys,{fromDate,toDate,register});
+      if(rows.length)await saveBoothSalesImportRows(rows,existingMap);
+      detailCount+=sales.length;
+    }
+    window.__smaregiOngoingSalesState={ok:true,hasOngoingEvent:true,fetchedAt,detailCount};
+    return window.__smaregiOngoingSalesState;
+  }catch(error){
+    window.__smaregiOngoingSalesState={ok:false,hasOngoingEvent:true,error:String(error?.message||error)};
+    throw error;
+  }
+}
+
+window.refreshBoothOngoingSalesCache=refreshBoothOngoingSalesCache;
 
 async function confirmBoothSalesImport(){
   const form=validateBoothSalesForm();
@@ -7622,8 +7887,10 @@ async function rollbackBoothEventShelfQty(moveResult){
 }
 
 async function confirmBoothSalesImport(){
+  if(window.__aricoBoothSalesConfirming)return;
+  window.__aricoBoothSalesConfirming=true;
   const form=validateBoothSalesForm();
-  if(!form)return;
+  if(!form){window.__aricoBoothSalesConfirming=false;return;}
   const {event,fromDate,toDate,staff}=form;
   try{
     const pending=await sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(event.id)}&import_status=eq.pending&order=sold_at.asc&limit=500`);
@@ -7659,6 +7926,7 @@ async function confirmBoothSalesImport(){
     await loadBoothSalesImports(event.id);
     boothShowSuccess("\u8ca9\u58f2\u78ba\u5b9a\u5b8c\u4e86","\u8ca9\u58f2\u6570\u91cf\u3092\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u304b\u3089\u6e1b\u7b97\u3057\u307e\u3057\u305f\u3002");
   }catch(error){boothShowError("\u8ca9\u58f2\u78ba\u5b9a\u30a8\u30e9\u30fc",error.message||"\u8ca9\u58f2\u306e\u78ba\u5b9a\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002");}
+  finally{window.__aricoBoothSalesConfirming=false;}
 }
 
 async function buildBoothDepartureInventoryData(){

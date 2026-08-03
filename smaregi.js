@@ -6,6 +6,7 @@ let smaregiStockItems=[];
 let smaregiStockChecks=[];
 let smaregiCurrentEventStockByBarcode=new Map();
 let smaregiEventStorageStockByBarcode=new Map();
+let smaregiOngoingEventSalesByBarcode=new Map();
 let smaregiEventInventoryStoreCode="";
 const SMAREGI_DIFFERENCE_REASON_CATEGORIES=["入力ミス","出荷処理漏れ","入荷処理漏れ","商品転用","サンプル使用","商品持ち出し","返品処理漏れ","スマレジ登録ミス","棚違い","不明"];
 let smaregiAutoRefreshTimer=null;
@@ -303,17 +304,30 @@ function getSmaregiEventShelfStock(barcode){
   return getSmaregiEventStorageStock(barcode);
 }
 
+function getSmaregiOngoingEventSalesQty(barcode){
+  return Number(smaregiOngoingEventSalesByBarcode.get(String(barcode||"").trim())||0);
+}
+
+function getSmaregiEventShelfProvisionalStock(barcode){
+  const current=getSmaregiEventStorageStock(barcode);
+  const pending=getSmaregiOngoingEventSalesQty(barcode);
+  return Math.max(0,current-pending);
+}
+
 function getSmaregiInventoryBreakdown(item,check=getSmaregiCheck(item?.barcode)){
   const actualStock=check&&check.actual_stock!==null&&check.actual_stock!==undefined&&String(check.actual_stock)!==""
     ? Number(check.actual_stock||0)
     : null;
   const currentEventStock=0;
   const eventStorageStock=getSmaregiEventStorageStock(item?.barcode);
-  const eventShelfStock=eventStorageStock;
+  const ongoingSalesQty=getSmaregiOngoingEventSalesQty(item?.barcode);
+  const eventShelfStock=getSmaregiEventShelfProvisionalStock(item?.barcode);
   const savedSmaregiStock=getSavedSmaregiStockValue(item);
   const smaregiStock=savedSmaregiStock===null ? null : savedSmaregiStock;
   const smaregiStockForComparison=smaregiStock===null ? null : getComparableSmaregiStockNumber(item,0);
-  const calculation=actualStock===null||smaregiStockForComparison===null ? null : calculateInventoryDifference({
+  const ongoingSalesState=window.__smaregiOngoingSalesState;
+  const ongoingSalesUnavailable=ongoingSalesState?.hasOngoingEvent===true&&ongoingSalesState?.ok===false;
+  const calculation=actualStock===null||smaregiStockForComparison===null||ongoingSalesUnavailable ? null : calculateInventoryDifference({
     aricoStock:actualStock,
     eventNormalStock:eventShelfStock,
     smaregiStock:smaregiStockForComparison
@@ -322,6 +336,8 @@ function getSmaregiInventoryBreakdown(item,check=getSmaregiCheck(item?.barcode))
     actualStock,
     currentEventStock,
     eventStorageStock,
+    ongoingSalesQty,
+    ongoingSalesUnavailable,
     eventShelfStock,
     eventNormalStock:eventShelfStock,
     comparisonStock:calculation?.comparisonStock??null,
@@ -394,6 +410,7 @@ window.calculateSmaregiEventShelfCurrentQty=getSmaregiEventShelfCurrentQty;
 async function loadSmaregiEventInventoryCache(barcodes=[]){
   smaregiCurrentEventStockByBarcode=new Map();
   smaregiEventStorageStockByBarcode=new Map();
+  smaregiOngoingEventSalesByBarcode=new Map();
   smaregiEventInventoryStoreCode="";
   const uniqueBarcodes=[...new Set((barcodes||[]).map(value=>String(value||"").trim()).filter(Boolean))];
   if(!uniqueBarcodes.length)return;
@@ -403,6 +420,29 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
 
   const storeCode=normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode());
   smaregiEventInventoryStoreCode=storeCode;
+  // During an event, the common shelf row is the last confirmed DB stock.
+  // Pending sales are a read-only adjustment for comparison only.
+  try{
+    const now=new Date();
+    const events=await sbAll(`booth_events?select=id,event_start,event_end,status,store_code&store_code=eq.${encodeURIComponent(storeCode)}&limit=1000`,1000,5000);
+    const activeEventIds=(Array.isArray(events)?events:[]).filter(event=>{
+      if(String(event.status||"").toLowerCase()==="closed")return false;
+      const start=String(event.event_start||"").slice(0,10);
+      const end=String(event.event_end||event.event_start||"").slice(0,10);
+      const today=now.toISOString().slice(0,10);
+      return (!start||today>=start)&&(!end||today<=end);
+    }).map(event=>String(event.id||"").trim()).filter(Boolean);
+    const ongoingSalesState=window.__smaregiOngoingSalesState;
+    if(activeEventIds.length&&(!ongoingSalesState||ongoingSalesState.ok!==false)){
+      const eventFilter=buildSmaregiInFilter(activeEventIds);
+      const pendingSales=await sbAll(`event_sales_imports?select=event_id,barcode,quantity,import_status&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&import_status=eq.pending&limit=50000`,1000,50000).catch(()=>[]);
+      (Array.isArray(pendingSales)?pendingSales:[]).forEach(row=>{
+        addSmaregiMapValue(smaregiOngoingEventSalesByBarcode,row.barcode,Number(row.quantity||0));
+      });
+    }
+  }catch(error){
+    console.warn("[Smaregi ongoing event sales lookup failed]",error);
+  }
   // event_storage_stocks is the one current-stock row per store + barcode.
   // Do not rebuild the current shelf by summing event-specific rows.
   try{

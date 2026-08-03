@@ -2291,11 +2291,27 @@ async function syncSmaregiStockFromApi(){
     });
     const data=await res.json().catch(()=>({}));
     if(!res.ok)throw new Error(data.error||`API error ${res.status}`);
+    let eventSalesError="";
+    let eventSalesState=null;
+    if(typeof window.refreshBoothOngoingSalesCache==="function"){
+      try{
+        eventSalesState=await window.refreshBoothOngoingSalesCache(context);
+      }catch(eventError){
+        eventSalesError=String(eventError?.message||eventError);
+      }
+    }
     await loadLatestSmaregiSnapshot();
+    const eventSalesSummary=eventSalesError
+      ? `\n開催中販売：取得失敗\n開催中差異判定：未確定\n理由：${eventSalesError}`
+      : eventSalesState?.hasOngoingEvent
+        ? `\n開催中イベント：あり\nイベント販売明細：${Number(eventSalesState.detailCount||0)}件\n最終取得日時：${eventSalesState.fetchedAt||"-"}`
+        : "\n開催中イベント：なし";
     showPopup?.("スマレジAPI取得完了",
-      `対象店舗：${data.store_name||context.storeName||context.storeCode}\n対象商品：${Number(data.item_count||0)}件\n変動履歴：${Number(data.change_count||0)}件\n対象期間：${fmt(data.range_from)} - ${fmt(data.range_to)}${data.warning?`\n\n注意：${data.warning}`:""}`
+      `対象店舗：${data.store_name||context.storeName||context.storeCode}\n対象商品：${Number(data.item_count||0)}件\n変動履歴：${Number(data.change_count||0)}件\n対象期間：${fmt(data.range_from)} - ${fmt(data.range_to)}${data.warning?`\n\n注意：${data.warning}`:""}${eventSalesSummary}`
     );
-    showMessage?.(`スマレジAPI取得完了：${Number(data.item_count||0)}件 / ${data.store_name||context.storeName||context.storeCode}`,"ok");
+    showMessage?.(eventSalesError
+      ? `スマレジ在庫：取得成功\n開催中販売：取得失敗\n開催中差異判定：未確定\n${eventSalesError}`
+      : `スマレジAPI取得完了：${Number(data.item_count||0)}件 / ${data.store_name||context.storeName||context.storeCode}`,eventSalesError?"err":"ok");
   }catch(error){
     showMessage?.(`スマレジAPI取得失敗\n${error.message}`,"err");
   }
