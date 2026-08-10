@@ -466,6 +466,7 @@
   }
 
   async function finishCount(){
+    await refreshRemote();
     const session=currentSession();
     if(!session){
       setMessage("appInventoryCountProductInfo","終了するセッションがありません。","err");
@@ -480,11 +481,12 @@
       return;
     }
     try{
-      await sb(`inventory_count_sessions?id=eq.${encodeURIComponent(session.id)}`,{
+      const updated=await sb(`inventory_count_sessions?id=eq.${encodeURIComponent(session.id)}&status=eq.${encodeURIComponent(STATUS_ACTIVE)}`,{
         method:"PATCH",
-        headers:{Prefer:"return=minimal"},
+        headers:{Prefer:"return=representation"},
         body:JSON.stringify({status:STATUS_FINISHED,finished_at:nowIso(),memo:document.getElementById("appInventorySessionMemo")?.value||session.memo||""})
       });
+      if(!Array.isArray(updated)||!updated.length)throw new Error("棚卸セッションの状態が別端末で変更されています。最新状態を再取得してください。");
       await refreshRemote();
       setMessage("appInventoryCountCsvInfo","棚卸を終了しました。差異比較を実行できます。","ok");
       renderAll();
@@ -524,6 +526,7 @@
 
   async function closeCurrentSession(){
     if(!requireAppInventoryAdminAccess())return;
+    await refreshRemote();
     const session=currentSession();
     if(!session){
       setMessage("appInventoryCountCsvInfo","終了するセッションを選択してください。","err");
@@ -675,7 +678,15 @@
       setMessage("appInventoryCountProductInfo","カウント数は0以上の整数で入力してください。","err");
       return;
     }
+    // 保存直前にもサーバーのセッション状態を再取得する。別端末で
+    // 締められたセッションへ古いローカル状態から追記しない。
+    await refreshRemote();
+    if(!requireSession())return;
     const session=currentSession();
+    if(session?.status!==STATUS_ACTIVE){
+      setMessage("appInventoryCountProductInfo","この棚卸セッションはすでに締められています。","err");
+      return;
+    }
     try{
       await sb("inventory_count_items",{
         method:"POST",
@@ -696,7 +707,7 @@
       });
       state.diffs=[];
       state.duplicateGroups=[];
-      await loadItems();
+      await refreshRemote();
       renderAll();
       clearScanForm(`登録しました：${product.name||""} / ${qty}`);
     }catch(error){

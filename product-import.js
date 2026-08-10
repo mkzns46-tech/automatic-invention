@@ -61,8 +61,8 @@ function ensureProductMasterImportNotice(){
       <div><p>■ 通常の取込</p><ul><li>「商品マスター取り込み」を使用します</li><li>全ページの商品情報を取得します</li></ul></div>
       <div><p>■ CSV予備取込</p><ul><li>API障害時のみ「CSVから取込」を使用します</li><li>CSVを最新API取得済みとして扱いません</li></ul></div>
       <div><p>■ 新規商品の扱い</p><ul><li>新規商品は登録されます</li><li>初期アプリ在庫は「0」で登録されます</li></ul></div>
-      <div><p>■ 既存商品の扱い</p><ul><li>バーコードが一致する商品は商品名のみ更新します</li><li>アプリ在庫は変更しません</li></ul></div>
-      <div><p>■ 更新しない項目</p><ul><li>アプリ在庫</li><li>棚番</li><li>価格</li><li>部門</li><li>商品区分</li><li>イベント在庫</li><li>棚卸履歴</li><li>原因確認履歴</li></ul></div>
+      <div><p>■ 既存商品の扱い</p><ul><li>在庫変動がなくても商品マスター項目の変更を更新します</li><li>アプリ在庫は変更しません</li></ul></div>
+      <div><p>■ 更新しない項目</p><ul><li>アプリ在庫</li><li>棚番</li><li>共通イベント棚在庫</li><li>ガチャ在庫</li><li>在庫履歴</li><li>ARICO独自備考・独自フラグ</li></ul></div>
     </div>
     <p style="margin:10px 0 0;font-weight:700;">■ 注意</p>
     <ul>
@@ -338,7 +338,7 @@ function buildSmaregiProductPayload(row,current,isNew){
     ["smaregi_updated_at",row.smaregi_updated_at]
   ];
   apiFields.forEach(([key,value])=>{
-    if(value!==undefined&&value!==null&&value!=="")payload[key]=value;
+    if(value!==undefined)payload[key]=value===null?null:value;
   });
   if(isNew)payload.base_stock=0;
   return payload;
@@ -359,6 +359,27 @@ async function upsertSmaregiProductRows(rows){
       const minimal=rows.map(row=>({barcode:row.barcode,name:row.name,...(row.base_stock===0?{base_stock:0}:{})}));
       try{await upsertProducts(minimal);}catch(_){throw secondError||firstError;}
     }
+  }
+}
+
+function getSmaregiExistingProductFilter(current){
+  const id=String(current?.id||"").trim();
+  if(id)return `id=eq.${encodeURIComponent(id)}`;
+  const barcode=String(current?.barcode||"").trim();
+  if(barcode)return `barcode=eq.${encodeURIComponent(barcode)}`;
+  throw new Error("既存商品の更新対象キーがありません。");
+}
+
+async function updateSmaregiExistingProductRows(rows){
+  for(const row of rows||[]){
+    const payload={...(row?.payload||{})};
+    // 商品マスター取込では既存商品のARICO在庫を上書きしない。
+    delete payload.base_stock;
+    await sb(`products?${getSmaregiExistingProductFilter(row?.current)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify(payload)
+    });
   }
 }
 
@@ -414,21 +435,23 @@ async function importSmaregiProducts(){
       if(current&&comparisonFields.every(key=>String(current[key]??"")===String(payload[key]??""))){
         unchanged++;
       }else{
-        (current?updates:inserts).push(payload);
+        if(current)updates.push({current,payload});
+        else inserts.push(payload);
       }
     });
     const ok=typeof confirmAppAction==="function"
       ?await confirmAppAction("商品マスター更新確認",`新規 ${inserts.length}件 / 更新 ${updates.length}件 / 変更なし ${unchanged}件 / 要確認 ${failures.length}件`,{okText:"保存"})
       :true;
     if(!ok)return;
-    for(const batch of [updates,inserts])for(let i=0;i<batch.length;i+=500)await upsertSmaregiProductRows(batch.slice(i,i+500));
+    for(let i=0;i<updates.length;i+=100)await updateSmaregiExistingProductRows(updates.slice(i,i+100));
+    for(let i=0;i<inserts.length;i+=500)await upsertSmaregiProductRows(inserts.slice(i,i+500));
     const returnedIds=new Set(rows.map(row=>String(row.smaregi_product_id||"").trim()).filter(Boolean));
     let inactiveCount=0;
     for(const current of existing){
       const id=String(current.smaregi_product_id||"").trim();
       if(id&&returnedIds.size&&!returnedIds.has(id)&&Object.prototype.hasOwnProperty.call(current,"smaregi_active")){
         try{
-          await sb(`products?barcode=eq.${encodeURIComponent(current.barcode)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({smaregi_active:false})});
+          await sb(`products?${getSmaregiExistingProductFilter(current)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({smaregi_active:false})});
           inactiveCount++;
         }catch(_){ }
       }

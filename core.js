@@ -640,7 +640,9 @@ async function sb(path,opt={}){
     ...(opt.headers||{})
   };
 
-  const res=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/"+path,{...opt,headers});
+  const requestOptions={...opt,headers};
+  if(!requestOptions.method||String(requestOptions.method).toUpperCase()==="GET")requestOptions.cache="no-store";
+  const res=await fetch(SUPABASE_URL.replace(/\/+$/,"")+"/rest/v1/"+path,requestOptions);
   const text=await res.text();
 
   let body=null;
