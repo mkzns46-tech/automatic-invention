@@ -374,19 +374,51 @@ function getSmaregiImportMatchInfo(row,existingById,existingByBarcode,existingBy
   const barcodeMatches=getSmaregiIndexMatches(existingByBarcode,barcode);
   const codeMatches=supportedColumns.has("product_code")
     ?getSmaregiIndexMatches(existingByCode,code):[];
-  const matches=[...new Set([...idMatches,...barcodeMatches,...codeMatches])];
-  const barcodeIdentityConflict=!idMatches.length&&barcodeMatches.length===1&&id&&
-    String(barcodeMatches[0]?.smaregi_product_id??"").trim()&&
-    String(barcodeMatches[0].smaregi_product_id).trim()!==id;
-  const conflict=idMatches.length>1||barcodeMatches.length>1||codeMatches.length>1||
-    matches.length>1||barcodeIdentityConflict;
-  let reason="";
-  if(conflict){
-    reason=barcodeIdentityConflict
-      ?"smaregi_product_id and barcode identify different products"
-      :"multiple ARICO products match the same master record";
+  // 商品名・商品コード・smaregi_product_idだけでは商品を特定しない。
+  // ARICOの商品識別子はバーコードを正とし、IDは一致確認にだけ使う。
+  if(barcodeMatches.length>1){
+    return {
+      idMatches,barcodeMatches,codeMatches,matches:barcodeMatches,
+      current:null,conflict:true,
+      reason:"同一バーコードに複数のARICO商品があります"
+    };
   }
-  return {idMatches,barcodeMatches,codeMatches,matches,current:matches.length===1&&!conflict?matches[0]:null,conflict,reason};
+
+  if(barcodeMatches.length===1){
+    const current=barcodeMatches[0];
+    const currentId=String(current?.smaregi_product_id??"").trim();
+    if(currentId&&id&&currentId!==id){
+      return {
+        idMatches,barcodeMatches,codeMatches,matches:[current],
+        current:null,conflict:true,
+        reason:"バーコード一致商品に別のスマレジ商品IDが登録されています"
+      };
+    }
+    if(!currentId&&idMatches.some(item=>item!==current)){
+      return {
+        idMatches,barcodeMatches,codeMatches,matches:[current,...idMatches],
+        current:null,conflict:true,
+        reason:"スマレジ商品IDが別のARICO商品で使用されています"
+      };
+    }
+    return {
+      idMatches,barcodeMatches,codeMatches,matches:[current],
+      current,conflict:false,reason:"barcode"
+    };
+  }
+
+  // バーコードが変わった商品は、IDが一致していても自動更新しない。
+  // 履歴や外部参照を壊さず、商品紐付け競合として確認対象にする。
+  if(idMatches.length){
+    return {
+      idMatches,barcodeMatches,codeMatches,matches:idMatches,
+      current:null,conflict:true,
+      reason:"スマレジ商品IDは一致しますがバーコードが異なります"
+    };
+  }
+
+  // 商品コードも商品名も照合キーにしない。バーコード未登録なら新規候補。
+  return {idMatches,barcodeMatches,codeMatches,matches:[],current:null,conflict:false,reason:"new"};
 }
 
 function getSmaregiImportMatch(row,existingById,existingByBarcode,existingByCode,supportedColumns=SMAREGI_PRODUCT_MASTER_COLUMNS){
@@ -414,6 +446,7 @@ function buildSmaregiProductPayload(row,current,isNew,supportedColumns=SMAREGI_P
   ];
   apiFields.forEach(([key,value])=>{
     if(supported.has(key)&&!SMAREGI_PRODUCT_MASTER_PROTECTED_COLUMNS.has(key)&&value!==undefined){
+      if(key==="smaregi_product_id"&&!value&&current?.smaregi_product_id)return;
       payload[key]=value===null?null:value;
     }
   });
