@@ -1424,27 +1424,83 @@ function isSmaregiDifferenceCsvRow({check,item=null,difference,snapshotValues=nu
   return Number.isFinite(numericDifference)&&numericDifference!==0;
 }
 
+const SMAREGI_DIFFERENCE_CSV_HEADER=[
+  "チェック日時","店舗","商品名","バーコード","アプリ在庫","イベント棚在庫",
+  "比較用在庫","スマレジ在庫","差異","自動問題なし","手動問題なし",
+  "原因カテゴリ","差異要因","備考","確認状態","確認者","確認日時","データ状態"
+];
+
+function buildSmaregiDifferenceCsvRow({
+  check=null,
+  item={},
+  snapshot=null,
+  snapshotValues=null,
+  breakdown=null,
+  difference=null
+}={}){
+  const barcode=String(check?.barcode||item?.barcode||"").trim();
+  const isReliable=snapshotValues ? snapshotValues.isReliable!==false : true;
+  const savedDifference=snapshotValues?.savedDifference;
+  const csvDifference=isReliable
+    ? (difference ?? snapshotValues?.difference ?? breakdown?.difference ?? "")
+    : (savedDifference===null||savedDifference===undefined||String(savedDifference).trim()==="" ? "不明" : savedDifference);
+  const appStock=snapshotValues?.appStock ?? getSmaregiAppStock(barcode);
+  const eventShelfStock=isReliable
+    ? (snapshotValues?.eventShelfStock ?? breakdown?.eventShelfStock ?? "")
+    : "不明";
+  const comparisonStock=isReliable
+    ? (snapshotValues?.comparisonStock ?? breakdown?.comparisonStock ?? "")
+    : "不明";
+  const smaregiStock=snapshotValues?.smaregiStock
+    ?? breakdown?.smaregiStock
+    ?? getSavedSmaregiStockValue(item)
+    ?? "";
+  const autoNoIssue=snapshotValues?.isAutoNoIssue===true||(!snapshotValues&&breakdown?.isNoIssue===true);
+  const manualNoIssue=snapshotValues?.manualNoIssue===true||(!snapshotValues&&isSmaregiNoIssueCheck(check));
+  const confirmation=getSmaregiCsvConfirmation(check);
+  const dataState=snapshotValues?.dataState
+    || (snapshot ? "保存済みスナップショット" : "イベント棚在庫未保存");
+  return [
+    check?.checked_at ? fmt(check.checked_at) : "",
+    getSmaregiCsvStoreLabel({check,item,snapshot,snapshotValues}),
+    item.product_name||item.productName||"",
+    barcode,
+    appStock??"",
+    eventShelfStock,
+    comparisonStock,
+    smaregiStock,
+    csvDifference,
+    autoNoIssue ? "はい" : "いいえ",
+    manualNoIssue ? "はい" : "いいえ",
+    String(check?.difference_reason_category||""),
+    String(check?.difference_reason_memo||""),
+    getSmaregiCsvNote(check),
+    confirmation.status,
+    confirmation.by,
+    confirmation.at,
+    getSmaregiCsvDataStateLabel(dataState)
+  ];
+}
+
 function smaregiCsvRows(differenceOnly=false){
-  const rows=[["商品コード","商品名","スマレジ在庫数","シート在庫数","実在庫数","スマレジ差異","担当者","チェック日時","チェック済み状態","原因カテゴリ","原因メモ","原因記入者","原因記入日時"]];
+  const rows=[SMAREGI_DIFFERENCE_CSV_HEADER];
   smaregiStockItems.forEach(item=>{
     const check=getSmaregiCheck(item.barcode);
-    const difference=check ? getSmaregiDifference(item) : "";
-    if(differenceOnly&&!isSmaregiDifferenceCsvRow({check,item,difference}))return;
-    rows.push([
-      item.barcode,
-      item.product_name||"",
-      getSavedSmaregiStockNumber(item,0),
-      getSmaregiAppStock(item.barcode),
-      check?.actual_stock??"",
+    const breakdown=check ? getSmaregiInventoryBreakdown(item,check) : null;
+    const difference=breakdown?.difference??(check ? getSmaregiDifference(item) : "");
+    if(differenceOnly&&!isSmaregiDifferenceCsvRow({
+      check,
+      item,
       difference,
-      getSmaregiDisplayCheckedBy(check),
-      check?.checked_at ? fmt(check.checked_at) : "",
-    getSmaregiCsvStatus(check,difference,item),
-    check?.difference_reason_category||"",
-    check?.difference_reason_memo||"",
-    check?.difference_reason_by||"",
-    check?.difference_reason_at ? fmt(check.difference_reason_at) : ""
-    ]);
+      calculation:breakdown?.calculation
+    }))return;
+    rows.push(buildSmaregiDifferenceCsvRow({
+      check,
+      item,
+      snapshot:smaregiSnapshot,
+      breakdown,
+      difference
+    }));
   });
   return rows;
 }
@@ -1468,10 +1524,129 @@ function isInSmaregiDifferenceDateRange(value,range=getSmaregiDifferenceDateRang
   return true;
 }
 
-function getSmaregiSnapshotStoreCode(snapshot){
+const SMAREGI_CSV_DATA_STATE_LABELS=Object.freeze({
+  event_history_reconstructed:"イベント履歴から復元",
+  saved_snapshot:"保存済みスナップショット",
+  snapshot_saved:"保存済みスナップショット",
+  no_valid_events:"有効なイベントなし",
+  no_shared_event_shelf_history:"共通イベント棚履歴なし",
+  incomplete_event_history:"イベント履歴不足",
+  incomplete_shared_event_shelf_history:"共通イベント棚履歴不足",
+  invalid_check_time:"チェック日時不明",
+  event_shelf_unavailable:"イベント棚在庫未保存",
+  event_shelf_not_saved:"イベント棚在庫未保存"
+});
+
+function getSmaregiCsvDataStateLabel(value){
+  const text=String(value||"").trim();
+  if(!text)return "イベント棚在庫未保存";
+  if(Object.prototype.hasOwnProperty.call(SMAREGI_CSV_DATA_STATE_LABELS,text)){
+    return SMAREGI_CSV_DATA_STATE_LABELS[text];
+  }
+  // Already-localized values should remain readable; unknown internal codes are
+  // made explicit instead of leaking an opaque status into the CSV.
+  if(/[ぁ-んァ-ヶ一-龯]/.test(text))return text;
+  return `不明（状態: ${text}）`;
+}
+
+function getSmaregiHistoricalStoreReference(check={},item={},snapshot={}){
   const note=String(snapshot?.note||"");
-  const match=note.match(/store_code:([^/\s]+)/);
-  return match ? normalizeSmaregiStoreCodeForStorage(match[1]) : "";
+  const storeCodeFromNote=note.match(/store_code:([^/\s]+)/)?.[1]||"";
+  const storeIdFromNote=note.match(/store_id:([^/\s]+)/)?.[1]||"";
+  const rawStoreCode=String(
+    storeCodeFromNote
+      || check?.store_code
+      || item?.store_code
+      || snapshot?.store_code
+      || ""
+  ).trim();
+  const rawStoreId=String(
+    storeIdFromNote
+      || check?.store_id
+      || item?.store_id
+      || snapshot?.store_id
+      || ""
+  ).trim();
+  return {
+    storeCode:rawStoreCode ? normalizeSmaregiStoreCodeForStorage(rawStoreCode) : "",
+    storeId:rawStoreId
+  };
+}
+
+function getSmaregiCsvKnownStoreInfo(storeCode){
+  const normalized=normalizeSmaregiStoreCodeForStorage(storeCode);
+  const stores=typeof SMAREGI_CONTEXT_OPTIONS!=="undefined"&&Array.isArray(SMAREGI_CONTEXT_OPTIONS.stores)
+    ? SMAREGI_CONTEXT_OPTIONS.stores
+    : [];
+  return stores.find(store=>store.key===normalized)||null;
+}
+
+function formatSmaregiCsvStoreLabel(storeInfo){
+  const label=String(storeInfo?.label||"").trim();
+  return label ? (label.endsWith("店") ? label : `${label}店`) : "";
+}
+
+function getSmaregiCsvStoreLabel({check=null,item=null,snapshot=null,snapshotValues=null}={}){
+  const reference=getSmaregiHistoricalStoreReference(check||{},item||{},snapshot||{});
+  const directInfo=getSmaregiCsvKnownStoreInfo(reference.storeCode)
+    || getSmaregiCsvKnownStoreInfo(snapshotValues?.storeKey||"");
+  if(directInfo)return formatSmaregiCsvStoreLabel(directInfo);
+
+  // API snapshots contain the store ID and store code together. This also
+  // handles older rows that kept only the numeric ID when the current snapshot
+  // proves which configured store that ID belongs to.
+  const currentReference=getSmaregiHistoricalStoreReference({}, {}, smaregiSnapshot||{});
+  const currentInfo=getSmaregiCsvKnownStoreInfo(getSmaregiCurrentStoreCode());
+  if(reference.storeId&&currentReference.storeId
+    && reference.storeId===currentReference.storeId&&currentInfo){
+    return formatSmaregiCsvStoreLabel(currentInfo);
+  }
+
+  const rawStoreId=reference.storeId||String(snapshotValues?.storeKey||"").trim();
+  return rawStoreId ? `不明（店舗ID: ${rawStoreId}）` : "不明（店舗ID: 不明）";
+}
+
+function getSmaregiSnapshotStoreCode(snapshot){
+  return getSmaregiHistoricalStoreReference({}, {}, snapshot).storeCode;
+}
+
+function getSmaregiCsvNote(check){
+  return [check?.note,check?.memo,check?.no_issue_reason]
+    .map(value=>String(value||"").trim())
+    .filter(Boolean)
+    .join(" / ");
+}
+
+function getSmaregiCsvConfirmation(check){
+  if(!check)return {status:"未確認",by:"",at:""};
+  const equipmentChecked=check.equipment_checked===true
+    || String(check.equipment_checked||"").toLowerCase()==="true";
+  if(equipmentChecked){
+    return {
+      status:"確認済み",
+      by:String(check.equipment_checked_by||"").trim(),
+      at:check.equipment_checked_at ? fmt(check.equipment_checked_at) : ""
+    };
+  }
+  if(isSmaregiNoIssueCheck(check)){
+    return {
+      status:"問題なし確認済み",
+      by:String(check.no_issue_by||getSmaregiDisplayCheckedBy(check)||"").trim(),
+      at:check.no_issue_at ? fmt(check.no_issue_at) : (check.checked_at ? fmt(check.checked_at) : "")
+    };
+  }
+  if(String(check.difference_reason_by||"").trim()||check.difference_reason_at){
+    return {
+      status:"原因入力済み",
+      by:String(check.difference_reason_by||"").trim(),
+      at:check.difference_reason_at ? fmt(check.difference_reason_at) : ""
+    };
+  }
+  return {
+    status:"チェック済み",
+    by:getSmaregiDisplayCheckedBy(check),
+    at:check.checked_at ? fmt(check.checked_at) : ""
+  };
 }
 
 function getSmaregiHistoricalNumericValue(objects,keys){
@@ -1769,15 +1944,10 @@ async function loadSmaregiHistoricalEventShelfReconstruction(checks,itemMap,stor
 }
 
 function getSmaregiHistoricalStoreKey(check,item,snapshot){
-  const snapshotNote=String(snapshot?.note||"");
-  const snapshotStoreId=snapshotNote.match(/store_id:([^/\s]+)/)?.[1];
-  if(snapshotStoreId)return normalizeSmaregiStoreCodeForStorage(snapshotStoreId);
-  const snapshotStoreCode=getSmaregiSnapshotStoreCode(snapshot);
-  if(snapshotStoreCode)return snapshotStoreCode;
-  const storeId=[check?.store_id,item?.store_id,snapshot?.store_id,check?.store_code,item?.store_code]
-    .map(value=>String(value||"").trim())
-    .find(Boolean);
-  return storeId ? normalizeSmaregiStoreCodeForStorage(storeId) : `snapshot:${String(check?.snapshot_id||"unknown")}`;
+  const reference=getSmaregiHistoricalStoreReference(check,item,snapshot);
+  if(reference.storeId)return normalizeSmaregiStoreCodeForStorage(reference.storeId);
+  if(reference.storeCode)return reference.storeCode;
+  return `snapshot:${String(check?.snapshot_id||"unknown")}`;
 }
 
 function getSmaregiHistoricalSnapshotValues(check,item,snapshot,reconstructed=null){
@@ -1826,6 +1996,7 @@ function getSmaregiHistoricalSnapshotValues(check,item,snapshot,reconstructed=nu
       isReliable:true,
       dataState:"event_history_reconstructed",
       storeKey:getSmaregiHistoricalStoreKey(check,item,snapshot),
+      ...getSmaregiHistoricalStoreReference(check,item,snapshot),
       snapshotId:String(check?.snapshot_id||snapshot?.id||"")
     };
   }
@@ -1841,6 +2012,7 @@ function getSmaregiHistoricalSnapshotValues(check,item,snapshot,reconstructed=nu
     isReliable:hasSnapshot,
     dataState:hasSnapshot ? "保存済みスナップショット" : "イベント棚在庫未保存",
     storeKey:getSmaregiHistoricalStoreKey(check,item,snapshot),
+    ...getSmaregiHistoricalStoreReference(check,item,snapshot),
     snapshotId:String(check?.snapshot_id||snapshot?.id||"")
   };
 }
@@ -1879,6 +2051,13 @@ async function loadSmaregiHistoricalDifferenceRows(){
   const currentStoreId=String(context?.storeId||context?.store_id||"").trim();
   const currentStoreKeys=new Set([storeCode,currentStoreId].filter(Boolean).map(value=>normalizeSmaregiStoreCodeForStorage(value)));
   const snapshots=await sbAll("smaregi_stock_snapshots?select=*&order=imported_at.desc",1000,50000).catch(()=>[]);
+  const currentSnapshot=smaregiSnapshot
+    || (snapshots||[]).find(snapshot=>getSmaregiSnapshotStoreCode(snapshot)===storeCode)
+    || null;
+  const currentSnapshotReference=getSmaregiHistoricalStoreReference({}, {}, currentSnapshot||{});
+  if(currentSnapshotReference.storeId){
+    currentStoreKeys.add(normalizeSmaregiStoreCodeForStorage(currentSnapshotReference.storeId));
+  }
   const snapshotMap=new Map((snapshots||[]).map(snapshot=>[String(snapshot.id),snapshot]));
   const items=await sbAll("smaregi_stock_items?select=*",1000,50000);
   const itemMap=new Map(items.map(item=>[`${item.snapshot_id}::${item.barcode}`,item]));
@@ -1935,26 +2114,20 @@ async function loadSmaregiHistoricalDifferenceRows(){
 async function smaregiHistoricalDifferenceCsvRows(){
   const range=getSmaregiDifferenceDateRange("smaregiDiffCsvFromDate","smaregiDiffCsvToDate");
   const historical=await loadSmaregiHistoricalDifferenceRows();
-  const rows=[["チェック日時","店舗","商品名","バーコード","アプリ在庫","イベント棚在庫","比較用在庫","スマレジ在庫","差異","自動問題なし","手動問題なし","データ状態"]];
-  getSmaregiHistoricalRowsInRange(historical,range).forEach(({check,item,difference,calculation,snapshotValues})=>{
+  const rows=[SMAREGI_DIFFERENCE_CSV_HEADER];
+  getSmaregiHistoricalRowsInRange(historical,range).forEach(({check,item,snapshot,difference,calculation,snapshotValues})=>{
     const csvDifference=snapshotValues?.isReliable===false
       ? (snapshotValues.savedDifference===null ? "不明" : snapshotValues.savedDifference)
       : difference;
     if(!isSmaregiDifferenceCsvRow({check,item,difference:csvDifference,snapshotValues,calculation}))return;
-    rows.push([
-      check.checked_at ? fmt(check.checked_at) : "",
-      snapshotValues?.storeKey||"",
-      item.product_name||item.productName||"",
-      check.barcode||"",
-      snapshotValues?.appStock??"",
-      snapshotValues?.isReliable===false ? "不明" : (snapshotValues?.eventShelfStock??""),
-      snapshotValues?.isReliable===false ? "不明" : (snapshotValues?.comparisonStock??""),
-      snapshotValues?.smaregiStock??getSavedSmaregiStockValue(item)??"",
-      csvDifference,
-      snapshotValues?.isAutoNoIssue ? "はい" : "いいえ",
-      snapshotValues?.manualNoIssue ? "はい" : "いいえ",
-      snapshotValues?.dataState||"イベント棚在庫未保存"
-    ]);
+    rows.push(buildSmaregiDifferenceCsvRow({
+      check,
+      item,
+      snapshot,
+      snapshotValues,
+      calculation,
+      difference:csvDifference
+    }));
   });
   return rows;
 }
@@ -1972,7 +2145,11 @@ async function exportSmaregiCheckCsv(differenceOnly=false){
     const rows=differenceOnly ? await smaregiHistoricalDifferenceCsvRows() : smaregiCsvRows(false);
     const today=new Date();
     const ymd=`${today.getFullYear()}${String(today.getMonth()+1).padStart(2,"0")}${String(today.getDate()).padStart(2,"0")}`;
-    downloadCsvFile(differenceOnly?`差異一覧${ymd}.csv`:"smaregi_stock_check_all.csv",rows);
+    downloadCsvFile(
+      differenceOnly?`差異一覧${ymd}.csv`:"smaregi_stock_check_all.csv",
+      rows,
+      {excelTextColumns:[3]}
+    );
     showMessage(`${differenceOnly?"差異のみ":"全体"}CSVを出力しました：${rows.length-1}件`,"ok");
   }catch(e){
     showMessage("差異CSV出力エラー。\n"+e.message,"err");

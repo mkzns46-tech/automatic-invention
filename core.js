@@ -744,8 +744,17 @@ function getCurrentStock(barcode){
   return Number(p?.base_stock||0);
 }
 
-function downloadCsvFile(filename,rows){
-  const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\r\n");
+function downloadCsvFile(filename,rows,{excelTextColumns=[]}={}){
+  const excelTextColumnSet=new Set((excelTextColumns||[]).map(Number));
+  const csv=rows.map((row,rowIndex)=>row.map((value,columnIndex)=>{
+    const text=String(value??"");
+    // Keep barcode-like columns visible as text when Excel opens the CSV.
+    // The wrapper is applied only to the exported cell; the stored value is unchanged.
+    if(rowIndex>0&&excelTextColumnSet.has(columnIndex)&&text!==""){
+      return `="${text.replaceAll('"','""')}"`;
+    }
+    return `"${text.replaceAll('"','""')}"`;
+  }).join(",")).join("\r\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
