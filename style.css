@@ -758,6 +758,93 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   border-radius:8px;
   background:#f5fbf7;
 }
+
+/* Ver 2.64: app inventory uses one shared draft per store. */
+.app-count-draft-bar{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr)) auto;
+  gap:10px;
+  align-items:center;
+  margin:12px 0;
+  padding:12px 14px;
+  border:1px solid #cfe5d6;
+  border-radius:10px;
+  background:#f7fcf8;
+}
+.app-count-draft-bar div{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+.app-count-draft-bar span{
+  color:#527161;
+  font-size:12px;
+  font-weight:700;
+}
+.app-count-draft-bar strong{
+  overflow-wrap:anywhere;
+}
+.app-count-toolbar{
+  grid-template-columns:repeat(2,minmax(180px,220px));
+  justify-content:end;
+  margin:12px 0;
+}
+.app-count-qty-input{
+  width:110px;
+  min-width:80px;
+  padding:8px 10px;
+  font-weight:900;
+}
+.app-count-name-cell small{
+  display:block;
+  margin-top:4px;
+  font-size:12px;
+  font-weight:600;
+}
+.app-count-delete-btn{
+  width:auto;
+  min-width:72px;
+  margin:0;
+  padding:8px 12px;
+}
+.app-count-history-table{min-width:760px}
+
+@media(max-width:800px){
+  .app-count-draft-bar{
+    grid-template-columns:1fr 1fr;
+  }
+  .app-count-draft-bar button{
+    grid-column:1/-1;
+    margin-top:0;
+  }
+  body[data-inventory-screen="app-inventory-count"] .app-count-toolbar{
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    margin:10px 0;
+  }
+  body[data-inventory-screen="app-inventory-count"] .app-count-toolbar button{
+    width:100%;
+    margin-top:0;
+  }
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-table{
+    min-width:0;
+  }
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(1)::before{content:"店舗" !important;}
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(2)::before{content:"担当者" !important;}
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(3)::before{content:"入力開始" !important;}
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(4)::before{content:"反映日時" !important;}
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(5)::before{content:"商品数" !important;}
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(6)::before{content:"差異商品" !important;}
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(7)::before{content:"反映商品" !important;}
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(8)::before{content:"状態" !important;}
+  body[data-inventory-screen="app-inventory-count"] .app-count-qty-input{
+    width:100%;
+    max-width:180px;
+  }
+  body[data-inventory-screen="app-inventory-count"] .app-count-delete-btn{
+    width:100%;
+  }
+}
 .booth-return-target-event[hidden]{display:none}
 .booth-return-target-event select,
 .booth-return-common-fields input,

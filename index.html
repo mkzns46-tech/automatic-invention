@@ -352,29 +352,23 @@
     <div class="section-title">
       <div>
         <h2>アプリ内棚卸</h2>
-        <p class="section-note">スキャン・検索でカウントした商品だけを、棚卸前のアプリ在庫と比較します。</p>
+        <p class="section-note">開いたらすぐ入力できます。保存した内容は店舗ごとに共有されます。</p>
       </div>
-      <div id="appInventoryCountStatus" class="badge muted">未開始</div>
+      <div id="appInventoryCountStatus" class="badge">棚卸中</div>
     </div>
-    <div class="app-count-session-bar">
-      <label>セッション切替<select id="appInventorySessionSelect"><option value="">セッションを選択</option></select></label>
-      <div class="app-count-current-session">
-        <span>現在のセッション</span>
-        <strong id="appInventoryCurrentSessionName">セッション未選択</strong>
-      </div>
-      <label class="inline-check app-count-toggle"><input type="checkbox" id="appInventoryShowEndedSessions">終了済みセッションを表示</label>
+    <div class="app-count-draft-bar">
+      <div><span>対象店舗</span><strong id="appInventoryStoreName">東京</strong></div>
+      <div><span>入力済み</span><strong id="appInventoryDraftCount">0商品</strong></div>
+      <div><span>最終保存</span><strong id="appInventoryLastSaved">未保存</strong></div>
+      <button type="button" id="appInventoryRefreshBtn" class="secondary">最新状態に更新</button>
     </div>
     <div class="app-count-staff-row">
       <label>担当者 <span class="required">必須</span><select id="appInventoryCountStaff"><option value="">担当者を選択</option></select><div id="appInventoryCountStaffPicker" class="staff-picker"></div></label>
       <div class="app-count-current-staff">現在の担当者：<strong id="appInventoryCurrentStaffName">未選択</strong></div>
     </div>
     <div class="app-count-toolbar">
-      <label>セッション名 <span class="required">必須</span><input id="appInventorySessionName" placeholder="例：2026/07/05 午前棚卸"></label>
-      <label>メモ<input id="appInventorySessionMemo" placeholder="例：店頭棚A、Easton、ストリング棚卸"></label>
-      <button type="button" id="startAppInventoryCountBtn">棚卸開始</button>
-      <button type="button" id="finishAppInventoryCountBtn" class="secondary">棚卸終了</button>
-      <button type="button" id="closeAppInventorySessionBtn" class="secondary">セッション終了</button>
-      <button type="button" id="deleteAppInventorySessionBtn" class="danger">削除</button>
+      <button type="button" id="appInventoryApplyBtn" class="admin-only">在庫へ反映</button>
+      <button type="button" id="appInventoryClearBtn" class="danger admin-only">入力内容をクリア</button>
     </div>
     <div class="app-count-workflow">
       <section class="app-count-block">
@@ -395,15 +389,12 @@
           </div>
           <button type="button" id="appInventoryCloseCameraBtn" class="secondary">閉じる</button>
         </div>
-        <div id="appInventoryCameraMessage" class="message">カメラを使う場合は棚卸開始後に「📷カメラ」を押してください。</div>
-        <div id="appInventoryCountProductInfo" class="message">棚卸開始後、商品をスキャンまたは検索してください。</div>
+        <div id="appInventoryCameraMessage" class="message">カメラを使う場合は「📷カメラ」を押してください。</div>
+        <div id="appInventoryCountProductInfo" class="message">商品をスキャンまたは検索してください。</div>
       </section>
       <section class="app-count-block">
-        <h3>棚卸前アプリ在庫比較</h3>
-        <div class="button-row">
-          <button type="button" id="compareAppInventoryCountBtn" class="secondary">差異比較</button>
-        </div>
-        <div id="appInventoryCountCsvInfo" class="message">棚卸終了後、差異比較を実行できます。</div>
+        <h3>反映前の確認</h3>
+        <div id="appInventoryCountCsvInfo" class="message">保存済みの入力を最新在庫と照合し、管理者が反映します。</div>
       </section>
     </div>
     <section class="app-count-block">
@@ -413,35 +404,8 @@
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table">
-          <thead><tr><th>商品名</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>重複</th></tr></thead>
+          <thead><tr><th>商品名</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>操作</th></tr></thead>
           <tbody id="appInventoryCountBody"></tbody>
-        </table>
-      </div>
-    </section>
-    <section class="app-count-block">
-      <div class="section-title">
-        <h3>重複確認</h3>
-        <div id="appInventoryDuplicateSummary" class="badge muted">重複なし</div>
-      </div>
-      <div class="table-wrap app-count-table-wrap">
-        <table class="app-count-table app-count-duplicate-table">
-          <thead><tr><th>商品名</th><th>バーコード</th><th>カウント数</th><th>担当者</th><th>保存日時</th><th>採用</th></tr></thead>
-          <tbody id="appInventoryDuplicateBody"></tbody>
-        </table>
-      </div>
-    </section>
-    <section class="app-count-block">
-      <div class="section-title">
-        <h3>差異一覧</h3>
-        <div class="app-count-title-actions">
-          <label class="inline-check app-count-toggle"><input type="checkbox" id="appInventoryShowReflectedDiffs">反映済みを表示</label>
-          <div id="appInventoryDiffSummary" class="badge muted">未比較</div>
-        </div>
-      </div>
-      <div class="table-wrap app-count-table-wrap">
-        <table class="app-count-table app-count-diff-table">
-          <thead><tr><th>商品名</th><th>バーコード</th><th>カウント数</th><th>差異</th><th>更新</th></tr></thead>
-          <tbody id="appInventoryDiffBody"></tbody>
         </table>
       </div>
     </section>
@@ -451,13 +415,13 @@
         <div id="appInventoryHistorySummary" class="badge muted">0件</div>
       </div>
       <div class="app-count-history-filter">
-        <label>セッション名検索<input id="appInventoryHistoryNameFilter" placeholder="セッション名"></label>
+        <label>棚卸検索<input id="appInventoryHistoryNameFilter" placeholder="棚卸名"></label>
         <label>担当者検索<input id="appInventoryHistoryStaffFilter" placeholder="担当者"></label>
         <label>日付検索<input id="appInventoryHistoryDateFilter" type="date"></label>
       </div>
       <div class="table-wrap app-count-table-wrap">
         <table class="app-count-table app-count-history-table">
-          <thead><tr><th>セッション名</th><th>担当者</th><th>開始日時</th><th>棚卸終了日時</th><th>セッション終了日時</th><th>カウント商品数</th><th>重複件数</th><th>差異件数</th><th>更新件数</th><th>ステータス</th></tr></thead>
+          <thead><tr><th>店舗</th><th>担当者</th><th>入力開始</th><th>反映日時</th><th>商品数</th><th>差異商品</th><th>反映商品</th><th>状態</th></tr></thead>
           <tbody id="appInventoryHistoryBody"></tbody>
         </table>
       </div>

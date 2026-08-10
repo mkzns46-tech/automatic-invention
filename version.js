@@ -1,5 +1,5 @@
 (function(){
-  const version="Ver 2.63";
+  const version="Ver 2.64";
   window.ARICO_APP_VERSION=version;
   function addVersionBadge(){
     if(document.getElementById("aricoAppVersionBadge"))return;
