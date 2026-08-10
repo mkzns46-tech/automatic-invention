@@ -308,21 +308,60 @@ function updateSmaregiProductImportControl(){
   ensureProductMasterImportNotice();
 }
 
-function getSmaregiImportMatch(row,existingById,existingByBarcode,existingByCode){
+// Keep API fields limited to the verified products-table schema. Unknown
+// Smaregi fields must not reach PostgREST and trigger PGRST204.
+const SMAREGI_PRODUCT_MASTER_COLUMNS=new Set([
+  "barcode",
+  "name",
+  "base_stock",
+  "smaregi_product_id",
+  "price",
+  "category",
+  "genre",
+  "department"
+]);
+const SMAREGI_PRODUCT_MASTER_API_FIELDS=[
+  "smaregi_product_id",
+  "product_code",
+  "product_type",
+  "color",
+  "size",
+  "price",
+  "cost",
+  "category",
+  "genre",
+  "department",
+  "smaregi_active",
+  "smaregi_updated_at"
+];
+const SMAREGI_PRODUCT_MASTER_PROTECTED_COLUMNS=new Set([
+  "base_stock",
+  "location",
+  "created_at"
+]);
+
+function getSmaregiSupportedProductMasterColumns(existingRows){
+  const rows=Array.isArray(existingRows)?existingRows:[];
+  const discovered=new Set(rows.flatMap(row=>Object.keys(row||{})));
+  if(!discovered.size)return new Set(SMAREGI_PRODUCT_MASTER_COLUMNS);
+  return new Set([...SMAREGI_PRODUCT_MASTER_COLUMNS].filter(key=>discovered.has(key)));
+}
+
+function getSmaregiImportMatch(row,existingById,existingByBarcode,existingByCode,supportedColumns=SMAREGI_PRODUCT_MASTER_COLUMNS){
   const id=String(row.smaregi_product_id||"").trim();
   const barcode=String(row.barcode||"").trim();
   const code=String(row.product_code||"").trim();
-  return (id&&existingById.get(id))
+  return (supportedColumns.has("smaregi_product_id")&&id&&existingById.get(id))
     || (barcode&&existingByBarcode.get(barcode))
-    || (code&&existingByCode.get(code))
+    || (supportedColumns.has("product_code")&&code&&existingByCode.get(code))
     || null;
 }
 
-function buildSmaregiProductPayload(row,current,isNew){
-  const payload={
-    barcode:String(row.barcode||current?.barcode||"").trim(),
-    name:String(row.name||current?.name||"").trim()
-  };
+function buildSmaregiProductPayload(row,current,isNew,supportedColumns=SMAREGI_PRODUCT_MASTER_COLUMNS){
+  const supported=supportedColumns instanceof Set?supportedColumns:SMAREGI_PRODUCT_MASTER_COLUMNS;
+  const payload={};
+  if(supported.has("barcode"))payload.barcode=String(row.barcode||current?.barcode||"").trim();
+  if(supported.has("name"))payload.name=String(row.name||current?.name||"").trim();
   const apiFields=[
     ["smaregi_product_id",row.smaregi_product_id],
     ["product_code",row.product_code],
@@ -338,9 +377,11 @@ function buildSmaregiProductPayload(row,current,isNew){
     ["smaregi_updated_at",row.smaregi_updated_at]
   ];
   apiFields.forEach(([key,value])=>{
-    if(value!==undefined)payload[key]=value===null?null:value;
+    if(supported.has(key)&&!SMAREGI_PRODUCT_MASTER_PROTECTED_COLUMNS.has(key)&&value!==undefined){
+      payload[key]=value===null?null:value;
+    }
   });
-  if(isNew)payload.base_stock=0;
+  if(isNew&&supported.has("base_stock"))payload.base_stock=0;
   return payload;
 }
 
@@ -374,7 +415,7 @@ async function updateSmaregiExistingProductRows(rows){
   for(const row of rows||[]){
     const payload={...(row?.payload||{})};
     // 商品マスター取込では既存商品のARICO在庫を上書きしない。
-    delete payload.base_stock;
+    SMAREGI_PRODUCT_MASTER_PROTECTED_COLUMNS.forEach(key=>delete payload[key]);
     await sb(`products?${getSmaregiExistingProductFilter(row?.current)}`,{
       method:"PATCH",
       headers:{Prefer:"return=minimal"},
@@ -407,6 +448,7 @@ async function importSmaregiProducts(){
       ?await sbAll("products?select=*",1000,50000)
       :await sb("products?select=*&limit=50000");
     const existing=Array.isArray(existingRows)?existingRows:[];
+    const supportedColumns=getSmaregiSupportedProductMasterColumns(existing);
     const byId=new Map(existing.filter(row=>String(row.smaregi_product_id||"").trim()).map(row=>[String(row.smaregi_product_id).trim(),row]));
     const byBarcode=new Map(existing.filter(row=>String(row.barcode||"").trim()).map(row=>[String(row.barcode).trim(),row]));
     const byCode=new Map(existing.filter(row=>String(row.product_code||"").trim()).map(row=>[String(row.product_code).trim(),row]));
@@ -416,7 +458,8 @@ async function importSmaregiProducts(){
     const inserts=[];
     let unchanged=0;
     const failures=[];
-    const comparisonFields=["barcode","name","smaregi_product_id","product_code","product_type","color","size","price","cost","category","genre","department","smaregi_active","smaregi_updated_at"];
+    const comparisonFields=["barcode","name",...SMAREGI_PRODUCT_MASTER_API_FIELDS]
+      .filter((key,index,array)=>array.indexOf(key)===index&&supportedColumns.has(key));
     rows.forEach(row=>{
       const barcode=String(row.barcode||"").trim();
       if(!barcode||!String(row.name||"").trim()){
@@ -430,8 +473,8 @@ async function importSmaregiProducts(){
         failures.push({name:row.name,id,reason:"同一バーコードに複数の商品IDがあるため自動統合しません"});
         return;
       }
-      const current=getSmaregiImportMatch(row,byId,byBarcode,byCode);
-      const payload=buildSmaregiProductPayload(row,current,!current);
+      const current=getSmaregiImportMatch(row,byId,byBarcode,byCode,supportedColumns);
+      const payload=buildSmaregiProductPayload(row,current,!current,supportedColumns);
       if(current&&comparisonFields.every(key=>String(current[key]??"")===String(payload[key]??""))){
         unchanged++;
       }else{
@@ -449,7 +492,7 @@ async function importSmaregiProducts(){
     let inactiveCount=0;
     for(const current of existing){
       const id=String(current.smaregi_product_id||"").trim();
-      if(id&&returnedIds.size&&!returnedIds.has(id)&&Object.prototype.hasOwnProperty.call(current,"smaregi_active")){
+      if(id&&returnedIds.size&&!returnedIds.has(id)&&supportedColumns.has("smaregi_active")&&Object.prototype.hasOwnProperty.call(current,"smaregi_active")){
         try{
           await sb(`products?${getSmaregiExistingProductFilter(current)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({smaregi_active:false})});
           inactiveCount++;
