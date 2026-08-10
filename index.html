@@ -363,23 +363,23 @@
       <button type="button" id="appInventoryRefreshBtn" class="secondary">最新状態に更新</button>
     </div>
     <div class="app-count-staff-row">
-      <label>担当者 <span class="required">必須</span><select id="appInventoryCountStaff"><option value="">担当者を選択</option></select><div id="appInventoryCountStaffPicker" class="staff-picker"></div></label>
+      <label>担当者 <span class="required">必須</span><select id="appInventoryCountStaff" disabled><option value="">担当者を選択</option></select><div id="appInventoryCountStaffPicker" class="staff-picker"></div></label>
       <div class="app-count-current-staff">現在の担当者：<strong id="appInventoryCurrentStaffName">未選択</strong></div>
     </div>
     <div class="app-count-toolbar">
-      <button type="button" id="appInventoryApplyBtn" class="admin-only">在庫へ反映</button>
-      <button type="button" id="appInventoryClearBtn" class="danger admin-only">入力内容をクリア</button>
+      <button type="button" id="appInventoryApplyBtn" class="admin-only" disabled>在庫へ反映</button>
+      <button type="button" id="appInventoryClearBtn" class="danger admin-only" disabled>入力内容をクリア</button>
     </div>
     <div class="app-count-workflow">
       <section class="app-count-block">
         <h3>カウント入力</h3>
         <div class="app-count-input-grid">
-          <label class="app-count-scan-label">商品スキャン・バーコード<span class="app-count-scan-row"><input id="appInventoryCountBarcode" autocomplete="off" placeholder="バーコードをスキャン、または手入力"><button type="button" id="appInventoryCameraBtn" class="secondary app-count-camera-btn">📷カメラ</button></span></label>
-          <label>商品名検索<input id="appInventoryCountSearch" autocomplete="off" placeholder="商品名の一部を入力"></label>
-          <label class="product-search-sort-label app-count-sort-label">並び順<select id="appInventoryProductSearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label>
+          <label class="app-count-scan-label">商品スキャン・バーコード<span class="app-count-scan-row"><input id="appInventoryCountBarcode" autocomplete="off" placeholder="バーコードをスキャン、または手入力" disabled><button type="button" id="appInventoryCameraBtn" class="secondary app-count-camera-btn" disabled>📷カメラ</button></span></label>
+          <label>商品名検索<input id="appInventoryCountSearch" autocomplete="off" placeholder="商品名の一部を入力" disabled></label>
+          <label class="product-search-sort-label app-count-sort-label">並び順<select id="appInventoryProductSearchSort" disabled><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label>
           <div id="appInventoryCountSearchResults" class="product-search-results app-count-search-results"></div>
-          <label>カウント数<input id="appInventoryCountQty" type="number" min="0" step="1" inputmode="numeric" placeholder="数量を入力"></label>
-          <button type="button" id="saveAppInventoryCountBtn">登録</button>
+          <label>カウント数<input id="appInventoryCountQty" type="number" min="0" step="1" inputmode="numeric" placeholder="数量を入力" disabled></label>
+          <button type="button" id="saveAppInventoryCountBtn" disabled>登録</button>
         </div>
         <div id="appInventoryCameraArea" class="app-count-camera-area" hidden>
           <video id="appInventoryCountVideo" muted playsinline></video>
@@ -387,7 +387,7 @@
             <div class="camera-guide-box"><div class="camera-guide-line"></div></div>
             <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
           </div>
-          <button type="button" id="appInventoryCloseCameraBtn" class="secondary">閉じる</button>
+          <button type="button" id="appInventoryCloseCameraBtn" class="secondary" disabled>閉じる</button>
         </div>
         <div id="appInventoryCameraMessage" class="message">カメラを使う場合は「📷カメラ」を押してください。</div>
         <div id="appInventoryCountProductInfo" class="message">商品をスキャンまたは検索してください。</div>

@@ -27,6 +27,7 @@
   let searchResultCache=[];
   let draftCreationPromise=null;
   let refreshPromise=null;
+  let draftReady=false;
 
   function safe(value){
     return typeof esc==="function" ? esc(value) : String(value??"")
@@ -83,6 +84,30 @@
     if(!node)return;
     node.textContent=text;
     node.className=`message${type?` ${type}`:""}`;
+  }
+
+  function setInventoryControlsEnabled(enabled){
+    const controls=[
+      "appInventoryCountStaff",
+      "appInventoryCountBarcode",
+      "appInventoryCountSearch",
+      "appInventoryProductSearchSort",
+      "appInventoryCountQty",
+      "saveAppInventoryCountBtn",
+      "appInventoryCameraBtn",
+      "appInventoryCloseCameraBtn",
+      "appInventoryApplyBtn",
+      "appInventoryClearBtn"
+    ];
+    controls.forEach(id=>{
+      const node=document.getElementById(id);
+      if(node)node.disabled=!enabled;
+    });
+    document.querySelectorAll("#appInventoryCountBody .app-count-qty-input,#appInventoryCountBody .app-count-delete-btn").forEach(node=>{
+      node.disabled=!enabled;
+    });
+    const panel=document.getElementById("appInventoryCountPanel");
+    if(panel)panel.setAttribute("aria-busy",enabled?"false":"true");
   }
 
   function getSessionStoreCode(session){
@@ -167,12 +192,17 @@
       const active=state.sessions.filter(session=>isActiveForStore(session,storeCode));
       if(savedSession)state.currentSessionId=String(savedSession.id);
       else if(active[0])state.currentSessionId=String(active[0].id);
-      else state.currentSessionId=String((await createDraft(storeCode)).id);
+      else{
+        const created=await createDraft(storeCode);
+        state.sessions=[created,...state.sessions];
+        state.currentSessionId=String(created.id);
+      }
       localStorage.setItem(CURRENT_DRAFT_KEY,state.currentSessionId);
     }catch(error){
       state.sessions=[];
       state.currentSessionId="";
       setRemoteError(error);
+      throw error;
     }
   }
 
@@ -185,6 +215,7 @@
     }catch(error){
       state.items=[];
       setRemoteError(error);
+      throw error;
     }
   }
 
@@ -197,11 +228,25 @@
 
   async function refreshRemote(){
     if(refreshPromise)return refreshPromise;
+    setInventoryControlsEnabled(false);
     refreshPromise=(async()=>{
       await loadSessions();
       await loadItems();
       await loadHistoryItems();
-    })().finally(()=>{refreshPromise=null;});
+      if(!currentSession()?.id)throw new Error("棚卸ドラフトのsession_idを取得できませんでした。");
+      draftReady=true;
+      return currentSession();
+    })().catch(error=>{
+      draftReady=false;
+      setRemoteError(error);
+      throw error;
+    }).finally(()=>{
+      refreshPromise=null;
+      if(draftReady){
+        setInventoryControlsEnabled(true);
+        renderDraftInfo();
+      }
+    });
     return refreshPromise;
   }
 
@@ -234,7 +279,7 @@
       if(!button)return;
       button.classList.toggle("admin-required",!hasAdminAccess());
       button.title=hasAdminAccess()?"":"管理者のみ操作できます";
-      button.disabled=!hasAdminAccess();
+      button.disabled=!draftReady||!hasAdminAccess();
     });
   }
 
@@ -276,6 +321,7 @@
     body.querySelectorAll(".app-count-delete-btn").forEach(button=>{
       button.addEventListener("click",()=>deleteDraftItem(button.dataset.id,button));
     });
+    setInventoryControlsEnabled(draftReady);
   }
 
   function renderHistoryRows(){
@@ -345,13 +391,22 @@
   }
 
   window.renderAppInventoryCount=async function(){
-    await refreshRemote();
+    try{await refreshRemote();}
+    catch(_){renderAll();return false;}
     renderAll();
+    return true;
   };
+
+  async function ensureDraftReady(){
+    if(draftReady&&currentSession()?.status===STATUS_ACTIVE&&String(currentSession()?.id||""))return true;
+    try{await refreshRemote();}
+    catch(_){return false;}
+    return draftReady&&currentSession()?.status===STATUS_ACTIVE&&String(currentSession()?.id||"")!=="";
+  }
 
   function requireDraft(){
     const session=currentSession();
-    if(session?.status===STATUS_ACTIVE)return true;
+    if(draftReady&&session?.status===STATUS_ACTIVE&&String(session.id||""))return true;
     setMessage("appInventoryCountProductInfo","棚卸入力を読み込めません。最新状態に更新してください。","err");
     return false;
   }
@@ -386,6 +441,7 @@
   }
 
   async function saveCount(){
+    if(!await ensureDraftReady())return;
     if(!requireDraft())return;
     const product=selectedProduct||await previewBarcode();
     if(!product)return;
@@ -395,7 +451,7 @@
       document.getElementById("appInventoryCountStaff")?.focus();
       return;
     }
-    await refreshRemote();
+    try{await refreshRemote();}catch(_){return;}
     if(!requireDraft())return;
     const existing=latestRows(state.items).find(row=>row.key===normalizeKey(product.barcode));
     const qtyInput=document.getElementById("appInventoryCountQty");
@@ -403,6 +459,13 @@
     const result=raw===""&&existing?{qty:existing.count+1}:validateQty(raw);
     if(result.error){setMessage("appInventoryCountProductInfo",result.error,"err");qtyInput?.focus();return;}
     const session=currentSession();
+    const sessionId=String(session?.id||"").trim();
+    if(!sessionId){
+      draftReady=false;
+      setInventoryControlsEnabled(false);
+      setMessage("appInventoryCountProductInfo","棚卸データを準備中です。少し待ってから再試行してください。","err");
+      return;
+    }
     const details=productDetails(product);
     try{
       await updateDraftStaff(session,staff);
@@ -417,7 +480,7 @@
         await sb("inventory_count_items",{
           method:"POST",
           headers:{Prefer:"return=minimal"},
-          body:JSON.stringify({...payload,before_stock:Number(product.base_stock||0),memo:"",adopted:false})
+          body:JSON.stringify({...payload,session_id:sessionId,before_stock:Number(product.base_stock||0),memo:"",adopted:false})
         });
       }
       state.items=[];
@@ -428,12 +491,14 @@
   }
 
   async function updateDraftItem(itemId,rawQty){
+    if(!await ensureDraftReady())return;
     if(!requireDraft())return;
     const result=validateQty(rawQty);
     if(result.error){setMessage("appInventoryCountProductInfo",result.error,"err");await refreshRemote();renderAll();return;}
-    const session=currentSession();
     try{
       await refreshRemote();
+      const session=currentSession();
+      if(!session?.id)throw new Error("棚卸ドラフトのsession_idを取得できませんでした。");
       const row=latestRows(state.items).find(item=>String(item.id)===String(itemId));
       if(!row)throw new Error("入力行が別端末で変更されています。最新状態を再取得しました。");
       await updateDraftStaff(session,getStaffValue()||row.staff);
@@ -449,6 +514,7 @@
   }
 
   async function deleteDraftItem(itemId,button){
+    if(!await ensureDraftReady())return;
     if(!requireDraft())return;
     const row=state.items.map(itemDisplay).find(item=>String(item.id)===String(itemId));
     if(!row)return;
@@ -620,6 +686,10 @@
   }
 
   async function previewBarcode(resetQty=false){
+    if(!draftReady){
+      setMessage("appInventoryCountProductInfo","棚卸データを準備中です。","ok");
+      return null;
+    }
     const code=String(document.getElementById("appInventoryCountBarcode")?.value||"").trim();
     if(!code){
       if(selectedProduct){showProduct(selectedProduct,resetQty);return selectedProduct;}
@@ -649,6 +719,7 @@
   }
 
   async function handleSearchInput(){
+    if(!draftReady)return;
     const host=document.getElementById("appInventoryCountSearchResults");
     const keyword=document.getElementById("appInventoryCountSearch")?.value||"";
     if(!host)return;
@@ -704,6 +775,7 @@
   }
 
   async function startAppInventoryCamera(){
+    if(!await ensureDraftReady())return;
     if(!requireDraft())return;
     const video=document.getElementById("appInventoryCountVideo");
     const area=document.getElementById("appInventoryCameraArea");
@@ -739,10 +811,18 @@
     if(showMessage)setMessage("appInventoryCameraMessage","カメラを終了しました。","ok");
   }
 
-  function bindAppInventoryCountEvents(){
+  async function bindAppInventoryCountEvents(){
+    setInventoryControlsEnabled(false);
+    setMessage("appInventoryCountProductInfo","棚卸データを準備中...","ok");
     document.getElementById("appInventoryApplyBtn")?.addEventListener("click",applyCurrentDraft);
     document.getElementById("appInventoryClearBtn")?.addEventListener("click",clearCurrentDraft);
-    document.getElementById("appInventoryRefreshBtn")?.addEventListener("click",async()=>{await refreshRemote();renderAll();setMessage("appInventoryCountProductInfo","最新の保存内容を読み込みました。","ok");});
+    document.getElementById("appInventoryRefreshBtn")?.addEventListener("click",async()=>{
+      try{
+        await refreshRemote();
+        renderAll();
+        setMessage("appInventoryCountProductInfo","最新の保存内容を読み込みました。","ok");
+      }catch(_){renderAll();}
+    });
     document.getElementById("saveAppInventoryCountBtn")?.addEventListener("click",saveCount);
     document.getElementById("appInventoryCameraBtn")?.addEventListener("click",startAppInventoryCamera);
     document.getElementById("appInventoryCloseCameraBtn")?.addEventListener("click",()=>stopAppInventoryCamera(true));
@@ -764,7 +844,7 @@
       document.getElementById(id)?.addEventListener("change",renderHistoryRows);
     });
     window.addEventListener("beforeunload",()=>stopAppInventoryCamera(false));
-    renderAppInventoryCount();
+    await window.renderAppInventoryCount();
   }
 
   window.addEventListener("DOMContentLoaded",bindAppInventoryCountEvents);
