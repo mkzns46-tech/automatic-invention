@@ -347,14 +347,50 @@ function getSmaregiSupportedProductMasterColumns(existingRows){
   return new Set([...SMAREGI_PRODUCT_MASTER_COLUMNS].filter(key=>discovered.has(key)));
 }
 
+function getSmaregiIndexMatches(index,key){
+  if(!index||!key)return [];
+  const value=index.get(key);
+  if(Array.isArray(value))return value;
+  return value?[value]:[];
+}
+
+function createSmaregiProductIndex(rows,key){
+  const index=new Map();
+  (rows||[]).forEach(row=>{
+    const value=String(row?.[key]??"").trim();
+    if(!value)return;
+    if(!index.has(value))index.set(value,[]);
+    index.get(value).push(row);
+  });
+  return index;
+}
+
+function getSmaregiImportMatchInfo(row,existingById,existingByBarcode,existingByCode,supportedColumns=SMAREGI_PRODUCT_MASTER_COLUMNS){
+  const id=String(row?.smaregi_product_id??"").trim();
+  const barcode=String(row?.barcode??"").trim();
+  const code=String(row?.product_code??"").trim();
+  const idMatches=supportedColumns.has("smaregi_product_id")
+    ?getSmaregiIndexMatches(existingById,id):[];
+  const barcodeMatches=getSmaregiIndexMatches(existingByBarcode,barcode);
+  const codeMatches=supportedColumns.has("product_code")
+    ?getSmaregiIndexMatches(existingByCode,code):[];
+  const matches=[...new Set([...idMatches,...barcodeMatches,...codeMatches])];
+  const barcodeIdentityConflict=!idMatches.length&&barcodeMatches.length===1&&id&&
+    String(barcodeMatches[0]?.smaregi_product_id??"").trim()&&
+    String(barcodeMatches[0].smaregi_product_id).trim()!==id;
+  const conflict=idMatches.length>1||barcodeMatches.length>1||codeMatches.length>1||
+    matches.length>1||barcodeIdentityConflict;
+  let reason="";
+  if(conflict){
+    reason=barcodeIdentityConflict
+      ?"smaregi_product_id and barcode identify different products"
+      :"multiple ARICO products match the same master record";
+  }
+  return {idMatches,barcodeMatches,codeMatches,matches,current:matches.length===1&&!conflict?matches[0]:null,conflict,reason};
+}
+
 function getSmaregiImportMatch(row,existingById,existingByBarcode,existingByCode,supportedColumns=SMAREGI_PRODUCT_MASTER_COLUMNS){
-  const id=String(row.smaregi_product_id||"").trim();
-  const barcode=String(row.barcode||"").trim();
-  const code=String(row.product_code||"").trim();
-  return (supportedColumns.has("smaregi_product_id")&&id&&existingById.get(id))
-    || (barcode&&existingByBarcode.get(barcode))
-    || (supportedColumns.has("product_code")&&code&&existingByCode.get(code))
-    || null;
+  return getSmaregiImportMatchInfo(row,existingById,existingByBarcode,existingByCode,supportedColumns).current;
 }
 
 function buildSmaregiProductPayload(row,current,isNew,supportedColumns=SMAREGI_PRODUCT_MASTER_COLUMNS){
@@ -449,15 +485,16 @@ async function importSmaregiProducts(){
       :await sb("products?select=*&limit=50000");
     const existing=Array.isArray(existingRows)?existingRows:[];
     const supportedColumns=getSmaregiSupportedProductMasterColumns(existing);
-    const byId=new Map(existing.filter(row=>String(row.smaregi_product_id||"").trim()).map(row=>[String(row.smaregi_product_id).trim(),row]));
-    const byBarcode=new Map(existing.filter(row=>String(row.barcode||"").trim()).map(row=>[String(row.barcode).trim(),row]));
-    const byCode=new Map(existing.filter(row=>String(row.product_code||"").trim()).map(row=>[String(row.product_code).trim(),row]));
+    const byId=createSmaregiProductIndex(existing,"smaregi_product_id");
+    const byBarcode=createSmaregiProductIndex(existing,"barcode");
+    const byCode=createSmaregiProductIndex(existing,"product_code");
     const duplicateBarcodes=new Set((data.warnings||[]).map(w=>String(w.barcode||"")).filter(Boolean));
-    const seenIds=new Set();
-    const updates=[];
-    const inserts=[];
+    const apiIds=new Map();
+    const apiBarcodes=new Map();
+    const plans=[];
     let unchanged=0;
     const failures=[];
+    const conflicts=[];
     const comparisonFields=["barcode","name",...SMAREGI_PRODUCT_MASTER_API_FIELDS]
       .filter((key,index,array)=>array.indexOf(key)===index&&supportedColumns.has(key));
     rows.forEach(row=>{
@@ -467,27 +504,93 @@ async function importSmaregiProducts(){
         return;
       }
       const id=String(row.smaregi_product_id||"").trim();
-      if(id&&seenIds.has(id))return;
-      if(id)seenIds.add(id);
+      if(id&&apiIds.has(id)){
+        conflicts.push({name:row.name||"",barcode,id,reason:"duplicate smaregi_product_id in API response"});
+        return;
+      }
+      if(id)apiIds.set(id,row);
+      if(apiBarcodes.has(barcode)){
+        conflicts.push({name:row.name||"",barcode,id,reason:"duplicate barcode in API response"});
+        return;
+      }
+      apiBarcodes.set(barcode,row);
       if(duplicateBarcodes.has(barcode)){
         failures.push({name:row.name,id,reason:"同一バーコードに複数の商品IDがあるため自動統合しません"});
         return;
       }
-      const current=getSmaregiImportMatch(row,byId,byBarcode,byCode,supportedColumns);
+      const matchInfo=getSmaregiImportMatchInfo(row,byId,byBarcode,byCode,supportedColumns);
+      if(matchInfo.conflict){
+        conflicts.push({name:row.name||"",barcode,id,reason:matchInfo.reason||"product matching conflict",arico_identifiers:matchInfo.matches.map(item=>item.barcode).filter(Boolean)});
+        return;
+      }
+      const current=matchInfo.current;
       const payload=buildSmaregiProductPayload(row,current,!current,supportedColumns);
-      if(current&&comparisonFields.every(key=>String(current[key]??"")===String(payload[key]??""))){
+      const fieldsToCompare=comparisonFields.filter(key=>Object.prototype.hasOwnProperty.call(payload,key));
+      if(current&&fieldsToCompare.every(key=>String(current[key]??"")===String(payload[key]??""))){
         unchanged++;
       }else{
-        if(current)updates.push({current,payload});
-        else inserts.push(payload);
+        plans.push({current,payload,row});
       }
     });
+    const plannedBarcodes=new Map();
+    const validPlans=[];
+    plans.forEach(plan=>{
+      const barcode=String(plan.payload?.barcode||"").trim();
+      const current=plan.current||null;
+      const existingOwners=getSmaregiIndexMatches(byBarcode,barcode);
+      if(existingOwners.some(owner=>owner!==current)){
+        conflicts.push({name:plan.row?.name||"",barcode,id:String(plan.row?.smaregi_product_id||"").trim(),reason:"target barcode is already owned by another ARICO product",arico_identifiers:existingOwners.map(item=>item.barcode).filter(Boolean)});
+        return;
+      }
+      const plannedOwner=plannedBarcodes.get(barcode);
+      if(plannedOwner&&plannedOwner!==current){
+        conflicts.push({name:plan.row?.name||"",barcode,id:String(plan.row?.smaregi_product_id||"").trim(),reason:"multiple API rows target the same ARICO barcode"});
+        return;
+      }
+      plannedBarcodes.set(barcode,current);
+      validPlans.push(plan);
+    });
+    const updates=validPlans.filter(plan=>plan.current).map(plan=>({current:plan.current,payload:plan.payload}));
+    const inserts=validPlans.filter(plan=>!plan.current).map(plan=>plan.payload);
     const ok=typeof confirmAppAction==="function"
       ?await confirmAppAction("商品マスター更新確認",`新規 ${inserts.length}件 / 更新 ${updates.length}件 / 変更なし ${unchanged}件 / 要確認 ${failures.length}件`,{okText:"保存"})
       :true;
     if(!ok)return;
-    for(let i=0;i<updates.length;i+=100)await updateSmaregiExistingProductRows(updates.slice(i,i+100));
-    for(let i=0;i<inserts.length;i+=500)await upsertSmaregiProductRows(inserts.slice(i,i+500));
+    const writeFailures=[];
+    let updatedCount=0;
+    let insertedCount=0;
+    for(let i=0;i<updates.length;i+=100){
+      const batch=updates.slice(i,i+100);
+      try{
+        await updateSmaregiExistingProductRows(batch);
+        updatedCount+=batch.length;
+      }catch(_){
+        for(const update of batch){
+          try{
+            await updateSmaregiExistingProductRows([update]);
+            updatedCount++;
+          }catch(error){
+            writeFailures.push({name:update.current?.name||"",barcode:update.payload?.barcode||update.current?.barcode||"",id:update.payload?.smaregi_product_id||update.current?.smaregi_product_id||"",reason:`update failed: ${error.message||error}`});
+          }
+        }
+      }
+    }
+    for(let i=0;i<inserts.length;i+=500){
+      const batch=inserts.slice(i,i+500);
+      try{
+        await upsertSmaregiProductRows(batch);
+        insertedCount+=batch.length;
+      }catch(_){
+        for(const insert of batch){
+          try{
+            await upsertSmaregiProductRows([insert]);
+            insertedCount++;
+          }catch(error){
+            writeFailures.push({name:insert.name||"",barcode:insert.barcode||"",id:insert.smaregi_product_id||"",reason:`insert failed: ${error.message||error}`});
+          }
+        }
+      }
+    }
     const returnedIds=new Set(rows.map(row=>String(row.smaregi_product_id||"").trim()).filter(Boolean));
     let inactiveCount=0;
     for(const current of existing){
@@ -499,11 +602,14 @@ async function importSmaregiProducts(){
         }catch(_){ }
       }
     }
-    saveSmaregiProductImportHistory({source:"api",started_at:startedAt,finished_at:new Date().toISOString(),page_count:Number(data.page_count||0),new_count:inserts.length,updated_count:updates.length,unchanged_count:unchanged,inactive_count:inactiveCount,failure_count:failures.length,failures:warningsToHistory(failures,data.warnings||[]),store_code:context.storeCode||"",contract_id:context.contractId||""});
+    const failureCount=failures.length+writeFailures.length;
+    const warningCount=failureCount+conflicts.length+(Array.isArray(data.warnings)?data.warnings.length:0);
+    saveSmaregiProductImportHistory({source:"api",started_at:startedAt,finished_at:new Date().toISOString(),page_count:Number(data.page_count||0),new_count:insertedCount,updated_count:updatedCount,unchanged_count:unchanged,conflict_count:conflicts.length,inactive_count:inactiveCount,failure_count:failureCount,failures:warningsToHistory([...failures,...writeFailures,...conflicts],data.warnings||[]),store_code:context.storeCode||"",contract_id:context.contractId||""});
     if(typeof loadProducts==="function")await loadProducts();
     else if(typeof render==="function")render();
-    const warningCount=failures.length+(Array.isArray(data.warnings)?data.warnings.length:0);
-    showMessage(`スマレジAPI取込完了：新規${inserts.length}件／更新${updates.length}件／変更なし${unchanged}件／停止${inactiveCount}件${warningCount?`／要確認${warningCount}件`:""}`,"ok");
+
+    showMessage(`商品マスター取込結果: 更新${updatedCount}件 / 新規${insertedCount}件 / 変更なし${unchanged}件 / 競合${conflicts.length}件 / 失敗${failureCount}件`,warningCount?"err":"ok");
+    if(conflicts.length)failures.push(...conflicts);
     if(warningCount&&typeof showPopup==="function"){
       const details=warningsToHistory(failures,data.warnings||[]).slice(0,20).map(item=>`${item.name||item.id||"商品"}：${item.reason}`).join("\n");
       showPopup("商品マスター取込の要確認",details||`${warningCount}件の確認が必要です。`);
