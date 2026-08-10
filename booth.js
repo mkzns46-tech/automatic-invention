@@ -8503,16 +8503,46 @@ function getBoothReportSalesSummaryRows(rows){
   };
 }
 
+function getBoothReportSalesKey(row){
+  return String(row?.barcode||row?.smaregi_product_id||"").trim();
+}
+
+function mergeBoothReportReturnSales(itemRows,salesRows){
+  const salesByKey=new Map();
+  (Array.isArray(salesRows)?salesRows:[]).forEach(row=>{
+    if(isBoothGachaSaleRow(row))return;
+    const key=getBoothReportSalesKey(row);
+    if(!key)return;
+    salesByKey.set(key,(salesByKey.get(key)||0)+Number(row.quantity||0));
+  });
+  return (Array.isArray(itemRows)?itemRows:[]).map(row=>{
+    const key=getBoothReportSalesKey(row);
+    const importedQty=key&&salesByKey.has(key)?salesByKey.get(key):null;
+    return {
+      ...row,
+      // Event sales imports are the report source of truth. Older confirmed
+      // events may only have booth_event_items.sold_qty, so retain that value
+      // only when no matching import detail exists.
+      sold_qty:importedQty===null?Number(row.sold_qty||0):importedQty
+    };
+  });
+}
+
 buildBoothEventReportData=async function(eventId){
-  const [items,imports,movements,diffRows]=await Promise.all([
+  const [items,importsResult,movements,diffRows]=await Promise.all([
     sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo,event_storage_qty,shelf_return_qty,updated_at&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc&limit=3000`).catch(()=>[]),
-    sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed)&order=sold_at.asc&limit=3000`).catch(()=>[]),
+    sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed)&order=sold_at.asc&limit=3000`)
+      .then(rows=>({ok:true,rows:Array.isArray(rows)?rows:[]}))
+      .catch(error=>({ok:false,rows:[],error})),
     sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,memo,movement_type,item_type&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(departure_count,return,gacha_pick,gacha_return,event_close_return)&order=created_at.desc&limit=3000`).catch(()=>[]),
     buildBoothDiffUniverseRows(eventId).catch(()=>[])
   ]);
+  if(!importsResult.ok){
+    throw new Error(`イベント販売実績の取得に失敗しました。販売数を0として計算していません。${importsResult.error?.message?`\n${importsResult.error.message}`:""}`);
+  }
   const rows=Array.isArray(items)?items:[];
   const gacha=rows.filter(row=>String(row.item_type||"")==="gacha_prize");
-  const salesRows=dedupeBoothSalesRows(imports);
+  const salesRows=dedupeBoothSalesRows(importsResult.rows);
   const isGachaSale=row=>isBoothGachaSaleRow(row);
   const normalSales=salesRows.filter(row=>!isGachaSale(row));
   const gachaSales=salesRows.filter(isGachaSale);
@@ -8521,7 +8551,7 @@ buildBoothEventReportData=async function(eventId){
   const normalSummary=getBoothReportSalesSummaryRows(reportNormalSales);
   const gachaSummary=getBoothReportSalesSummaryRows(reportGachaSales);
   return {
-    normal:rows.filter(row=>String(row.item_type||"normal")==="normal"),
+    normal:mergeBoothReportReturnSales(rows.filter(row=>String(row.item_type||"normal")==="normal"),normalSales),
     gacha,
     salesRows:[...reportNormalSales,...reportGachaSales],
     normalSales:reportNormalSales,
