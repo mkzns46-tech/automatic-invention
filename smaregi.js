@@ -53,7 +53,9 @@ function getComparableSmaregiStockNumber(itemOrValue,fallback=0){
     ? parseSavedSmaregiStockNumber(itemOrValue)
     : getSavedSmaregiStockValue(itemOrValue);
   const value=raw===null ? fallback : raw;
-  return value<0 ? 0 : value;
+  // Keep the API value as-is. Non-positive stock is handled by the
+  // difference rule below, while the displayed value must remain accurate.
+  return value;
 }
 
 function normalizeInventoryQuantity(value,fallback=0){
@@ -68,14 +70,21 @@ function calculateInventoryDifference({aricoStock,eventNormalStock,smaregiStock}
   const normalizedSmaregiStock=normalizeInventoryQuantity(smaregiStock);
   const comparisonStock=normalizedAricoStock+normalizedEventNormalStock;
   const difference=comparisonStock-normalizedSmaregiStock;
+  const nonPositiveNoIssue=comparisonStock<=0&&normalizedSmaregiStock<=0;
   return {
     aricoStock:normalizedAricoStock,
     eventNormalStock:normalizedEventNormalStock,
     comparisonStock,
     smaregiStock:normalizedSmaregiStock,
     difference,
-    isNoIssue:difference===0
+    isNoIssue:difference===0||nonPositiveNoIssue,
+    nonPositiveNoIssue
   };
+}
+
+function isSmaregiNonPositiveNoIssue({comparisonStock,smaregiStock}={}){
+  return normalizeInventoryQuantity(comparisonStock)<=0
+    && normalizeInventoryQuantity(smaregiStock)<=0;
 }
 
 function createSmaregiDifferenceSnapshot({appStock,eventShelfStock,smaregiStock}={}){
@@ -190,6 +199,7 @@ window.getSavedSmaregiStockValue=getSavedSmaregiStockValue;
 window.getSavedSmaregiStockNumber=getSavedSmaregiStockNumber;
 window.getComparableSmaregiStockNumber=getComparableSmaregiStockNumber;
 window.calculateInventoryDifference=calculateInventoryDifference;
+window.isSmaregiNonPositiveNoIssue=isSmaregiNonPositiveNoIssue;
 window.createSmaregiDifferenceSnapshot=createSmaregiDifferenceSnapshot;
 window.getSmaregiSnapshotFields=getSmaregiSnapshotFields;
 window.persistSmaregiCheckRecord=persistSmaregiCheckRecord;
@@ -251,7 +261,10 @@ function getSmaregiActualDifference(item){
 }
 
 function calculateSmaregiDifference(smaregiStock,actualStock){
-  const smaregi=getComparableSmaregiStockNumber(smaregiStock,0);
+  const parsed=typeof smaregiStock==="number"||typeof smaregiStock==="string"
+    ? parseSavedSmaregiStockNumber(smaregiStock)
+    : getSavedSmaregiStockValue(smaregiStock);
+  const smaregi=parsed===null?0:parsed;
   const actual=Number(actualStock||0);
   // スマレジ在庫がマイナスでも現物が0なら、棚卸上は差異なしとして扱う。
   return calculateInventoryDifference({aricoStock:actual,eventNormalStock:0,smaregiStock:smaregi}).difference;
@@ -508,7 +521,9 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
       // event item row already represents the picked quantity's current event
       // shelf balance, while the common row is only the fallback source.
       eventItemStockKeys.forEach(barcode=>{
-        smaregiEventStorageStockByBarcode.set(barcode,Number(eventItemStockByBarcode.get(barcode)||0));
+       if(!smaregiEventStorageStockByBarcode.has(barcode)){
+         smaregiEventStorageStockByBarcode.set(barcode,Number(eventItemStockByBarcode.get(barcode)||0));
+       }
       });
     }catch(error){
       console.warn("[Smaregi event shelf item lookup failed]",error);
@@ -975,6 +990,42 @@ async function syncSmaregiStockFromApi(){
   }
 }
 
+async function prepareSmaregiActualStockTargets(targets){
+  const prepared=[];
+  const missing=[];
+  for(const item of targets){
+    const barcode=String(item?.barcode??"").trim();
+    if(!barcode){
+      missing.push({barcode:"",productName:item?.product_name||""});
+      continue;
+    }
+    const actualStock=Number(getSmaregiCheck(barcode)?.actual_stock||0);
+    if(!Number.isFinite(actualStock)||actualStock<0)continue;
+    const product=await fetchProductByBarcode(barcode);
+    if(!product){
+      missing.push({barcode,productName:item?.product_name||""});
+      continue;
+    }
+    prepared.push({
+      item,
+      barcode,
+      actualStock,
+      product,
+      beforeStock:Number(product.base_stock||0)
+    });
+  }
+  if(missing.length){
+    const details=missing.map(row=>[
+      "商品マスター未登録",
+      `バーコード：${row.barcode||"（空欄）"}`,
+      `商品名：${row.productName||"（不明）"}`
+    ].join("\n")).join("\n\n");
+    if(typeof showPopup==="function")showPopup("商品マスター未登録",details);
+    throw new Error(details);
+  }
+  return prepared;
+}
+
 async function applySmaregiActualStocksToSheet(completedBy){
   const targets=smaregiStockItems.filter(item=>{
     const check=getSmaregiCheck(item.barcode);
@@ -986,39 +1037,45 @@ async function applySmaregiActualStocksToSheet(completedBy){
       && check.actual_stock!==undefined
       && String(check.actual_stock)!=="";
   });
-
-  for(const item of targets){
-    const barcode=String(item.barcode||"");
-    const check=getSmaregiCheck(barcode);
-    const actual_stock=Number(check.actual_stock||0);
-    if(!Number.isFinite(actual_stock)||actual_stock<0)continue;
-
-    const product=await fetchProductByBarcode(barcode);
-    const beforeStock=Number(product?.base_stock||0);
-    if(beforeStock===actual_stock)continue;
-
-    await sb("inventory_logs",{
-      method:"POST",
-      headers:{Prefer:"return=minimal"},
-      body:JSON.stringify({
-        type:"在庫修正",
-        staff:completedBy,
-        barcode,
-        product_name:item.product_name||product?.name||"",
-        quantity:actual_stock,
-        memo:`スマレジ変動商品チェック完了時に実在庫反映（前在庫 ${beforeStock}）`
-      })
-    });
-
-    await updateProductCurrentStock(barcode,actual_stock);
+  const prepared=await prepareSmaregiActualStockTargets(targets);
+  const operations=[];
+  try{
+    for(const row of prepared){
+      if(row.beforeStock===row.actualStock)continue;
+      const operation={...row,inventoryLogId:null};
+      operations.push(operation);
+      const inserted=await sb("inventory_logs",{
+        method:"POST",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify({
+          type:"在庫修正",
+          staff:completedBy,
+          barcode:row.barcode,
+          product_name:row.item.product_name||row.product?.name||"",
+          quantity:row.actualStock,
+          memo:`スマレジ変動商品チェック完了時に実在庫反映（前在庫 ${row.beforeStock}）`
+        })
+      });
+      operation.inventoryLogId=Array.isArray(inserted)&&inserted[0]?.id ? inserted[0].id : null;
+      await updateProductCurrentStock(row.barcode,row.actualStock);
+    }
+  }catch(error){
+    for(const operation of operations.reverse()){
+      try{await updateProductCurrentStock(operation.barcode,operation.beforeStock);}catch(rollbackError){console.warn("[smaregi stock rollback failed]",rollbackError);}
+      if(operation.inventoryLogId){
+        try{await sb(`inventory_logs?id=eq.${encodeURIComponent(operation.inventoryLogId)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});}catch(rollbackError){console.warn("[smaregi log rollback failed]",rollbackError);}
+      }
+    }
+    throw error;
   }
 
   console.log("[Smaregi Actual Stocks Applied]",{
     appliedBy:completedBy,
-    targetCount:targets.length
+    targetCount:targets.length,
+    appliedCount:operations.length
   });
 
-  return targets.length;
+  return operations.length;
 }
 
 async function completeSmaregiStockCheck(){
@@ -1358,6 +1415,7 @@ function isSmaregiDifferenceCsvRow({check,item=null,difference,snapshotValues=nu
   if(!check||isSmaregiExcludedCheck(check))return false;
   if(isSmaregiNoIssueCheck(check))return false;
   if(snapshotValues?.isAutoNoIssue===true)return false;
+  if(snapshotValues&&isSmaregiNonPositiveNoIssue(snapshotValues))return false;
   if(calculation?.isNoIssue===true)return false;
   if(!snapshotValues&&item&&isSmaregiEffectiveNoIssueCheck(item,check))return false;
   const numericDifference=Number.isFinite(Number(difference))
@@ -1736,10 +1794,16 @@ function getSmaregiHistoricalSnapshotValues(check,item,snapshot,reconstructed=nu
     .every(value=>value!==null)
     && (snapshotVersion===null||snapshotVersion>=2);
   const difference=hasSnapshot ? snapshotDifference : null;
+  const snapshotCalculation=hasSnapshot ? calculateInventoryDifference({
+    aricoStock:appStock,
+    eventNormalStock:eventShelfStock,
+    smaregiStock
+  }) : null;
   const isAutoNoIssue=hasSnapshot && (
     check?.is_auto_no_issue_at_check===true
     || String(check?.is_auto_no_issue_at_check||"").toLowerCase()==="true"
     || snapshotDifference===0
+    || snapshotCalculation?.isNoIssue===true
   );
   const manualNoIssue=check?.is_manual_no_issue===true
     || String(check?.is_manual_no_issue||"").toLowerCase()==="true"

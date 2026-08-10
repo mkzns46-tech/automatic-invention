@@ -3640,12 +3640,25 @@ function getBoothMovementTakeoutSource(row){
 
 function getBoothCurrentStoreCode(){
   const context=getBoothSalesContext();
-  return String(context?.storeCode||"tokyo");
+  return normalizeBoothStoreCode(context?.storeCode||"tokyo");
+}
+
+function normalizeBoothStoreCode(value){
+  const text=String(value||"").trim().toLowerCase();
+  if(text==="東京"||text==="東京店"||text==="tokyo")return "tokyo";
+  if(text==="愛知"||text==="愛知店"||text==="aichi")return "aichi";
+  if(text==="長野"||text==="長野店"||text==="nagano")return "nagano";
+  return text;
 }
 
 async function findBoothEventStorageStock(storeCode,barcode){
-  const rows=await sb(`event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty&store_code=eq.${encodeURIComponent(storeCode)}&barcode=eq.${encodeURIComponent(barcode)}&limit=1`);
-  return Array.isArray(rows)&&rows[0]?rows[0]:null;
+  const normalizedStore=normalizeBoothStoreCode(storeCode);
+  const normalizedBarcode=String(barcode||"").trim();
+  if(!normalizedStore||!normalizedBarcode)return null;
+  const rows=await sb(`event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty&barcode=eq.${encodeURIComponent(normalizedBarcode)}&limit=100`);
+  return Array.isArray(rows)
+    ? (rows.find(row=>normalizeBoothStoreCode(row?.store_code)===normalizedStore)||null)
+    : null;
 }
 
 // Older event rows were created before the store-wide event shelf table was
@@ -4371,6 +4384,11 @@ async function applyBoothReturnSourceItem(item,quantity,processType,staff){
 }
 
 async function insertBoothReturnMovement(event,item,quantity,staff,memo,movementType="return"){
+  const requestedType=String(movementType||"return");
+  const normalizedType=requestedType==="event_stock_confirm"?"return":requestedType;
+  const normalizedMemo=requestedType==="event_stock_confirm"
+    ? ["イベント棚に残す確認",memo].filter(Boolean).join(" / ")
+    : memo;
   const inserted=await sb("booth_stock_movements",{
     method:"POST",
     headers:{Prefer:"return=representation"},
@@ -4379,11 +4397,11 @@ async function insertBoothReturnMovement(event,item,quantity,staff,memo,movement
       barcode:item.barcode,
       product_name:item.product_name||"",
       item_type:"normal",
-      movement_type:movementType,
+      movement_type:normalizedType,
       quantity,
       staff,
-      memo,
-      takeout_source:movementType==="event_transfer"?"event":"normal",
+      memo:normalizedMemo,
+      takeout_source:normalizedType==="event_transfer"?"event":"normal",
       affects_smaregi:false,
       smaregi_delta:0
     }])
@@ -8270,13 +8288,25 @@ async function confirmBoothSalesImport(){
     const itemByBarcode=new Map(items.map(item=>[String(item.barcode||""),item]));
     const addByBarcode=new Map();
     rows.forEach(row=>{const barcode=String(row.barcode||"").trim();if(barcode)addByBarcode.set(barcode,(addByBarcode.get(barcode)||0)+Number(row.quantity||0));});
+    const prepared=[];
+    for(const [barcode,addQty] of addByBarcode.entries()){
+      if(!Number.isFinite(addQty)||addQty<=0)continue;
+      const item=itemByBarcode.get(barcode);
+      if(!item)throw new Error(`${barcode}: イベント商品として登録されていません。`);
+      const product=await findBoothProductByBarcode(barcode);
+      if(!product)throw new Error(`${barcode}: 商品マスターが見つかりません。`);
+      const stock=await findBoothEventStorageStock(getBoothCurrentStoreCode(),barcode);
+      const currentQty=Number(stock?.storage_qty||0);
+      if(!stock||currentQty<addQty){
+        throw new Error(`${product.name||item.product_name||barcode}: 共通イベント棚在庫が不足しています（現在 ${currentQty} / 販売 ${addQty}）。`);
+      }
+      prepared.push({barcode,addQty,item,product,stock});
+    }
+    if(!prepared.length)throw new Error("販売確定できる数量がありません。");
     const applied=[];
     try{
-      for(const [barcode,addQty] of addByBarcode.entries()){
-        const item=itemByBarcode.get(barcode);
-        if(!item)continue;
-        const product=await findBoothProductByBarcode(barcode)||{barcode, name:item.product_name||""};
-        const stock=await findBoothEventStorageStock(getBoothCurrentStoreCode(),barcode);
+      for(const preparedRow of prepared){
+        const {barcode,addQty,item,product,stock}=preparedRow;
         const storageBefore=stock?{...stock}:null;
         await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),product,-addQty);
         const storageMovement=await insertBoothCommonEventMovement(event,product,addQty,staff,"\u30a4\u30d9\u30f3\u30c8\u8ca9\u58f2","storage_out");
@@ -8349,9 +8379,9 @@ async function loadBoothReturnHistory(eventId){
   const list=el("boothReturnHistoryList");
   if(!list)return;
   try{
-    const rows=await sb(`booth_stock_movements?select=id,created_at,product_name,barcode,quantity,staff,memo,movement_type&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(return,event_transfer,event_stock_confirm)&item_type=eq.normal&order=created_at.desc&limit=100`);
+    const rows=await sb(`booth_stock_movements?select=id,created_at,product_name,barcode,quantity,staff,memo,movement_type&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(return,event_transfer)&item_type=eq.normal&order=created_at.desc&limit=100`);
     const values=Array.isArray(rows)?rows:[];
-    list.innerHTML=values.length?`<div class="booth-history-table-wrap"><table class="booth-history-table"><thead><tr><th>\u65e5\u6642</th><th>\u5546\u54c1\u540d</th><th>\u30d0\u30fc\u30b3\u30fc\u30c9</th><th>\u6570\u91cf</th><th>\u51e6\u7406</th><th>\u62c5\u5f53\u8005</th></tr></thead><tbody>${values.map(row=>`<tr><td>${esc(formatBoothDateTime(row.created_at))}</td><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.quantity??0)}</td><td>${esc(row.movement_type==="event_stock_confirm"?"\u30a4\u30d9\u30f3\u30c8\u68da\u306b\u6b8b\u3059":"\u901a\u5e38\u68da\u3078\u623b\u3059")}</td><td>${esc(row.staff||"-")}</td></tr>`).join("")}</tbody></table></div>`:"<div class=\"booth-empty\">\u623b\u308a\u5728\u5eab\u5c65\u6b74\u306f\u3042\u308a\u307e\u305b\u3093\u3002</div>";
+    list.innerHTML=values.length?`<div class="booth-history-table-wrap"><table class="booth-history-table"><thead><tr><th>\u65e5\u6642</th><th>\u5546\u54c1\u540d</th><th>\u30d0\u30fc\u30b3\u30fc\u30c9</th><th>\u6570\u91cf</th><th>\u51e6\u7406</th><th>\u62c5\u5f53\u8005</th></tr></thead><tbody>${values.map(row=>{const kept=String(row.memo||"").includes("イベント棚に残す確認");return `<tr><td>${esc(formatBoothDateTime(row.created_at))}</td><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.quantity??0)}</td><td>${esc(kept?"\u30a4\u30d9\u30f3\u30c8\u68da\u306b\u6b8b\u3059":"\u901a\u5e38\u68da\u3078\u623b\u3059")}</td><td>${esc(row.staff||"-")}</td></tr>`}).join("")}</tbody></table></div>`:"<div class=\"booth-empty\">\u623b\u308a\u5728\u5eab\u5c65\u6b74\u306f\u3042\u308a\u307e\u305b\u3093\u3002</div>";
   }catch(error){list.innerHTML=`<div class="booth-empty">${esc(error.message||"\u623b\u308a\u5c65\u6b74\u3092\u8aad\u307f\u8fbc\u3081\u307e\u305b\u3093\u3002")}</div>`;}
 }
 
@@ -8673,7 +8703,7 @@ exportBoothEventReportPdf=async function(event){
 
 // Ver 2.38: event close uses the current common event shelf stock.
 function getBoothEventStoreCode(event){
-  return String(event?.store_code||getBoothCurrentStoreCode?.()||"tokyo").toLowerCase();
+  return normalizeBoothStoreCode(event?.store_code||getBoothCurrentStoreCode?.()||"tokyo");
 }
 
 async function loadBoothCloseCommonStockSummary(event,summary){
