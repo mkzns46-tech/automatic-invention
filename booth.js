@@ -1132,7 +1132,7 @@ async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
   for(const item of reflectedRows){
     const processType=getBoothReturnProcessType(item)||"shelf";
     const qty=getBoothReturnReflectedQty(item);
-    if(qty>0&&item.barcode&&processType==="storage"){
+    if(qty>0&&item.barcode&&processType==="storage"&&false){
       await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),item,-qty);
       await sb("event_storage_movements",{
         method:"POST",
@@ -1149,7 +1149,7 @@ async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
           memo:"締め解除によりイベント保管反映を取消"
         }])
       });
-    }else if(qty>0&&item.barcode){
+    }else if(qty>0&&item.barcode&&processType!=="storage"){
       await adjustBoothProductBaseStock(item.barcode,-qty);
     }
     await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
@@ -8261,14 +8261,14 @@ async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
   for(const item of reflectedRows){
     const processType=getBoothReturnProcessType(item)||"shelf";
     const qty=getBoothReturnReflectedQty(item);
-    if(qty>0&&item.barcode&&processType==="storage"){
+    if(qty>0&&item.barcode&&processType==="storage"&&false){
       await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),item,-qty);
       await insertBoothCommonEventMovement({id:eventId},item,qty,staff,"\u30c1\u30a7\u30c3\u30af\u89e3\u9664","storage_out");
     }else if(qty>0&&item.barcode&&processType==="shelf"){
       await adjustBoothProductBaseStock(item.barcode,-qty);
       await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),item,qty);
       await insertBoothCommonEventMovement({id:eventId},item,qty,staff,"\u30c1\u30a7\u30c3\u30af\u89e3\u9664","storage_in");
-    }else if(qty>0&&item.barcode&&processType!=="keep"){
+    }else if(qty>0&&item.barcode&&processType!=="keep"&&processType!=="storage"){
       await adjustBoothProductBaseStock(item.barcode,-qty);
     }
     await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({return_reflected:false,return_reflected_qty:0,return_reflected_at:null,return_reflected_by:null,shelf_return_reflected:false,shelf_return_reflected_qty:0,shelf_return_reflected_at:null,shelf_return_reflected_by:null,updated_at:now})});
@@ -8383,12 +8383,14 @@ async function buildBoothDepartureInventoryData(eventId){
     const quantity=Number(row.storage_qty||0);
     normalByBarcode.set(barcode,{product_name:row.product_name||product.name||"",name:product.name||row.product_name||"",barcode,shelf:boothProductShelfText(product),commonShelfQty:quantity,taken:quantity,soldQty:null,remain:quantity,updated_at:row.updated_at||""});
   });
-  // The selected event's normal takeout is not in event_storage_stocks until it is moved to the common shelf.
-  // Use the event item balance for those barcodes and keep the common-shelf row as the fallback.
+  // event_storage_stocks is the store-common canonical balance. Use the
+  // selected event item only as a legacy fallback when no common-shelf row
+  // exists, so an ended event cannot overwrite the current store balance.
   eventItems.forEach(item=>{
     const barcode=String(item.barcode||"").trim();
     const current=boothEventItemCurrentQty(item);
     if(!barcode||current<=0)return;
+    if(normalByBarcode.has(barcode))return;
     const product=products.get(barcode)||{};
     normalByBarcode.set(barcode,{product_name:item.product_name||product.name||"",name:product.name||item.product_name||"",barcode,shelf:boothProductShelfText(product),commonShelfQty:current,taken:Number(item.taken_qty||0),soldQty:Number(item.sold_qty||0),remain:current,updated_at:item.updated_at||""});
   });
@@ -8998,7 +9000,7 @@ async function reflectBoothShelfReturnsOnClose(summary,staff){
       const delta=getBoothReturnReflectDelta(item);
       const operation={item,before:{...item},processType,delta,baseMoved:false,storageMoved:false,movement:null};
       applied.push(operation);
-      if(processType==="storage"){
+      if(processType==="storage"&&item.__legacyStorageMove===true){
         await upsertBoothEventStorageStock(getBoothEventStoreCode({store_code:item.store_code}),item,delta);
         operation.storageMoved=true;
         operation.movement=await insertBoothCommonEventMovement({id:item.event_id||boothCurrentEventId},item,delta,staff,"イベント終了時の棚戻し","storage_in");
@@ -9133,7 +9135,9 @@ async function saveBoothReportReturnQty(itemId,button){
   }
   const nextReturned=Number(value);
   window.__aricoBoothReportReturnSaving=true;
+  let baseStockDelta=0;
   let stockDelta=0;
+  let storageStockDelta=0;
   let processType="";
   let stockChanged=false;
   let stockProduct=null;
@@ -9156,36 +9160,41 @@ async function saveBoothReportReturnQty(itemId,button){
         ? Number(item.return_reflected_qty||0)
         : oldReturned)
       : 0;
-    if(wasReflected&&(processType==="shelf"||processType==="storage")){
-      stockDelta=nextReturned-reflectedQty;
+    if(processType==="shelf"||processType==="storage"){
+      baseStockDelta=nextReturned-reflectedQty;
+      // Keeping the item on the common event shelf records the return count
+      // only. The current common-shelf stock is not increased a second time.
+      storageStockDelta=processType==="shelf"?-baseStockDelta:0;
     }
     stockProduct=await findBoothProductByBarcode(String(item.barcode||"").trim());
-    if(stockDelta&&processType==="shelf"){
+    if(baseStockDelta&&processType==="shelf"){
       if(!stockProduct)throw new Error(`商品マスターが見つかりません: ${item.barcode}`);
-      await adjustBoothProductBaseStock(item.barcode,stockDelta);
-      stockChanged=true;
-    }else if(stockDelta&&processType==="storage"){
-      await upsertBoothEventStorageStock(getBoothEventStoreCode(event),item,stockDelta);
+      await adjustBoothProductBaseStock(item.barcode,baseStockDelta);
       stockChanged=true;
     }
+    if(storageStockDelta){
+      await upsertBoothEventStorageStock(getBoothEventStoreCode(event),item,storageStockDelta);
+      stockChanged=true;
+    }
+    stockDelta=processType==="shelf"?baseStockDelta:storageStockDelta;
     const now=new Date().toISOString();
-    const reflectedValue=wasReflected?nextReturned:0;
+    const reflectedValue=(processType==="shelf"||processType==="storage")?nextReturned:0;
     const payload={
       returned_qty:nextReturned,
       difference_qty:calculateBoothDifference({...item,returned_qty:nextReturned}),
       return_process_type:processType||item.return_process_type||null,
-      return_reflected:wasReflected&&nextReturned>0,
+      return_reflected:(processType==="shelf"||processType==="storage")&&nextReturned>0,
       return_reflected_qty:reflectedValue,
-      return_reflected_at:wasReflected&&nextReturned>0?now:null,
+      return_reflected_at:(processType==="shelf"||processType==="storage")&&nextReturned>0?now:null,
       return_reflected_by:wasReflected&&nextReturned>0?(item.return_reflected_by||"レポート修正"):null,
       shelf_return_qty:processType==="shelf"?reflectedValue:0,
       event_storage_qty:processType==="storage"?reflectedValue:0,
-      shelf_return_reflected:processType==="shelf"&&wasReflected&&nextReturned>0,
+      shelf_return_reflected:processType==="shelf"&&nextReturned>0,
       shelf_return_reflected_qty:processType==="shelf"?reflectedValue:0,
-      shelf_return_reflected_at:processType==="shelf"&&wasReflected&&nextReturned>0?now:null,
+      shelf_return_reflected_at:processType==="shelf"&&nextReturned>0?now:null,
       shelf_return_reflected_by:processType==="shelf"&&wasReflected&&nextReturned>0?(item.shelf_return_reflected_by||"レポート修正"):null
     };
-    if(stockDelta){
+    if(baseStockDelta){
       adjustmentLog=await sb("inventory_logs",{
         method:"POST",
         headers:{Prefer:"return=representation"},
@@ -9194,7 +9203,7 @@ async function saveBoothReportReturnQty(itemId,button){
           staff:String(item.return_reflected_by||"レポート修正"),
           barcode:item.barcode,
           product_name:item.product_name||"",
-          quantity:stockDelta,
+          quantity:baseStockDelta,
           memo:`イベント戻り実数修正 ${oldReturned} -> ${nextReturned}`,
           event_id:event.id,
           affects_smaregi:false,
@@ -9399,19 +9408,23 @@ async function saveBoothReportReturnBatch(){
       const nextReturned=Number(entry.value);
       const reflected=isBoothReturnReflected(item);
       const reflectedQty=reflected?getBoothReturnReflectedQty(item):0;
-      const stockDelta=destination==="shelf"?nextReturned-reflectedQty:0;
-      const operation={item,before,stockDelta,baseAdjusted:false,storageAdjusted:false,movement:null,inventoryLog:null,patched:false};
+      const returnDelta=nextReturned-reflectedQty;
+      const baseStockDelta=destination==="shelf"?returnDelta:0;
+      // A storage return is already represented by the common shelf stock.
+      // Only a normal-shelf return moves quantity between stock locations.
+      const storageStockDelta=destination==="shelf"?-returnDelta:0;
+      const operation={item,before,baseStockDelta,storageStockDelta,baseAdjusted:false,storageAdjusted:false,movement:null,inventoryLog:null,patched:false};
       operations.push(operation);
-      if(stockDelta!==0){
+       if(baseStockDelta||storageStockDelta){
         if(destination==="shelf"){
-          await adjustBoothProductBaseStock(item.barcode,stockDelta);
+           await adjustBoothProductBaseStock(item.barcode,baseStockDelta);
           operation.baseAdjusted=true;
         }
-        await upsertBoothEventStorageStock(getBoothEventStoreCode(event),item,-stockDelta);
+         await upsertBoothEventStorageStock(getBoothEventStoreCode(event),item,storageStockDelta);
         operation.storageAdjusted=true;
-        const movementType=stockDelta>0?"storage_out":"storage_in";
-        operation.movement=await insertBoothCommonEventMovement(event,item,Math.abs(stockDelta),staff,stockDelta>0?"通常棚へ戻す":"戻り実績修正",movementType);
-        operation.inventoryLog=await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({type:"在庫修正",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:stockDelta,memo:`イベントレポート戻り実績 ${reflectedQty} -> ${nextReturned}`,event_id:event.id,affects_smaregi:false,smaregi_delta:0})});
+         const movementType=storageStockDelta>0?"storage_in":"storage_out";
+        operation.movement=await insertBoothCommonEventMovement(event,item,Math.abs(storageStockDelta),staff,storageStockDelta>0?"戻り実績保存":"通常棚へ戻す",movementType);
+        operation.inventoryLog=baseStockDelta?await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({type:"在庫修正",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:baseStockDelta,memo:`イベントレポート戻り実績 ${reflectedQty} -> ${nextReturned}`,event_id:event.id,affects_smaregi:false,smaregi_delta:0})}):null;
       }
       const now=new Date().toISOString();
       await patchBoothEventItem(item,{
@@ -9440,11 +9453,151 @@ async function saveBoothReportReturnBatch(){
         if(operation.patched)await patchBoothEventItem(operation.item,getBoothReportReturnRestorePayload(operation.before));
         if(operation.inventoryLog?.[0]?.id)await sb(`inventory_logs?id=eq.${encodeURIComponent(operation.inventoryLog[0].id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
         if(operation.movement?.id)await sb(`event_storage_movements?id=eq.${encodeURIComponent(operation.movement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
-        if(operation.storageAdjusted)await upsertBoothEventStorageStock(getBoothEventStoreCode(event),operation.item,operation.stockDelta);
-        if(operation.baseAdjusted)await adjustBoothProductBaseStock(operation.item.barcode,-operation.stockDelta);
+        if(operation.storageAdjusted)await upsertBoothEventStorageStock(getBoothEventStoreCode(event),operation.item,-operation.storageStockDelta);
+        if(operation.baseAdjusted)await adjustBoothProductBaseStock(operation.item.barcode,-operation.baseStockDelta);
       }catch(rollbackError){console.warn("[booth report return batch rollback failed]",rollbackError);}
     }
     boothShowError("戻り実績保存エラー",error.message||"戻り実績の保存に失敗しました。");
+  }finally{
+    window.__aricoBoothReportReturnBatchSaving=false;
+  }
+}
+
+// Final batch-save implementation: keep booth_event_items as the return
+// record and update the store-common event shelf by destination delta.
+async function saveBoothReportReturnBatch(){
+  if(window.__aricoBoothReportReturnBatchSaving)return;
+  const section=document.querySelector("[data-booth-report-return-section]");
+  const event=getBoothCurrentEvent();
+  const destination=normalizeBoothReportReturnDestination(section?.dataset.selectedDestination||"");
+  if(!section||!event){boothShowError("Return save error","Open an event report first.");return;}
+  if(!destination){boothShowError("Return destination required","Select a return destination first.");return;}
+  if(section.dataset.destinationMixed==="true"){boothShowError("Return destination error","Existing rows have mixed destinations.");return;}
+
+  const entries=new Map();
+  section.querySelectorAll("[data-booth-report-return-input]").forEach(input=>{
+    const id=String(input.dataset.itemId||"");
+    if(id&&!entries.has(id))entries.set(id,{
+      id,
+      value:String(input.value||"").trim(),
+      saved:Number(input.dataset.savedReturned||0),
+      productName:String(input.dataset.productName||""),
+      barcode:String(input.dataset.barcode||"")
+    });
+  });
+  const changed=[...entries.values()].filter(row=>row.value!==String(row.saved));
+  if(!changed.length)return;
+  for(const row of changed){
+    if(!/^[0-9]+$/.test(row.value)){
+      boothShowError("Return quantity error","Enter a whole number of 0 or more.");
+      return;
+    }
+  }
+
+  const totalQty=changed.reduce((sum,row)=>sum+Number(row.value),0);
+  const body=[
+    "Save event return results?",
+    `Destination: ${getBoothReportReturnDestinationLabel(destination)}`,
+    `Changed products: ${changed.length}`,
+    `Returned quantity total: ${totalQty}`
+  ].join(String.fromCharCode(10));
+  const ok=typeof confirmAppAction==="function"
+    ?await confirmAppAction("Save event return results",body,{okText:"Save",cancelText:"Cancel"})
+    :true;
+  if(!ok)return;
+
+  window.__aricoBoothReportReturnBatchSaving=true;
+  const operations=[];
+  const staff=String(event.created_by||"event report");
+  try{
+    for(const entry of changed){
+      const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,shelf_return_reflected_by,return_process_type,return_reflected,return_reflected_qty,return_reflected_at,return_reflected_by&event_id=eq.${encodeURIComponent(event.id)}&id=eq.${encodeURIComponent(entry.id)}&item_type=eq.normal&limit=1`);
+      const item=Array.isArray(rows)&&rows[0]?rows[0]:null;
+      if(!item)throw new Error("Return item was not found.");
+      const before={...item};
+      const existingDestination=normalizeBoothReportReturnDestination(getBoothReturnProcessType(item));
+      if(existingDestination&&existingDestination!==destination){
+        throw new Error("This event already has a different return destination.");
+      }
+      const nextReturned=Number(entry.value);
+      const planned=calculateBoothReturnPlannedQty(item);
+      if(nextReturned>planned)throw new Error(`Return quantity exceeds planned quantity for ${item.product_name||item.barcode}.`);
+      const reflectedQty=isBoothReturnReflected(item)?getBoothReturnReflectedQty(item):0;
+      const returnDelta=nextReturned-reflectedQty;
+      const baseStockDelta=destination==="shelf"?returnDelta:0;
+      // A storage return is already represented by the common shelf stock.
+      // Only a normal-shelf return moves quantity between stock locations.
+      const storageStockDelta=destination==="shelf"?-returnDelta:0;
+      const operation={item,before,baseStockDelta,storageStockDelta,baseAdjusted:false,storageAdjusted:false,movement:null,inventoryLog:null,patched:false};
+      operations.push(operation);
+
+      if(baseStockDelta){
+        const product=await findBoothProductByBarcode(String(item.barcode||"").trim());
+        if(!product)throw new Error(`Product master not found: ${item.barcode}`);
+        await adjustBoothProductBaseStock(item.barcode,baseStockDelta);
+        operation.baseAdjusted=true;
+      }
+      if(storageStockDelta){
+        await upsertBoothEventStorageStock(getBoothEventStoreCode(event),item,storageStockDelta);
+        operation.storageAdjusted=true;
+        operation.movement=await insertBoothCommonEventMovement(
+          event,
+          item,
+          Math.abs(storageStockDelta),
+          staff,
+          storageStockDelta>0?"event return kept on common shelf":"event return moved to normal shelf",
+          storageStockDelta>0?"storage_in":"storage_out"
+        );
+      }
+      if(baseStockDelta){
+        operation.inventoryLog=await sb("inventory_logs",{
+          method:"POST",
+          headers:{Prefer:"return=representation"},
+          body:JSON.stringify({
+            type:"inventory adjustment",
+            staff,
+            barcode:item.barcode,
+            product_name:item.product_name||"",
+            quantity:baseStockDelta,
+            memo:`event return ${reflectedQty} -> ${nextReturned}`,
+            event_id:event.id,
+            affects_smaregi:false,
+            smaregi_delta:0
+          })
+        });
+      }
+      const now=new Date().toISOString();
+      await patchBoothEventItem(item,{
+        returned_qty:nextReturned,
+        difference_qty:calculateBoothDifference({...item,returned_qty:nextReturned}),
+        return_process_type:destination,
+        return_reflected:nextReturned>0,
+        return_reflected_qty:nextReturned,
+        return_reflected_at:nextReturned>0?now:null,
+        return_reflected_by:nextReturned>0?staff:null,
+        shelf_return_qty:destination==="shelf"?nextReturned:0,
+        event_storage_qty:destination==="storage"?nextReturned:0,
+        shelf_return_reflected:destination==="shelf"&&nextReturned>0,
+        shelf_return_reflected_qty:destination==="shelf"?nextReturned:0,
+        shelf_return_reflected_at:destination==="shelf"&&nextReturned>0?now:null,
+        shelf_return_reflected_by:destination==="shelf"&&nextReturned>0?staff:null
+      });
+      operation.patched=true;
+    }
+    await refreshBoothEventRelatedViews(event.id);
+    await loadBoothEventReport(event.id);
+    boothShowSuccess("Return results saved",`${changed.length} products saved.`);
+  }catch(error){
+    for(const operation of operations.reverse()){
+      try{
+        if(operation.patched)await patchBoothEventItem(operation.item,getBoothReportReturnRestorePayload(operation.before));
+        if(operation.inventoryLog?.[0]?.id)await sb(`inventory_logs?id=eq.${encodeURIComponent(operation.inventoryLog[0].id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+        if(operation.movement?.id)await sb(`event_storage_movements?id=eq.${encodeURIComponent(operation.movement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+        if(operation.storageAdjusted)await upsertBoothEventStorageStock(getBoothEventStoreCode(event),operation.item,-operation.storageStockDelta);
+        if(operation.baseAdjusted)await adjustBoothProductBaseStock(operation.item.barcode,-operation.baseStockDelta);
+      }catch(rollbackError){console.warn("[booth report return batch rollback failed]",rollbackError);}
+    }
+    boothShowError("Return save error",error.message||"Failed to save event return results.");
   }finally{
     window.__aricoBoothReportReturnBatchSaving=false;
   }

@@ -68,7 +68,9 @@ function calculateInventoryDifference({aricoStock,eventNormalStock,smaregiStock}
   const normalizedAricoStock=normalizeInventoryQuantity(aricoStock);
   const normalizedEventNormalStock=normalizeInventoryQuantity(eventNormalStock);
   const normalizedSmaregiStock=normalizeInventoryQuantity(smaregiStock);
-  const comparisonStock=normalizedAricoStock+normalizedEventNormalStock;
+  // The common event shelf is physically separate from the normal shelf.
+  // Compare the normal ARICO shelf after removing the current event-shelf stock.
+  const comparisonStock=normalizedAricoStock-normalizedEventNormalStock;
   const difference=comparisonStock-normalizedSmaregiStock;
   const nonPositiveNoIssue=comparisonStock<=0&&normalizedSmaregiStock<=0;
   return {
@@ -453,9 +455,9 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     console.warn("[Smaregi ongoing event sales lookup failed]",error);
   }
 
-  // event_storage_stocks is the fallback current stock for the store-common
-  // event shelf. An event pick is recorded in booth_event_items, so the
-  // event-specific remaining quantity must take precedence when it exists.
+  // event_storage_stocks is the canonical current balance for the
+  // store-common event shelf. Legacy event-item rows are used only when no
+  // common-shelf row exists, so an ended event cannot overwrite the balance.
   try{
     const commonStocks=await sbAll(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(storeCode)}&barcode=in.(${barcodeFilter})`,1000,50000);
     (Array.isArray(commonStocks)?commonStocks:[]).forEach(row=>{
