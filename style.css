@@ -909,7 +909,7 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   border-radius:0;
   background:#fff;
   color:#123c2b;
-  text-align:left;
+  text-align:center;
   cursor:pointer;
 }
 .booth-return-search-result:last-child{border-bottom:0}
@@ -2347,6 +2347,7 @@ header h1{
   align-items:center;
   justify-content:center;
   padding:18px;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
 }
 .app-popup-card{
   width:min(420px,92vw);
@@ -2354,21 +2355,45 @@ header h1{
   border-radius:20px;
   box-shadow:0 20px 60px rgba(0,0,0,.22);
   border:2px solid #2d6a4f;
-  padding:22px;
+  box-sizing:border-box;
+  max-height:90vh;
+  max-height:90dvh;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
   text-align:center;
 }
 .app-popup-title{
   font-size:22px;
   font-weight:900;
   color:#1b4332;
-  margin-bottom:12px;
+  flex:0 0 auto;
+  padding:22px 22px 12px;
+  margin:0;
 }
 .app-popup-body{
+  box-sizing:border-box;
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
   font-size:16px;
   line-height:1.7;
   color:#123c2b;
   white-space:pre-line;
-  margin-bottom:18px;
+  overflow-wrap:anywhere;
+  text-align:left;
+  padding:0 22px 18px;
+  margin:0;
+}
+.app-popup-footer,
+.app-confirm-actions,
+.booth-confirm-actions{
+  flex:0 0 auto;
+  box-sizing:border-box;
+  padding:0 22px calc(22px + env(safe-area-inset-bottom));
+  margin-top:0;
 }
 #appPopupClose{
   width:100%;
@@ -2377,6 +2402,17 @@ header h1{
   background:#2d6a4f;
   color:#fff;
   font-weight:900;
+}
+.app-confirm-actions,
+.booth-confirm-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.app-confirm-actions button,
+.booth-confirm-actions button{
+  margin:0;
+  min-width:0;
 }
 .memo-cell{
   display:flex;
@@ -4849,7 +4885,7 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:10px;
-  margin-top:16px;
+  margin-top:0;
 }
 .booth-confirm-actions button{
   margin:0;
@@ -5458,7 +5494,7 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:10px;
-  margin-top:18px;
+  margin-top:0;
 }
 .app-confirm-actions button{
   margin-top:0;

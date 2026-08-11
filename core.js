@@ -550,7 +550,7 @@ function confirmAppAction(title,body,{okText="実行",cancelText="キャンセ�
     popup.innerHTML=`<div class="app-popup-card">
       <div class="app-popup-title">${esc(title||"確認")}</div>
       <div class="app-popup-body">${esc(body||"")}</div>
-      <div class="app-confirm-actions">
+      <div class="app-confirm-actions app-popup-footer">
         <button type="button" class="secondary app-confirm-cancel-btn">${esc(cancelText)}</button>
         <button type="button" class="app-confirm-ok-btn">${esc(okText)}</button>
       </div>

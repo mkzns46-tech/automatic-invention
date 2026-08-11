@@ -1357,7 +1357,7 @@ function showBoothConfirmPopup(title,body,onOk){
   popup.innerHTML=`<div class="app-popup-card">
     <div class="app-popup-title">${esc(title)}</div>
     <div class="app-popup-body">${esc(body)}</div>
-    <div class="booth-confirm-actions">
+    <div class="booth-confirm-actions app-popup-footer">
       <button type="button" class="secondary booth-confirm-cancel-btn">キャンセル</button>
       <button type="button" class="booth-confirm-ok-btn">OK</button>
     </div>
@@ -9336,7 +9336,7 @@ function renderBoothReportReturnBatchSection(rows){
     const saved=isBoothReturnReflected(row)||getBoothReturnProcessType(row);
     return `<tr data-booth-report-return-row data-item-id="${esc(id)}" data-return-diff="${esc(row.return_difference)}">
       <td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.taken_qty??0)}</td><td>${esc(row.sold_qty??0)}</td><td>${esc(row.consumed_qty??0)}</td><td>${esc(row.planned_return_qty)}</td>
-      <td><input class="booth-history-qty-input" data-booth-report-return-input type="number" min="0" step="1" inputmode="numeric" data-item-id="${esc(id)}" data-saved-returned="${esc(returned)}" data-planned-returned="${esc(row.planned_return_qty)}" value="${esc(returned)}" aria-label="戻り実数"></td>
+      <td><input class="booth-history-qty-input" data-booth-report-return-input type="number" min="0" step="1" inputmode="numeric" data-item-id="${esc(id)}" data-product-name="${esc(row.product_name||"")}" data-barcode="${esc(row.barcode||"")}" data-saved-returned="${esc(returned)}" data-planned-returned="${esc(row.planned_return_qty)}" value="${esc(returned)}" aria-label="戻り実数"></td>
       <td><strong data-booth-report-return-difference>${esc(row.return_difference)}</strong></td><td><span data-booth-report-return-status>${saved?"保存済み":"未保存"}</span></td></tr>`;
   }).join("");
   const cards=list.map(row=>{
@@ -9346,7 +9346,7 @@ function renderBoothReportReturnBatchSection(rows){
     return `<article class="booth-history-card booth-report-return-card" data-booth-report-return-row data-item-id="${esc(id)}" data-return-diff="${esc(row.return_difference)}">
       <div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong><span>${esc(row.barcode||"-")}</span></div>
       <div class="booth-history-card-meta"><span>持ち出し数：${esc(row.taken_qty??0)}</span><span>販売数：${esc(row.sold_qty??0)}</span><span>ガチャ移動数：${esc(row.consumed_qty??0)}</span><span>戻り予定数：${esc(row.planned_return_qty)}</span><span>差異：<strong data-booth-report-return-difference>${esc(row.return_difference)}</strong></span></div>
-      <label>戻り実数<input class="booth-history-qty-input" data-booth-report-return-input type="number" min="0" step="1" inputmode="numeric" data-item-id="${esc(id)}" data-saved-returned="${esc(returned)}" data-planned-returned="${esc(row.planned_return_qty)}" value="${esc(returned)}"></label>
+      <label>戻り実数<input class="booth-history-qty-input" data-booth-report-return-input type="number" min="0" step="1" inputmode="numeric" data-item-id="${esc(id)}" data-product-name="${esc(row.product_name||"")}" data-barcode="${esc(row.barcode||"")}" data-saved-returned="${esc(returned)}" data-planned-returned="${esc(row.planned_return_qty)}" value="${esc(returned)}"></label>
       <span class="booth-report-return-status" data-booth-report-return-status>${saved?"保存済み":"未保存"}</span></article>`;
   }).join("");
   return `<section class="booth-report-section booth-report-return-batch" data-booth-report-return-section data-selected-destination="${esc(locked)}" data-destination-mixed="${state.mixed?"true":"false"}">
@@ -9369,7 +9369,7 @@ async function saveBoothReportReturnBatch(){
   const entries=new Map();
   section.querySelectorAll("[data-booth-report-return-input]").forEach(input=>{
     const id=String(input.dataset.itemId||"");
-    if(id&&!entries.has(id))entries.set(id,{id,value:String(input.value||"").trim(),saved:Number(input.dataset.savedReturned||0)});
+    if(id&&!entries.has(id))entries.set(id,{id,value:String(input.value||"").trim(),saved:Number(input.dataset.savedReturned||0),productName:String(input.dataset.productName||""),barcode:String(input.dataset.barcode||"")});
   });
   const changed=[...entries.values()].filter(row=>row.value!==String(row.saved));
   if(!changed.length)return;
@@ -9378,7 +9378,7 @@ async function saveBoothReportReturnBatch(){
   }
   const totalQty=changed.reduce((sum,row)=>sum+Number(row.value),0);
   const totalDelta=changed.reduce((sum,row)=>sum+(Number(row.value)-row.saved),0);
-  const summary=changed.map(row=>`${row.id}: ${row.saved} → ${Number(row.value)}`).join(String.fromCharCode(10));
+  const summary=changed.map(row=>`${row.productName||"商品"}（${row.barcode||"バーコード不明"}）: ${row.saved} → ${Number(row.value)}`).join(String.fromCharCode(10));
   const movementMessage=destination==="shelf"
     ? `共通イベント棚から通常棚へ差分 ${totalDelta} 個を反映します。`
     : "在庫移動は行わず、戻り実績のみ保存します。";
