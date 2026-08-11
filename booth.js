@@ -687,7 +687,6 @@ function getBoothReturnProcessLabel(type){
 function getBoothCommonShelfCurrentQtyFromEventItem(item){
   const taken=Number(item?.taken_qty||0);
   const sold=Number(item?.sold_qty||0);
-  const consumed=Number(item?.consumed_qty||0);
   const processType=getBoothCloseReturnProcessType(item);
   const returned=Number(item?.returned_qty||0);
   const keepsOnCommonShelf=processType==="storage"||processType==="event"||processType==="keep";
@@ -696,7 +695,8 @@ function getBoothCommonShelfCurrentQtyFromEventItem(item){
     : Number(item?.shelf_return_qty||0)>0
       ? Number(item.shelf_return_qty||0)
       : returned;
-  return Math.max(0,taken-sold-shelfReturn-consumed);
+  // Gacha is an independent stock flow and never changes common event shelf.
+  return Math.max(0,taken-sold-shelfReturn);
 }
 
 function isBoothReturnReflected(item){
@@ -744,12 +744,22 @@ function getBoothShelfReturnReflectDelta(item){
   return Number(item?.shelf_return_effective_qty||0)-Number(item?.shelf_return_reflected_qty||0);
 }
 
-function mergeBoothCloseRows(normalItems,gachaItems,products){
+function mergeBoothCloseRows(normalItems,gachaItems,products,salesRows=[]){
   const productMap=new Map((products||[]).map(product=>[String(product.barcode||""),product]));
+  const salesByBarcode=new Map();
+  (Array.isArray(salesRows)?salesRows:[]).forEach(sale=>{
+    if(isBoothGachaSaleRow(sale))return;
+    const barcode=String(sale?.barcode||"").trim();
+    if(!barcode)return;
+    salesByBarcode.set(barcode,(salesByBarcode.get(barcode)||0)+Number(sale?.quantity||0));
+  });
   const rowsByBarcode=new Map();
   (normalItems||[]).forEach(item=>{
     const barcode=String(item.barcode||"");
     const product=productMap.get(barcode)||{};
+    const soldQty=salesByBarcode.has(barcode)
+      ? salesByBarcode.get(barcode)
+      : Number(item.sold_qty||0);
     rowsByBarcode.set(barcode,{
       id:item.id,
       event_id:item.event_id,
@@ -761,7 +771,7 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
       normal_takeout_qty:Number(item.normal_takeout_qty||0),
       storage_takeout_qty:Number(item.storage_takeout_qty||0),
       taken_qty:Number(item.taken_qty||0),
-      sold_qty:Number(item.sold_qty||0),
+      sold_qty:soldQty,
       returned_qty:Number(item.returned_qty||0),
       shelf_return_qty:Number(item.shelf_return_qty||0),
       event_storage_qty:Number(item.event_storage_qty||0),
@@ -772,7 +782,7 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
       return_reflected_qty:getBoothReturnReflectedQty(item),
       return_reflect_qty:getBoothReturnReflectQty(item),
       consumed_qty:Number(item.consumed_qty||0),
-      difference_qty:calculateBoothItemDifference(item),
+      difference_qty:calculateBoothItemDifference({...item,sold_qty:soldQty}),
       diff_memo:item.diff_memo||"",
       updated_at:item.updated_at||"",
       shelf_return_reflected:isBoothShelfReturnReflected(item),
@@ -824,10 +834,20 @@ function mergeBoothCloseRows(normalItems,gachaItems,products){
 
 async function loadBoothCloseSummary(event){
   const eventId=encodeURIComponent(event.id);
-  const normalItems=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,shelf_return_reflected_by,return_process_type,return_reflected,return_reflected_qty,return_reflected_at,return_reflected_by,updated_at&event_id=eq.${eventId}&item_type=eq.normal&order=product_name.asc`);
-  const gachaItems=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,difference_qty,updated_at&event_id=eq.${eventId}&item_type=eq.gacha_prize&order=product_name.asc`);
+  const [normalItems,gachaItems,salesRows]=await Promise.all([
+    sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,shelf_return_reflected_by,return_process_type,return_reflected,return_reflected_qty,return_reflected_at,return_reflected_by,updated_at&event_id=eq.${eventId}&item_type=eq.normal&order=product_name.asc`),
+    sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,difference_qty,updated_at&event_id=eq.${eventId}&item_type=eq.gacha_prize&order=product_name.asc`),
+    // Event close uses the same event-scoped sales details as the report.
+    // A failed read must not be treated as zero sales.
+    sb(`event_sales_imports?select=*&event_id=eq.${eventId}&import_status=in.(pending,confirmed)&order=sold_at.asc&limit=3000`)
+  ]);
   const products=await fetchBoothProductsForItems([...(normalItems||[]),...(gachaItems||[])]);
-  const rows=mergeBoothCloseRows(normalItems||[],gachaItems||[],products||[]);
+  const rows=mergeBoothCloseRows(
+    normalItems||[],
+    gachaItems||[],
+    products||[],
+    dedupeBoothSalesRows(salesRows||[])
+  );
   const diffRows=rows.filter(row=>Number(row.difference_qty||0)!==0);
   const unconfirmedRows=diffRows.filter(row=>!String(row.diff_memo||"").trim());
   const returnPendingRows=rows.filter(row=>row.item_type==="normal"&&getBoothReturnReflectDelta(row)!==0);
@@ -6123,7 +6143,9 @@ async function getConfirmedBoothSalesQty(eventId,barcode){
 }
 
 function calculateBoothItemDifference(item){
-  return Number(item?.taken_qty||0)-Number(item?.sold_qty||0)-Number(item?.returned_qty||0)-Number(item?.consumed_qty||0);
+  const itemType=String(item?.item_type||"normal");
+  const gachaConsumed=itemType==="gacha_prize"?Number(item?.consumed_qty||0):0;
+  return Number(item?.taken_qty||0)-Number(item?.sold_qty||0)-Number(item?.returned_qty||0)-gachaConsumed;
 }
 
 function getBoothDiffStatus(item){
@@ -8807,13 +8829,12 @@ function renderBoothCloseConfirmPanel(event,summary){
     const current=Number(row.event_shelf_current_qty||0);
     const taken=Number(row.taken_qty||0);
     const sold=Number(row.sold_qty||0);
-    const consumed=Number(row.consumed_qty||0);
-    const planned=Math.max(0,taken-sold-consumed);
+    const planned=Math.max(0,taken-sold);
     const returned=Number(row.returned_qty||0);
     const destination=getBoothCloseReturnProcessType(row);
     const destinationLabel=destination==="storage"?"共通イベント棚":destination==="shelf"?"通常棚":"未確定";
-    return '<tr><td>'+esc(row.product_name||"-")+'</td><td>'+esc(row.barcode||"-")+'</td><td>'+esc(taken)+'</td><td>'+esc(sold)+'</td><td>'+esc(consumed)+'</td><td>'+esc(planned)+'</td><td>'+esc(returned)+'</td><td>'+esc(destinationLabel)+'</td><td><strong>'+esc(current)+'</strong></td></tr>';
-  }).join(""):'<tr><td colspan="9">終了対象の商品はありません。</td></tr>';
+    return '<tr><td>'+esc(row.product_name||"-")+'</td><td>'+esc(row.barcode||"-")+'</td><td>'+esc(taken)+'</td><td>'+esc(sold)+'</td><td>'+esc(planned)+'</td><td>'+esc(returned)+'</td><td>'+esc(destinationLabel)+'</td><td><strong>'+esc(current)+'</strong></td></tr>';
+  }).join(""):'<tr><td colspan="8">終了対象の商品はありません。</td></tr>';
   area.innerHTML='<section class="booth-work-card booth-close-card">'+
     '<h4>イベント終了処理</h4>'+
     '<p class="section-note">終了前に戻り数量を確定します。スマレジ在庫APIは呼び出しません。</p>'+
@@ -8831,7 +8852,7 @@ function renderBoothCloseConfirmPanel(event,summary){
       '<div><span>イベント棚に残る数量</span><strong>'+esc(remainingQty)+'</strong></div>'+
     '</div>'+
     '<div class="booth-history-table-wrap booth-close-table-wrap"><table class="booth-history-table booth-close-table">'+
-      '<thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し</th><th>販売</th><th>ガチャ移動</th><th>戻り予定</th><th>戻り実数</th><th>戻り先</th><th>共通イベント棚現数</th></tr></thead>'+
+      '<thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し</th><th>販売</th><th>戻り予定</th><th>戻り実数</th><th>戻り先</th><th>共通イベント棚現数</th></tr></thead>'+
       '<tbody>'+tableRows+'</tbody></table></div>'+
     '<div class="booth-close-actions"><button type="button" id="boothCloseReloadBtn" class="secondary">再読み込み</button><button type="button" id="boothCloseConfirmBtn">イベントを終了する</button></div>'+
   '</section>';
@@ -9007,8 +9028,7 @@ async function rollbackBoothCloseReflection(summary,staff){
 function calculateBoothReturnPlannedQty(item){
   return Math.max(0,
     Number(item?.taken_qty||0)-
-    Number(item?.sold_qty||0)-
-    Number(item?.consumed_qty||0)
+    Number(item?.sold_qty||0)
   );
 }
 
