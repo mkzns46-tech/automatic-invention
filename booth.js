@@ -8819,9 +8819,12 @@ function renderBoothCloseConfirmPanel(event,summary){
   if(!area)return;
   const storeCode=getBoothEventStoreCode(event);
   const context=getBoothCloseStoreContext(event);
+  const adminAuthed=typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
   const period=[event?.event_start,event?.event_end].filter(Boolean).join(" - ")||"-";
   const rows=Array.isArray(summary?.rows)?summary.rows:[];
   const normalRows=rows.filter(row=>Number(row.normal_takeout_qty||0)>0||Number(row.storage_takeout_qty||0)>0||Number(row.taken_qty||0)>0);
+  const savedReturnRows=normalRows.filter(row=>Number(row.returned_qty||0)>0&&normalizeBoothReportReturnDestination(getBoothReturnProcessType(row)));
+  const returnDestinationState=getBoothReportReturnDestinationState(savedReturnRows);
   const returnTotal=normalRows.reduce((sum,row)=>sum+Number(row.returned_qty||0),0);
   const remainingRows=normalRows.filter(row=>Number(row.event_shelf_current_qty||0)>0);
   const remainingQty=remainingRows.reduce((sum,row)=>sum+Number(row.event_shelf_current_qty||0),0);
@@ -8854,7 +8857,7 @@ function renderBoothCloseConfirmPanel(event,summary){
     '<div class="booth-history-table-wrap booth-close-table-wrap"><table class="booth-history-table booth-close-table">'+
       '<thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し</th><th>販売</th><th>戻り予定</th><th>戻り実数</th><th>戻り先</th><th>共通イベント棚現数</th></tr></thead>'+
       '<tbody>'+tableRows+'</tbody></table></div>'+
-    '<div class="booth-close-actions"><button type="button" id="boothCloseReloadBtn" class="secondary">再読み込み</button><button type="button" id="boothCloseConfirmBtn">イベントを終了する</button></div>'+
+    '<div class="booth-close-actions"><button type="button" id="boothCloseReloadBtn" class="secondary">再読み込み</button>'+(adminAuthed&&returnDestinationState.locked&&!returnDestinationState.mixed?'<button type="button" class="secondary" data-booth-return-destination-change data-event-id="'+esc(event?.id||'')+'" data-current-destination="'+esc(returnDestinationState.locked)+'">戻り先を変更</button>':'')+(isBoothEventClosed(event)?'<button type="button" id="boothCloseConfirmBtn" disabled>イベント終了済み</button>':'<button type="button" id="boothCloseConfirmBtn">イベントを終了する</button>')+'</div>'+
   '</section>';
   el("boothCloseReloadBtn")?.addEventListener("click",()=>confirmBoothEventClosePreparing(event));
   el("boothCloseConfirmBtn")?.addEventListener("click",()=>confirmBoothEventClose(event));
@@ -8863,7 +8866,6 @@ function renderBoothCloseConfirmPanel(event,summary){
 async function confirmBoothEventClosePreparing(event){
   const area=el("boothEventWorkArea");
   if(!event?.id){boothShowError("イベント終了エラー","イベントが見つかりません。");return;}
-  if(isBoothEventClosed(event)){boothShowError("イベント終了エラー","このイベントはすでに終了しています。");return;}
   if(area)area.innerHTML='<section class="booth-work-card"><div class="booth-empty">イベント棚の現数を読み込み中…</div></section>';
   try{
     const summary=await loadBoothCloseCommonStockSummary(event,await loadBoothCloseSummary(event));
@@ -9231,6 +9233,174 @@ function getBoothReportReturnDestinationLabel(value){
   return "未選択";
 }
 
+function getBoothReturnDestinationChangeRows(rows){
+  return (Array.isArray(rows)?rows:[]).filter(row=>{
+    const itemType=String(row?.item_type||"normal").toLowerCase();
+    return itemType==="normal"&&Number(row?.returned_qty||0)>0&&normalizeBoothReportReturnDestination(getBoothReturnProcessType(row));
+  });
+}
+
+async function insertBoothReturnDestinationAudit(event,item,oldDestination,newDestination,quantity,staff){
+  const now=new Date().toISOString();
+  const memo=[
+    "イベント戻り先変更",
+    `変更前：${getBoothReportReturnDestinationLabel(oldDestination)}`,
+    `変更後：${getBoothReportReturnDestinationLabel(newDestination)}`,
+    `戻り実数：${Number(quantity||0)}`,
+    `変更日時：${now}`
+  ].join(" / ");
+  const rows=await sb("inventory_logs",{
+    method:"POST",
+    headers:{Prefer:"return=representation"},
+    body:JSON.stringify({
+      type:"在庫修正",
+      event_id:event?.id||null,
+      staff,
+      barcode:item?.barcode||"",
+      product_name:item?.product_name||"",
+      quantity:Number(quantity||0),
+      memo,
+      affects_smaregi:false,
+      smaregi_delta:0
+    })
+  });
+  return Array.isArray(rows)&&rows[0]?rows[0]:null;
+}
+
+async function insertBoothReturnDestinationMovement(event,item,storeCode,oldDestination,newDestination,quantity,staff){
+  const movementType=oldDestination==="shelf"&&newDestination==="storage"?"storage_in":"storage_out";
+  const rows=await sb("event_storage_movements",{
+    method:"POST",
+    headers:{Prefer:"return=representation"},
+    body:JSON.stringify([{
+      event_id:event?.id||null,
+      store_code:storeCode,
+      smaregi_product_id:item?.smaregi_product_id?String(item.smaregi_product_id):null,
+      barcode:item?.barcode||"",
+      product_name:item?.product_name||"",
+      movement_type:movementType,
+      quantity:Math.abs(Number(quantity||0)),
+      staff,
+      memo:`イベント戻り先変更：${getBoothReportReturnDestinationLabel(oldDestination)} → ${getBoothReportReturnDestinationLabel(newDestination)}`
+    }])
+  });
+  return Array.isArray(rows)&&rows[0]?rows[0]:null;
+}
+
+async function changeBoothEventReturnDestination(eventId,requestedDestination){
+  if(window.__aricoBoothReturnDestinationChanging)return;
+  if(typeof hasInventoryPrivilegedAccess!=="function"||!hasInventoryPrivilegedAccess()){
+    boothShowError("戻り先変更エラー","戻り先の変更は管理者のみ実行できます。");
+    return;
+  }
+  const destination=normalizeBoothReportReturnDestination(requestedDestination);
+  if(!destination){
+    boothShowError("戻り先変更エラー","変更後の戻り先が不正です。");
+    return;
+  }
+  const targetEventId=String(eventId||boothCurrentEventId||"").trim();
+  if(!targetEventId){
+    boothShowError("戻り先変更エラー","イベントが選択されていません。");
+    return;
+  }
+  let event=null;
+  let operations=[];
+  try{
+    const eventRows=await sb(`booth_events?select=*&id=eq.${encodeURIComponent(targetEventId)}&limit=1`);
+    event=Array.isArray(eventRows)&&eventRows[0]?eventRows[0]:null;
+    if(!event)throw new Error("イベントが見つかりません。");
+    const rows=await sb(`booth_event_items?select=*&event_id=eq.${encodeURIComponent(targetEventId)}&item_type=eq.normal&limit=3000`);
+    const returnedItems=(Array.isArray(rows)?rows:[]).filter(row=>Number(row?.returned_qty||0)>0);
+    const returnedRows=getBoothReturnDestinationChangeRows(returnedItems);
+    if(!returnedRows.length)throw new Error("戻り実績が保存された通常商品がありません。");
+    if(returnedRows.length!==returnedItems.length)throw new Error("戻り先が未確定の商品があります。先にイベントレポートで戻り先を確定してください。");
+    const state=getBoothReportReturnDestinationState(returnedRows);
+    if(state.mixed)throw new Error("同じイベント内で戻り先が混在しています。個別に変更せず、先に管理者へ確認してください。");
+    const current=state.locked;
+    if(!current)throw new Error("現在の戻り先を確認できません。");
+    if(current===destination){
+      boothShowSuccess("戻り先変更","指定された戻り先はすでに設定されています。数量・在庫は変更していません。");
+      return;
+    }
+    const totalQty=returnedRows.reduce((sum,row)=>sum+Number(row.returned_qty||0),0);
+    const closed=isBoothEventClosed(event);
+    const body=[
+      "イベント単位で戻り先を変更します。",
+      `現在：${getBoothReportReturnDestinationLabel(current)}`,
+      `変更後：${getBoothReportReturnDestinationLabel(destination)}`,
+      `対象商品：${returnedRows.length}件`,
+      `戻り実数合計：${totalQty}個`,
+      closed?"このイベントは締め済みです。変更後の在庫場所だけを反映します。":"戻り実数そのものは変更しません。"
+    ].join(String.fromCharCode(10));
+    const ok=typeof confirmAppAction==="function"
+      ?await confirmAppAction("イベント戻り先変更",body,{okText:"変更する",cancelText:"キャンセル"})
+      :true;
+    if(!ok)return;
+    window.__aricoBoothReturnDestinationChanging=true;
+    const storeCode=getBoothEventStoreCode(event);
+    const staff=String(event.closed_by||event.created_by||"管理者").trim()||"管理者";
+    for(const row of returnedRows){
+      const latestRows=await sb(`booth_event_items?select=*&event_id=eq.${encodeURIComponent(targetEventId)}&id=eq.${encodeURIComponent(row.id)}&item_type=eq.normal&limit=1`);
+      const latest=Array.isArray(latestRows)&&latestRows[0]?latestRows[0]:null;
+      if(!latest)throw new Error(`${row.product_name||row.barcode}: 最新の戻り実績が見つかりません。`);
+      const latestDestination=normalizeBoothReportReturnDestination(getBoothReturnProcessType(latest));
+      if(latestDestination!==current)throw new Error("保存中に戻り先が変更されました。画面を再読み込みして確認してください。");
+      const quantity=Number(latest.returned_qty||0);
+      const before={...latest};
+      const operation={item:latest,before,baseDelta:destination==="shelf"?quantity:-quantity,storageDelta:destination==="storage"?quantity:-quantity,baseAdjusted:false,storageAdjusted:false,inventoryLog:null,movement:null,patched:false};
+      operations.push(operation);
+      const product=await findBoothProductByBarcode(String(latest.barcode||"").trim());
+      if(!product)throw new Error(`商品マスターが見つかりません：${latest.barcode||""}`);
+      if(operation.storageDelta<0){
+        const stock=await findBoothEventStorageStock(storeCode,latest.barcode);
+        if(!stock||Number(stock.storage_qty||0)<Math.abs(operation.storageDelta))throw new Error(`${latest.product_name||latest.barcode}: 共通イベント棚在庫が不足しています。`);
+      }
+      if(operation.baseDelta) {
+        await adjustBoothProductBaseStock(latest.barcode,operation.baseDelta);
+        operation.baseAdjusted=true;
+      }
+      if(operation.storageDelta){
+        await upsertBoothEventStorageStock(storeCode,latest,operation.storageDelta);
+        operation.storageAdjusted=true;
+        operation.movement=await insertBoothReturnDestinationMovement(event,latest,storeCode,current,destination,quantity,staff);
+      }
+      operation.inventoryLog=await insertBoothReturnDestinationAudit(event,latest,current,destination,operation.baseDelta,staff);
+      const now=new Date().toISOString();
+      await patchBoothEventItem(latest,{
+        return_process_type:destination,
+        shelf_return_qty:destination==="shelf"?quantity:0,
+        event_storage_qty:destination==="storage"?quantity:0,
+        shelf_return_reflected:destination==="shelf"&&quantity>0,
+        shelf_return_reflected_qty:destination==="shelf"?quantity:0,
+        shelf_return_reflected_at:destination==="shelf"&&quantity>0?now:null,
+        shelf_return_reflected_by:destination==="shelf"&&quantity>0?staff:null,
+        return_reflected:true,
+        return_reflected_qty:quantity,
+        return_reflected_at:quantity>0?now:null,
+        return_reflected_by:quantity>0?staff:null
+      });
+      operation.patched=true;
+    }
+    await refreshBoothEventRelatedViews(targetEventId);
+    if(document.querySelector("[data-booth-report-return-section]"))await loadBoothEventReport(targetEventId);
+    else if(el("boothCloseCard")||el("boothCloseConfirmBtn"))await confirmBoothEventClosePreparing(event);
+    boothShowSuccess("戻り先を変更しました",`${returnedRows.length}件の戻り先を${getBoothReportReturnDestinationLabel(destination)}へ変更しました。戻り実数は変更していません。`);
+  }catch(error){
+    for(const operation of operations.reverse()){
+      try{
+        if(operation.patched)await patchBoothEventItem(operation.item,getBoothReportReturnRestorePayload(operation.before));
+        if(operation.inventoryLog?.id)await sb(`inventory_logs?id=eq.${encodeURIComponent(operation.inventoryLog.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+        if(operation.movement?.id)await sb(`event_storage_movements?id=eq.${encodeURIComponent(operation.movement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+        if(operation.storageAdjusted)await upsertBoothEventStorageStock(getBoothEventStoreCode(event),operation.item,-operation.storageDelta);
+        if(operation.baseAdjusted)await adjustBoothProductBaseStock(operation.item.barcode,-operation.baseDelta);
+      }catch(rollbackError){console.warn("[booth return destination rollback failed]",rollbackError);}
+    }
+    boothShowError("戻り先変更エラー",error.message||"戻り先の変更に失敗しました。");
+  }finally{
+    window.__aricoBoothReturnDestinationChanging=false;
+  }
+}
+
 function getBoothReportReturnDestinationState(rows){
   const types=[...new Set((Array.isArray(rows)?rows:[]).map(row=>normalizeBoothReportReturnDestination(getBoothReturnProcessType(row))).filter(Boolean))];
   return {locked:types.length===1?types[0]:"",mixed:types.length>1};
@@ -9301,8 +9471,12 @@ function renderBoothReportReturnBatchSection(rows){
   if(!list.length)return `<section class="booth-report-section" data-booth-report-return-section><h5>通常商品戻り実績</h5><div class="booth-empty">通常商品の戻り実績はありません。</div></section>`;
   const state=getBoothReportReturnDestinationState(list);
   const locked=state.locked;
+  const adminAuthed=typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
   const destinationLabel=locked?getBoothReportReturnDestinationLabel(locked):"未選択";
   const destinationButtons=["shelf","storage"].map(type=>`<button type="button" class="booth-report-return-destination-btn${locked===type?" is-selected":""}" data-booth-report-return-destination="${type}" aria-pressed="${locked===type?"true":"false"}" ${locked||state.mixed?"disabled":""}>${getBoothReportReturnDestinationLabel(type)}</button>`).join("");
+  const destinationChangeButton=locked&&!state.mixed&&adminAuthed
+    ?`<button type="button" class="secondary" data-booth-return-destination-change data-event-id="${esc(boothCurrentEventId||"")}">戻り先を変更</button>`
+    :"";
   const tableRows=list.map(row=>{
     const id=String(row.id||"");
     const returned=Number(row.returned_qty||0);
@@ -9323,8 +9497,8 @@ function renderBoothReportReturnBatchSection(rows){
       <span class="booth-report-return-status" data-booth-report-return-status>${saved?"保存済み":"未保存"}</span></article>`;
   }).join("");
   return `<section class="booth-report-section booth-report-return-batch" data-booth-report-return-section data-selected-destination="${esc(locked)}" data-destination-mixed="${state.mixed?"true":"false"}">
-    <div class="booth-report-return-header"><div><h5>通常商品戻り実績</h5><p class="section-note">戻り実数を入力して、最後に一括保存します。保存後の戻り先はイベント単位で固定されます。</p></div><strong data-booth-report-return-unsaved-count>未保存：0件</strong></div>
-    <div class="booth-report-return-destination"><strong>戻り先（イベント単位で固定）</strong><span data-booth-report-return-destination-label>${esc(destinationLabel)}</span><div class="booth-report-return-destination-options" role="group" aria-label="戻り先">${destinationButtons}</div>${state.mixed?'<p class="form-error">既存データの戻り先が混在しています。個別に変更せず管理者へ確認してください。</p>':""}</div>
+    <div class="booth-report-return-header"><div><h5>通常商品戻り実績</h5><p class="section-note">戻り実数を入力して、最後に一括保存します。保存後の戻り先はイベント単位で固定され、管理者が変更できます。</p></div><strong data-booth-report-return-unsaved-count>未保存：0件</strong></div>
+    <div class="booth-report-return-destination"><strong>戻り先（イベント単位で固定）</strong><span data-booth-report-return-destination-label>${esc(destinationLabel)}</span><div class="booth-report-return-destination-options" role="group" aria-label="戻り先">${destinationButtons}</div>${destinationChangeButton}${state.mixed?'<p class="form-error">既存データの戻り先が混在しています。個別に変更せず管理者へ確認してください。</p>':""}</div>
     <div class="button-row"><button type="button" class="secondary" data-booth-report-return-filter="all" aria-pressed="true">全件</button><button type="button" class="secondary" data-booth-report-return-filter="diff" aria-pressed="false">差異のみ</button></div>
     <div class="booth-report-return-actions"><button type="button" class="primary" data-booth-report-return-batch-save disabled>戻り実績を一括保存（0件）</button><span>変更した商品のみ保存します。</span></div>
     <div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table booth-report-return-table"><thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し数</th><th>販売数</th><th>ガチャ移動数</th><th>戻り予定数</th><th>戻り実数</th><th>差異</th><th>状態</th></tr></thead><tbody>${tableRows}</tbody></table></div>
@@ -9569,6 +9743,15 @@ async function saveBoothReportReturnBatch(){
 
 if(!window.__aricoBoothReportReturnBatchHandlersBound){
   document.addEventListener("click",event=>{
+    const destinationChange=event.target.closest("[data-booth-return-destination-change]");
+    if(destinationChange){
+      const eventId=String(destinationChange.dataset.eventId||boothCurrentEventId||"");
+      const reportSection=destinationChange.closest("[data-booth-report-return-section]");
+      const currentDestination=normalizeBoothReportReturnDestination(reportSection?.dataset.selectedDestination||destinationChange.dataset.currentDestination||"");
+      const nextDestination=currentDestination==="shelf"?"storage":"shelf";
+      void changeBoothEventReturnDestination(eventId,nextDestination);
+      return;
+    }
     const destinationButton=event.target.closest("[data-booth-report-return-destination]");
     if(destinationButton){
       const section=destinationButton.closest("[data-booth-report-return-section]");
