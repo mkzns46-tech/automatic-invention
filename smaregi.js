@@ -432,11 +432,14 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
   const storeCode=normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode());
   smaregiEventInventoryStoreCode=storeCode;
   let activeEventIds=[];
+  let storeEventIds=[];
   // Pending sales are a read-only adjustment for comparison only.
   try{
     const now=new Date();
     const events=await sbAll(`booth_events?select=id,event_start,event_end,status,store_code&store_code=eq.${encodeURIComponent(storeCode)}&limit=1000`,1000,5000);
-    activeEventIds=(Array.isArray(events)?events:[]).filter(event=>{
+    const storeEvents=(Array.isArray(events)?events:[]).filter(event=>String(event?.id||"").trim());
+    storeEventIds=storeEvents.map(event=>String(event.id||"").trim()).filter(Boolean);
+    activeEventIds=storeEvents.filter(event=>{
       if(String(event.status||"").toLowerCase()==="closed")return false;
       const start=String(event.event_start||"").slice(0,10);
       const end=String(event.event_end||event.event_start||"").slice(0,10);
@@ -468,11 +471,10 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     console.warn("[Smaregi common event shelf lookup failed]",error);
   }
 
-  if(activeEventIds.length){
-    const eventItemStockByBarcode=new Map();
-    const eventItemStockKeys=new Set();
+  if(storeEventIds.length){
+    const eventItemFallbackByBarcode=new Map();
     try{
-      const eventFilter=buildSmaregiInFilter(activeEventIds);
+      const eventFilter=buildSmaregiInFilter(storeEventIds);
       const [eventItems,movementRows,salesRows]=await Promise.all([
       sbAll(`booth_event_items?select=id,event_id,barcode,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,shelf_return_qty,event_storage_qty,consumed_qty,updated_at&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&item_type=eq.normal`,1000,50000),
        sbAll(`booth_stock_movements?select=id,event_id,barcode,movement_type,item_type,quantity,takeout_source&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&movement_type=in.(departure_count,take_out,event_pick,return,event_close_return,gacha_pick)`,1000,50000).catch(()=>[]),
@@ -520,18 +522,21 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
       ].some(value=>normalizeInventoryQuantity(value)>0)
         || movements.some(movement=>["event_pick","take_out","departure_count","gacha_pick"].includes(String(movement?.movement_type||"").trim()));
       if(!hasEventActivity)return;
-      const current=Number(eventItemStockByBarcode.get(barcode)||0);
-      eventItemStockByBarcode.set(barcode,current+qty);
-      eventItemStockKeys.add(barcode);
-      });
+       const updatedAt=new Date(row.updated_at||0).getTime();
+       const previous=eventItemFallbackByBarcode.get(barcode);
+       if(!previous||updatedAt>=previous.updatedAt){
+         eventItemFallbackByBarcode.set(barcode,{qty,updatedAt});
+       }
+       });
 
       // Do not add event_storage_stocks and booth_event_items together. The
-      // event item row already represents the picked quantity's current event
-      // shelf balance, while the common row is only the fallback source.
-      eventItemStockKeys.forEach(barcode=>{
-       if(!smaregiEventStorageStockByBarcode.has(barcode)){
-         smaregiEventStorageStockByBarcode.set(barcode,Number(eventItemStockByBarcode.get(barcode)||0));
-       }
+      // latest event-item row is only a compatibility fallback when the
+      // store-common row is absent. This keeps ended-event legacy data visible
+      // without summing the same common shelf balance more than once.
+      eventItemFallbackByBarcode.forEach(({qty},barcode)=>{
+        if(!smaregiEventStorageStockByBarcode.has(barcode)){
+          smaregiEventStorageStockByBarcode.set(barcode,Math.max(0,Number(qty||0)));
+        }
       });
     }catch(error){
       console.warn("[Smaregi event shelf item lookup failed]",error);
