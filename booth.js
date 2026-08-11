@@ -9164,6 +9164,401 @@ exportBoothEventReportPdf=async function(event){
   }
 };
 
+// Ver 2.74: count event returns first; choose the destination in the report.
+(function(){
+  const root=window;
+  const states=root.__aricoPureReturnStates||(root.__aricoPureReturnStates=new Map());
+
+  function currentEvent(){
+    return typeof getBoothCurrentEvent==="function"?getBoothCurrentEvent():null;
+  }
+
+  function key(event){return String(event?.id||"");}
+
+  function stateFor(event){
+    const id=key(event);
+    let state=states.get(id);
+    if(!state){
+      state={eventId:id,event,rows:new Map(),draft:new Map(),saved:new Map(),query:"",loading:true,error:""};
+      states.set(id,state);
+    }
+    state.event=event;
+    return state;
+  }
+
+  function takeoutQty(row){
+    const taken=Number(row?.taken_qty||0);
+    if(taken>0)return taken;
+    return Math.max(0,Number(row?.normal_takeout_qty||0)+Number(row?.storage_takeout_qty||0));
+  }
+
+  function countRows(event){
+    return sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,returned_qty,updated_at&event_id=eq.${encodeURIComponent(event.id)}&item_type=eq.normal&order=product_name.asc&limit=5000`)
+      .then(rows=>(Array.isArray(rows)?rows:[]).filter(row=>takeoutQty(row)>0||Number(row?.returned_qty||0)>0));
+  }
+
+  function pureReturnRows(state){
+    const query=String(state.query||"").trim().toLowerCase();
+    return [...state.rows.values()].filter(row=>{
+      if(!query)return true;
+      return `${row.product_name||""} ${row.barcode||""}`.toLowerCase().includes(query);
+    });
+  }
+
+  function renderPureReturnList(state){
+    const list=el("boothReturnDraftList");
+    if(!list)return;
+    if(state.loading){
+      list.innerHTML='<div class="booth-empty" data-pure-return-loading>戻り実数を読み込み中...</div>';
+      return;
+    }
+    if(state.error){
+      list.innerHTML=`<div class="booth-error-message">${esc(state.error)}</div>`;
+      return;
+    }
+    const rows=pureReturnRows(state);
+    if(!rows.length){
+      list.innerHTML='<div class="booth-empty">対象商品がありません。</div>';
+      return;
+    }
+    const closed=isBoothEventClosed(state.event);
+    list.innerHTML=rows.map(row=>{
+      const barcode=String(row.barcode||"");
+      const max=takeoutQty(row);
+      const value=Number(state.draft.get(barcode)??row.returned_qty??0);
+      const saved=Number(state.saved.get(barcode)??row.returned_qty??0);
+      return `<article class="booth-return-draft-item" data-pure-return-row data-barcode="${esc(barcode)}">
+        <div class="booth-return-draft-head"><strong>${esc(row.product_name||"-")}</strong><button type="button" class="secondary" data-pure-return-action="remove" data-barcode="${esc(barcode)}" ${closed?"disabled":""}>削除</button></div>
+        <div class="booth-return-draft-meta"><span>バーコード：${esc(barcode)}</span><span>持ち出し数：${esc(max)}</span><span>保存済み：${esc(saved)}</span></div>
+        <div class="booth-return-draft-controls">
+          <button type="button" class="secondary" data-pure-return-action="decrease" data-barcode="${esc(barcode)}" ${closed||value<=0?"disabled":""}>−</button>
+          <input type="number" min="0" max="${esc(max)}" step="1" inputmode="numeric" value="${esc(value)}" data-pure-return-qty="${esc(barcode)}" ${closed?"disabled":""}>
+          <button type="button" class="secondary" data-pure-return-action="increase" data-barcode="${esc(barcode)}" ${closed||value>=max?"disabled":""}>＋</button>
+        </div>
+      </article>`;
+    }).join("");
+  }
+
+  function renderPureReturnHistory(state,rows){
+    const list=el("boothReturnHistoryList");
+    if(!list)return;
+    const saved=(Array.isArray(rows)?rows:[...state.rows.values()]).filter(row=>Number(row?.returned_qty||0)>0);
+    if(!saved.length){
+      list.innerHTML='<div class="booth-empty">保存済みの戻り実績はありません。</div>';
+      return;
+    }
+    list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table"><thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し数</th><th>戻り実数</th></tr></thead><tbody>${saved.map(row=>`<tr><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(takeoutQty(row))}</td><td><strong>${esc(row.returned_qty||0)}</strong></td></tr>`).join("")}</tbody></table></div>`;
+  }
+
+  function setPureReturnControlsDisabled(disabled){
+    ["boothReturnBarcode","boothReturnProductSearch","boothReturnStaff","boothReturnMemo","boothReturnApplyBtn","boothReturnStartCameraBtn"].forEach(id=>{
+      const node=el(id);
+      if(node)node.disabled=disabled;
+    });
+  }
+
+  async function loadPureReturnState(state){
+    state.loading=true;
+    state.error="";
+    renderPureReturnList(state);
+    setPureReturnControlsDisabled(true);
+    try{
+      const rows=await countRows(state.event);
+      state.rows=new Map(rows.map(row=>[String(row.barcode||""),row]).filter(([barcode])=>barcode));
+      for(const [barcode,row] of state.rows){
+        const returned=Math.max(0,Number(row.returned_qty||0));
+        if(!state.draft.has(barcode))state.draft.set(barcode,returned);
+        state.saved.set(barcode,returned);
+      }
+      state.loading=false;
+      renderPureReturnList(state);
+      renderPureReturnHistory(state,rows);
+      setPureReturnControlsDisabled(isBoothEventClosed(state.event));
+    }catch(error){
+      state.loading=false;
+      state.error=error?.message||"戻り実績を取得できませんでした。";
+      renderPureReturnList(state);
+      renderPureReturnHistory(state,[]);
+      setPureReturnControlsDisabled(true);
+    }
+  }
+
+  function changePureReturnQty(state,barcode,delta){
+    const row=state.rows.get(String(barcode||""));
+    if(!row)return;
+    const max=takeoutQty(row);
+    const current=Number(state.draft.get(barcode)??row.returned_qty??0);
+    const next=Math.max(0,Math.min(max,current+delta));
+    state.draft.set(barcode,next);
+    renderPureReturnList(state);
+  }
+
+  root.renderBoothReturnPanel=function(event){
+    const area=el("boothEventWorkArea");
+    if(!area)return;
+    const state=stateFor(event);
+    const closed=isBoothEventClosed(event);
+    const staffOptions=typeof getBoothStaffOptions==="function"?getBoothStaffOptions():"";
+    area.innerHTML=`<section class="booth-work-card booth-return-card">
+      <h4>戻り在庫処理</h4>
+      <p class="section-note">イベントから実際に戻ってきた数量だけを数えて保存します。戻り先はイベントレポートで確定します。</p>
+      <div class="booth-return-scan-controls">
+        <button type="button" id="boothReturnStartCameraBtn" ${closed?"disabled":""}>カメラ読取</button>
+        <button type="button" id="boothReturnStopCameraBtn" class="secondary">停止</button>
+        <label class="booth-return-barcode-label">バーコード<input id="boothReturnBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力してEnter" ${closed?"disabled":""}></label>
+      </div>
+      <div class="booth-return-product-search"><label>商品名検索<input id="boothReturnProductSearch" autocomplete="off" placeholder="商品名・バーコードで検索" ${closed?"disabled":""}></label></div>
+      <div class="booth-return-common-fields"><label>担当者<select id="boothReturnStaff" ${closed?"disabled":""}>${staffOptions}</select></label><label>メモ<input id="boothReturnMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}></label></div>
+      <div id="boothReturnDraftList" class="booth-return-draft-list"><div class="booth-empty" data-pure-return-loading>戻り実数を読み込み中...</div></div>
+      <button type="button" id="boothReturnApplyBtn" class="booth-return-apply-btn" ${closed?"disabled":""}>戻り実数を一括保存</button>
+    </section>
+    <section class="booth-work-card booth-return-history-card"><div class="booth-list-header"><h4>戻り実績</h4><button type="button" id="reloadBoothReturnHistoryBtn" class="secondary">再読み込み</button></div><div id="boothReturnHistoryList" class="booth-carry-history-list"><div class="booth-empty">読み込み中...</div></div></section>`;
+
+    const barcodeInput=el("boothReturnBarcode");
+    barcodeInput?.addEventListener("keydown",inputEvent=>{
+      if(inputEvent.key!=="Enter")return;
+      inputEvent.preventDefault();
+      void root.addBoothReturnDraftFromBarcode(barcodeInput.value);
+      barcodeInput.value="";
+    });
+    el("boothReturnProductSearch")?.addEventListener("input",inputEvent=>{
+      state.query=inputEvent.target.value;
+      renderPureReturnList(state);
+    });
+    el("boothReturnDraftList")?.addEventListener("click",inputEvent=>{
+      const button=inputEvent.target.closest("[data-pure-return-action]");
+      if(!button)return;
+      const barcode=String(button.dataset.barcode||"");
+       if(button.dataset.pureReturnAction==="remove")state.draft.set(barcode,0);
+      else if(button.dataset.pureReturnAction==="increase")changePureReturnQty(state,barcode,1);
+      else if(button.dataset.pureReturnAction==="decrease")changePureReturnQty(state,barcode,-1);
+      renderPureReturnList(state);
+    });
+    el("boothReturnDraftList")?.addEventListener("change",inputEvent=>{
+      const input=inputEvent.target.closest("[data-pure-return-qty]");
+      if(!input)return;
+      const barcode=String(input.dataset.pureReturnQty||"");
+      const row=state.rows.get(barcode);
+      const text=String(input.value||"").trim();
+      if(!row||!/^[0-9]+$/.test(text)){renderPureReturnList(state);return;}
+      state.draft.set(barcode,Math.max(0,Math.min(takeoutQty(row),Number(text))));
+      renderPureReturnList(state);
+    });
+    el("boothReturnApplyBtn")?.addEventListener("click",()=>void root.saveBoothReturnDraft());
+    el("reloadBoothReturnHistoryBtn")?.addEventListener("click",()=>void loadPureReturnState(state));
+    el("boothReturnStartCameraBtn")?.addEventListener("click",()=>{boothScanTarget="return";startBoothCarryOutCamera();});
+    el("boothReturnStopCameraBtn")?.addEventListener("click",stopBoothCarryOutCamera);
+    void loadPureReturnState(state);
+  };
+
+  root.addBoothReturnDraftFromBarcode=async function(rawBarcode){
+    const event=currentEvent();
+    const state=event?stateFor(event):null;
+    const barcode=String(rawBarcode||"").trim();
+    if(!event||!state||!barcode||state.loading||isBoothEventClosed(event))return;
+    let row=state.rows.get(barcode);
+    if(!row){
+      row=await findBoothEventItemByBarcode(event.id,barcode);
+      if(row&&row.item_type==="normal"&&takeoutQty(row)>0){
+        state.rows.set(barcode,row);
+        state.saved.set(barcode,Number(row.returned_qty||0));
+        state.draft.set(barcode,Number(row.returned_qty||0));
+      }
+    }
+    if(!row||row.item_type!=="normal"||takeoutQty(row)<=0){
+      boothShowError("対象外商品","このイベントの持ち出し対象商品ではありません。","boothReturnBarcode");
+      return;
+    }
+    const current=Number(state.draft.get(barcode)??row.returned_qty??0);
+    if(current>=takeoutQty(row)){
+      boothShowError("数量上限","戻り実数は持ち出し数を超えられません。","boothReturnBarcode");
+      return;
+    }
+    state.draft.set(barcode,current+1);
+    renderPureReturnList(state);
+  };
+
+  root.saveBoothReturnDraft=async function(){
+    const event=currentEvent();
+    const state=event?stateFor(event):null;
+    if(!event||!state||state.loading||isBoothEventClosed(event))return;
+    const changes=[...state.rows.entries()].map(([barcode,row])=>({barcode,row,before:Number(state.saved.get(barcode)??row.returned_qty??0),next:Number(state.draft.get(barcode)??row.returned_qty??0)})).filter(entry=>entry.before!==entry.next);
+    if(!changes.length){boothShowError("戻り実数保存","変更された商品がありません。");return;}
+    for(const entry of changes){
+      if(!Number.isInteger(entry.next)||entry.next<0||entry.next>takeoutQty(entry.row)){
+        boothShowError("戻り実数エラー","戻り実数は0以上の整数で、持ち出し数以下にしてください。");
+        return;
+      }
+    }
+    if(root.__aricoPureReturnSaving)return;
+    root.__aricoPureReturnSaving=true;
+    const operations=[];
+    try{
+      const latestRows=await countRows(event);
+      const latestByBarcode=new Map(latestRows.map(row=>[String(row.barcode||""),row]));
+      for(const entry of changes){
+        const latest=latestByBarcode.get(entry.barcode);
+        if(!latest)throw new Error(`対象商品が見つかりません: ${entry.barcode}`);
+        if(entry.next>takeoutQty(latest))throw new Error(`${latest.product_name||entry.barcode}: 持ち出し数を超えています。`);
+        operations.push({item:latest,before:Number(latest.returned_qty||0)});
+        await patchBoothEventItem(latest,{returned_qty:entry.next});
+      }
+      await loadPureReturnState(state);
+      boothShowSuccess("戻り実数を保存しました。",`${changes.length}商品の実数を保存しました。戻り先はイベントレポートで確定します。`);
+    }catch(error){
+      for(const operation of operations.reverse()){
+        try{await patchBoothEventItem(operation.item,{returned_qty:operation.before});}catch(rollbackError){console.warn("[pure return rollback failed]",rollbackError);}
+      }
+      boothShowError("戻り実数保存エラー",error?.message||"戻り実数を保存できませんでした。");
+    }finally{
+      root.__aricoPureReturnSaving=false;
+    }
+  };
+
+  root.loadBoothReturnHistory=async function(eventId){
+    const state=states.get(String(eventId||""));
+    if(!state)return;
+    try{
+      const rows=await countRows(state.event);
+      renderPureReturnHistory(state,rows);
+    }catch(error){
+      const list=el("boothReturnHistoryList");
+      if(list)list.innerHTML=`<div class="booth-error-message">${esc(error?.message||"戻り実績を取得できませんでした。")}</div>`;
+    }
+  };
+
+  root.updateBoothReportReturnBatchSummary=function(section){
+    if(!section)return;
+    const selected=normalizeBoothReportReturnDestination(section.dataset.selectedDestination||"");
+    const button=section.querySelector("[data-booth-report-return-batch-save]");
+    if(button){
+      button.textContent=selected?"戻り先を一括確定":"戻り先を選択してください";
+      button.disabled=!selected||section.dataset.destinationMixed==="true"||section.dataset.destinationLocked==="true";
+    }
+    const label=section.querySelector("[data-booth-report-return-destination-label]");
+    if(label)label.textContent=selected?getBoothReportReturnDestinationLabel(selected):"未確定";
+  };
+
+  root.renderBoothReportReturnBatchSection=function(rows){
+    const list=(typeof buildBoothReportReturnRows==="function"?buildBoothReportReturnRows(rows):Array.isArray(rows)?rows:[]).filter(row=>row.item_type==="normal"||row.item_type==null);
+    if(!list.length)return '<section class="booth-report-section" data-booth-report-return-section><h5>戻り実績</h5><div class="booth-empty">戻り対象商品はありません。</div></section>';
+    const state=typeof getBoothReportReturnDestinationState==="function"?getBoothReportReturnDestinationState(list):{locked:"",mixed:false};
+    const locked=normalizeBoothReportReturnDestination(state.locked||"");
+    const recommended="storage";
+    const buttons=["storage","shelf"].map(type=>`<button type="button" class="booth-report-return-destination-btn${locked===type?" is-selected":""}" data-booth-report-return-destination="${type}" aria-pressed="${locked===type?"true":"false"}" ${locked||state.mixed?"disabled":""}>${getBoothReportReturnDestinationLabel(type)}</button>`).join("");
+    const rowsHtml=list.map(row=>`<tr><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.taken_qty??0)}</td><td><strong>${esc(row.returned_qty??0)}</strong></td></tr>`).join("");
+    const cards=list.map(row=>`<article class="booth-history-card"><div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong><span>${esc(row.barcode||"-")}</span></div><div class="booth-history-card-meta"><span>持ち出し数：${esc(row.taken_qty??0)}</span><span>戻り実数：${esc(row.returned_qty??0)}</span></div></article>`).join("");
+    return `<section class="booth-report-section booth-report-return-batch" data-booth-report-return-section data-selected-destination="${esc(locked)}" data-destination-locked="${locked?"true":"false"}" data-destination-mixed="${state.mixed?"true":"false"}">
+      <div class="booth-report-return-header"><div><h5>戻り実績</h5><p class="section-note">戻り在庫処理で保存した実数です。戻り先はイベント単位で一括確定します。</p></div><strong>対象商品：${esc(list.length)}商品 / 戻り実数合計：${esc(list.reduce((sum,row)=>sum+Number(row.returned_qty||0),0))}個</strong></div>
+      <div class="booth-report-return-destination"><strong>現在の戻り先：</strong><span data-booth-report-return-destination-label>${locked?esc(getBoothReportReturnDestinationLabel(locked)):"未確定"}</span><p class="section-note">おすすめ：${esc(getBoothReportReturnDestinationLabel(recommended))}（確認後に確定します）</p><div class="booth-report-return-destination-options" role="group" aria-label="戻り先">${buttons}</div>${state.mixed?'<p class="form-error">既存データの戻り先が混在しています。管理者が確認してください。</p>':""}</div>
+      <div class="booth-report-return-actions"><button type="button" class="primary" data-booth-report-return-batch-save ${locked||state.mixed?"disabled":"disabled"}>戻り先を選択してください</button></div>
+      <div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table"><thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し数</th><th>戻り実数</th></tr></thead><tbody>${rowsHtml}</tbody></table></div><div class="booth-history-cards booth-scroll-cards">${cards}</div>
+    </section>`;
+  };
+
+  root.saveBoothReportReturnBatch=async function(){
+    if(root.__aricoBoothReportReturnBatchSaving)return;
+    const section=document.querySelector("[data-booth-report-return-section]");
+    const event=currentEvent();
+    const destination=normalizeBoothReportReturnDestination(section?.dataset.selectedDestination||"");
+    if(!section||!event||!destination){boothShowError("戻り先未確定","戻り先を選択してから確定してください。");return;}
+    if(section.dataset.destinationLocked==="true"){boothShowError("戻り先確定済み","戻り先はすでに確定しています。変更は管理者操作から行ってください。");return;}
+    if(section.dataset.destinationMixed==="true"){boothShowError("戻り先確認エラー","既存データの戻り先が混在しています。");return;}
+    const ok=typeof confirmAppAction==="function"?await confirmAppAction("戻り先を一括確定",[`戻り先：${getBoothReportReturnDestinationLabel(destination)}`,"保存済みの戻り実数へイベント単位で適用します。","在庫移動は通常棚へ戻す場合だけ実行します。"].join("\n"),{okText:"確定",cancelText:"キャンセル"}):true;
+    if(!ok)return;
+    root.__aricoBoothReportReturnBatchSaving=true;
+    const operations=[];
+    const staff=String(event.created_by||"イベントレポート");
+    try{
+      const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,returned_qty,return_process_type,return_reflected,return_reflected_qty,return_reflected_at,return_reflected_by,shelf_return_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,shelf_return_reflected_by&event_id=eq.${encodeURIComponent(event.id)}&item_type=eq.normal&order=product_name.asc&limit=5000`);
+      const targets=(Array.isArray(rows)?rows:[]).filter(row=>takeoutQty(row)>0);
+      if(!targets.length)throw new Error("戻り対象商品がありません。");
+      const existing=typeof getBoothReportReturnDestinationState==="function"?getBoothReportReturnDestinationState(targets):{locked:"",mixed:false};
+      if(existing.mixed)throw new Error("既存データの戻り先が混在しています。");
+      if(existing.locked)throw new Error("戻り先はすでに確定しています。");
+      for(const item of targets){
+        const returned=Math.max(0,Number(item.returned_qty||0));
+        const reflected=isBoothReturnReflected(item);
+        const reflectedQty=reflected?getBoothReturnReflectedQty(item):0;
+        const delta=returned-reflectedQty;
+        const operation={item,before:{...item},baseDelta:destination==="shelf"?delta:0,storageDelta:destination==="shelf"?-delta:0,baseAdjusted:false,storageAdjusted:false,movement:null,inventoryLog:null,patched:false};
+        operations.push(operation);
+        if(operation.baseDelta){await adjustBoothProductBaseStock(item.barcode,operation.baseDelta);operation.baseAdjusted=true;}
+        if(operation.storageDelta){await upsertBoothEventStorageStock(getBoothEventStoreCode(event),item,operation.storageDelta);operation.storageAdjusted=true;}
+        if(operation.storageDelta&&typeof insertBoothCommonEventMovement==="function")operation.movement=await insertBoothCommonEventMovement(event,item,Math.abs(operation.storageDelta),staff,operation.storageDelta>0?"event return kept on common shelf":"event return moved to normal shelf",operation.storageDelta>0?"storage_in":"storage_out");
+        if(operation.baseDelta)operation.inventoryLog=await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({type:"在庫修正",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:operation.baseDelta,memo:"event return destination confirmed",event_id:event.id,affects_smaregi:false,smaregi_delta:0})});
+        const now=new Date().toISOString();
+        await patchBoothEventItem(item,{return_process_type:destination,return_reflected:true,return_reflected_qty:returned,return_reflected_at:now,return_reflected_by:staff,shelf_return_qty:destination==="shelf"?returned:0,shelf_return_reflected:destination==="shelf",shelf_return_reflected_qty:destination==="shelf"?returned:0,shelf_return_reflected_at:destination==="shelf"?now:null,shelf_return_reflected_by:destination==="shelf"?staff:null});
+        operation.patched=true;
+      }
+      await refreshBoothEventRelatedViews(event.id);
+      await loadBoothEventReport(event.id);
+      boothShowSuccess("戻り先を確定しました",`${targets.length}商品の戻り先を${getBoothReportReturnDestinationLabel(destination)}にしました。`);
+    }catch(error){
+      for(const operation of operations.reverse()){
+        try{
+          if(operation.patched)await patchBoothEventItem(operation.item,getBoothReportReturnRestorePayload(operation.before));
+          if(operation.inventoryLog?.[0]?.id)await sb(`inventory_logs?id=eq.${encodeURIComponent(operation.inventoryLog[0].id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+          if(operation.movement?.id)await sb(`event_storage_movements?id=eq.${encodeURIComponent(operation.movement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+          if(operation.storageAdjusted)await upsertBoothEventStorageStock(getBoothEventStoreCode(event),operation.item,-operation.storageDelta);
+          if(operation.baseAdjusted)await adjustBoothProductBaseStock(operation.item.barcode,-operation.baseDelta);
+        }catch(rollbackError){console.warn("[event return destination rollback failed]",rollbackError);}
+      }
+      boothShowError("戻り先確定エラー",error?.message||"戻り先を確定できませんでした。");
+    }finally{
+      root.__aricoBoothReportReturnBatchSaving=false;
+    }
+  };
+
+  const originalCloseRender=root.renderBoothCloseConfirmPanel;
+  root.renderBoothCloseConfirmPanel=function(event,summary){
+    originalCloseRender(event,summary);
+    const card=el("boothCloseCard")||document.querySelector(".booth-close-card");
+    const button=el("boothCloseConfirmBtn");
+    const rows=Array.isArray(summary?.rows)?summary.rows:[];
+    const normalRows=rows.filter(row=>row.item_type==="normal"&&(Number(row.normal_takeout_qty||0)>0||Number(row.storage_takeout_qty||0)>0||Number(row.taken_qty||0)>0));
+    const missingReturn=normalRows.length>0&&!normalRows.some(row=>Number(row.returned_qty||0)>0)&&!normalRows.some(row=>getBoothReturnProcessType(row));
+    const pending=(summary?.unprocessedReturnRows||rows.filter(row=>row.item_type==="normal"&&Number(row.returned_qty||0)>0&&!getBoothReturnProcessType(row))).length;
+    const requiresReturnInput=Boolean(missingReturn||pending);
+    if(!requiresReturnInput||!card)return;
+    if(button)button.disabled=true;
+    const actions=card.querySelector(".booth-close-actions");
+    if(actions){
+      const warning=document.createElement("div");
+      warning.className="message err booth-close-warning";
+      warning.innerHTML=missingReturn?"戻り実績が保存されていません。戻り在庫処理で実数を保存してください。 <button type=\"button\" class=\"secondary\" data-open-booth-report>戻り在庫処理を開く</button>":"戻り実績は保存済みです。戻り先をイベントレポートで確定してください。 <button type=\"button\" class=\"secondary\" data-open-booth-report>イベントレポートを開く</button>";
+      actions.before(warning);
+      warning.querySelector("[data-open-booth-report]")?.addEventListener("click",()=>{if(missingReturn&&typeof renderBoothReturnPanel==="function")renderBoothReturnPanel(event);else if(typeof renderBoothEventReportPanel==="function")renderBoothEventReportPanel(event);});
+    }
+  };
+
+  function timeout(promise,ms){
+    let timer;
+    const guard=new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(new Error("イベント締めデータの取得がタイムアウトしました。")),ms);});
+    return Promise.race([Promise.resolve(promise),guard]).finally(()=>clearTimeout(timer));
+  }
+
+  root.confirmBoothEventClosePreparing=async function(event){
+    const area=el("boothEventWorkArea");
+    if(!event?.id){boothShowError("イベント締めエラー","イベントが選択されていません。");return;}
+    if(area)area.innerHTML='<section class="booth-work-card"><div class="booth-empty" data-booth-close-loading>イベント棚の現数を読み込み中...</div></section>';
+    try{
+      const summary=await timeout(loadBoothCloseSummary(event),30000);
+      const withShelf=await timeout(loadBoothCloseCommonStockSummary(event,summary),30000);
+      root.renderBoothCloseConfirmPanel(event,withShelf);
+    }catch(error){
+      if(area)area.innerHTML=`<section class="booth-work-card booth-error-card"><h4>イベント締めデータを取得できませんでした。</h4><p class="booth-error-message">${esc(error?.message||"取得に失敗しました。")}</p><button type="button" id="boothCloseRetryBtn" class="secondary">再読み込み</button></section>`;
+      el("boothCloseRetryBtn")?.addEventListener("click",()=>root.confirmBoothEventClosePreparing(event));
+    }finally{
+      const loading=area?.querySelector("[data-booth-close-loading]");
+      if(loading){
+        area.innerHTML='<section class="booth-work-card booth-error-card"><h4>イベント締めデータを取得できませんでした。</h4><p class="booth-error-message">読み込みを完了できませんでした。再読み込みしてください。</p><button type="button" id="boothCloseRetryBtn" class="secondary">再読み込み</button></section>';
+        el("boothCloseRetryBtn")?.addEventListener("click",()=>root.confirmBoothEventClosePreparing(event));
+      }
+    }
+  };
+})();
+
 // Ver 2.38: event close uses the current common event shelf stock.
 function getBoothEventStoreCode(event){
   return normalizeBoothStoreCode(event?.store_code||getBoothCurrentStoreCode?.()||"tokyo");
@@ -9289,8 +9684,11 @@ async function confirmBoothEventClose(event){
     if(!latestEvent){boothShowError("イベント終了エラー","イベントが見つかりません。");return;}
     if(isBoothEventClosed(latestEvent)){boothShowError("イベント終了エラー","このイベントはすでに終了しています。");return;}
     const summary=await loadBoothCloseSummary(latestEvent);
+    const closeNormalRows=summary.rows.filter(row=>row.item_type==="normal"&&(Number(row.normal_takeout_qty||0)>0||Number(row.storage_takeout_qty||0)>0||Number(row.taken_qty||0)>0));
+    const noReturnSaved=closeNormalRows.length>0&&!closeNormalRows.some(row=>Number(row.returned_qty||0)>0)&&!closeNormalRows.some(row=>getBoothReturnProcessType(row));
     const unprocessedNormal=summary.rows.filter(row=>row.item_type==="normal"&&(Number(row.normal_takeout_qty||0)>0||Number(row.storage_takeout_qty||0)>0||Number(row.taken_qty||0)>0)&&Number(row.returned_qty||0)>0&&!getBoothReturnProcessType(row));
-    if(unprocessedNormal.length){boothShowError("イベント終了エラー","戻り先が未選択の商品があります。通常棚へ戻すか、イベント棚に残すを選択してください。");return;}
+    if(noReturnSaved){boothShowError("イベント終了エラー","戻り実績が保存されていません。戻り在庫処理で実数を保存してください。");return;}
+    if(unprocessedNormal.length){boothShowError("イベント終了エラー","戻り先が未選択の商品があります。イベントレポートで戻り先を確定してください。");return;}
     const body=["イベント名："+(latestEvent.name||"-"),"担当者："+staff,"対象商品数："+summary.rows.length,"通常棚へ戻す数量と、イベント棚に残る数量を保存してイベントを終了します。"].join("\\n");
     const ok=typeof confirmAppAction==="function"?await confirmAppAction("イベント終了確認",body,{okText:"イベントを終了する"}):true;
     if(!ok)return;
