@@ -9390,7 +9390,7 @@ async function saveBoothReportReturnBatch(){
   const staff=String(event.created_by||"イベントレポート戻り実績");
   try{
     for(const entry of changed){
-      const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,smaregi_product_id,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,shelf_return_reflected_by,return_process_type,return_reflected,return_reflected_qty,return_reflected_at,return_reflected_by&event_id=eq.${encodeURIComponent(event.id)}&id=eq.${encodeURIComponent(entry.id)}&item_type=eq.normal&limit=1`);
+      const rows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,shelf_return_reflected_by,return_process_type,return_reflected,return_reflected_qty,return_reflected_at,return_reflected_by&event_id=eq.${encodeURIComponent(event.id)}&id=eq.${encodeURIComponent(entry.id)}&item_type=eq.normal&limit=1`);
       const item=Array.isArray(rows)&&rows[0]?rows[0]:null;
       if(!item)throw new Error("対象の戻り商品が見つかりません。");
       const before={...item};
