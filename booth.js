@@ -9050,7 +9050,9 @@ async function rollbackBoothCloseReflection(summary,staff){
     if(processType==="shelf"){
       await adjustBoothProductBaseStock(item.barcode,-delta);
       await upsertBoothEventStorageStock(getBoothEventStoreCode({store_code:item.store_code}),item,delta);
-    }else if(processType==="storage"){
+    }else if(processType==="storage"&&item.__legacyStorageMove===true){
+      // Keep rollback compatibility for legacy rows that really moved stock.
+      // The current common-shelf return path is record-only.
       await upsertBoothEventStorageStock(getBoothEventStoreCode({store_code:item.store_code}),item,-delta);
     }
     await patchBoothEventItem(item,getBoothCloseRestorePayload(item));
