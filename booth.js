@@ -10666,7 +10666,7 @@ exportBoothEventReportPdf=async function(event){
       boothCurrentEventId=String(event.id);
       renderBoothEvents(boothEvents);
       renderBoothEventDetail(closedEvent);
-      boothShowSuccess("Event close complete","Event status was closed. Stock quantities were not changed by the close button.");
+      boothShowSuccess("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u5b8c\u4e86","\u30a4\u30d9\u30f3\u30c8\u3092\u7de0\u3081\u307e\u3057\u305f\u3002\u7de0\u3081\u30dc\u30bf\u30f3\u3067\u306f\u901a\u5e38\u68da\u30fb\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u306e\u6570\u91cf\u306f\u5909\u66f4\u3057\u3066\u3044\u307e\u305b\u3093\u3002");
       return {closedEvent,snapshots};
     }catch(error){
       for(const row of snapshots){
@@ -10677,43 +10677,84 @@ exportBoothEventReportPdf=async function(event){
   };
 
   confirmBoothEventClose=async function(event){
-    const staff=String(event?.closed_by||event?.created_by||"event close").trim()||"event close";
+    const staff=String(event?.closed_by||event?.created_by||"\u30a4\u30d9\u30f3\u30c8\u7de0\u3081").trim()||"\u30a4\u30d9\u30f3\u30c8\u7de0\u3081";
     try{
       const latestRows=await sb("booth_events?select=*&id=eq."+encodeURIComponent(event.id)+"&limit=1");
       const latestEvent=Array.isArray(latestRows)&&latestRows[0]?latestRows[0]:null;
-      if(!latestEvent){boothShowError("Event close error","Event was not found.");return;}
-      if(isBoothEventClosed(latestEvent)){boothShowError("Event close error","This event is already closed.");return;}
+      if(!latestEvent){boothShowError("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u30a8\u30e9\u30fc","\u30a4\u30d9\u30f3\u30c8\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3002");return;}
+      if(isBoothEventClosed(latestEvent)){boothShowError("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u30a8\u30e9\u30fc","\u3053\u306e\u30a4\u30d9\u30f3\u30c8\u306f\u3059\u3067\u306b\u7de0\u3081\u6e08\u307f\u3067\u3059\u3002");return;}
       const summary=await loadBoothCloseCommonStockSummary(latestEvent,await loadBoothCloseSummary(latestEvent));
       const normalRows=aricoCloseRowsNeedingReturn(summary);
       const noReturnSaved=aricoCloseHasNoReturnSaved(normalRows);
       const unprocessedNormal=aricoCloseRowsWithoutDestination(normalRows);
       if(noReturnSaved){
-        boothShowError("Event close error","Return counts are not saved. Save the actual returned counts first.");
+        boothShowError("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u30a8\u30e9\u30fc","\u623b\u308a\u5b9f\u6570\u304c\u4fdd\u5b58\u3055\u308c\u3066\u3044\u307e\u305b\u3093\u3002\u623b\u308a\u5728\u5eab\u51e6\u7406\u3067\u5b9f\u6570\u3092\u4fdd\u5b58\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
         return;
       }
       if(unprocessedNormal.length){
-        boothShowError("Event close error","Some returned items do not have a return destination. Confirm it in the event report.");
+        boothShowError("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u30a8\u30e9\u30fc","\u623b\u308a\u5148\u304c\u672a\u78ba\u5b9a\u306e\u5546\u54c1\u304c\u3042\u308a\u307e\u3059\u3002\u30a4\u30d9\u30f3\u30c8\u30ec\u30dd\u30fc\u30c8\u3067\u623b\u308a\u5148\u3092\u78ba\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
         return;
       }
       const eventShelfQty=normalRows.reduce((sum,row)=>sum+Number(row.event_shelf_current_qty||0),0);
       const returnQty=normalRows.reduce((sum,row)=>sum+Number(row.returned_qty||0),0);
       const body=[
-        "Close this event.",
-        "The close button will not change normal shelf or common event shelf quantities.",
+        "\u3053\u306e\u30a4\u30d9\u30f3\u30c8\u3092\u7de0\u3081\u307e\u3059\u3002",
+        "\u7de0\u3081\u30dc\u30bf\u30f3\u3067\u306f\u901a\u5e38\u68da\u30fb\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u306e\u6570\u91cf\u306f\u5909\u66f4\u3057\u307e\u305b\u3093\u3002",
         "",
-        "Event: "+(latestEvent.name||"-"),
-        "Staff: "+staff,
-        "Products: "+normalRows.length,
-        "Saved returned quantity: "+returnQty,
-        "Quantity remaining on common event shelf: "+eventShelfQty
+        "\u30a4\u30d9\u30f3\u30c8\uff1a"+(latestEvent.name||"-"),
+        "\u62c5\u5f53\u8005\uff1a"+staff,
+        "\u5bfe\u8c61\u5546\u54c1\u6570\uff1a"+normalRows.length,
+        "\u4fdd\u5b58\u6e08\u307f\u623b\u308a\u5b9f\u6570\uff1a"+returnQty,
+        "\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u306b\u6b8b\u308b\u6570\u91cf\uff1a"+eventShelfQty
       ].join("\n");
       const ok=typeof confirmAppAction==="function"
-        ? await confirmAppAction("Confirm event close",body,{okText:"Close event",cancelText:"Cancel"})
+        ? await confirmAppAction("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u78ba\u8a8d",body,{okText:"\u30a4\u30d9\u30f3\u30c8\u3092\u7de0\u3081\u308b",cancelText:"\u30ad\u30e3\u30f3\u30bb\u30eb"})
         : true;
       if(!ok)return;
       await finalizeBoothEventClose(latestEvent,summary,staff);
     }catch(error){
-      boothShowError("Event close error",error.message||"Failed to close the event.");
+      boothShowError("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u30a8\u30e9\u30fc",error.message||"\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002");
+    }
+  };
+
+  confirmBoothEventReopen=async function(event){
+    const staff=String(el("boothReopenStaff")?.value||"").trim();
+    const reason=String(el("boothReopenReason")?.value||"").trim();
+    if(!staff){boothShowError("\u7de0\u3081\u89e3\u9664\u30a8\u30e9\u30fc","\u89e3\u9664\u62c5\u5f53\u8005\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044\u3002","boothReopenStaff");return;}
+    if(!reason){boothShowError("\u7de0\u3081\u89e3\u9664\u30a8\u30e9\u30fc","\u89e3\u9664\u7406\u7531\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044\u3002","boothReopenReason");return;}
+    try{
+      const latestRows=await sb("booth_events?select=*&id=eq."+encodeURIComponent(event.id)+"&limit=1");
+      const latestEvent=Array.isArray(latestRows)&&latestRows[0]?latestRows[0]:null;
+      if(!latestEvent){boothShowError("\u7de0\u3081\u89e3\u9664\u30a8\u30e9\u30fc","\u30a4\u30d9\u30f3\u30c8\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3002");return;}
+      if(!isBoothEventClosed(latestEvent)){boothShowError("\u7de0\u3081\u89e3\u9664\u30a8\u30e9\u30fc","\u3053\u306e\u30a4\u30d9\u30f3\u30c8\u306f\u7de0\u3081\u6e08\u307f\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3002");return;}
+      const reasonText=el("boothReopenReason")?.selectedOptions?.[0]?.textContent||reason;
+      const body=[
+        "\u3053\u306e\u30a4\u30d9\u30f3\u30c8\u306e\u7de0\u3081\u3092\u89e3\u9664\u3057\u307e\u3059\u3002",
+        "\u7de0\u3081\u89e3\u9664\u30dc\u30bf\u30f3\u3067\u306f\u901a\u5e38\u68da\u30fb\u5171\u901a\u30a4\u30d9\u30f3\u30c8\u68da\u306e\u6570\u91cf\u306f\u5909\u66f4\u3057\u307e\u305b\u3093\u3002",
+        "",
+        "\u30a4\u30d9\u30f3\u30c8\uff1a"+(latestEvent.name||"-"),
+        "\u7de0\u3081\u65e5\u6642\uff1a"+formatBoothDateTime(latestEvent.closed_at),
+        "\u89e3\u9664\u62c5\u5f53\u8005\uff1a"+staff,
+        "\u89e3\u9664\u7406\u7531\uff1a"+reasonText
+      ].join("\n");
+      const ok=typeof confirmAppAction==="function"
+        ? await confirmAppAction("\u7de0\u3081\u89e3\u9664\u78ba\u8a8d",body,{okText:"\u7de0\u3081\u89e3\u9664",cancelText:"\u30ad\u30e3\u30f3\u30bb\u30eb"})
+        : true;
+      if(!ok)return;
+      const now=new Date().toISOString();
+      const updated=await sb("booth_events?id=eq."+encodeURIComponent(latestEvent.id),{
+        method:"PATCH",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify({status:"draft",closed_at:null,closed_by:null,reopened_at:now,reopened_by:staff,reopen_reason:reason})
+      });
+      const reopenedEvent=Array.isArray(updated)&&updated[0]?updated[0]:{...latestEvent,status:"draft",closed_at:null,closed_by:null,reopened_at:now,reopened_by:staff,reopen_reason:reason};
+      boothEvents=boothEvents.map(row=>String(row.id)===String(latestEvent.id)?reopenedEvent:row);
+      boothCurrentEventId=String(latestEvent.id);
+      renderBoothEvents(boothEvents);
+      renderBoothEventDetail(reopenedEvent);
+      boothShowSuccess("\u7de0\u3081\u89e3\u9664\u5b8c\u4e86","\u30a4\u30d9\u30f3\u30c8\u306e\u7de0\u3081\u3092\u89e3\u9664\u3057\u307e\u3057\u305f\u3002\u5728\u5eab\u6570\u91cf\u306f\u5909\u66f4\u3057\u3066\u3044\u307e\u305b\u3093\u3002");
+    }catch(error){
+      boothShowError("\u7de0\u3081\u89e3\u9664\u30a8\u30e9\u30fc",error.message||"\u7de0\u3081\u89e3\u9664\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002");
     }
   };
 
@@ -10721,4 +10762,5 @@ exportBoothEventReportPdf=async function(event){
   root.finalizeBoothEventClose=finalizeBoothEventClose;
   root.reflectBoothShelfReturnsOnClose=reflectBoothShelfReturnsOnClose;
   root.rollbackBoothCloseReflection=rollbackBoothCloseReflection;
+  root.confirmBoothEventReopen=confirmBoothEventReopen;
 })(window);
