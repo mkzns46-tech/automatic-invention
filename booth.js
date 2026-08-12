@@ -10616,3 +10616,109 @@ exportBoothEventReportPdf=async function(event){
     boothShowError("PDF出力エラー",error.message||"イベントレポートPDFの出力に失敗しました。");
   }
 };
+
+// Ver 2.75: event close is status-only. Return stock movements are completed
+// when the return destination is confirmed in the event report.
+(function(root){
+  function aricoCloseRowsNeedingReturn(summary){
+    const rows=Array.isArray(summary?.rows)?summary.rows:[];
+    return rows.filter(row=>row.item_type==="normal"&&(
+      Number(row.normal_takeout_qty||0)>0||
+      Number(row.storage_takeout_qty||0)>0||
+      Number(row.taken_qty||0)>0
+    ));
+  }
+
+  function aricoCloseRowsWithoutDestination(rows){
+    return rows.filter(row=>Number(row.returned_qty||0)>0&&!normalizeBoothReportReturnDestination(getBoothReturnProcessType(row)));
+  }
+
+  function aricoCloseHasNoReturnSaved(rows){
+    return rows.length>0
+      && !rows.some(row=>Number(row.returned_qty||0)>0)
+      && !rows.some(row=>normalizeBoothReportReturnDestination(getBoothReturnProcessType(row)));
+  }
+
+  reflectBoothShelfReturnsOnClose=async function(){
+    return [];
+  };
+
+  rollbackBoothCloseReflection=async function(){
+    return [];
+  };
+
+  finalizeBoothEventClose=async function(event,summary,staff){
+    const now=new Date().toISOString();
+    let snapshots=[];
+    try{
+      const finalSummary=await loadBoothCloseCommonStockSummary(event,await loadBoothCloseSummary(event));
+      snapshots=await createBoothEventCloseSnapshots(event,finalSummary,staff,now).catch(error=>{
+        console.warn("[booth close snapshot skipped]",error);
+        return [];
+      });
+      const updated=await sb("booth_events?id=eq."+encodeURIComponent(event.id),{
+        method:"PATCH",
+        headers:{Prefer:"return=representation"},
+        body:JSON.stringify({status:"closed",closed_at:now,closed_by:staff})
+      });
+      const closedEvent=Array.isArray(updated)&&updated[0]?updated[0]:{...event,status:"closed",closed_at:now,closed_by:staff};
+      boothEvents=boothEvents.map(row=>String(row.id)===String(event.id)?closedEvent:row);
+      boothCurrentEventId=String(event.id);
+      renderBoothEvents(boothEvents);
+      renderBoothEventDetail(closedEvent);
+      boothShowSuccess("Event close complete","Event status was closed. Stock quantities were not changed by the close button.");
+      return {closedEvent,snapshots};
+    }catch(error){
+      for(const row of snapshots){
+        if(row?.id)await sb("booth_stock_movements?id=eq."+encodeURIComponent(row.id),{method:"DELETE",headers:{Prefer:"return=minimal"}}).catch(()=>{});
+      }
+      throw error;
+    }
+  };
+
+  confirmBoothEventClose=async function(event){
+    const staff=String(event?.closed_by||event?.created_by||"event close").trim()||"event close";
+    try{
+      const latestRows=await sb("booth_events?select=*&id=eq."+encodeURIComponent(event.id)+"&limit=1");
+      const latestEvent=Array.isArray(latestRows)&&latestRows[0]?latestRows[0]:null;
+      if(!latestEvent){boothShowError("Event close error","Event was not found.");return;}
+      if(isBoothEventClosed(latestEvent)){boothShowError("Event close error","This event is already closed.");return;}
+      const summary=await loadBoothCloseCommonStockSummary(latestEvent,await loadBoothCloseSummary(latestEvent));
+      const normalRows=aricoCloseRowsNeedingReturn(summary);
+      const noReturnSaved=aricoCloseHasNoReturnSaved(normalRows);
+      const unprocessedNormal=aricoCloseRowsWithoutDestination(normalRows);
+      if(noReturnSaved){
+        boothShowError("Event close error","Return counts are not saved. Save the actual returned counts first.");
+        return;
+      }
+      if(unprocessedNormal.length){
+        boothShowError("Event close error","Some returned items do not have a return destination. Confirm it in the event report.");
+        return;
+      }
+      const eventShelfQty=normalRows.reduce((sum,row)=>sum+Number(row.event_shelf_current_qty||0),0);
+      const returnQty=normalRows.reduce((sum,row)=>sum+Number(row.returned_qty||0),0);
+      const body=[
+        "Close this event.",
+        "The close button will not change normal shelf or common event shelf quantities.",
+        "",
+        "Event: "+(latestEvent.name||"-"),
+        "Staff: "+staff,
+        "Products: "+normalRows.length,
+        "Saved returned quantity: "+returnQty,
+        "Quantity remaining on common event shelf: "+eventShelfQty
+      ].join("\n");
+      const ok=typeof confirmAppAction==="function"
+        ? await confirmAppAction("Confirm event close",body,{okText:"Close event",cancelText:"Cancel"})
+        : true;
+      if(!ok)return;
+      await finalizeBoothEventClose(latestEvent,summary,staff);
+    }catch(error){
+      boothShowError("Event close error",error.message||"Failed to close the event.");
+    }
+  };
+
+  root.confirmBoothEventClose=confirmBoothEventClose;
+  root.finalizeBoothEventClose=finalizeBoothEventClose;
+  root.reflectBoothShelfReturnsOnClose=reflectBoothShelfReturnsOnClose;
+  root.rollbackBoothCloseReflection=rollbackBoothCloseReflection;
+})(window);
