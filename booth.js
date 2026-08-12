@@ -10543,7 +10543,7 @@ if(!window.__aricoBoothReportReturnBatchHandlersBound){
       const selected=normalizeBoothReportReturnDestination(destinationButton.dataset.boothReportReturnDestination||"");
       if(!section)return;
       const locked=normalizeBoothReportReturnDestination(section.dataset.selectedDestination||"");
-      if(locked&&locked!==selected&&section.dataset.destinationMixed!=="true"){boothShowError("戻り先固定エラー","このイベントの戻り先は既に固定されています。");return;}
+      if(locked&&locked!==selected&&section.dataset.destinationMixed!=="true"&&section.dataset.returnDestinationDirty!=="true"){boothShowError("戻り先固定エラー","このイベントの戻り先は既に固定されています。");return;}
       section.dataset.selectedDestination=selected;
       if(section.dataset.destinationMixed==="true")section.dataset.destinationMixed="false";
       section.dataset.returnDestinationDirty="true";
