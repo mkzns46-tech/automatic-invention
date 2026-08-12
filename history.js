@@ -68,6 +68,78 @@ async function selectProductHistoryByBarcode(){
   await showProductHistoryForBarcode(input.value);
 }
 
+const historyEventShelfStockCache=new Map();
+
+function getHistoryCurrentStoreCode(){
+  if(typeof getCurrentSmaregiContext==="function"){
+    const context=getCurrentSmaregiContext();
+    if(context?.storeCode)return String(context.storeCode).trim().toLowerCase();
+  }
+  if(window.currentStore)return String(window.currentStore).trim().toLowerCase();
+  return "tokyo";
+}
+
+function historyInFilter(values){
+  return [...new Set((values||[]).map(value=>String(value||"").trim()).filter(Boolean))]
+    .map(value=>value.replace(/[(),]/g,""))
+    .filter(Boolean)
+    .join(",");
+}
+
+function historyEventShelfCacheKey(storeCode,barcode){
+  return `${String(storeCode||"").trim().toLowerCase()}|${String(barcode||"").trim()}`;
+}
+
+async function loadHistoryEventShelfStocksForLogs(sourceLogs){
+  const storeCode=getHistoryCurrentStoreCode();
+  const barcodes=[...new Set((sourceLogs||[]).map(log=>String(log?.barcode||"").trim()).filter(Boolean))];
+  if(!storeCode||!barcodes.length)return;
+
+  const filter=historyInFilter(barcodes);
+  if(!filter)return;
+
+  try{
+    const rows=await sb(`event_storage_stocks?select=store_code,barcode,storage_qty&store_code=eq.${encodeURIComponent(storeCode)}&barcode=in.(${filter})&limit=5000`);
+    const found=new Set();
+    if(Array.isArray(rows)){
+      rows.forEach(row=>{
+        const key=historyEventShelfCacheKey(row.store_code||storeCode,row.barcode);
+        historyEventShelfStockCache.set(key,Number(row.storage_qty||0));
+        found.add(String(row.barcode||"").trim());
+      });
+    }
+    barcodes.forEach(barcode=>{
+      if(!found.has(barcode))historyEventShelfStockCache.set(historyEventShelfCacheKey(storeCode,barcode),0);
+    });
+  }catch(error){
+    console.warn("[history event shelf stock load failed]",error);
+  }
+}
+
+function getHistoryEventShelfStock(barcode){
+  const key=historyEventShelfCacheKey(getHistoryCurrentStoreCode(),barcode);
+  return historyEventShelfStockCache.has(key) ? historyEventShelfStockCache.get(key) : "";
+}
+
+function ensureHistoryEventShelfHeaders(){
+  ["recentRegistrationHistoryBody","historyBody","selectedHistoryBody"].forEach(bodyId=>{
+    const body=el(bodyId);
+    const table=body?.closest("table");
+    const row=table?.querySelector("thead tr");
+    if(!row||row.querySelector("[data-history-event-shelf-header]"))return;
+    const th=document.createElement("th");
+    th.textContent="イベント棚";
+    th.dataset.historyEventShelfHeader="true";
+    const cells=[...row.children];
+    const currentStockHeader=cells[7]||null;
+    row.insertBefore(th,currentStockHeader?.nextSibling||null);
+  });
+}
+
+function getHistoryCsvHeaders(){
+  return ["入力日時","区分","担当者","商品名","在庫数","入荷","出荷","現在庫","イベント棚","備考","商品転用確認","確認者","確認日時"];
+}
+
 
 function normalizeSearchText(s){
   return String(s||"").normalize("NFKC").trim().toLowerCase().replace(/\s+/g," ");
@@ -483,7 +555,7 @@ function renderSelectedProductHistory(){
   }
 }
 
-function renderSelectedProductHistoryWithData(productLogs){
+async function renderSelectedProductHistoryWithData(productLogs){
   const badge=el("selectedProductBadge");
   const range=el("historyRangeBadge");
   const body=el("selectedHistoryBody");
@@ -502,6 +574,8 @@ function renderSelectedProductHistoryWithData(productLogs){
       equipment_checked_at:log.equipment_checked_at
     })));
 
+  ensureHistoryEventShelfHeaders();
+  await loadHistoryEventShelfStocksForLogs(productLogs);
   body.innerHTML=buildProductHistoryRowsFromLogs(selectedBarcode,productLogs,productLogs);
 
   bindMemoEditButtons();
@@ -563,6 +637,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
       <td>${r.inQty}</td>
       <td>${r.outQty}</td>
       <td>${r.afterStock}</td>
+      <td>${getHistoryEventShelfStock(r.log.barcode)}</td>
       <td>${memoCellHtml(r.log)}</td>
       <td>${equipmentCheckHtml(r.log)}</td>
     </tr>`;
@@ -595,18 +670,24 @@ function getFilteredGlobalLogs(){
   });
 }
 
-function renderGlobalHistory(){
+async function renderGlobalHistory(){
   const body=el("historyBody");
   if(!body)return;
-  body.innerHTML=buildGlobalHistoryRows(getFilteredGlobalLogs());
+  const rows=getFilteredGlobalLogs();
+  ensureHistoryEventShelfHeaders();
+  await loadHistoryEventShelfStocksForLogs(rows);
+  body.innerHTML=buildGlobalHistoryRows(rows);
   bindMemoEditButtons();
   bindEquipmentConfirmButtons();
 }
 
-function renderRecentRegistrationHistory(){
+async function renderRecentRegistrationHistory(){
   const body=el("recentRegistrationHistoryBody");
   if(!body)return;
-  body.innerHTML=buildGlobalHistoryRows(logs.slice(0,10));
+  const rows=logs.slice(0,10);
+  ensureHistoryEventShelfHeaders();
+  await loadHistoryEventShelfStocksForLogs(rows);
+  body.innerHTML=buildGlobalHistoryRows(rows);
   bindMemoEditButtons();
   bindEquipmentConfirmButtons();
 }
@@ -644,6 +725,7 @@ function buildGlobalHistoryRows(sourceLogs=logs){
       <td>${inQty}</td>
       <td>${outQty}</td>
       <td>${afterStock}</td>
+      <td>${getHistoryEventShelfStock(log.barcode)}</td>
       <td>${memoCellHtml(log)}</td>
       <td>${equipmentCheckHtml(log)}</td>
     </tr>`;
@@ -763,6 +845,130 @@ async function exportAllDataCsv(){
         await fetchProductsByBarcodes(allLogs.map(l=>l.barcode));
       }
     }catch(_){}
+    const rows=buildHistoryExportRows(allLogs);
+    if(rows.length<=1){
+      showMessage("出力する履歴がありません。","err");
+      return;
+    }
+    downloadCsvFile("all_inventory_history.csv",rows);
+    showMessage(`全履歴CSVを出力しました：${rows.length-1}件`,"ok");
+  }catch(e){
+    showMessage("全履歴CSV出力エラー。\n"+e.message,"err");
+  }
+}
+
+// Ver 2.79: add current common event shelf quantity to history display/CSV.
+function buildHistoryExportRows(sourceLogs){
+  const rows=[getHistoryCsvHeaders()];
+  const grouped=new Map();
+
+  for(const log of sourceLogs||[]){
+    const barcode=String(log.barcode||"");
+    if(!grouped.has(barcode))grouped.set(barcode,[]);
+    grouped.get(barcode).push(log);
+  }
+
+  const resultRows=[];
+
+  for(const [barcode,list] of grouped.entries()){
+    const p=gp(barcode);
+    let running=Number(p?.base_stock||0);
+    const desc=list.slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+
+    for(const log of desc){
+      const q=Number(log.quantity||0);
+      let beforeStock="";
+      let afterStock=running;
+      let inQty="";
+      let outQty="";
+
+      if(isInventoryInType(log.type)){
+        beforeStock=running-q;
+        inQty=q;
+        running-=q;
+      }else if(isInventoryOutType(log.type)){
+        beforeStock=running+q;
+        outQty=q;
+        running+=q;
+      }else if(log.type==="蝨ｨ蠎ｫ菫ｮ豁｣"){
+        beforeStock="-";
+        afterStock=q;
+      }
+
+      resultRows.push({
+        created_at:log.created_at,
+        row:[
+          fmt(log.created_at),
+          inventoryTypeLabel(log.type),
+          log.staff||"",
+          gp(log.barcode)?.name || log.product_name || "",
+          beforeStock,
+          inQty,
+          outQty,
+          afterStock,
+          getHistoryEventShelfStock(log.barcode),
+          String(log.memo||"").replace(/蛯吝刀霆｢逕ｨ/g,"蝠・刀霆｢逕ｨ"),
+          (log.type==="蛯吝刀霆｢逕ｨ"||log.type==="equipment_transfer") ? (isEquipmentTransferChecked(log) ? "確認済み" : "未確認") : "",
+          log.equipment_checked_by||"",
+          log.equipment_checked_at ? fmt(log.equipment_checked_at) : ""
+        ]
+      });
+    }
+  }
+
+  resultRows
+    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))
+    .forEach(r=>rows.push(r.row));
+
+  return rows;
+}
+
+async function exportProductHistoryCsv(){
+  try{
+    if(!selectedBarcode){
+      showMessage("商品を選択してください。","err");
+      return;
+    }
+
+    const table=document.getElementById("selectedHistoryBody");
+    await loadHistoryEventShelfStocksForLogs((typeof logs!=="undefined"?logs:[]).filter(log=>String(log.barcode||"")===String(selectedBarcode||"")));
+    const rows=[getHistoryCsvHeaders().slice(0,11)];
+
+    if(table){
+      [...table.querySelectorAll("tr")].forEach(tr=>{
+        const cols=[...tr.querySelectorAll("td")].map(td=>td.textContent.trim());
+        if(cols.length)rows.push(cols);
+      });
+    }
+
+    if(rows.length<=1){
+      showMessage("出力する商品履歴がありません。","err");
+      return;
+    }
+
+    downloadCsvFile("product_history.csv",rows);
+    showMessage("商品履歴CSVを出力しました。","ok");
+  }catch(e){
+    showMessage("商品履歴CSV出力エラー。\n"+e.message,"err");
+  }
+}
+
+async function exportCsv(){
+  await loadHistoryEventShelfStocksForLogs(logs);
+  const rows=buildHistoryExportRows(logs);
+  downloadCsvFile("inventory_history_latest.csv",rows);
+}
+
+async function exportAllDataCsv(){
+  try{
+    showMessage("全履歴CSVを作成中...");
+    const allLogs=await sbAll("inventory_logs?select=*&order=created_at.desc",1000,50000);
+    try{
+      if(typeof fetchProductsByBarcodes==="function"){
+        await fetchProductsByBarcodes(allLogs.map(l=>l.barcode));
+      }
+    }catch(_){}
+    await loadHistoryEventShelfStocksForLogs(allLogs);
     const rows=buildHistoryExportRows(allLogs);
     if(rows.length<=1){
       showMessage("出力する履歴がありません。","err");

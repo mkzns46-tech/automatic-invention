@@ -102,6 +102,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
       <td class="${historyQuantityClass(row.inQty)}">${row.inQty}</td>
       <td class="${historyQuantityClass(row.outQty)}">${row.outQty}</td>
       <td>${row.afterStock}</td>
+      <td>${getHistoryEventShelfStock(row.log.barcode)}</td>
       <td>${memoCellHtml(row.log)}</td>
       <td>${equipmentCheckHtml(row.log)}</td>
     </tr>`;
@@ -141,6 +142,7 @@ function buildGlobalHistoryRows(sourceLogs=logs){
       <td class="${historyQuantityClass(inQty)}">${inQty}</td>
       <td class="${historyQuantityClass(outQty)}">${outQty}</td>
       <td>${afterStock}</td>
+      <td>${getHistoryEventShelfStock(log.barcode)}</td>
       <td>${memoCellHtml(log)}</td>
       <td>${equipmentCheckHtml(log)}</td>
     </tr>`;
