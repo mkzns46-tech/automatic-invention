@@ -9433,7 +9433,7 @@ exportBoothEventReportPdf=async function(event){
     const button=section.querySelector("[data-booth-report-return-batch-save]");
     if(button){
       button.textContent=selected?"戻り先を一括確定":"戻り先を選択してください";
-      button.disabled=!selected||section.dataset.destinationMixed==="true"||section.dataset.destinationLocked==="true";
+      button.disabled=!selected||section.dataset.destinationLocked==="true";
     }
     const label=section.querySelector("[data-booth-report-return-destination-label]");
     if(label)label.textContent=selected?getBoothReportReturnDestinationLabel(selected):"未確定";
@@ -9445,12 +9445,12 @@ exportBoothEventReportPdf=async function(event){
     const state=typeof getBoothReportReturnDestinationState==="function"?getBoothReportReturnDestinationState(list):{locked:"",mixed:false};
     const locked=normalizeBoothReportReturnDestination(state.locked||"");
     const recommended="storage";
-    const buttons=["storage","shelf"].map(type=>`<button type="button" class="booth-report-return-destination-btn${locked===type?" is-selected":""}" data-booth-report-return-destination="${type}" aria-pressed="${locked===type?"true":"false"}" ${locked||state.mixed?"disabled":""}>${getBoothReportReturnDestinationLabel(type)}</button>`).join("");
+    const buttons=["storage","shelf"].map(type=>`<button type="button" class="booth-report-return-destination-btn${locked===type?" is-selected":""}" data-booth-report-return-destination="${type}" aria-pressed="${locked===type?"true":"false"}" ${locked&&!state.mixed?"disabled":""}>${getBoothReportReturnDestinationLabel(type)}</button>`).join("");
     const rowsHtml=list.map(row=>`<tr><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.taken_qty??0)}</td><td><strong>${esc(row.returned_qty??0)}</strong></td></tr>`).join("");
     const cards=list.map(row=>`<article class="booth-history-card"><div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong><span>${esc(row.barcode||"-")}</span></div><div class="booth-history-card-meta"><span>持ち出し数：${esc(row.taken_qty??0)}</span><span>戻り実数：${esc(row.returned_qty??0)}</span></div></article>`).join("");
     return `<section class="booth-report-section booth-report-return-batch" data-booth-report-return-section data-selected-destination="${esc(locked)}" data-destination-locked="${locked?"true":"false"}" data-destination-mixed="${state.mixed?"true":"false"}">
       <div class="booth-report-return-header"><div><h5>戻り実績</h5><p class="section-note">戻り在庫処理で保存した実数です。戻り先はイベント単位で一括確定します。</p></div><strong>対象商品：${esc(list.length)}商品 / 戻り実数合計：${esc(list.reduce((sum,row)=>sum+Number(row.returned_qty||0),0))}個</strong></div>
-      <div class="booth-report-return-destination"><strong>現在の戻り先：</strong><span data-booth-report-return-destination-label>${locked?esc(getBoothReportReturnDestinationLabel(locked)):"未確定"}</span><p class="section-note">おすすめ：${esc(getBoothReportReturnDestinationLabel(recommended))}（確認後に確定します）</p><div class="booth-report-return-destination-options" role="group" aria-label="戻り先">${buttons}</div>${state.mixed?'<p class="form-error">既存データの戻り先が混在しています。管理者が確認してください。</p>':""}</div>
+      <div class="booth-report-return-destination"><strong>現在の戻り先：</strong><span data-booth-report-return-destination-label>${locked?esc(getBoothReportReturnDestinationLabel(locked)):"未確定"}</span><p class="section-note">おすすめ：${esc(getBoothReportReturnDestinationLabel(recommended))}（確認後に確定します）</p><div class="booth-report-return-destination-options" role="group" aria-label="戻り先">${buttons}</div>${state.mixed?'<p class="form-error">既存データの戻り先が混在しています。戻り先を選ぶとイベント単位で統一できます。</p>':""}</div>
       <div class="booth-report-return-actions"><button type="button" class="primary" data-booth-report-return-batch-save ${locked||state.mixed?"disabled":"disabled"}>戻り先を選択してください</button></div>
       <div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table"><thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し数</th><th>戻り実数</th></tr></thead><tbody>${rowsHtml}</tbody></table></div><div class="booth-history-cards booth-scroll-cards">${cards}</div>
     </section>`;
@@ -9463,7 +9463,7 @@ exportBoothEventReportPdf=async function(event){
     const destination=normalizeBoothReportReturnDestination(section?.dataset.selectedDestination||"");
     if(!section||!event||!destination){boothShowError("戻り先未確定","戻り先を選択してから確定してください。");return;}
     if(section.dataset.destinationLocked==="true"){boothShowError("戻り先確定済み","戻り先はすでに確定しています。変更は管理者操作から行ってください。");return;}
-    if(section.dataset.destinationMixed==="true"){boothShowError("戻り先確認エラー","既存データの戻り先が混在しています。");return;}
+    if(section.dataset.destinationMixed==="true")section.dataset.destinationMixed="false";
     const ok=typeof confirmAppAction==="function"?await confirmAppAction("戻り先を一括確定",[`戻り先：${getBoothReportReturnDestinationLabel(destination)}`,"保存済みの戻り実数へイベント単位で適用します。","在庫移動は通常棚へ戻す場合だけ実行します。"].join("\n"),{okText:"確定",cancelText:"キャンセル"}):true;
     if(!ok)return;
     root.__aricoBoothReportReturnBatchSaving=true;
@@ -9474,7 +9474,6 @@ exportBoothEventReportPdf=async function(event){
       const targets=(Array.isArray(rows)?rows:[]).filter(row=>takeoutQty(row)>0);
       if(!targets.length)throw new Error("戻り対象商品がありません。");
       const existing=typeof getBoothReportReturnDestinationState==="function"?getBoothReportReturnDestinationState(targets):{locked:"",mixed:false};
-      if(existing.mixed)throw new Error("既存データの戻り先が混在しています。");
       if(existing.locked)throw new Error("戻り先はすでに確定しています。");
       for(const item of targets){
         const returned=Math.max(0,Number(item.returned_qty||0));
@@ -10213,11 +10212,12 @@ function updateBoothReportReturnBatchSummary(section){
   });
   const changed=[...values.values()].filter(row=>row.value!==row.saved);
   const selected=normalizeBoothReportReturnDestination(section.dataset.selectedDestination||"");
+  const destinationDirty=section.dataset.returnDestinationDirty==="true";
   section.querySelectorAll("[data-booth-report-return-unsaved-count]").forEach(node=>{node.textContent=`未保存：${changed.length}件`;});
   const button=section.querySelector("[data-booth-report-return-batch-save]");
   if(button){
-    button.textContent=`戻り実績を一括保存（${changed.length}件）`;
-    button.disabled=!selected||changed.length===0||section.dataset.destinationMixed==="true";
+    button.textContent=destinationDirty&&changed.length===0?"戻り先を一括確定":`戻り実績を一括保存（${changed.length}件）`;
+    button.disabled=!selected||(!destinationDirty&&changed.length===0);
   }
   section.querySelectorAll("[data-booth-report-return-row]").forEach(row=>{
     const input=row.querySelector("[data-booth-report-return-input]");
@@ -10254,7 +10254,7 @@ function renderBoothReportReturnBatchSection(rows){
   const locked=state.locked;
   const adminAuthed=typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
   const destinationLabel=locked?getBoothReportReturnDestinationLabel(locked):"未選択";
-  const destinationButtons=["shelf","storage"].map(type=>`<button type="button" class="booth-report-return-destination-btn${locked===type?" is-selected":""}" data-booth-report-return-destination="${type}" aria-pressed="${locked===type?"true":"false"}" ${locked||state.mixed?"disabled":""}>${getBoothReportReturnDestinationLabel(type)}</button>`).join("");
+  const destinationButtons=["shelf","storage"].map(type=>`<button type="button" class="booth-report-return-destination-btn${locked===type?" is-selected":""}" data-booth-report-return-destination="${type}" aria-pressed="${locked===type?"true":"false"}" ${locked&&!state.mixed?"disabled":""}>${getBoothReportReturnDestinationLabel(type)}</button>`).join("");
   const destinationChangeButton=locked&&!state.mixed&&adminAuthed
     ?`<button type="button" class="secondary" data-booth-return-destination-change data-event-id="${esc(boothCurrentEventId||"")}">戻り先を変更</button>`
     :"";
@@ -10279,7 +10279,7 @@ function renderBoothReportReturnBatchSection(rows){
   }).join("");
   return `<section class="booth-report-section booth-report-return-batch" data-booth-report-return-section data-selected-destination="${esc(locked)}" data-destination-mixed="${state.mixed?"true":"false"}">
     <div class="booth-report-return-header"><div><h5>通常商品戻り実績</h5><p class="section-note">戻り実数を入力して、最後に一括保存します。保存後の戻り先はイベント単位で固定され、管理者が変更できます。</p></div><strong data-booth-report-return-unsaved-count>未保存：0件</strong></div>
-    <div class="booth-report-return-destination"><strong>戻り先（イベント単位で固定）</strong><span data-booth-report-return-destination-label>${esc(destinationLabel)}</span><div class="booth-report-return-destination-options" role="group" aria-label="戻り先">${destinationButtons}</div>${destinationChangeButton}${state.mixed?'<p class="form-error">既存データの戻り先が混在しています。個別に変更せず管理者へ確認してください。</p>':""}</div>
+    <div class="booth-report-return-destination"><strong>戻り先（イベント単位で固定）</strong><span data-booth-report-return-destination-label>${esc(destinationLabel)}</span><div class="booth-report-return-destination-options" role="group" aria-label="戻り先">${destinationButtons}</div>${destinationChangeButton}${state.mixed?'<p class="form-error">既存データの戻り先が混在しています。戻り先を選ぶとイベント単位で統一できます。</p>':""}</div>
     <div class="button-row"><button type="button" class="secondary" data-booth-report-return-filter="all" aria-pressed="true">全件</button><button type="button" class="secondary" data-booth-report-return-filter="diff" aria-pressed="false">差異のみ</button></div>
     <div class="booth-report-return-actions"><button type="button" class="primary" data-booth-report-return-batch-save disabled>戻り実績を一括保存（0件）</button><span>変更した商品のみ保存します。</span></div>
     <div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table booth-report-return-table"><thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し数</th><th>販売数</th><th>ガチャ移動数</th><th>戻り予定数</th><th>戻り実数</th><th>差異</th><th>状態</th></tr></thead><tbody>${tableRows}</tbody></table></div>
@@ -10293,7 +10293,7 @@ async function saveBoothReportReturnBatch(){
   const destination=normalizeBoothReportReturnDestination(section?.dataset.selectedDestination||"");
   if(!section||!event){boothShowError("戻り実績保存エラー","イベントレポートを開いてから操作してください。");return;}
   if(!destination){boothShowError("戻り先未選択","戻り先を選択してください。");return;}
-  if(section.dataset.destinationMixed==="true"){boothShowError("戻り先確認エラー","既存データの戻り先が混在しているため一括保存できません。");return;}
+  if(section.dataset.destinationMixed==="true")section.dataset.destinationMixed="false";
   const entries=new Map();
   section.querySelectorAll("[data-booth-report-return-input]").forEach(input=>{
     const id=String(input.dataset.itemId||"");
@@ -10391,7 +10391,7 @@ async function saveBoothReportReturnBatch(){
   const destination=normalizeBoothReportReturnDestination(section?.dataset.selectedDestination||"");
   if(!section||!event){boothShowError("Return save error","Open an event report first.");return;}
   if(!destination){boothShowError("Return destination required","Select a return destination first.");return;}
-  if(section.dataset.destinationMixed==="true"){boothShowError("Return destination error","Existing rows have mixed destinations.");return;}
+  if(section.dataset.destinationMixed==="true")section.dataset.destinationMixed="false";
 
   const entries=new Map();
   section.querySelectorAll("[data-booth-report-return-input]").forEach(input=>{
@@ -10404,8 +10404,9 @@ async function saveBoothReportReturnBatch(){
       barcode:String(input.dataset.barcode||"")
     });
   });
-  const changed=[...entries.values()].filter(row=>row.value!==String(row.saved));
-  if(!changed.length)return;
+  const destinationDirty=section.dataset.returnDestinationDirty==="true";
+  const changed=[...entries.values()].filter(row=>destinationDirty||row.value!==String(row.saved));
+  if(!changed.length){boothShowError("Return save error","No return results or destination changes to save.");return;}
   for(const row of changed){
     if(!/^[0-9]+$/.test(row.value)){
       boothShowError("Return quantity error","Enter a whole number of 0 or more.");
@@ -10435,18 +10436,21 @@ async function saveBoothReportReturnBatch(){
       if(!item)throw new Error("Return item was not found.");
       const before={...item};
       const existingDestination=normalizeBoothReportReturnDestination(getBoothReturnProcessType(item));
-      if(existingDestination&&existingDestination!==destination){
+      if(existingDestination&&existingDestination!==destination&&!destinationDirty){
         throw new Error("This event already has a different return destination.");
       }
       const nextReturned=Number(entry.value);
       const planned=calculateBoothReturnPlannedQty(item);
       if(nextReturned>planned)throw new Error(`Return quantity exceeds planned quantity for ${item.product_name||item.barcode}.`);
       const reflectedQty=isBoothReturnReflected(item)?getBoothReturnReflectedQty(item):0;
-      const returnDelta=nextReturned-reflectedQty;
-      const baseStockDelta=destination==="shelf"?returnDelta:0;
+      const previousBaseStockEffect=existingDestination==="shelf"?reflectedQty:0;
+      const previousStorageStockEffect=existingDestination==="shelf"?-reflectedQty:0;
+      const nextBaseStockEffect=destination==="shelf"?nextReturned:0;
+      const nextStorageStockEffect=destination==="shelf"?-nextReturned:0;
+      const baseStockDelta=nextBaseStockEffect-previousBaseStockEffect;
       // A storage return is already represented by the common shelf stock.
       // Only a normal-shelf return moves quantity between stock locations.
-      const storageStockDelta=destination==="shelf"?-returnDelta:0;
+      const storageStockDelta=nextStorageStockEffect-previousStorageStockEffect;
       const operation={item,before,baseStockDelta,storageStockDelta,baseAdjusted:false,storageAdjusted:false,movement:null,inventoryLog:null,patched:false};
       operations.push(operation);
 
@@ -10537,10 +10541,12 @@ if(!window.__aricoBoothReportReturnBatchHandlersBound){
     if(destinationButton){
       const section=destinationButton.closest("[data-booth-report-return-section]");
       const selected=normalizeBoothReportReturnDestination(destinationButton.dataset.boothReportReturnDestination||"");
-      if(!section||section.dataset.destinationMixed==="true")return;
+      if(!section)return;
       const locked=normalizeBoothReportReturnDestination(section.dataset.selectedDestination||"");
-      if(locked&&locked!==selected){boothShowError("戻り先固定エラー","このイベントの戻り先は既に固定されています。");return;}
+      if(locked&&locked!==selected&&section.dataset.destinationMixed!=="true"){boothShowError("戻り先固定エラー","このイベントの戻り先は既に固定されています。");return;}
       section.dataset.selectedDestination=selected;
+      if(section.dataset.destinationMixed==="true")section.dataset.destinationMixed="false";
+      section.dataset.returnDestinationDirty="true";
       section.querySelectorAll("[data-booth-report-return-destination]").forEach(button=>{button.setAttribute("aria-pressed",button===destinationButton?"true":"false");button.classList.toggle("is-selected",button===destinationButton);});
       const label=section.querySelector("[data-booth-report-return-destination-label]");
       if(label)label.textContent=getBoothReportReturnDestinationLabel(selected);
