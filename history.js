@@ -114,6 +114,77 @@ async function loadHistoryEventShelfStocksForLogs(sourceLogs){
   }catch(error){
     console.warn("[history event shelf stock load failed]",error);
   }
+  await loadHistoryEventShelfFallbackStocks(storeCode,barcodes);
+}
+
+async function loadHistoryEventShelfFallbackStocks(storeCode,barcodes){
+  const emptyBarcodes=(barcodes||[]).filter(barcode=>{
+    const key=historyEventShelfCacheKey(storeCode,barcode);
+    return !historyEventShelfStockCache.has(key)||Number(historyEventShelfStockCache.get(key)||0)===0;
+  });
+  if(!emptyBarcodes.length)return;
+
+  const filter=historyInFilter(emptyBarcodes);
+  if(!filter)return;
+
+  try{
+    const movementRows=await sb(`event_storage_movements?select=id,store_code,barcode,movement_type,quantity,memo,created_at&store_code=eq.${encodeURIComponent(storeCode)}&barcode=in.(${filter})&order=created_at.asc&limit=5000`);
+    const totals=new Map();
+    const seen=new Set();
+    (Array.isArray(movementRows)?movementRows:[]).forEach(row=>{
+      const rowStore=String(row.store_code||"").trim().toLowerCase();
+      const barcode=String(row.barcode||"").trim();
+      if(rowStore!==storeCode||!barcode)return;
+      const id=String(row.id||"");
+      if(id&&seen.has(id))return;
+      if(id)seen.add(id);
+      const quantity=Math.abs(Number(row.quantity||0));
+      if(!Number.isFinite(quantity))return;
+      const type=String(row.movement_type||"").trim();
+      const current=Number(totals.get(barcode)||0);
+      if(type==="storage_in")totals.set(barcode,current+quantity);
+      else if(type==="storage_out")totals.set(barcode,current-quantity);
+      else if(type==="adjustment"){
+        const match=String(row.memo||"").match(/(-?\d+)\s*->\s*(-?\d+)/);
+        if(match)totals.set(barcode,current+Number(match[2])-Number(match[1]));
+      }
+    });
+    totals.forEach((value,barcode)=>{
+      if(value>0)historyEventShelfStockCache.set(historyEventShelfCacheKey(storeCode,barcode),Math.max(0,value));
+    });
+  }catch(error){
+    console.warn("[history event shelf movement fallback failed]",error);
+  }
+
+  const stillEmpty=emptyBarcodes.filter(barcode=>Number(historyEventShelfStockCache.get(historyEventShelfCacheKey(storeCode,barcode))||0)===0);
+  if(!stillEmpty.length)return;
+
+  try{
+    const events=await sb(`booth_events?select=id,store_code,status&store_code=eq.${encodeURIComponent(storeCode)}&limit=5000`);
+    const eventIds=(Array.isArray(events)?events:[])
+      .filter(event=>!new Set(["cancelled","canceled","invalid","deleted"]).has(String(event.status||"").trim().toLowerCase()))
+      .map(event=>String(event.id||"").trim())
+      .filter(Boolean);
+    if(!eventIds.length)return;
+    const eventFilter=historyInFilter(eventIds);
+    const barcodeFilter=historyInFilter(stillEmpty);
+    if(!eventFilter||!barcodeFilter)return;
+    const itemRows=await sb(`booth_event_items?select=id,event_id,barcode,item_type,returned_qty,event_storage_qty,return_process_type&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&item_type=eq.normal&limit=5000`);
+    const totals=new Map();
+    (Array.isArray(itemRows)?itemRows:[]).forEach(row=>{
+      const barcode=String(row.barcode||"").trim();
+      if(!barcode)return;
+      const savedStorage=Number(row.event_storage_qty||0);
+      const keptReturn=String(row.return_process_type||"").trim()==="storage" ? Number(row.returned_qty||0) : 0;
+      const quantity=Math.max(savedStorage,keptReturn,0);
+      if(quantity>0)totals.set(barcode,Number(totals.get(barcode)||0)+quantity);
+    });
+    totals.forEach((value,barcode)=>{
+      if(value>0)historyEventShelfStockCache.set(historyEventShelfCacheKey(storeCode,barcode),value);
+    });
+  }catch(error){
+    console.warn("[history event shelf event item fallback failed]",error);
+  }
 }
 
 function getHistoryEventShelfStock(barcode){
