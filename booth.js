@@ -306,8 +306,9 @@ function showBoothEventCreateError(text){
   if(typeof showPopup==="function")showPopup("イベント作成エラー",text);
 }
 
-async function loadBoothCommonEventShelfStartRows(storeCode){
+async function loadBoothCommonEventShelfStartRows(storeCode,options={}){
   const normalizedStore=normalizeBoothStoreCode(storeCode||getBoothCurrentStoreCode());
+  const excludeEventId=String(options.excludeEventId||"").trim();
   if(!normalizedStore)return [];
   const byBarcode=new Map();
   const commonRows=await sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(normalizedStore)}&storage_qty=gt.0&order=product_name.asc&limit=5000`).catch(()=>[]);
@@ -331,6 +332,7 @@ async function loadBoothCommonEventShelfStartRows(storeCode){
   const eventIds=(Array.isArray(events)?events:[])
     .filter(event=>normalizeBoothStoreCode(event?.store_code)===normalizedStore)
     .map(event=>String(event.id||"").trim())
+    .filter(id=>!excludeEventId||id!==excludeEventId)
     .filter(Boolean);
   if(eventIds.length){
     const itemRows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,shelf_return_qty,event_storage_qty,return_process_type,updated_at&event_id=in.(${buildInFilter(eventIds)})&item_type=eq.normal&order=updated_at.desc&limit=50000`).catch(()=>[]);
@@ -370,7 +372,7 @@ async function seedBoothEventStartInventoryFromCommonShelf(event,storeCode){
     const barcode=String(row.barcode||"").trim();
     if(barcode&&!existingByBarcode.has(barcode))existingByBarcode.set(barcode,row);
   });
-  const rows=await loadBoothCommonEventShelfStartRows(storeCode);
+  const rows=await loadBoothCommonEventShelfStartRows(storeCode,{excludeEventId:eventId});
   const rowsToInsert=[];
   const rowsToPatch=[];
   rows.forEach(row=>{
@@ -379,8 +381,14 @@ async function seedBoothEventStartInventoryFromCommonShelf(event,storeCode){
       rowsToInsert.push(row);
       return;
     }
-    if(Number(existingRow.storage_takeout_qty||0)>0)return;
-    rowsToPatch.push({row,existingRow});
+    const normalQty=Number(existingRow.normal_takeout_qty||0);
+    const sourceQty=Number(row.quantity||0);
+    const storageQty=row.source==="event_storage_stocks"?Math.max(0,sourceQty-normalQty):sourceQty;
+    if(storageQty<=0)return;
+    const currentStorage=Number(existingRow.storage_takeout_qty||0);
+    const currentTaken=Number(existingRow.taken_qty||0);
+    if(currentStorage===storageQty&&currentTaken===normalQty+storageQty)return;
+    rowsToPatch.push({row:{...row,quantity:storageQty},existingRow});
   });
   if(!rowsToInsert.length&&!rowsToPatch.length)return {count:0,total:0,skipped:false};
   const now=new Date().toISOString();
@@ -3889,7 +3897,12 @@ async function loadBoothDepartureInventoryList(eventId){
       list.innerHTML='<div class="booth-empty">持ち出し在庫・販売履歴・ガチャ在庫はありません。</div>';
       return;
     }
-    list.innerHTML=`${renderBoothDepartureNormalSection(normalRows)}${renderBoothDepartureGachaSection(gachaRows)}`;
+    const commonTotal=normalRows.reduce((sum,row)=>sum+Number(row.commonShelfQty||0),0);
+    const gachaTotal=gachaRows.reduce((sum,row)=>sum+Number(row.remain||0),0);
+    list.innerHTML=`<div class="booth-summary-strip">
+      <span>共通イベント棚 現在：${esc(normalRows.length)}商品 / ${esc(commonTotal)}個</span>
+      <span>ガチャ現在庫：${esc(gachaRows.length)}商品 / ${esc(gachaTotal)}個</span>
+    </div>${renderBoothDepartureNormalSection(normalRows)}${renderBoothDepartureGachaSection(gachaRows)}`;
   }catch(e){
     list.innerHTML='<div class="booth-empty">持ち出し在庫一覧を読み込めませんでした。</div>';
     boothShowError("持ち出し在庫一覧エラー","持ち出し在庫一覧の読み込みに失敗しました。\n"+e.message);

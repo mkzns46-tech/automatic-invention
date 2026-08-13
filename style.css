@@ -5141,6 +5141,23 @@ body[data-inventory-screen="history"] #productHistoryCard:not([hidden]){
   max-width:100%;
   overflow:auto;
 }
+.booth-summary-strip{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:10px 0 12px;
+}
+.booth-summary-strip span{
+  display:inline-flex;
+  align-items:center;
+  min-height:32px;
+  padding:6px 12px;
+  border:1px solid #b7dfc6;
+  border-radius:8px;
+  background:#e8f6ee;
+  color:#063b2a;
+  font-weight:800;
+}
 .booth-history-table{
   width:100%;
   min-width:720px;
