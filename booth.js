@@ -364,12 +364,27 @@ async function loadBoothCommonEventShelfStartRows(storeCode){
 async function seedBoothEventStartInventoryFromCommonShelf(event,storeCode){
   const eventId=String(event?.id||"").trim();
   if(!eventId)return {count:0,total:0,skipped:true};
-  const existing=await sb(`booth_event_items?select=id&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&limit=1`).catch(()=>[]);
-  if(Array.isArray(existing)&&existing.length)return {count:0,total:0,skipped:true};
+  const existing=await sb(`booth_event_items?select=id,barcode,product_name,taken_qty,normal_takeout_qty,storage_takeout_qty&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&limit=50000`).catch(()=>[]);
+  const existingByBarcode=new Map();
+  (Array.isArray(existing)?existing:[]).forEach(row=>{
+    const barcode=String(row.barcode||"").trim();
+    if(barcode&&!existingByBarcode.has(barcode))existingByBarcode.set(barcode,row);
+  });
   const rows=await loadBoothCommonEventShelfStartRows(storeCode);
-  if(!rows.length)return {count:0,total:0,skipped:false};
+  const rowsToInsert=[];
+  const rowsToPatch=[];
+  rows.forEach(row=>{
+    const existingRow=existingByBarcode.get(String(row.barcode||"").trim());
+    if(!existingRow){
+      rowsToInsert.push(row);
+      return;
+    }
+    if(Number(existingRow.storage_takeout_qty||0)>0)return;
+    rowsToPatch.push({row,existingRow});
+  });
+  if(!rowsToInsert.length&&!rowsToPatch.length)return {count:0,total:0,skipped:false};
   const now=new Date().toISOString();
-  const payload=rows.map(row=>({
+  const payload=rowsToInsert.map(row=>({
     event_id:eventId,
     barcode:row.barcode,
     product_name:row.product_name||"",
@@ -390,11 +405,51 @@ async function seedBoothEventStartInventoryFromCommonShelf(event,storeCode){
       body:JSON.stringify(payload.slice(i,i+500))
     });
   }
+  for(const {row,existingRow} of rowsToPatch){
+    const normalQty=Number(existingRow.normal_takeout_qty||0);
+    const storageQty=Number(row.quantity||0);
+    await sb(`booth_event_items?id=eq.${encodeURIComponent(existingRow.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        product_name:existingRow.product_name||row.product_name||"",
+        taken_qty:normalQty+storageQty,
+        storage_takeout_qty:storageQty,
+        updated_at:now
+      })
+    });
+  }
   return {
-    count:payload.length,
-    total:payload.reduce((sum,row)=>sum+Number(row.taken_qty||0),0),
+    count:payload.length+rowsToPatch.length,
+    total:payload.reduce((sum,row)=>sum+Number(row.taken_qty||0),0)
+      +rowsToPatch.reduce((sum,{row})=>sum+Number(row.quantity||0),0),
     skipped:false
   };
+}
+
+async function seedBoothEventStartInventoryForOpen(event){
+  const eventId=String(event?.id||"").trim();
+  if(!eventId||isBoothEventClosed(event))return;
+  window.__boothStartInventorySeedInProgress=window.__boothStartInventorySeedInProgress||new Set();
+  if(window.__boothStartInventorySeedInProgress.has(eventId))return;
+  window.__boothStartInventorySeedInProgress.add(eventId);
+  try{
+    const result=await seedBoothEventStartInventoryFromCommonShelf(event,event.store_code||getBoothCurrentStoreCode());
+    if(result.count>0){
+      const text=`共通イベント棚から ${result.count}商品 / ${result.total}個 を今回イベントの開始在庫として反映しました。`;
+      showBoothLocalMessage(text,"ok");
+      if(typeof showMessage==="function")showMessage(text,"ok");
+      await loadBoothEvents();
+      renderBoothEventDetail(getBoothCurrentEvent());
+    }
+  }catch(error){
+    console.warn("[booth event start inventory seed on open failed]",error);
+    const text=`共通イベント棚の開始在庫反映に失敗しました: ${error?.message||error}`;
+    showBoothLocalMessage(text,"warn");
+    if(typeof showMessage==="function")showMessage(text,"warn");
+  }finally{
+    window.__boothStartInventorySeedInProgress.delete(eventId);
+  }
 }
 
 async function createBoothEvent(){
@@ -1460,6 +1515,7 @@ function openBoothEvent(eventId){
   const event=getBoothCurrentEvent();
   renderBoothEvents(boothEvents);
   renderBoothEventDetail(event);
+  if(event)seedBoothEventStartInventoryForOpen(event);
   if(event){
     showBoothLocalMessage(`イベントを開きました：${event.name}`,"ok");
   }else if(typeof showMessage==="function"){
