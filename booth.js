@@ -306,6 +306,97 @@ function showBoothEventCreateError(text){
   if(typeof showPopup==="function")showPopup("イベント作成エラー",text);
 }
 
+async function loadBoothCommonEventShelfStartRows(storeCode){
+  const normalizedStore=normalizeBoothStoreCode(storeCode||getBoothCurrentStoreCode());
+  if(!normalizedStore)return [];
+  const byBarcode=new Map();
+  const commonRows=await sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(normalizedStore)}&storage_qty=gt.0&order=product_name.asc&limit=5000`).catch(()=>[]);
+  (Array.isArray(commonRows)?commonRows:[]).forEach(row=>{
+    const barcode=String(row.barcode||"").trim();
+    if(!barcode)return;
+    const current=byBarcode.get(barcode)||{
+      barcode,
+      product_name:row.product_name||"",
+      quantity:0,
+      updated_at:row.updated_at||"",
+      source:"event_storage_stocks"
+    };
+    current.quantity+=Number(row.storage_qty||0);
+    if(row.updated_at&&String(row.updated_at)>String(current.updated_at||""))current.updated_at=row.updated_at;
+    if(!current.product_name&&row.product_name)current.product_name=row.product_name;
+    byBarcode.set(barcode,current);
+  });
+
+  const events=await sb(`booth_events?select=id,store_code&store_code=eq.${encodeURIComponent(normalizedStore)}&limit=5000`).catch(()=>[]);
+  const eventIds=(Array.isArray(events)?events:[])
+    .filter(event=>normalizeBoothStoreCode(event?.store_code)===normalizedStore)
+    .map(event=>String(event.id||"").trim())
+    .filter(Boolean);
+  if(eventIds.length){
+    const itemRows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,shelf_return_qty,event_storage_qty,return_process_type,updated_at&event_id=in.(${buildInFilter(eventIds)})&item_type=eq.normal&order=updated_at.desc&limit=50000`).catch(()=>[]);
+    (Array.isArray(itemRows)?itemRows:[]).forEach(item=>{
+      const barcode=String(item.barcode||"").trim();
+      if(!barcode||byBarcode.has(barcode))return;
+      const quantity=getBoothCommonShelfCurrentQtyFromEventItem(item);
+      if(quantity<=0)return;
+      byBarcode.set(barcode,{
+        barcode,
+        product_name:item.product_name||"",
+        quantity,
+        updated_at:item.updated_at||"",
+        source:"booth_event_items"
+      });
+    });
+  }
+
+  const rows=[...byBarcode.values()].filter(row=>Number(row.quantity||0)>0);
+  const products=await loadBoothProductsByBarcode(rows.map(row=>row.barcode)).catch(()=>new Map());
+  return rows.map(row=>{
+    const product=products.get(String(row.barcode||""))||{};
+    return {
+      ...row,
+      product_name:product.name||row.product_name||"",
+      quantity:Number(row.quantity||0)
+    };
+  }).filter(row=>row.barcode&&row.quantity>0);
+}
+
+async function seedBoothEventStartInventoryFromCommonShelf(event,storeCode){
+  const eventId=String(event?.id||"").trim();
+  if(!eventId)return {count:0,total:0,skipped:true};
+  const existing=await sb(`booth_event_items?select=id&event_id=eq.${encodeURIComponent(eventId)}&item_type=eq.normal&limit=1`).catch(()=>[]);
+  if(Array.isArray(existing)&&existing.length)return {count:0,total:0,skipped:true};
+  const rows=await loadBoothCommonEventShelfStartRows(storeCode);
+  if(!rows.length)return {count:0,total:0,skipped:false};
+  const now=new Date().toISOString();
+  const payload=rows.map(row=>({
+    event_id:eventId,
+    barcode:row.barcode,
+    product_name:row.product_name||"",
+    item_type:"normal",
+    taken_qty:row.quantity,
+    normal_takeout_qty:0,
+    storage_takeout_qty:row.quantity,
+    sold_qty:0,
+    returned_qty:0,
+    consumed_qty:0,
+    difference_qty:row.quantity,
+    updated_at:now
+  }));
+  for(let i=0;i<payload.length;i+=500){
+    await sb("booth_event_items",{
+      method:"POST",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify(payload.slice(i,i+500))
+    });
+  }
+  return {
+    count:payload.length,
+    total:payload.reduce((sum,row)=>sum+Number(row.taken_qty||0),0),
+    skipped:false
+  };
+}
+
 async function createBoothEvent(){
   if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
   const name=String(el("boothEventName")?.value||"").trim();
@@ -369,13 +460,26 @@ async function createBoothEvent(){
       body:JSON.stringify([payload])
     });
     const row=Array.isArray(created)&&created[0]?created[0]:payload;
+    let startInventoryResult={count:0,total:0,skipped:false};
+    let startInventoryError="";
+    try{
+      startInventoryResult=await seedBoothEventStartInventoryFromCommonShelf(row,createContext.storeCode);
+    }catch(seedError){
+      console.warn("[booth event start inventory seed failed]",seedError);
+      startInventoryError=seedError?.message||String(seedError||"");
+    }
     boothEvents=[row,...boothEvents];
     renderBoothEvents(boothEvents);
     el("boothEventForm")?.reset();
     const successText=`イベントを作成しました：${row.name||name}`;
-    showBoothLocalMessage(successText,"ok");
-    if(typeof showMessage==="function")showMessage(successText,"ok");
-    if(typeof showPopup==="function")showPopup("イベント作成完了",`イベント名：${row.name||name}\n会場：${row.venue||venue}\n日程：${row.event_start||event_start} - ${row.event_end||event_end}`);
+    const startInventoryText=startInventoryError
+      ? `\n共通イベント棚の開始在庫反映に失敗しました: ${startInventoryError}`
+      : startInventoryResult.count>0
+        ? `\n共通イベント棚から ${startInventoryResult.count}商品 / ${startInventoryResult.total}個 を今回イベントの開始在庫として反映しました。`
+        : "\n共通イベント棚の開始在庫はありません。";
+    showBoothLocalMessage(successText+startInventoryText,startInventoryError?"warn":"ok");
+    if(typeof showMessage==="function")showMessage(successText+startInventoryText,startInventoryError?"warn":"ok");
+    if(typeof showPopup==="function")showPopup("イベント作成完了",`イベント名：${row.name||name}\n会場：${row.venue||venue}\n日程：${row.event_start||event_start} - ${row.event_end||event_end}${startInventoryText}`);
   }catch(e){
     if(typeof showMessage==="function")showMessage("イベント作成エラー\n"+e.message,"err");
     else showBoothLocalMessage("イベント作成エラー\n"+e.message,"err");
