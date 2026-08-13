@@ -328,9 +328,10 @@ async function loadBoothCommonEventShelfStartRows(storeCode,options={}){
     byBarcode.set(barcode,current);
   });
 
-  const events=await sb(`booth_events?select=id,store_code&store_code=eq.${encodeURIComponent(normalizedStore)}&limit=5000`).catch(()=>[]);
+  const events=await sb(`booth_events?select=id,store_code,status&store_code=eq.${encodeURIComponent(normalizedStore)}&limit=5000`).catch(()=>[]);
   const eventIds=(Array.isArray(events)?events:[])
     .filter(event=>normalizeBoothStoreCode(event?.store_code)===normalizedStore)
+    .filter(event=>isBoothEventClosedStatus(event))
     .map(event=>String(event.id||"").trim())
     .filter(id=>!excludeEventId||id!==excludeEventId)
     .filter(Boolean);
@@ -857,6 +858,9 @@ function getBoothCommonShelfCurrentQtyFromEventItem(item){
   const processType=getBoothCloseReturnProcessType(item);
   const returned=Number(item?.returned_qty||0);
   const keepsOnCommonShelf=processType==="storage"||processType==="event"||processType==="keep";
+  if(keepsOnCommonShelf&&returned>0){
+    return Math.max(0,returned);
+  }
   const shelfReturn=keepsOnCommonShelf
     ? 0
     : Number(item?.shelf_return_qty||0)>0
@@ -1523,7 +1527,6 @@ function openBoothEvent(eventId){
   const event=getBoothCurrentEvent();
   renderBoothEvents(boothEvents);
   renderBoothEventDetail(event);
-  if(event)seedBoothEventStartInventoryForOpen(event);
   if(event){
     showBoothLocalMessage(`イベントを開きました：${event.name}`,"ok");
   }else if(typeof showMessage==="function"){
@@ -8932,40 +8935,22 @@ async function confirmBoothSalesImport(){
 async function buildBoothDepartureInventoryData(eventId){
   const storeCode=getBoothCurrentStoreCode();
   const selectedEventId=String(eventId||boothCurrentEventId||"").trim();
-  const [stockRows,gachaRows,eventNormalRows]=await Promise.all([
-    sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(storeCode)}&storage_qty=gt.0&order=product_name.asc&limit=3000`).catch(()=>[]),
+  const [commonRows,gachaRows]=await Promise.all([
+    loadBoothCommonEventShelfStartRows(storeCode,{excludeEventId:selectedEventId}).catch(()=>[]),
     selectedEventId
       ? sb(`booth_event_items?select=barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,updated_at&event_id=eq.${encodeURIComponent(selectedEventId)}&item_type=eq.gacha_prize&order=product_name.asc&limit=3000`).catch(()=>[])
-      : Promise.resolve([]),
-    selectedEventId
-      ? sb(`booth_event_items?select=barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,updated_at&event_id=eq.${encodeURIComponent(selectedEventId)}&item_type=eq.normal&order=product_name.asc&limit=3000`).catch(()=>[])
       : Promise.resolve([])
   ]);
-  const stocks=Array.isArray(stockRows)?stockRows:[];
-  const eventItems=Array.isArray(eventNormalRows)?eventNormalRows:[];
-  const barcodes=[...new Set([
-    ...stocks.map(row=>String(row.barcode||"").trim()),
-    ...eventItems.map(row=>String(row.barcode||"").trim())
-  ].filter(Boolean))];
+  const stocks=Array.isArray(commonRows)?commonRows:[];
+  const barcodes=[...new Set(stocks.map(row=>String(row.barcode||"").trim()).filter(Boolean))];
   const products=await loadBoothProductsByBarcode(barcodes);
   const normalByBarcode=new Map();
   stocks.forEach(row=>{
     const barcode=String(row.barcode||"").trim();
     if(!barcode)return;
     const product=products.get(barcode)||{};
-    const quantity=Number(row.storage_qty||0);
+    const quantity=Number(row.quantity??row.storage_qty??0);
     normalByBarcode.set(barcode,{product_name:row.product_name||product.name||"",name:product.name||row.product_name||"",barcode,shelf:boothProductShelfText(product),commonShelfQty:quantity,taken:quantity,soldQty:null,remain:quantity,updated_at:row.updated_at||""});
-  });
-  // event_storage_stocks is the store-common canonical balance. Use the
-  // selected event item only as a legacy fallback when no common-shelf row
-  // exists, so an ended event cannot overwrite the current store balance.
-  eventItems.forEach(item=>{
-    const barcode=String(item.barcode||"").trim();
-    const current=getBoothCommonShelfCurrentQtyFromEventItem(item);
-    if(!barcode||current<=0)return;
-    if(normalByBarcode.has(barcode))return;
-    const product=products.get(barcode)||{};
-    normalByBarcode.set(barcode,{product_name:item.product_name||product.name||"",name:product.name||item.product_name||"",barcode,shelf:boothProductShelfText(product),commonShelfQty:current,taken:Number(item.taken_qty||0),soldQty:Number(item.sold_qty||0),remain:current,updated_at:item.updated_at||""});
   });
   const normalRows=[...normalByBarcode.values()];
   const gacha=Array.isArray(gachaRows)?gachaRows:[];
