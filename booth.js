@@ -375,23 +375,14 @@ async function seedBoothEventStartInventoryFromCommonShelf(event,storeCode){
   });
   const rows=await loadBoothCommonEventShelfStartRows(storeCode,{excludeEventId:eventId});
   const rowsToInsert=[];
-  const rowsToPatch=[];
   rows.forEach(row=>{
     const existingRow=existingByBarcode.get(String(row.barcode||"").trim());
     if(!existingRow){
       rowsToInsert.push(row);
       return;
     }
-    const normalQty=Number(existingRow.normal_takeout_qty||0);
-    const sourceQty=Number(row.quantity||0);
-    const storageQty=row.source==="event_storage_stocks"?Math.max(0,sourceQty-normalQty):sourceQty;
-    if(storageQty<=0)return;
-    const currentStorage=Number(existingRow.storage_takeout_qty||0);
-    const currentTaken=Number(existingRow.taken_qty||0);
-    if(currentStorage===storageQty&&currentTaken===normalQty+storageQty)return;
-    rowsToPatch.push({row:{...row,quantity:storageQty},existingRow});
   });
-  if(!rowsToInsert.length&&!rowsToPatch.length)return {count:0,total:0,skipped:false};
+  if(!rowsToInsert.length)return {count:0,total:0,skipped:false};
   const now=new Date().toISOString();
   const payload=rowsToInsert.map(row=>({
     event_id:eventId,
@@ -414,29 +405,15 @@ async function seedBoothEventStartInventoryFromCommonShelf(event,storeCode){
       body:JSON.stringify(payload.slice(i,i+500))
     });
   }
-  for(const {row,existingRow} of rowsToPatch){
-    const normalQty=Number(existingRow.normal_takeout_qty||0);
-    const storageQty=Number(row.quantity||0);
-    await sb(`booth_event_items?id=eq.${encodeURIComponent(existingRow.id)}`,{
-      method:"PATCH",
-      headers:{Prefer:"return=minimal"},
-      body:JSON.stringify({
-        product_name:existingRow.product_name||row.product_name||"",
-        taken_qty:normalQty+storageQty,
-        storage_takeout_qty:storageQty,
-        updated_at:now
-      })
-    });
-  }
   return {
-    count:payload.length+rowsToPatch.length,
-    total:payload.reduce((sum,row)=>sum+Number(row.taken_qty||0),0)
-      +rowsToPatch.reduce((sum,{row})=>sum+Number(row.quantity||0),0),
+    count:payload.length,
+    total:payload.reduce((sum,row)=>sum+Number(row.taken_qty||0),0),
     skipped:false
   };
 }
 
 async function seedBoothEventStartInventoryForOpen(event){
+  return {count:0,total:0,skipped:true};
   const eventId=String(event?.id||"").trim();
   if(!eventId||isBoothEventClosed(event))return;
   window.__boothStartInventorySeedInProgress=window.__boothStartInventorySeedInProgress||new Set();
@@ -2451,7 +2428,7 @@ async function loadBoothProductsByBarcode(barcodes){
   const unique=[...new Set((barcodes||[]).filter(Boolean).map(String))];
   if(!unique.length)return new Map();
   const inList=unique.map(v=>encodeURIComponent(v)).join(",");
-  const rows=await sb(`products?select=barcode,name,location,updated_at&barcode=in.(${inList})&limit=1000`).catch(()=>[]);
+  const rows=await sb(`products?select=barcode,name,location,category,genre,department,smaregi_product_id,price,updated_at&barcode=in.(${inList})&limit=1000`).catch(()=>[]);
   return new Map((Array.isArray(rows)?rows:[]).map(row=>[String(row.barcode||""),row]));
 }
 
@@ -3861,15 +3838,30 @@ async function renderBoothDepartureInventoryListPanel(event){
           <option value="updated_at">最終更新順</option>
         </select>
       </label>
+      <label>表示
+        <select id="boothDepartureListFilter">
+          <option value="all">全件</option>
+          <option value="start">開始時イベント棚あり</option>
+          <option value="additional">追加持ち出しあり</option>
+          <option value="taken">今回持ち出しあり</option>
+        </select>
+      </label>
     </div>
     <div id="boothDepartureInventoryList" class="booth-event-inventory-list"><div class="booth-empty">読み込み中...</div></div>
   </section>`;
   const storageKey="arico_booth_departure_list_sort";
+  const filterStorageKey="arico_booth_departure_list_filter";
   const sortEl=el("boothDepartureListSort");
   if(sortEl)sortEl.value=localStorage.getItem(storageKey)||"name";
+  const filterEl=el("boothDepartureListFilter");
+  if(filterEl)filterEl.value=localStorage.getItem(filterStorageKey)||"all";
   el("boothDepartureListSearch")?.addEventListener("input",()=>loadBoothDepartureInventoryList(event.id));
   el("boothDepartureListSort")?.addEventListener("change",()=>{
     localStorage.setItem(storageKey,String(el("boothDepartureListSort")?.value||"name"));
+    loadBoothDepartureInventoryList(event.id);
+  });
+  el("boothDepartureListFilter")?.addEventListener("change",()=>{
+    localStorage.setItem(filterStorageKey,String(el("boothDepartureListFilter")?.value||"all"));
     loadBoothDepartureInventoryList(event.id);
   });
   el("boothDepartureListReloadBtn")?.addEventListener("click",()=>loadBoothDepartureInventoryList(event.id));
@@ -8967,6 +8959,17 @@ async function buildBoothDepartureInventoryData(eventId){
     if(!barcode)return;
     const product=products.get(barcode)||{};
     const common=commonByBarcode.get(barcode)||{};
+    const searchText=[
+      item.product_name,
+      product.name,
+      barcode,
+      boothProductShelfText(product),
+      product.category,
+      product.genre,
+      product.department,
+      product.smaregi_product_id,
+      product.price
+    ].filter(value=>value!==null&&value!==undefined&&String(value).trim()!=="").join(" ");
     const startQty=Math.max(0,Number(item.storage_takeout_qty||0));
     const additionalQty=Math.max(0,Number(item.normal_takeout_qty||0));
     const splitTotal=startQty+additionalQty;
@@ -8977,6 +8980,7 @@ async function buildBoothDepartureInventoryData(eventId){
       name:product.name||item.product_name||common.product_name||"",
       barcode,
       shelf:boothProductShelfText(product),
+      searchText,
       startQty:splitTotal>0?startQty:0,
       additionalQty:splitTotal>0?additionalQty:legacyTaken,
       taken:splitTotal>0?splitTotal:legacyTaken,
@@ -8993,7 +8997,18 @@ async function buildBoothDepartureInventoryData(eventId){
     if(!barcode||normalByBarcode.has(barcode))return;
     const product=products.get(barcode)||{};
     const quantity=Number(row.quantity??row.storage_qty??0);
-    normalByBarcode.set(barcode,{product_name:row.product_name||product.name||"",name:product.name||row.product_name||"",barcode,shelf:boothProductShelfText(product),startQty:quantity,additionalQty:0,commonShelfQty:quantity,taken:quantity,soldQty:null,remain:quantity,updated_at:row.updated_at||"",editable:false,missingEventItem:true});
+    const searchText=[
+      row.product_name,
+      product.name,
+      barcode,
+      boothProductShelfText(product),
+      product.category,
+      product.genre,
+      product.department,
+      product.smaregi_product_id,
+      product.price
+    ].filter(value=>value!==null&&value!==undefined&&String(value).trim()!=="").join(" ");
+    normalByBarcode.set(barcode,{product_name:row.product_name||product.name||"",name:product.name||row.product_name||"",barcode,shelf:boothProductShelfText(product),searchText,startQty:quantity,additionalQty:0,commonShelfQty:quantity,taken:quantity,soldQty:null,remain:quantity,updated_at:row.updated_at||"",editable:false,missingEventItem:true});
   });
   const normalRows=[...normalByBarcode.values()];
   const gacha=Array.isArray(gachaRows)?gachaRows:[];
@@ -9015,7 +9030,7 @@ function renderBoothDepartureNormalSection(rows){
     return `<tr data-booth-departure-row data-item-id="${esc(row.id||"")}" data-barcode="${esc(row.barcode||"")}">
       <td>${esc(row.product_name||"-")}</td>
       <td>${esc(row.barcode||"-")}</td>
-      <td><input class="booth-history-qty-input" data-booth-departure-start type="number" min="0" step="1" inputmode="numeric" value="${esc(row.startQty??0)}" ${disabled}></td>
+      <td><input class="booth-history-qty-input" data-booth-departure-start type="number" min="0" step="1" inputmode="numeric" value="${esc(row.startQty??0)}" disabled readonly></td>
       <td><input class="booth-history-qty-input" data-booth-departure-additional type="number" min="0" step="1" inputmode="numeric" value="${esc(row.additionalQty??0)}" ${disabled}></td>
       <td><strong data-booth-departure-total>${esc(row.taken??0)}</strong></td>
       <td>${esc(row.commonShelfQty??0)}</td>
@@ -9031,7 +9046,7 @@ function renderBoothDepartureNormalSection(rows){
     return `<article class="booth-history-card booth-departure-card" data-booth-departure-row data-item-id="${esc(row.id||"")}" data-barcode="${esc(row.barcode||"")}">
       <div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong><span>${esc(row.barcode||"-")}</span></div>
       <div class="booth-history-card-meta"><span>今回持ち出し: <strong data-booth-departure-total>${esc(row.taken??0)}</strong></span><span>共通イベント棚現在庫: ${esc(row.commonShelfQty??0)}</span><span>最終更新: ${esc(formatBoothDateTime(row.updated_at))}</span></div>
-      <label>開始時イベント棚<input class="booth-history-qty-input" data-booth-departure-start type="number" min="0" step="1" inputmode="numeric" value="${esc(row.startQty??0)}" ${disabled}></label>
+      <label>開始時イベント棚<input class="booth-history-qty-input" data-booth-departure-start type="number" min="0" step="1" inputmode="numeric" value="${esc(row.startQty??0)}" disabled readonly></label>
       <label>追加持ち出し<input class="booth-history-qty-input" data-booth-departure-additional type="number" min="0" step="1" inputmode="numeric" value="${esc(row.additionalQty??0)}" ${disabled}></label>
       ${action}
     </article>`;
@@ -9058,20 +9073,18 @@ async function saveBoothDepartureCorrection(itemId,button){
   const event=getBoothCurrentEvent();
   if(!event)throw new Error("イベントが選択されていません。");
   const row=button?.closest("[data-booth-departure-row]");
-  const startInput=row?.querySelector("[data-booth-departure-start]");
   const additionalInput=row?.querySelector("[data-booth-departure-additional]");
-  const newStartRaw=String(startInput?.value||"").trim();
   const newAdditionalRaw=String(additionalInput?.value||"").trim();
-  if(!/^\d+$/.test(newStartRaw)||!/^\d+$/.test(newAdditionalRaw)){
+  if(!/^\d+$/.test(newAdditionalRaw)){
     boothShowError("持ち出し数修正エラー","開始時イベント棚・追加持ち出しは0以上の整数で入力してください。");
     return;
   }
   const item=await loadBoothEventItemForDepartureCorrection(itemId);
   if(String(item.event_id)!==String(event.id))throw new Error("別イベントの商品は修正できません。");
   if(String(item.item_type||"normal")!=="normal")throw new Error("通常商品の持ち出しだけ修正できます。");
-  const newStart=Number(newStartRaw);
-  const newAdditional=Number(newAdditionalRaw);
   const oldStart=Math.max(0,Number(item.storage_takeout_qty||0));
+  const newStart=oldStart;
+  const newAdditional=Number(newAdditionalRaw);
   const oldAdditional=Math.max(0,Number(item.normal_takeout_qty||0));
   const additionalDelta=newAdditional-oldAdditional;
   const product=await findBoothProductByBarcode(item.barcode);
@@ -9193,6 +9206,100 @@ loadBoothDepartureInventoryList=async function(eventId){
   }
 };
 
+loadBoothDepartureInventoryList=async function(eventId){
+  const list=el("boothDepartureInventoryList");
+  if(!list)return;
+  try{
+    list.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    const data=await buildBoothDepartureInventoryData(eventId);
+    const query=String(el("boothDepartureListSearch")?.value||"").trim().toLowerCase();
+    const sortKey=String(el("boothDepartureListSort")?.value||localStorage.getItem("arico_booth_departure_list_sort")||"name");
+    const filterKey=String(el("boothDepartureListFilter")?.value||localStorage.getItem("arico_booth_departure_list_filter")||"all");
+    const searchMatches=row=>!query||[row.searchText,row.product_name,row.name,row.barcode,row.shelf].some(value=>String(value||"").toLowerCase().includes(query));
+    const departureFilterMatches=row=>{
+      if(filterKey==="start")return Number(row.startQty||0)>0;
+      if(filterKey==="additional")return Number(row.additionalQty||0)>0;
+      if(filterKey==="taken")return Number(row.taken||0)>0;
+      return true;
+    };
+    const sortRows=rows=>sortBoothInventoryRows(rows.map(row=>({
+      ...row,
+      name:row.name||row.product_name||"",
+      updated_at:row.updated_at||""
+    })),sortKey);
+    const allNormalRows=Array.isArray(data.normalRows)?data.normalRows:[];
+    const allGachaRows=Array.isArray(data.gachaRows)?data.gachaRows:[];
+    const normalRows=sortRows(allNormalRows.filter(row=>searchMatches(row)&&departureFilterMatches(row)));
+    const gachaRows=sortRows(allGachaRows.filter(row=>searchMatches(row)));
+    if(!normalRows.length&&!gachaRows.length){
+      list.innerHTML='<div class="booth-empty">条件に一致する持ち出し在庫はありません。</div>';
+      return;
+    }
+    const allDepartureRows=allNormalRows.filter(row=>Number(row.taken||0)>0);
+    const allCommonRows=allNormalRows.filter(row=>Number(row.commonShelfQty||0)>0);
+    const allGachaActiveRows=allGachaRows.filter(row=>Number(row.remain||0)>0);
+    const departureTotal=allDepartureRows.reduce((sum,row)=>sum+Number(row.taken||0),0);
+    const commonTotal=allCommonRows.reduce((sum,row)=>sum+Number(row.commonShelfQty||0),0);
+    const gachaTotal=allGachaActiveRows.reduce((sum,row)=>sum+Number(row.remain||0),0);
+    list.innerHTML=`<div class="booth-summary-strip">
+      <span>今回持ち出し：${esc(allDepartureRows.length)}商品 / ${esc(departureTotal)}個</span>
+      <span>共通イベント棚 現在：${esc(allCommonRows.length)}商品 / ${esc(commonTotal)}個</span>
+      <span>ガチャ現在庫：${esc(allGachaActiveRows.length)}商品 / ${esc(gachaTotal)}個</span>
+      <span>表示：${esc(normalRows.length)} / ${esc(allNormalRows.length)}商品</span>
+    </div>${renderBoothDepartureNormalSection(normalRows)}${renderBoothDepartureGachaSection(gachaRows)}`;
+  }catch(error){
+    list.innerHTML='<div class="booth-empty">持ち出し在庫一覧を読み込めませんでした。</div>';
+    boothShowError("持ち出し在庫一覧エラー",error.message||"持ち出し在庫一覧の読み込みに失敗しました。");
+  }
+};
+
+loadBoothDepartureInventoryList=async function(eventId){
+  const list=el("boothDepartureInventoryList");
+  if(!list)return;
+  try{
+    list.innerHTML='<div class="booth-empty">読み込み中...</div>';
+    const data=await buildBoothDepartureInventoryData(eventId);
+    const query=String(el("boothDepartureListSearch")?.value||"").trim().toLowerCase();
+    const sortKey=String(el("boothDepartureListSort")?.value||localStorage.getItem("arico_booth_departure_list_sort")||"name");
+    const filterKey=String(el("boothDepartureListFilter")?.value||localStorage.getItem("arico_booth_departure_list_filter")||"all");
+    const searchMatches=row=>!query||[row.searchText,row.product_name,row.name,row.barcode,row.shelf].some(value=>String(value||"").toLowerCase().includes(query));
+    const departureFilterMatches=row=>{
+      if(filterKey==="start")return Number(row.startQty||0)>0;
+      if(filterKey==="additional")return Number(row.additionalQty||0)>0;
+      if(filterKey==="taken")return Number(row.taken||0)>0;
+      return true;
+    };
+    const sortRows=rows=>sortBoothInventoryRows(rows.map(row=>({
+      ...row,
+      name:row.name||row.product_name||"",
+      updated_at:row.updated_at||""
+    })),sortKey);
+    const allNormalRows=Array.isArray(data.normalRows)?data.normalRows:[];
+    const allGachaRows=Array.isArray(data.gachaRows)?data.gachaRows:[];
+    const normalRows=sortRows(allNormalRows.filter(row=>searchMatches(row)&&departureFilterMatches(row)));
+    const gachaRows=sortRows(allGachaRows.filter(row=>searchMatches(row)));
+    if(!normalRows.length&&!gachaRows.length){
+      list.innerHTML='<div class="booth-empty">条件に一致する持ち出し在庫はありません。</div>';
+      return;
+    }
+    const allDepartureRows=allNormalRows.filter(row=>Number(row.taken||0)>0);
+    const allCommonRows=allNormalRows.filter(row=>Number(row.commonShelfQty||0)>0);
+    const allGachaActiveRows=allGachaRows.filter(row=>Number(row.remain||0)>0);
+    const departureTotal=allDepartureRows.reduce((sum,row)=>sum+Number(row.taken||0),0);
+    const commonTotal=allCommonRows.reduce((sum,row)=>sum+Number(row.commonShelfQty||0),0);
+    const gachaTotal=allGachaActiveRows.reduce((sum,row)=>sum+Number(row.remain||0),0);
+    list.innerHTML=`<div class="booth-summary-strip">
+      <span>今回持ち出し：${esc(allDepartureRows.length)}商品 / ${esc(departureTotal)}個</span>
+      <span>共通イベント棚 現在：${esc(allCommonRows.length)}商品 / ${esc(commonTotal)}個</span>
+      <span>ガチャ現在庫：${esc(allGachaActiveRows.length)}商品 / ${esc(gachaTotal)}個</span>
+      <span>表示：${esc(normalRows.length)} / ${esc(allNormalRows.length)}商品</span>
+    </div>${renderBoothDepartureNormalSection(normalRows)}${renderBoothDepartureGachaSection(gachaRows)}`;
+  }catch(error){
+    list.innerHTML='<div class="booth-empty">持ち出し在庫一覧を読み込めませんでした。</div>';
+    boothShowError("持ち出し在庫一覧エラー",error.message||"持ち出し在庫一覧の読み込みに失敗しました。");
+  }
+};
+
 exportBoothDepartureInventoryCsv=async function(event){
   try{
     const data=await buildBoothDepartureInventoryData(event?.id);
@@ -9225,7 +9332,7 @@ exportBoothDepartureInventoryPdf=async function(event){
 
 if(!window.__aricoBoothDepartureCorrectionHandlersBound){
   document.addEventListener("input",event=>{
-    const input=event.target.closest("[data-booth-departure-start],[data-booth-departure-additional]");
+    const input=event.target.closest("[data-booth-departure-additional]");
     if(input)syncBoothDepartureCorrectionRow(input.closest("[data-booth-departure-row]"));
   });
   document.addEventListener("click",event=>{
