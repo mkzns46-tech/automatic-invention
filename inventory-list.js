@@ -86,9 +86,6 @@
       barcode,
       name:text(product?.name||storage?.product_name||"商品名未登録"),
       productCode:text(product?.smaregi_product_id),
-      partNumber:"",
-      color:"",
-      size:"",
       shelf:shelfLabel(product||{}),
       baseStock,
       eventStock,
@@ -102,9 +99,6 @@
       row.name,
       row.barcode,
       row.productCode,
-      row.partNumber,
-      row.color,
-      row.size,
       row.shelf
     ].join(" ").toLowerCase();
     return row;
@@ -200,9 +194,6 @@
       <td class="inventory-list-name-cell"><strong>${safeEsc(row.name)}</strong></td>
       <td>${safeEsc(row.barcode)}</td>
       <td>${safeEsc(row.productCode||"-")}</td>
-      <td>${safeEsc(row.partNumber||"-")}</td>
-      <td>${safeEsc(row.color||"-")}</td>
-      <td>${safeEsc(row.size||"-")}</td>
       <td>${safeEsc(row.shelf||"-")}</td>
       <td class="${rowClass(row.baseStock)}">${safeEsc(row.baseStock)}</td>
       <td>${safeEsc(row.eventStock)}</td>
@@ -227,7 +218,7 @@
     if(summary)summary.innerHTML=summaryHtml();
     const visible=state.filtered.slice(0,state.renderLimit);
     const body=byId("inventoryListTableBody");
-    if(body)body.innerHTML=visible.map(renderTableRow).join("")||`<tr><td colspan="11">条件に一致する商品はありません。</td></tr>`;
+    if(body)body.innerHTML=visible.map(renderTableRow).join("")||`<tr><td colspan="8">条件に一致する商品はありません。</td></tr>`;
     const cards=byId("inventoryListCards");
     if(cards)cards.innerHTML=visible.map(renderCard).join("")||`<div class="booth-empty">条件に一致する商品はありません。</div>`;
     const more=byId("inventoryListMoreBtn");
@@ -251,24 +242,29 @@
       return;
     }
     panel.hidden=false;
-    panel.innerHTML=`<div class="inventory-list-edit-card" data-inventory-list-edit-card data-barcode="${safeEsc(row.barcode)}">
+    panel.innerHTML=`<div class="inventory-list-edit-card" data-inventory-list-edit-card data-barcode="${safeEsc(row.barcode)}" data-before-base="${safeEsc(row.baseStock)}" data-before-event="${safeEsc(row.eventStock)}">
       <div class="inventory-list-edit-head">
-        <strong>${safeEsc(row.name)}</strong>
-        <small>バーコード：${safeEsc(row.barcode)}</small>
+        <div>
+          <strong>${safeEsc(row.name)}</strong>
+          <small>バーコード：${safeEsc(row.barcode)} / 商品コード：${safeEsc(row.productCode||"-")}</small>
+        </div>
+        <button type="button" class="secondary" data-inventory-list-cancel>閉じる</button>
       </div>
+      <div class="inventory-list-edit-label">現在在庫</div>
       <div class="inventory-list-edit-current">
-        <div><span>通常棚</span><strong>${safeEsc(row.baseStock)}</strong></div>
-        <div><span>イベント棚</span><strong>${safeEsc(row.eventStock)}</strong></div>
-        <div><span>比較用</span><strong data-inventory-list-comparison>${safeEsc(row.comparisonStock)}</strong></div>
+        <div class="inventory-stock-card inventory-stock-card-base" data-stock-card="base"><span>通常棚</span><strong>${safeEsc(row.baseStock)}</strong><small data-change-label="base">変更なし</small></div>
+        <div class="inventory-stock-card inventory-stock-card-event" data-stock-card="event"><span>イベント棚</span><strong>${safeEsc(row.eventStock)}</strong><small data-change-label="event">変更なし</small></div>
+        <div class="inventory-stock-card inventory-stock-card-comparison" data-stock-card="comparison"><span>比較用</span><strong data-inventory-list-comparison>${safeEsc(row.comparisonStock)}</strong><small data-change-label="comparison">修正後比較用在庫：${safeEsc(row.comparisonStock)}</small></div>
       </div>
+      <div class="inventory-list-edit-label">修正入力</div>
       <div class="inventory-list-edit-stock-grid">
-        <label>通常棚在庫 <small>現在：${safeEsc(row.baseStock)}</small><input id="inventoryListEditBaseStock" type="number" step="1" inputmode="numeric" value="${safeEsc(row.baseStock)}"></label>
-        <label>イベント棚在庫 <small>現在：${safeEsc(row.eventStock)}</small><input id="inventoryListEditEventStock" type="number" step="1" inputmode="numeric" value="${safeEsc(row.eventStock)}"></label>
+        <label class="inventory-stock-input-card inventory-stock-input-base" data-stock-input-card="base"><span>通常棚在庫</span><small>現在：${safeEsc(row.baseStock)}</small><input id="inventoryListEditBaseStock" type="number" step="1" inputmode="numeric" value="${safeEsc(row.baseStock)}"><em data-delta-label="base">変更なし</em></label>
+        <label class="inventory-stock-input-card inventory-stock-input-event" data-stock-input-card="event"><span>イベント棚在庫</span><small>現在：${safeEsc(row.eventStock)}</small><input id="inventoryListEditEventStock" type="number" step="1" inputmode="numeric" value="${safeEsc(row.eventStock)}"><em data-delta-label="event">変更なし</em></label>
       </div>
       <label>修正理由（必須）<select id="inventoryListEditReason">
         <option value="">選択してください</option>
         <option value="実棚確認">実棚確認</option>
-        <option value="入力ミス">入力ミス</option>
+        <option value="入力ミス修正">入力ミス修正</option>
         <option value="過去処理漏れ">過去処理漏れ</option>
         <option value="破損">破損</option>
         <option value="移動処理漏れ">移動処理漏れ</option>
@@ -277,7 +273,7 @@
       <label>備考<input id="inventoryListEditMemo" type="text" placeholder="任意メモ"></label>
       <div class="inventory-list-edit-actions">
         <button type="button" data-inventory-list-save="${safeEsc(row.barcode)}">在庫修正を保存</button>
-        <button type="button" class="secondary" data-inventory-list-cancel>閉じる</button>
+        <button type="button" class="secondary" data-inventory-list-cancel>キャンセル</button>
       </div>
     </div>`;
     syncEditComparison();
@@ -285,6 +281,7 @@
   }
 
   function syncEditComparison(){
+    const card=byId("inventoryListEditPanel")?.querySelector("[data-inventory-list-edit-card]");
     const baseRaw=text(byId("inventoryListEditBaseStock")?.value);
     const eventRaw=text(byId("inventoryListEditEventStock")?.value);
     const node=byId("inventoryListEditPanel")?.querySelector("[data-inventory-list-comparison]");
@@ -293,7 +290,33 @@
       node.textContent="-";
       return;
     }
-    node.textContent=String(Number(baseRaw)+Number(eventRaw));
+    const nextBase=Number(baseRaw);
+    const nextEvent=Number(eventRaw);
+    const beforeBase=Number(card?.dataset.beforeBase||0);
+    const beforeEvent=Number(card?.dataset.beforeEvent||0);
+    const beforeComparison=beforeBase+beforeEvent;
+    const nextComparison=nextBase+nextEvent;
+    node.textContent=String(nextComparison);
+    const updateChange=(key,before,next)=>{
+      const delta=next-before;
+      const changed=delta!==0;
+      const sign=delta>0?"+":"";
+      const textValue=changed?`変更 ${sign}${delta}`:"変更なし";
+      card?.querySelector(`[data-stock-card="${key}"]`)?.classList.toggle("is-changed",changed);
+      card?.querySelector(`[data-stock-input-card="${key}"]`)?.classList.toggle("is-changed",changed);
+      const changeLabel=card?.querySelector(`[data-change-label="${key}"]`);
+      if(changeLabel)changeLabel.textContent=textValue;
+      const deltaLabel=card?.querySelector(`[data-delta-label="${key}"]`);
+      if(deltaLabel)deltaLabel.textContent=changed?`${before} → ${next}（${sign}${delta}）`:"変更なし";
+    };
+    updateChange("base",beforeBase,nextBase);
+    updateChange("event",beforeEvent,nextEvent);
+    card?.querySelector(`[data-stock-card="comparison"]`)?.classList.toggle("is-changed",beforeComparison!==nextComparison);
+    const comparisonLabel=card?.querySelector(`[data-change-label="comparison"]`);
+    if(comparisonLabel){
+      const delta=nextComparison-beforeComparison;
+      comparisonLabel.textContent=`修正後比較用在庫：${nextComparison}${delta?`（変更 ${delta>0?"+":""}${delta}）`:""}`;
+    }
   }
 
   async function fetchLatestInventoryRow(barcode){
@@ -475,14 +498,11 @@
   }
   function exportCsv(){
     const rows=[
-      ["商品名","バーコード","商品コード","品番","カラー","サイズ","棚番","通常棚在庫","イベント棚在庫","比較用在庫"],
+      ["商品名","バーコード","商品コード","棚番","通常棚在庫","イベント棚在庫","比較用在庫"],
       ...state.filtered.map(row=>[
         row.name,
         row.barcode,
         row.productCode,
-        row.partNumber,
-        row.color,
-        row.size,
         row.shelf,
         row.baseStock,
         row.eventStock,

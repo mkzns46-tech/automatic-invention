@@ -9824,17 +9824,34 @@ exportBoothEventReportPdf=async function(event){
   function renderPureReturnList(state){
     const list=el("boothReturnDraftList");
     if(!list)return;
+    const previousScrollTop=list.scrollTop||0;
+    const updateSummary=()=>{
+      const changed=[...state.rows.entries()].filter(([barcode,row])=>Number(state.draft.get(barcode)??row.returned_qty??0)!==Number(state.saved.get(barcode)??row.returned_qty??0)).length;
+      const badge=el("boothReturnUnsavedBadge");
+      if(badge){
+        badge.textContent=`未保存：${changed}商品`;
+        badge.classList.toggle("is-active",changed>0);
+      }
+      const button=el("boothReturnApplyBtn");
+      if(button){
+        button.textContent=changed>0?`戻り実数を一括保存（${changed}商品）`:"戻り実数を一括保存";
+        button.disabled=changed===0||state.loading||isBoothEventClosed(state.event);
+      }
+    };
     if(state.loading){
       list.innerHTML='<div class="booth-empty" data-pure-return-loading>戻り実数を読み込み中...</div>';
+      updateSummary();
       return;
     }
     if(state.error){
       list.innerHTML=`<div class="booth-error-message">${esc(state.error)}</div>`;
+      updateSummary();
       return;
     }
     const rows=pureReturnRows(state);
     if(!rows.length){
       list.innerHTML='<div class="booth-empty">対象商品がありません。</div>';
+      updateSummary();
       return;
     }
     const closed=isBoothEventClosed(state.event);
@@ -9843,9 +9860,14 @@ exportBoothEventReportPdf=async function(event){
       const max=takeoutQty(row);
       const value=Number(state.draft.get(barcode)??row.returned_qty??0);
       const saved=Number(state.saved.get(barcode)??row.returned_qty??0);
+      const dirty=value!==saved;
       return `<article class="booth-return-draft-item" data-pure-return-row data-barcode="${esc(barcode)}">
-        <div class="booth-return-draft-head"><strong>${esc(row.product_name||"-")}</strong><button type="button" class="secondary" data-pure-return-action="remove" data-barcode="${esc(barcode)}" ${closed?"disabled":""}>削除</button></div>
+        <div class="booth-return-draft-head">
+          <div><strong>${esc(row.product_name||"-")}</strong>${dirty?'<span class="booth-return-unsaved-chip">未保存</span>':""}</div>
+          <button type="button" class="secondary" data-pure-return-action="remove" data-barcode="${esc(barcode)}" ${closed?"disabled":""}>削除</button>
+        </div>
         <div class="booth-return-draft-meta"><span>バーコード：${esc(barcode)}</span><span>持ち出し数：${esc(max)}</span><span>保存済み：${esc(saved)}</span></div>
+        <div class="booth-return-qty-title">戻り実数</div>
         <div class="booth-return-draft-controls">
           <button type="button" class="secondary" data-pure-return-action="decrease" data-barcode="${esc(barcode)}" ${closed||value<=0?"disabled":""}>−</button>
           <input type="number" min="0" max="${esc(max)}" step="1" inputmode="numeric" value="${esc(value)}" data-pure-return-qty="${esc(barcode)}" ${closed?"disabled":""}>
@@ -9853,6 +9875,8 @@ exportBoothEventReportPdf=async function(event){
         </div>
       </article>`;
     }).join("");
+    updateSummary();
+    list.scrollTop=previousScrollTop;
   }
 
   function renderPureReturnHistory(state,rows){
@@ -9916,19 +9940,27 @@ exportBoothEventReportPdf=async function(event){
     const closed=isBoothEventClosed(event);
     const staffOptions=typeof getBoothStaffOptions==="function"?getBoothStaffOptions():"";
     area.innerHTML=`<section class="booth-work-card booth-return-card">
-      <h4>戻り在庫処理</h4>
-      <p class="section-note">イベントから実際に戻ってきた数量だけを数えて保存します。戻り先はイベントレポートで確定します。</p>
-      <div class="booth-return-scan-controls">
-        <button type="button" id="boothReturnStartCameraBtn" ${closed?"disabled":""}>カメラ読取</button>
-        <button type="button" id="boothReturnStopCameraBtn" class="secondary">停止</button>
-        <label class="booth-return-barcode-label">バーコード<input id="boothReturnBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力してEnter" ${closed?"disabled":""}></label>
+      <div class="booth-return-hero">
+        <div>
+          <h4>戻り在庫棚卸</h4>
+          <p class="section-note">イベントから戻ってきた商品をスキャンし、実際に戻ってきた数量を入力してください。<br>この画面では戻り先は決定しません。</p>
+        </div>
+        <strong id="boothReturnUnsavedBadge" class="booth-return-unsaved-summary">未保存：0商品</strong>
       </div>
-      <div class="booth-return-product-search"><label>商品名検索<input id="boothReturnProductSearch" autocomplete="off" placeholder="商品名・バーコードで検索" ${closed?"disabled":""}></label></div>
-      <div class="booth-return-common-fields"><label>担当者<select id="boothReturnStaff" ${closed?"disabled":""}>${staffOptions}</select></label><label>メモ<input id="boothReturnMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}></label></div>
+      <div class="booth-return-input-panel">
+        <div class="booth-return-scan-controls">
+          <label class="booth-return-barcode-label">バーコード<input id="boothReturnBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力してEnter" ${closed?"disabled":""}></label>
+          <button type="button" id="boothReturnStartCameraBtn" ${closed?"disabled":""}>カメラ読取</button>
+          <button type="button" id="boothReturnStopCameraBtn" class="secondary">停止</button>
+        </div>
+        <div class="booth-return-product-search"><label>商品検索<input id="boothReturnProductSearch" autocomplete="off" placeholder="商品名・バーコードで検索" ${closed?"disabled":""}></label></div>
+        <div class="booth-return-common-fields"><label>担当者<select id="boothReturnStaff" ${closed?"disabled":""}>${staffOptions}</select></label><label>メモ<input id="boothReturnMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}></label></div>
+      </div>
+      <div class="booth-return-divider"><span>今回の棚卸</span></div>
       <div id="boothReturnDraftList" class="booth-return-draft-list"><div class="booth-empty" data-pure-return-loading>戻り実数を読み込み中...</div></div>
       <button type="button" id="boothReturnApplyBtn" class="booth-return-apply-btn" ${closed?"disabled":""}>戻り実数を一括保存</button>
     </section>
-    <section class="booth-work-card booth-return-history-card"><div class="booth-list-header"><h4>戻り実績</h4><button type="button" id="reloadBoothReturnHistoryBtn" class="secondary">再読み込み</button></div><div id="boothReturnHistoryList" class="booth-carry-history-list"><div class="booth-empty">読み込み中...</div></div></section>`;
+    <section class="booth-work-card booth-return-history-card"><div class="booth-list-header"><div><h4>過去の戻り履歴</h4><p class="section-note">保存済みの戻り実数です。</p></div><button type="button" id="reloadBoothReturnHistoryBtn" class="secondary">再読み込み</button></div><div id="boothReturnHistoryList" class="booth-carry-history-list"><div class="booth-empty">読み込み中...</div></div></section>`;
 
     const barcodeInput=el("boothReturnBarcode");
     barcodeInput?.addEventListener("keydown",inputEvent=>{
