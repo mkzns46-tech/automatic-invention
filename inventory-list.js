@@ -1,6 +1,6 @@
 (function(){
   const PRODUCT_SELECT="barcode,name,smaregi_product_id,base_stock,location,price,category,genre,department,created_at";
-  const STORAGE_SELECT="store_code,barcode,product_name,storage_qty";
+  const STORAGE_SELECT="id,store_code,barcode,product_name,storage_qty,updated_at";
   const PAGE_SIZE=300;
   const state={
     rows:[],
@@ -93,7 +93,8 @@
       baseStock,
       eventStock,
       comparisonStock,
-      updatedAt:"",
+      storageId:storage?.id||"",
+      updatedAt:storage?.updated_at||"",
       rawProduct:product||null,
       searchText:""
     };
@@ -146,12 +147,12 @@
     }
   }
   function filterMatches(row,filter){
-    if(filter==="has_stock")return row.baseStock!==0||row.eventStock!==0;
-    if(filter==="zero")return row.baseStock===0&&row.eventStock===0;
+    if(filter==="has_stock")return row.comparisonStock>0;
+    if(filter==="zero")return row.comparisonStock===0;
     if(filter==="base_stock")return row.baseStock>0;
     if(filter==="event_stock")return row.eventStock>0;
     if(filter==="no_shelf")return !row.shelf||row.shelf==="棚番未設定"||row.shelf==="未登録";
-    if(filter==="negative")return row.baseStock<0;
+    if(filter==="negative")return row.baseStock<0||row.eventStock<0||row.comparisonStock<0;
     return true;
   }
   function sortRows(rows,sortKey){
@@ -181,11 +182,11 @@
     const totalBase=rows.reduce((sum,row)=>sum+row.baseStock,0);
     const totalEvent=rows.reduce((sum,row)=>sum+row.eventStock,0);
     const totalComparison=rows.reduce((sum,row)=>sum+row.comparisonStock,0);
-    const negative=state.rows.filter(row=>row.baseStock<0).length;
+    const negative=state.rows.filter(row=>row.baseStock<0||row.eventStock<0||row.comparisonStock<0).length;
     return [
       `表示：${rows.length} / 全${state.rows.length}商品`,
       `通常棚合計：${totalBase}`,
-      `共通イベント棚合計：${totalEvent}`,
+      `イベント棚合計：${totalEvent}`,
       `比較用在庫合計：${totalComparison}`,
       `マイナス在庫：${negative}商品`
     ].map(value=>`<span>${safeEsc(value)}</span>`).join("");
@@ -194,7 +195,7 @@
     return value<0 ? "inventory-list-negative" : "";
   }
   function renderTableRow(row){
-    const admin=isAdmin()&&row.rawProduct;
+    const admin=isAdmin()&&row.barcode;
     return `<tr>
       <td class="inventory-list-name-cell"><strong>${safeEsc(row.name)}</strong></td>
       <td>${safeEsc(row.barcode)}</td>
@@ -210,7 +211,7 @@
     </tr>`;
   }
   function renderCard(row){
-    const admin=isAdmin()&&row.rawProduct;
+    const admin=isAdmin()&&row.barcode;
     return `<article class="inventory-list-card">
       <div><strong>${safeEsc(row.name)}</strong><small>バーコード：${safeEsc(row.barcode)}</small><small>棚番：${safeEsc(row.shelf||"-")}</small></div>
       <dl>
@@ -218,7 +219,7 @@
         <div><dt>イベント棚</dt><dd>${safeEsc(row.eventStock)}</dd></div>
         <div><dt>比較用</dt><dd class="${rowClass(row.comparisonStock)}">${safeEsc(row.comparisonStock)}</dd></div>
       </dl>
-      ${admin?`<button type="button" class="secondary" data-inventory-list-edit="${safeEsc(row.barcode)}">通常棚を修正</button>`:""}
+      ${admin?`<button type="button" class="secondary" data-inventory-list-edit="${safeEsc(row.barcode)}">在庫を修正</button>`:""}
     </article>`;
   }
   function renderInventoryListRows(){
@@ -250,30 +251,139 @@
       return;
     }
     panel.hidden=false;
-    panel.innerHTML=`<div class="inventory-list-edit-grid">
-      <div>
+    panel.innerHTML=`<div class="inventory-list-edit-card" data-inventory-list-edit-card data-barcode="${safeEsc(row.barcode)}">
+      <div class="inventory-list-edit-head">
         <strong>${safeEsc(row.name)}</strong>
         <small>バーコード：${safeEsc(row.barcode)}</small>
-        <small>現在の通常棚在庫：${safeEsc(row.baseStock)}</small>
-        <small>共通イベント棚在庫：${safeEsc(row.eventStock)}</small>
       </div>
-      <label>修正後の通常棚在庫<input id="inventoryListEditStock" type="number" step="1" inputmode="numeric" value="${safeEsc(row.baseStock)}"></label>
-      <label>修正理由（必須）<input id="inventoryListEditReason" type="text" placeholder="例：棚卸差異修正"></label>
+      <div class="inventory-list-edit-current">
+        <div><span>通常棚</span><strong>${safeEsc(row.baseStock)}</strong></div>
+        <div><span>イベント棚</span><strong>${safeEsc(row.eventStock)}</strong></div>
+        <div><span>比較用</span><strong data-inventory-list-comparison>${safeEsc(row.comparisonStock)}</strong></div>
+      </div>
+      <div class="inventory-list-edit-stock-grid">
+        <label>通常棚在庫 <small>現在：${safeEsc(row.baseStock)}</small><input id="inventoryListEditBaseStock" type="number" step="1" inputmode="numeric" value="${safeEsc(row.baseStock)}"></label>
+        <label>イベント棚在庫 <small>現在：${safeEsc(row.eventStock)}</small><input id="inventoryListEditEventStock" type="number" step="1" inputmode="numeric" value="${safeEsc(row.eventStock)}"></label>
+      </div>
+      <label>修正理由（必須）<select id="inventoryListEditReason">
+        <option value="">選択してください</option>
+        <option value="実棚確認">実棚確認</option>
+        <option value="入力ミス">入力ミス</option>
+        <option value="過去処理漏れ">過去処理漏れ</option>
+        <option value="破損">破損</option>
+        <option value="移動処理漏れ">移動処理漏れ</option>
+        <option value="その他">その他</option>
+      </select></label>
       <label>備考<input id="inventoryListEditMemo" type="text" placeholder="任意メモ"></label>
       <div class="inventory-list-edit-actions">
         <button type="button" data-inventory-list-save="${safeEsc(row.barcode)}">在庫修正を保存</button>
         <button type="button" class="secondary" data-inventory-list-cancel>閉じる</button>
       </div>
     </div>`;
+    syncEditComparison();
     panel.scrollIntoView({behavior:"smooth",block:"nearest"});
   }
+
+  function syncEditComparison(){
+    const baseRaw=text(byId("inventoryListEditBaseStock")?.value);
+    const eventRaw=text(byId("inventoryListEditEventStock")?.value);
+    const node=byId("inventoryListEditPanel")?.querySelector("[data-inventory-list-comparison]");
+    if(!node)return;
+    if(!/^-?\d+$/.test(baseRaw)||!/^-?\d+$/.test(eventRaw)){
+      node.textContent="-";
+      return;
+    }
+    node.textContent=String(Number(baseRaw)+Number(eventRaw));
+  }
+
+  async function fetchLatestInventoryRow(barcode){
+    const storeCode=currentStoreCode();
+    const [productRows,storageMap]=await Promise.all([
+      sb(`products?select=${PRODUCT_SELECT}&barcode=eq.${encodeURIComponent(barcode)}&limit=1`),
+      fetchEventStorage(storeCode)
+    ]);
+    const product=Array.isArray(productRows)&&productRows[0]?productRows[0]:null;
+    const storage=storageMap.get(text(barcode))||null;
+    return normalizeProductRow(product,storage);
+  }
+
+  async function setEventStorageStock(storeCode,barcode,productName,nextStock){
+    const rows=await sb(`event_storage_stocks?select=${STORAGE_SELECT}&store_code=eq.${encodeURIComponent(storeCode)}&barcode=eq.${encodeURIComponent(barcode)}&limit=1`);
+    const current=Array.isArray(rows)&&rows[0]?rows[0]:null;
+    const now=new Date().toISOString();
+    if(current){
+      await sb(`event_storage_stocks?id=eq.${encodeURIComponent(current.id)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({
+          product_name:productName||current.product_name||"",
+          storage_qty:nextStock,
+          updated_at:now
+        })
+      });
+      return {previous:current,created:false};
+    }
+    const inserted=await sb("event_storage_stocks",{
+      method:"POST",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify([{
+        store_code:storeCode,
+        barcode,
+        product_name:productName||"",
+        storage_qty:nextStock,
+        updated_at:now
+      }])
+    });
+    return {previous:null,created:true,inserted:Array.isArray(inserted)?inserted[0]:null};
+  }
+
+  async function restoreEventStorageStock(storeCode,barcode,previous,created){
+    const rows=await sb(`event_storage_stocks?select=id&store_code=eq.${encodeURIComponent(storeCode)}&barcode=eq.${encodeURIComponent(barcode)}&limit=1`);
+    const current=Array.isArray(rows)&&rows[0]?rows[0]:null;
+    if(created){
+      if(current)await sb(`event_storage_stocks?id=eq.${encodeURIComponent(current.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+      return;
+    }
+    if(previous&&current){
+      await sb(`event_storage_stocks?id=eq.${encodeURIComponent(current.id)}`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({
+          product_name:previous.product_name||"",
+          storage_qty:Number(previous.storage_qty||0),
+          updated_at:previous.updated_at||new Date().toISOString()
+        })
+      });
+    }
+  }
+
+  async function logEventStorageCorrection({storeCode,barcode,productName,before,next,reason,memo}){
+    const delta=next-before;
+    await sb("event_storage_movements",{
+      method:"POST",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify([{
+        event_id:null,
+        store_code:storeCode,
+        smaregi_product_id:null,
+        barcode,
+        product_name:productName||"",
+        movement_type:"adjustment",
+        quantity:Math.abs(delta),
+        staff:window.currentStaffName||"管理者",
+        memo:["イベント棚在庫修正",`${before} -> ${next}`,`差分 ${delta}`,reason,memo].filter(Boolean).join(" / ")
+      }])
+    });
+  }
+
   async function saveStockCorrection(barcode,button){
     if(!isAdmin()){
       message("在庫修正は管理者認証後に実行できます。","err");
       return;
     }
-    const stockRaw=text(byId("inventoryListEditStock")?.value);
-    if(!/^-?\d+$/.test(stockRaw)){
+    const baseRaw=text(byId("inventoryListEditBaseStock")?.value);
+    const eventRaw=text(byId("inventoryListEditEventStock")?.value);
+    if(!/^-?\d+$/.test(baseRaw)||!/^-?\d+$/.test(eventRaw)){
       message("修正後在庫は整数で入力してください。","err");
       return;
     }
@@ -283,22 +393,33 @@
       return;
     }
     const memo=text(byId("inventoryListEditMemo")?.value);
-    const nextStock=Number(stockRaw);
-    const latestRows=await sb(`products?select=${PRODUCT_SELECT}&barcode=eq.${encodeURIComponent(barcode)}&limit=1`);
-    const latest=Array.isArray(latestRows)&&latestRows[0]?latestRows[0]:null;
-    if(!latest){
-      message("商品マスターが見つかりません。","err");
-      return;
-    }
-    const before=num(latest.base_stock);
-    if(before===nextStock){
+    const nextBase=Number(baseRaw);
+    const nextEvent=Number(eventRaw);
+    const latestRow=await fetchLatestInventoryRow(barcode);
+    const latest=latestRow.rawProduct;
+    const beforeBase=num(latestRow.baseStock);
+    const beforeEvent=num(latestRow.eventStock);
+    const baseChanged=beforeBase!==nextBase;
+    const eventChanged=beforeEvent!==nextEvent;
+    if(!baseChanged&&!eventChanged){
       message("在庫数が変わっていません。","err");
       return;
     }
+    if(baseChanged&&!latest){
+      message("通常棚を修正する商品マスターが見つかりません。イベント棚だけ修正できます。","err");
+      return;
+    }
+    if(nextEvent<0){
+      const negativeOk=typeof confirmAppAction==="function"
+        ? await confirmAppAction("イベント棚在庫がマイナスになります",`イベント棚在庫：${beforeEvent} → ${nextEvent}\nこのまま保存しますか？`,{okText:"保存",cancelText:"キャンセル"})
+        : window.confirm(`イベント棚在庫がマイナスになります。\n${beforeEvent} → ${nextEvent}\n保存しますか？`);
+      if(!negativeOk)return;
+    }
     const body=[
-      latest.name||barcode,
-      `通常棚在庫：${before} → ${nextStock}`,
-      `差分：${nextStock-before}`,
+      latestRow.name||barcode,
+      baseChanged?`通常棚在庫：${beforeBase} → ${nextBase}（差分 ${nextBase-beforeBase}）`:"",
+      eventChanged?`イベント棚在庫：${beforeEvent} → ${nextEvent}（差分 ${nextEvent-beforeEvent}）`:"",
+      `比較用在庫：${beforeBase+beforeEvent} → ${nextBase+nextEvent}`,
       `理由：${reason}`,
       memo?`備考：${memo}`:""
     ].filter(Boolean).join("\n");
@@ -307,29 +428,45 @@
       : window.confirm(body);
     if(!ok)return;
     if(button)button.disabled=true;
-    let updated=false;
+    let baseUpdated=false;
+    let eventUpdateResult=null;
+    const storeCode=currentStoreCode();
     try{
-      await updateProductCurrentStock(barcode,nextStock);
-      updated=true;
-      const logMemo=[reason,memo,`在庫一覧確認から修正（${before} → ${nextStock}）`].filter(Boolean).join(" / ");
-      await sb("inventory_logs",{
-        method:"POST",
-        headers:{Prefer:"return=representation"},
-        body:JSON.stringify({
-          type:"在庫修正",
-          staff:window.currentStaffName||"管理者",
-          barcode,
-          product_name:latest.name||"",
-          quantity:nextStock,
-          memo:logMemo
-        })
-      });
+      if(baseChanged){
+        await updateProductCurrentStock(barcode,nextBase);
+        baseUpdated=true;
+      }
+      if(eventChanged){
+        eventUpdateResult=await setEventStorageStock(storeCode,barcode,latestRow.name,nextEvent);
+      }
+      if(baseChanged){
+        const logMemo=[reason,memo,`在庫一覧確認から通常棚修正（${beforeBase} → ${nextBase} / 差分 ${nextBase-beforeBase}）`].filter(Boolean).join(" / ");
+        await sb("inventory_logs",{
+          method:"POST",
+          headers:{Prefer:"return=representation"},
+          body:JSON.stringify({
+            type:"在庫修正",
+            staff:window.currentStaffName||"管理者",
+            barcode,
+            product_name:latest?.name||latestRow.name||"",
+            quantity:nextBase,
+            memo:logMemo
+          })
+        });
+      }
+      if(eventChanged){
+        await logEventStorageCorrection({storeCode,barcode,productName:latestRow.name,before:beforeEvent,next:nextEvent,reason,memo});
+      }
       closeEditPanel();
       await loadInventoryListData(true);
-      message("通常棚在庫を修正しました。","ok");
+      message("在庫を修正しました。","ok");
+      if(typeof loadSmaregiDifferenceRanking==="function")setTimeout(()=>{try{loadSmaregiDifferenceRanking();}catch(_){}},0);
     }catch(error){
-      if(updated){
-        try{await updateProductCurrentStock(barcode,before);}catch(_){}
+      if(baseUpdated){
+        try{await updateProductCurrentStock(barcode,beforeBase);}catch(_){}
+      }
+      if(eventUpdateResult){
+        try{await restoreEventStorageStock(storeCode,barcode,eventUpdateResult.previous,eventUpdateResult.created);}catch(_){}
       }
       message(`在庫修正に失敗しました。\n${error.message||error}`,"err");
     }finally{
@@ -338,7 +475,7 @@
   }
   function exportCsv(){
     const rows=[
-      ["商品名","バーコード","商品コード","品番","カラー","サイズ","棚番","通常棚在庫","共通イベント棚在庫","比較用在庫"],
+      ["商品名","バーコード","商品コード","品番","カラー","サイズ","棚番","通常棚在庫","イベント棚在庫","比較用在庫"],
       ...state.filtered.map(row=>[
         row.name,
         row.barcode,
@@ -364,6 +501,9 @@
     byId("inventoryListFilter")?.addEventListener("change",()=>{state.renderLimit=PAGE_SIZE;applyInventoryListFilterSort();});
     byId("inventoryListSort")?.addEventListener("change",()=>{state.renderLimit=PAGE_SIZE;applyInventoryListFilterSort();});
     byId("inventoryListMoreBtn")?.addEventListener("click",()=>{state.renderLimit+=PAGE_SIZE;renderInventoryListRows();});
+    document.addEventListener("input",event=>{
+      if(event.target.closest("#inventoryListEditBaseStock,#inventoryListEditEventStock"))syncEditComparison();
+    });
     document.addEventListener("click",event=>{
       const edit=event.target.closest("[data-inventory-list-edit]");
       if(edit){

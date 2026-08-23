@@ -3913,7 +3913,7 @@ async function renderBoothDepartureInventoryListPanel(event){
           <option value="all">全件</option>
           <option value="start">開始時イベント棚あり</option>
           <option value="additional">追加持ち出しあり</option>
-          <option value="taken">今回持ち出しあり</option>
+          <option value="taken">イベント棚在庫あり</option>
         </select>
       </label>
     </div>
@@ -3965,7 +3965,7 @@ async function loadBoothDepartureInventoryList(eventId){
     const commonTotal=normalRows.reduce((sum,row)=>sum+Number(row.commonShelfQty||0),0);
     const gachaTotal=gachaRows.reduce((sum,row)=>sum+Number(row.remain||0),0);
     list.innerHTML=`<div class="booth-summary-strip">
-      <span>共通イベント棚 現在：${esc(normalRows.length)}商品 / ${esc(commonTotal)}個</span>
+      <span>イベント棚在庫：${esc(normalRows.length)}商品 / ${esc(commonTotal)}個</span>
       <span>ガチャ現在庫：${esc(gachaRows.length)}商品 / ${esc(gachaTotal)}個</span>
     </div>${renderBoothDepartureNormalSection(normalRows)}${renderBoothDepartureGachaSection(gachaRows)}`;
   }catch(e){
@@ -9124,12 +9124,11 @@ function renderBoothDepartureNormalSection(rows){
       <td>${esc(row.barcode||"-")}</td>
       <td><input class="booth-history-qty-input" data-booth-departure-start type="number" min="0" step="1" inputmode="numeric" value="${esc(row.startQty??0)}" ${disabled}></td>
       <td><input class="booth-history-qty-input" data-booth-departure-additional type="number" min="0" step="1" inputmode="numeric" value="${esc(row.additionalQty??0)}" ${disabled}></td>
-      <td><strong data-booth-departure-total>${esc(row.taken??0)}</strong></td>
-      <td>${esc(row.commonShelfQty??0)}</td>
+      <td><strong data-booth-departure-total>${esc(row.commonShelfQty??0)}</strong></td>
       <td>${esc(formatBoothDateTime(row.updated_at))}</td>
       <td>${action}</td>
     </tr>`;
-  }).join(""):"<tr><td colspan=\"8\">今回イベントの持ち出し在庫はありません。</td></tr>";
+  }).join(""):"<tr><td colspan=\"7\">今回イベントの持ち出し在庫はありません。</td></tr>";
   const cards=rows.map(row=>{
     const disabled=row.editable?"":"disabled";
     const action=row.editable
@@ -9137,13 +9136,13 @@ function renderBoothDepartureNormalSection(rows){
       :`<span class="status-badge">開始在庫のみ</span>`;
     return `<article class="booth-history-card booth-departure-card" data-booth-departure-row data-item-id="${esc(row.id||"")}" data-barcode="${esc(row.barcode||"")}">
       <div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong><span>${esc(row.barcode||"-")}</span></div>
-      <div class="booth-history-card-meta"><span>今回持ち出し: <strong data-booth-departure-total>${esc(row.taken??0)}</strong></span><span>共通イベント棚現在庫: ${esc(row.commonShelfQty??0)}</span><span>最終更新: ${esc(formatBoothDateTime(row.updated_at))}</span></div>
+      <div class="booth-history-card-meta"><span>イベント棚在庫: <strong data-booth-departure-total>${esc(row.commonShelfQty??0)}</strong></span><span>最終更新: ${esc(formatBoothDateTime(row.updated_at))}</span></div>
       <label>開始時イベント棚<input class="booth-history-qty-input" data-booth-departure-start type="number" min="0" step="1" inputmode="numeric" value="${esc(row.startQty??0)}" ${disabled}></label>
       <label>追加持ち出し<input class="booth-history-qty-input" data-booth-departure-additional type="number" min="0" step="1" inputmode="numeric" value="${esc(row.additionalQty??0)}" ${disabled}></label>
       ${action}
     </article>`;
   }).join("");
-  return `<section class="booth-split-list-section"><h5>今回イベント持ち出し在庫</h5><p class="section-note">開始時イベント棚と、今回追加で通常棚から持ち出した数量の合計です。追加持ち出しを修正すると通常棚と共通イベント棚も差分だけ調整します。</p><div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table booth-departure-list-table"><thead><tr><th>商品名</th><th>バーコード</th><th>開始時イベント棚</th><th>追加持ち出し</th><th>今回持ち出し</th><th>共通イベント棚現在庫</th><th>最終更新</th><th>修正</th></tr></thead><tbody>${body}</tbody></table></div><div class="booth-history-cards booth-scroll-cards">${cards}</div></section>`;
+  return `<section class="booth-split-list-section"><h5>今回イベント持ち出し在庫</h5><p class="section-note">開始時イベント棚と、今回追加で通常棚から持ち出した数量の合計をイベント棚在庫として表示します。追加持ち出しを修正すると通常棚と共通イベント棚も差分だけ調整します。</p><div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table booth-departure-list-table"><thead><tr><th>商品名</th><th>バーコード</th><th>開始時イベント棚</th><th>追加持ち出し</th><th>イベント棚在庫</th><th>最終更新</th><th>修正</th></tr></thead><tbody>${body}</tbody></table></div><div class="booth-history-cards booth-scroll-cards">${cards}</div></section>`;
 }
 
 function syncBoothDepartureCorrectionRow(row){
@@ -9299,12 +9298,10 @@ loadBoothDepartureInventoryList=async function(eventId){
       list.innerHTML='<div class="booth-empty">持ち出し在庫はありません。</div>';
       return;
     }
-    const departureTotal=normalRows.reduce((sum,row)=>sum+Number(row.taken||0),0);
     const commonTotal=normalRows.reduce((sum,row)=>sum+Number(row.commonShelfQty||0),0);
     const gachaTotal=gachaRows.reduce((sum,row)=>sum+Number(row.remain||0),0);
     list.innerHTML=`<div class="booth-summary-strip">
-      <span>今回持ち出し：${esc(normalRows.length)}商品 / ${esc(departureTotal)}個</span>
-      <span>共通イベント棚現在：${esc(normalRows.length)}商品 / ${esc(commonTotal)}個</span>
+      <span>イベント棚在庫：${esc(normalRows.length)}商品 / ${esc(commonTotal)}個</span>
       <span>ガチャ現在庫：${esc(gachaRows.length)}商品 / ${esc(gachaTotal)}個</span>
     </div>${renderBoothDepartureNormalSection(normalRows)}${renderBoothDepartureGachaSection(gachaRows)}`;
   }catch(error){
@@ -9326,7 +9323,7 @@ loadBoothDepartureInventoryList=async function(eventId){
     const departureFilterMatches=row=>{
       if(filterKey==="start")return Number(row.startQty||0)>0;
       if(filterKey==="additional")return Number(row.additionalQty||0)>0;
-      if(filterKey==="taken")return Number(row.taken||0)>0;
+      if(filterKey==="taken")return Number(row.commonShelfQty||0)>0;
       return true;
     };
     const sortRows=rows=>sortBoothInventoryRows(rows.map(row=>({
@@ -9342,15 +9339,12 @@ loadBoothDepartureInventoryList=async function(eventId){
       list.innerHTML='<div class="booth-empty">条件に一致する持ち出し在庫はありません。</div>';
       return;
     }
-    const allDepartureRows=allNormalRows.filter(row=>Number(row.taken||0)>0);
     const allCommonRows=allNormalRows.filter(row=>Number(row.commonShelfQty||0)>0);
     const allGachaActiveRows=allGachaRows.filter(row=>Number(row.remain||0)>0);
-    const departureTotal=allDepartureRows.reduce((sum,row)=>sum+Number(row.taken||0),0);
     const commonTotal=allCommonRows.reduce((sum,row)=>sum+Number(row.commonShelfQty||0),0);
     const gachaTotal=allGachaActiveRows.reduce((sum,row)=>sum+Number(row.remain||0),0);
     list.innerHTML=`<div class="booth-summary-strip">
-      <span>今回持ち出し：${esc(allDepartureRows.length)}商品 / ${esc(departureTotal)}個</span>
-      <span>共通イベント棚 現在：${esc(allCommonRows.length)}商品 / ${esc(commonTotal)}個</span>
+      <span>イベント棚在庫：${esc(allCommonRows.length)}商品 / ${esc(commonTotal)}個</span>
       <span>ガチャ現在庫：${esc(allGachaActiveRows.length)}商品 / ${esc(gachaTotal)}個</span>
       <span>表示：${esc(normalRows.length)} / ${esc(allNormalRows.length)}商品</span>
     </div>${renderBoothDepartureNormalSection(normalRows)}${renderBoothDepartureGachaSection(gachaRows)}`;
@@ -9373,7 +9367,7 @@ loadBoothDepartureInventoryList=async function(eventId){
     const departureFilterMatches=row=>{
       if(filterKey==="start")return Number(row.startQty||0)>0;
       if(filterKey==="additional")return Number(row.additionalQty||0)>0;
-      if(filterKey==="taken")return Number(row.taken||0)>0;
+      if(filterKey==="taken")return Number(row.commonShelfQty||0)>0;
       return true;
     };
     const sortRows=rows=>sortBoothInventoryRows(rows.map(row=>({
@@ -9389,15 +9383,12 @@ loadBoothDepartureInventoryList=async function(eventId){
       list.innerHTML='<div class="booth-empty">条件に一致する持ち出し在庫はありません。</div>';
       return;
     }
-    const allDepartureRows=allNormalRows.filter(row=>Number(row.taken||0)>0);
     const allCommonRows=allNormalRows.filter(row=>Number(row.commonShelfQty||0)>0);
     const allGachaActiveRows=allGachaRows.filter(row=>Number(row.remain||0)>0);
-    const departureTotal=allDepartureRows.reduce((sum,row)=>sum+Number(row.taken||0),0);
     const commonTotal=allCommonRows.reduce((sum,row)=>sum+Number(row.commonShelfQty||0),0);
     const gachaTotal=allGachaActiveRows.reduce((sum,row)=>sum+Number(row.remain||0),0);
     list.innerHTML=`<div class="booth-summary-strip">
-      <span>今回持ち出し：${esc(allDepartureRows.length)}商品 / ${esc(departureTotal)}個</span>
-      <span>共通イベント棚 現在：${esc(allCommonRows.length)}商品 / ${esc(commonTotal)}個</span>
+      <span>イベント棚在庫：${esc(allCommonRows.length)}商品 / ${esc(commonTotal)}個</span>
       <span>ガチャ現在庫：${esc(allGachaActiveRows.length)}商品 / ${esc(gachaTotal)}個</span>
       <span>表示：${esc(normalRows.length)} / ${esc(allNormalRows.length)}商品</span>
     </div>${renderBoothDepartureNormalSection(normalRows)}${renderBoothDepartureGachaSection(gachaRows)}`;
@@ -9412,8 +9403,8 @@ exportBoothDepartureInventoryCsv=async function(event){
     const data=await buildBoothDepartureInventoryData(event?.id);
     const rows=[
       ["今回イベント持ち出し在庫"],
-      ["商品名","バーコード","開始時イベント棚","追加持ち出し","今回持ち出し","共通イベント棚現在庫","最終更新"],
-      ...data.normalRows.map(row=>[row.product_name||"",row.barcode||"",row.startQty??0,row.additionalQty??0,row.taken??0,row.commonShelfQty??0,row.updated_at||""]),
+      ["商品名","バーコード","開始時イベント棚","追加持ち出し","イベント棚在庫","最終更新"],
+      ...data.normalRows.map(row=>[row.product_name||"",row.barcode||"",row.startQty??0,row.additionalQty??0,row.commonShelfQty??0,row.updated_at||""]),
       [],
       ["ガチャ持ち出し在庫"],
       ["商品名","バーコード","ガチャ持ち出し数","戻り実数","使用数","現在ガチャ在庫"],
@@ -9429,7 +9420,7 @@ exportBoothDepartureInventoryPdf=async function(event){
   try{
     const data=await buildBoothDepartureInventoryData(event?.id);
     const html=`<h1>持ち出し在庫一覧</h1>
-      ${boothPdfTable("今回イベント持ち出し在庫",["商品名","バーコード","開始時イベント棚","追加持ち出し","今回持ち出し","共通イベント棚現在庫","最終更新"],data.normalRows.map(row=>[row.product_name||"",row.barcode||"",row.startQty??0,row.additionalQty??0,row.taken??0,row.commonShelfQty??0,formatBoothDateTime(row.updated_at)]))}
+      ${boothPdfTable("今回イベント持ち出し在庫",["商品名","バーコード","開始時イベント棚","追加持ち出し","イベント棚在庫","最終更新"],data.normalRows.map(row=>[row.product_name||"",row.barcode||"",row.startQty??0,row.additionalQty??0,row.commonShelfQty??0,formatBoothDateTime(row.updated_at)]))}
       ${boothPdfTable("ガチャ持ち出し在庫",["商品名","バーコード","ガチャ持ち出し数","戻り実数","使用数","現在ガチャ在庫"],data.gachaRows.map(row=>[row.product_name||"",row.barcode||"",row.taken,boothGachaDisplayQty(row.returned),boothGachaDisplayQty(row.used),row.remain]))}`;
     if(openBoothPdfWindow(boothEventExportBaseName(event,"持ち出し在庫一覧"),html))boothShowSuccess("PDF出力","持ち出し在庫一覧のPDFを開きました。");
   }catch(error){

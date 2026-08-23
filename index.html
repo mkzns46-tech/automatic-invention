@@ -173,7 +173,7 @@
   <div class="section-title">
     <div>
       <h2>在庫一覧確認</h2>
-      <p class="section-note">通常棚在庫と共通イベント棚在庫を店舗単位で確認します。管理者のみ通常棚在庫を修正できます。</p>
+      <p class="section-note">通常棚在庫とイベント棚在庫を店舗単位で確認します。管理者のみ通常棚在庫とイベント棚在庫を修正できます。</p>
     </div>
     <div id="inventoryListStoreBadge" class="badge muted">店舗確認中</div>
   </div>
@@ -183,10 +183,10 @@
       <option value="all">全件</option>
       <option value="has_stock">在庫あり</option>
       <option value="zero">在庫0</option>
+      <option value="negative">マイナス在庫</option>
       <option value="base_stock">通常棚在庫あり</option>
       <option value="event_stock">イベント棚在庫あり</option>
       <option value="no_shelf">棚番未登録</option>
-      <option value="negative">マイナス在庫</option>
     </select></label>
     <label>並び順<select id="inventoryListSort">
       <option value="name">商品名順</option>
@@ -206,7 +206,7 @@
   <div id="inventoryListEditPanel" class="inventory-list-edit-panel" hidden></div>
   <div class="inventory-list-table-wrap">
     <table class="inventory-list-table">
-      <thead><tr><th>商品名</th><th>バーコード</th><th>商品コード</th><th>品番</th><th>カラー</th><th>サイズ</th><th>棚番</th><th>通常棚在庫</th><th>共通イベント棚在庫</th><th>比較用在庫</th><th>操作</th></tr></thead>
+      <thead><tr><th>商品名</th><th>バーコード</th><th>商品コード</th><th>品番</th><th>カラー</th><th>サイズ</th><th>棚番</th><th>通常棚在庫</th><th>イベント棚在庫</th><th>比較用在庫</th><th>操作</th></tr></thead>
       <tbody id="inventoryListTableBody"></tbody>
     </table>
   </div>
