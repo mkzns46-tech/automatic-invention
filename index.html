@@ -162,13 +162,58 @@
 </section>
 
 
-<section class="mobile-force-history card wide pc-only-section" id="globalHistoryCard" data-inventory-screen="history" hidden><h2>全体履歴</h2><div class="history-filter-grid"><label>区分検索<select id="historyTypeFilter"><option value="">すべて</option><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">商品転用</option><option value="event_pick">イベントピック</option><option value="event_close_return">イベント締め棚戻し</option><option value="gacha_pick">ガチャピック</option><option value="gacha_return">ガチャ戻り</option></select></label><label>商品名検索<input id="historyProductFilter" placeholder="商品名キーワード"/></label><label>担当者検索<input id="historyStaffFilter" placeholder="担当者キーワード"/></label><label>備考検索<input id="historyMemoFilter" placeholder="備考キーワード"/></label></div><div class="button-row"><button id="allDataCsvBtn" class="secondary">全履歴CSV</button><button id="clearFilterBtn" class="secondary">検索をクリア</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>商品転用確認</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
+<section class="mobile-force-history card wide pc-only-section" id="globalHistoryCard" data-inventory-screen="history" hidden><h2>全体履歴</h2><div class="history-filter-grid"><label>区分検索<select id="historyTypeFilter"><option value="">すべて</option><option value="入荷">入荷</option><option value="出荷">出荷</option><option value="在庫修正">在庫修正</option><option value="備品転用">商品転用</option><option value="event_pick">イベントピック</option><option value="event_close_return">イベント締め棚戻し</option><option value="gacha_pick">ガチャ持ち出し</option><option value="gacha_return">ガチャ戻り</option></select></label><label>商品名検索<input id="historyProductFilter" placeholder="商品名キーワード"/></label><label>担当者検索<input id="historyStaffFilter" placeholder="担当者キーワード"/></label><label>備考検索<input id="historyMemoFilter" placeholder="備考キーワード"/></label></div><div class="button-row"><button id="allDataCsvBtn" class="secondary">全履歴CSV</button><button id="clearFilterBtn" class="secondary">検索をクリア</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>商品転用確認</th></tr></thead><tbody id="historyBody"></tbody></table></div></section>
 <section class="card wide mobile-history-section" id="productHistoryCard" data-inventory-screen="history" hidden><div class="section-title"><h2>商品別履歴</h2></div><div id="productHistoryContent"><div id="historyRangeBadge" class="badge muted">商品を選択してください</div><div class="history-search-box"><label>商品履歴検索<input id="productHistoryBarcodeInput" placeholder="バーコードを入力またはスキャン" />
 <div class="inventory-product-search-controls product-history-search-controls"><label class="product-name-search-label">商品名検索
   <input id="productNameSearchInput" placeholder="商品名の一部を入力" />
 </label><label class="product-search-sort-label">並び順<select id="productHistorySearchSort"><option value="name">商品名順</option><option value="barcode">バーコード順</option><option value="location">棚番順</option><option value="updated">最終更新順</option></select></label></div>
 <div id="productSearchResults" class="product-search-results"></div></label></div><div class="history-camera-row"><button type="button" id="historyCameraBtn">カメラ読取</button></div><div class="button-row"><button id="productHistoryCsvBtn" type="button">商品履歴CSV</button>
 <button id="showAllSelectedHistoryBtn" class="secondary">全履歴を表示</button></div><div class="table-wrap"><table><thead><tr><th>入力日時</th><th>区分</th><th>担当者</th><th>商品名</th><th>在庫数</th><th>入荷</th><th>出荷</th><th>現在庫</th><th>備考</th><th>商品転用確認</th></tr></thead><tbody id="selectedHistoryBody"></tbody></table></div></div></section>
+<section class="card wide inventory-list-section" id="inventoryListCard" data-inventory-screen="inventory-list" hidden>
+  <div class="section-title">
+    <div>
+      <h2>在庫一覧確認</h2>
+      <p class="section-note">通常棚在庫と共通イベント棚在庫を店舗単位で確認します。管理者のみ通常棚在庫を修正できます。</p>
+    </div>
+    <div id="inventoryListStoreBadge" class="badge muted">店舗確認中</div>
+  </div>
+  <div class="inventory-list-toolbar">
+    <label>商品検索<input id="inventoryListSearchInput" type="text" placeholder="商品名・バーコード・商品コード・品番・カラー・サイズ"></label>
+    <label>表示<select id="inventoryListFilter">
+      <option value="all">全件</option>
+      <option value="has_stock">在庫あり</option>
+      <option value="zero">在庫0</option>
+      <option value="base_stock">通常棚在庫あり</option>
+      <option value="event_stock">イベント棚在庫あり</option>
+      <option value="no_shelf">棚番未登録</option>
+      <option value="negative">マイナス在庫</option>
+    </select></label>
+    <label>並び順<select id="inventoryListSort">
+      <option value="name">商品名順</option>
+      <option value="barcode">バーコード順</option>
+      <option value="shelf">棚番順</option>
+      <option value="updated">最終更新順</option>
+      <option value="base_desc">通常棚在庫 多い順</option>
+      <option value="event_desc">イベント棚在庫 多い順</option>
+      <option value="comparison_desc">比較用在庫 多い順</option>
+    </select></label>
+  </div>
+  <div class="inventory-list-actions">
+    <button type="button" id="inventoryListRefreshBtn" class="secondary">再読み込み</button>
+    <button type="button" id="inventoryListCsvBtn" class="secondary">在庫一覧CSV</button>
+  </div>
+  <div id="inventoryListSummary" class="inventory-list-summary"></div>
+  <div id="inventoryListMessage" class="message"></div>
+  <div id="inventoryListEditPanel" class="inventory-list-edit-panel" hidden></div>
+  <div class="inventory-list-table-wrap">
+    <table class="inventory-list-table">
+      <thead><tr><th>商品名</th><th>バーコード</th><th>商品コード</th><th>品番</th><th>カラー</th><th>サイズ</th><th>棚番</th><th>通常棚在庫</th><th>共通イベント棚在庫</th><th>比較用在庫</th><th>最終更新</th><th>操作</th></tr></thead>
+      <tbody id="inventoryListTableBody"></tbody>
+    </table>
+  </div>
+  <div id="inventoryListCards" class="inventory-list-cards"></div>
+  <button type="button" id="inventoryListMoreBtn" class="secondary inventory-list-more" hidden>さらに表示</button>
+</section>
 <section class="card wide smaregi-stock-check-section" id="smaregiStockCheckCard" data-inventory-screen="smaregi" hidden>
   <div class="section-title">
     <div>
@@ -442,6 +487,7 @@
 <script src="./booth.js" defer></script>
 <script src="./app-inventory-count.js" defer></script>
 <script src="./shelf-location.js" defer></script>
+<script src="./inventory-list.js" defer></script>
 <script src="./app.js" defer></script>
 <script src="./smaregi-check-final.js" defer></script>
 

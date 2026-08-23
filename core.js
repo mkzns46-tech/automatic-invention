@@ -16,7 +16,8 @@ const el=(id)=>document.getElementById(id);
 const INVENTORY_APP_MENU_SECTIONS=[
   {label:"在庫管理",items:[
     {key:"inventory",label:"在庫変動登録",action:"inventory"},
-    {key:"history",label:"履歴確認",action:"history"}
+    {key:"history",label:"履歴確認",action:"history"},
+    {key:"inventory-list",label:"在庫一覧確認",action:"inventory-list"}
   ]},
   {label:"棚卸作業",items:[
     {key:"smaregi",label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"}
@@ -333,6 +334,11 @@ function renderInventoryAppMenu(){
   if(inventoryButton)inventoryButton.addEventListener("click",showInventoryRegistration);
   const historyButton=menu.querySelector('[data-menu-action="history"]');
   if(historyButton)historyButton.addEventListener("click",showInventoryHistory);
+  const inventoryListButton=menu.querySelector('[data-menu-action="inventory-list"]');
+  if(inventoryListButton)inventoryListButton.addEventListener("click",()=>{
+    showInventoryScreen("inventory-list","inventory-list");
+    if(typeof renderInventoryList==="function")renderInventoryList();
+  });
   const appInventoryCountButton=menu.querySelector('[data-menu-action="app-inventory-count"]');
   if(appInventoryCountButton)appInventoryCountButton.addEventListener("click",()=>{
     showInventoryScreen("app-inventory-count","app-inventory-count");

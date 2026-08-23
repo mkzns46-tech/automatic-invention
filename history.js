@@ -9,7 +9,7 @@ function inventoryTypeLabel(type){
     equipment_transfer:"商品転用",
     "備品転用":"商品転用",
     "蛯吝刀霆｢逕ｨ":"商品転用",
-    gacha_pick:"ガチャ",
+    gacha_pick:"ガチャ持ち出し",
     gacha_return:"ガチャ戻し"
   };
   return labels[type]||String(type||"");

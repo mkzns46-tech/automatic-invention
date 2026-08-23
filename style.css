@@ -7983,3 +7983,159 @@ body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
     min-width:0;
   }
 }
+
+/* Ver 2.87 inventory list */
+.inventory-list-section .section-title{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+}
+.inventory-list-toolbar{
+  display:grid;
+  grid-template-columns:minmax(260px,2fr) minmax(150px,1fr) minmax(190px,1fr);
+  gap:10px;
+  align-items:end;
+  margin:12px 0;
+}
+.inventory-list-toolbar label{
+  display:grid;
+  gap:5px;
+  font-weight:800;
+}
+.inventory-list-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin:10px 0;
+}
+.inventory-list-summary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:10px 0;
+}
+.inventory-list-summary span{
+  padding:7px 10px;
+  border-radius:999px;
+  background:#e5f3eb;
+  color:var(--main-dark);
+  font-weight:800;
+}
+.inventory-list-table-wrap{
+  max-height:64vh;
+  overflow:auto;
+  border:1px solid #d5eadf;
+  border-radius:8px;
+  background:#fff;
+}
+.inventory-list-table{
+  width:100%;
+  min-width:1180px;
+  border-collapse:collapse;
+}
+.inventory-list-table th,
+.inventory-list-table td{
+  padding:8px 9px;
+  border-bottom:1px solid #d8eadf;
+  vertical-align:middle;
+  white-space:nowrap;
+}
+.inventory-list-table th{
+  position:sticky;
+  top:0;
+  z-index:1;
+  background:#d9f3df;
+}
+.inventory-list-table .inventory-list-name-cell{
+  min-width:230px;
+  white-space:normal;
+}
+.inventory-list-negative{
+  color:#c5162e;
+  font-weight:900;
+}
+.inventory-list-edit-panel{
+  margin:10px 0;
+  padding:12px;
+  border:1px solid #b8dfc9;
+  border-radius:10px;
+  background:#f7fcf8;
+}
+.inventory-list-edit-grid{
+  display:grid;
+  grid-template-columns:minmax(240px,1.4fr) minmax(150px,.8fr) minmax(220px,1fr) minmax(220px,1fr);
+  gap:10px;
+  align-items:end;
+}
+.inventory-list-edit-grid > div,
+.inventory-list-edit-grid label{
+  display:grid;
+  gap:5px;
+  font-weight:800;
+}
+.inventory-list-edit-grid small{
+  color:#526d60;
+  font-weight:700;
+}
+.inventory-list-edit-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.inventory-list-cards{
+  display:none;
+}
+.inventory-list-more{
+  width:100%;
+  margin-top:10px;
+}
+@media(max-width:800px){
+  .inventory-list-section .section-title,
+  .inventory-list-toolbar,
+  .inventory-list-edit-grid{
+    grid-template-columns:1fr;
+    display:grid;
+  }
+  .inventory-list-table-wrap{
+    display:none;
+  }
+  .inventory-list-cards{
+    display:grid;
+    gap:10px;
+  }
+  .inventory-list-card{
+    display:grid;
+    gap:8px;
+    padding:12px;
+    border:1px solid #b8dfc9;
+    border-radius:10px;
+    background:#fff;
+  }
+  .inventory-list-card small{
+    display:block;
+    margin-top:3px;
+    color:#526d60;
+    font-weight:700;
+  }
+  .inventory-list-card dl{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    margin:0;
+  }
+  .inventory-list-card dt{
+    color:#526d60;
+    font-size:.78rem;
+    font-weight:800;
+  }
+  .inventory-list-card dd{
+    margin:0;
+    font-size:1.1rem;
+    font-weight:900;
+  }
+  .inventory-list-edit-actions,
+  .inventory-list-edit-actions button{
+    width:100%;
+  }
+}

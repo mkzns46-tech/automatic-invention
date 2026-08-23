@@ -364,6 +364,40 @@ async function loadBoothCommonEventShelfStartRows(storeCode,options={}){
   }).filter(row=>row.barcode&&row.quantity>0);
 }
 
+async function loadBoothCurrentEventStorageRows(storeCode){
+  const normalizedStore=normalizeBoothStoreCode(storeCode||getBoothCurrentStoreCode());
+  if(!normalizedStore)return [];
+  const byBarcode=new Map();
+  const commonRows=await sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(normalizedStore)}&storage_qty=gt.0&order=product_name.asc&limit=5000`).catch(()=>[]);
+  (Array.isArray(commonRows)?commonRows:[]).forEach(row=>{
+    const barcode=String(row.barcode||"").trim();
+    const quantity=Number(row.storage_qty||0);
+    if(!barcode||quantity<=0)return;
+    const current=byBarcode.get(barcode)||{
+      barcode,
+      product_name:row.product_name||"",
+      quantity:0,
+      updated_at:"",
+      source:"event_storage_stocks"
+    };
+    current.quantity+=quantity;
+    if(row.updated_at&&String(row.updated_at)>String(current.updated_at||""))current.updated_at=row.updated_at;
+    if(!current.product_name&&row.product_name)current.product_name=row.product_name;
+    byBarcode.set(barcode,current);
+  });
+  const rows=[...byBarcode.values()].filter(row=>Number(row.quantity||0)>0);
+  const products=await loadBoothProductsByBarcode(rows.map(row=>row.barcode)).catch(()=>new Map());
+  return rows.map(row=>{
+    const product=products.get(String(row.barcode||""))||{};
+    return {
+      ...row,
+      product_name:product.name||row.product_name||"",
+      quantity:Number(row.quantity||0),
+      updated_at:row.updated_at||product.updated_at||""
+    };
+  }).filter(row=>row.barcode&&row.quantity>0);
+}
+
 async function seedBoothEventStartInventoryFromCommonShelf(event,storeCode){
   const eventId=String(event?.id||"").trim();
   if(!eventId)return {count:0,total:0,skipped:true};
@@ -5458,12 +5492,18 @@ async function registerBoothCarryOut(){
     const product=await findBoothProductByBarcode(barcode);
     if(!product){boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothCarryOutBarcode");return;}
     baseBefore=Number(product.base_stock||0);
-    if(baseBefore<quantity){
-      boothShowError("持ち出し登録エラー",`通常棚在庫が不足しています。現在庫 ${baseBefore} / 持ち出し ${quantity}`,"boothCarryOutQty");
-      return;
+    const baseAfter=baseBefore-quantity;
+    const negativeCarryOut=baseAfter<0;
+    if(negativeCarryOut){
+      const confirmed=await confirmBoothNegativeCarryOut(baseBefore,quantity,baseAfter);
+      if(!confirmed)return;
     }
+    const movementMemo=[
+      memo,
+      negativeCarryOut?`通常棚不足の状態でイベント持ち出し登録（処理前 ${baseBefore} / 持ち出し ${quantity} / 処理後 ${baseAfter}）`:""
+    ].filter(Boolean).join(" / ");
     previousStorage=await findBoothEventStorageStock(storeCode,product.barcode);
-    await updateBoothProductBaseStock(product.barcode,baseBefore-quantity);
+    await updateBoothProductBaseStock(product.barcode,baseAfter);
     await upsertBoothEventStorageStock(storeCode,product,quantity);
     const movementRows=await sb("booth_stock_movements",{
       method:"POST",
@@ -5476,7 +5516,7 @@ async function registerBoothCarryOut(){
         movement_type:"take_out",
         quantity,
         staff,
-        memo,
+        memo:movementMemo,
         takeout_source:"normal",
         affects_smaregi:false,
         smaregi_delta:0
@@ -5495,7 +5535,7 @@ async function registerBoothCarryOut(){
         movement_type:"storage_in",
         quantity,
         staff,
-        memo
+        memo:movementMemo
       }])
     });
     storageMovement=Array.isArray(storageMovementRows)&&storageMovementRows[0]?storageMovementRows[0]:null;
@@ -6700,6 +6740,22 @@ function calculateBoothItemDifference(item){
     ?getBoothNormalCarryOutTotalQty(item)
     :Number(item?.taken_qty||0);
   return taken-Number(item?.sold_qty||0)-Number(item?.returned_qty||0)-gachaConsumed;
+}
+
+async function confirmBoothNegativeCarryOut(currentQty,takeoutQty,afterQty){
+  const body=[
+    "通常棚在庫が不足しています。",
+    "",
+    `現在庫：${currentQty}`,
+    `持ち出し：${takeoutQty}`,
+    `持ち出し後：${afterQty}`,
+    "",
+    "このまま持ち出しを登録しますか？"
+  ].join("\n");
+  if(typeof confirmAppAction==="function"){
+    return await confirmAppAction("通常棚在庫が不足しています",body,{okText:"マイナス在庫で登録",cancelText:"キャンセル"});
+  }
+  return window.confirm(body);
 }
 
 function getBoothDiffStatus(item){
@@ -8931,7 +8987,7 @@ async function buildBoothDepartureInventoryData(eventId){
   const storeCode=getBoothCurrentStoreCode();
   const selectedEventId=String(eventId||boothCurrentEventId||"").trim();
   const [commonRows,eventNormalRows,gachaRows]=await Promise.all([
-    loadBoothCommonEventShelfStartRows(storeCode,{excludeEventId:selectedEventId}).catch(()=>[]),
+    loadBoothCurrentEventStorageRows(storeCode).catch(()=>[]),
     selectedEventId
       ? sb(`booth_event_items?select=id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,updated_at&event_id=eq.${encodeURIComponent(selectedEventId)}&item_type=eq.normal&order=product_name.asc&limit=5000`).catch(()=>[])
       : Promise.resolve([]),
@@ -9030,7 +9086,7 @@ function renderBoothDepartureNormalSection(rows){
     return `<tr data-booth-departure-row data-item-id="${esc(row.id||"")}" data-barcode="${esc(row.barcode||"")}">
       <td>${esc(row.product_name||"-")}</td>
       <td>${esc(row.barcode||"-")}</td>
-      <td><input class="booth-history-qty-input" data-booth-departure-start type="number" min="0" step="1" inputmode="numeric" value="${esc(row.startQty??0)}" disabled readonly></td>
+      <td><input class="booth-history-qty-input" data-booth-departure-start type="number" min="0" step="1" inputmode="numeric" value="${esc(row.startQty??0)}" ${disabled}></td>
       <td><input class="booth-history-qty-input" data-booth-departure-additional type="number" min="0" step="1" inputmode="numeric" value="${esc(row.additionalQty??0)}" ${disabled}></td>
       <td><strong data-booth-departure-total>${esc(row.taken??0)}</strong></td>
       <td>${esc(row.commonShelfQty??0)}</td>
@@ -9046,7 +9102,7 @@ function renderBoothDepartureNormalSection(rows){
     return `<article class="booth-history-card booth-departure-card" data-booth-departure-row data-item-id="${esc(row.id||"")}" data-barcode="${esc(row.barcode||"")}">
       <div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong><span>${esc(row.barcode||"-")}</span></div>
       <div class="booth-history-card-meta"><span>今回持ち出し: <strong data-booth-departure-total>${esc(row.taken??0)}</strong></span><span>共通イベント棚現在庫: ${esc(row.commonShelfQty??0)}</span><span>最終更新: ${esc(formatBoothDateTime(row.updated_at))}</span></div>
-      <label>開始時イベント棚<input class="booth-history-qty-input" data-booth-departure-start type="number" min="0" step="1" inputmode="numeric" value="${esc(row.startQty??0)}" disabled readonly></label>
+      <label>開始時イベント棚<input class="booth-history-qty-input" data-booth-departure-start type="number" min="0" step="1" inputmode="numeric" value="${esc(row.startQty??0)}" ${disabled}></label>
       <label>追加持ち出し<input class="booth-history-qty-input" data-booth-departure-additional type="number" min="0" step="1" inputmode="numeric" value="${esc(row.additionalQty??0)}" ${disabled}></label>
       ${action}
     </article>`;
@@ -9073,9 +9129,11 @@ async function saveBoothDepartureCorrection(itemId,button){
   const event=getBoothCurrentEvent();
   if(!event)throw new Error("イベントが選択されていません。");
   const row=button?.closest("[data-booth-departure-row]");
+  const startInput=row?.querySelector("[data-booth-departure-start]");
   const additionalInput=row?.querySelector("[data-booth-departure-additional]");
+  const newStartRaw=String(startInput?.value||"").trim();
   const newAdditionalRaw=String(additionalInput?.value||"").trim();
-  if(!/^\d+$/.test(newAdditionalRaw)){
+  if(!/^\d+$/.test(newStartRaw)||!/^\d+$/.test(newAdditionalRaw)){
     boothShowError("持ち出し数修正エラー","開始時イベント棚・追加持ち出しは0以上の整数で入力してください。");
     return;
   }
@@ -9083,10 +9141,11 @@ async function saveBoothDepartureCorrection(itemId,button){
   if(String(item.event_id)!==String(event.id))throw new Error("別イベントの商品は修正できません。");
   if(String(item.item_type||"normal")!=="normal")throw new Error("通常商品の持ち出しだけ修正できます。");
   const oldStart=Math.max(0,Number(item.storage_takeout_qty||0));
-  const newStart=oldStart;
+  const newStart=Number(newStartRaw);
   const newAdditional=Number(newAdditionalRaw);
   const oldAdditional=Math.max(0,Number(item.normal_takeout_qty||0));
   const additionalDelta=newAdditional-oldAdditional;
+  const startDelta=newStart-oldStart;
   const product=await findBoothProductByBarcode(item.barcode);
   if(!product)throw new Error(`商品マスターが見つかりません：${item.barcode}`);
   const storeCode=getBoothCurrentStoreCode();
@@ -9099,9 +9158,12 @@ async function saveBoothDepartureCorrection(itemId,button){
     taken_qty:newStart+newAdditional,
     difference_qty:calculateBoothItemDifference({...item,storage_takeout_qty:newStart,normal_takeout_qty:newAdditional,taken_qty:newStart+newAdditional})
   };
-  if(additionalDelta>0&&baseBefore<additionalDelta){
-    boothShowError("持ち出し数修正エラー",`通常棚在庫が不足しています。\n現在の通常棚：${baseBefore}\n追加したい数量：${additionalDelta}`);
-    return;
+  if(additionalDelta>0){
+    const baseAfter=baseBefore-additionalDelta;
+    if(baseAfter<0){
+      const confirmed=await confirmBoothNegativeCarryOut(baseBefore,additionalDelta,baseAfter);
+      if(!confirmed)return;
+    }
   }
   if(additionalDelta<0&&storageBeforeQty<Math.abs(additionalDelta)){
     boothShowError("持ち出し数修正エラー",`共通イベント棚在庫が不足しているため戻せません。\n現在の共通イベント棚：${storageBeforeQty}\n戻したい数量：${Math.abs(additionalDelta)}`);
@@ -9114,7 +9176,7 @@ async function saveBoothDepartureCorrection(itemId,button){
       await upsertBoothEventStorageStock(storeCode,{barcode:item.barcode,product_name:item.product_name||product.name||""},additionalDelta);
     }
     await patchBoothEventItem(item,patchedPayload);
-    boothShowSuccess("持ち出し数を修正しました",`開始時イベント棚：${oldStart} → ${newStart}\n追加持ち出し：${oldAdditional} → ${newAdditional}`);
+    boothShowSuccess("持ち出し数を修正しました",`開始時イベント棚：${oldStart} → ${newStart}\n追加持ち出し：${oldAdditional} → ${newAdditional}${startDelta!==0?"\n開始時イベント棚の修正では通常棚・共通イベント棚は変更していません。":""}`);
     await loadBoothDepartureInventoryList(event.id);
     if(document.getElementById("boothEventReportBody"))await loadBoothEventReport(event.id);
   }catch(error){
@@ -9332,7 +9394,7 @@ exportBoothDepartureInventoryPdf=async function(event){
 
 if(!window.__aricoBoothDepartureCorrectionHandlersBound){
   document.addEventListener("input",event=>{
-    const input=event.target.closest("[data-booth-departure-additional]");
+    const input=event.target.closest("[data-booth-departure-additional],[data-booth-departure-start]");
     if(input)syncBoothDepartureCorrectionRow(input.closest("[data-booth-departure-row]"));
   });
   document.addEventListener("click",event=>{
