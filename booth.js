@@ -311,7 +311,7 @@ async function loadBoothCommonEventShelfStartRows(storeCode,options={}){
   const excludeEventId=String(options.excludeEventId||"").trim();
   if(!normalizedStore)return [];
   const byBarcode=new Map();
-  const commonRows=await sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(normalizedStore)}&storage_qty=gt.0&order=product_name.asc&limit=5000`).catch(()=>[]);
+  const commonRows=await sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty&store_code=eq.${encodeURIComponent(normalizedStore)}&storage_qty=gt.0&order=product_name.asc&limit=5000`);
   (Array.isArray(commonRows)?commonRows:[]).forEach(row=>{
     const barcode=String(row.barcode||"").trim();
     if(!barcode)return;
@@ -319,11 +319,10 @@ async function loadBoothCommonEventShelfStartRows(storeCode,options={}){
       barcode,
       product_name:row.product_name||"",
       quantity:0,
-      updated_at:row.updated_at||"",
+      updated_at:"",
       source:"event_storage_stocks"
     };
     current.quantity+=Number(row.storage_qty||0);
-    if(row.updated_at&&String(row.updated_at)>String(current.updated_at||""))current.updated_at=row.updated_at;
     if(!current.product_name&&row.product_name)current.product_name=row.product_name;
     byBarcode.set(barcode,current);
   });
@@ -364,11 +363,12 @@ async function loadBoothCommonEventShelfStartRows(storeCode,options={}){
   }).filter(row=>row.barcode&&row.quantity>0);
 }
 
-async function loadBoothCurrentEventStorageRows(storeCode){
+async function loadBoothCurrentEventStorageRows(storeCode,options={}){
   const normalizedStore=normalizeBoothStoreCode(storeCode||getBoothCurrentStoreCode());
   if(!normalizedStore)return [];
   const byBarcode=new Map();
-  const commonRows=await sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(normalizedStore)}&storage_qty=gt.0&order=product_name.asc&limit=5000`).catch(()=>[]);
+  const selectedEventId=String(options.eventId||"").trim();
+  const commonRows=await sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty&store_code=eq.${encodeURIComponent(normalizedStore)}&storage_qty=gt.0&order=product_name.asc&limit=5000`);
   (Array.isArray(commonRows)?commonRows:[]).forEach(row=>{
     const barcode=String(row.barcode||"").trim();
     const quantity=Number(row.storage_qty||0);
@@ -381,10 +381,46 @@ async function loadBoothCurrentEventStorageRows(storeCode){
       source:"event_storage_stocks"
     };
     current.quantity+=quantity;
-    if(row.updated_at&&String(row.updated_at)>String(current.updated_at||""))current.updated_at=row.updated_at;
     if(!current.product_name&&row.product_name)current.product_name=row.product_name;
     byBarcode.set(barcode,current);
   });
+  const eventRows=await sb(`booth_events?select=id,store_code,status,created_at&store_code=eq.${encodeURIComponent(normalizedStore)}&order=created_at.desc&limit=5000`);
+  const events=(Array.isArray(eventRows)?eventRows:[])
+    .filter(event=>normalizeBoothStoreCode(event?.store_code)===normalizedStore)
+    .filter(event=>String(event?.status||"").toLowerCase()!=="deleted");
+  const eventOrderIds=[];
+  if(selectedEventId&&events.some(event=>String(event.id||"")===selectedEventId)){
+    eventOrderIds.push(selectedEventId);
+  }
+  events.forEach(event=>{
+    const id=String(event.id||"").trim();
+    if(id&&!eventOrderIds.includes(id))eventOrderIds.push(id);
+  });
+  if(eventOrderIds.length){
+    const orderMap=new Map(eventOrderIds.map((id,index)=>[id,index]));
+    const itemRows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,shelf_return_qty,event_storage_qty,return_process_type,updated_at&event_id=in.(${buildInFilter(eventOrderIds)})&item_type=eq.normal&order=updated_at.desc&limit=50000`);
+    const sortedItems=(Array.isArray(itemRows)?itemRows:[]).slice().sort((a,b)=>{
+      const orderA=orderMap.has(String(a.event_id||""))?orderMap.get(String(a.event_id||"")):999999;
+      const orderB=orderMap.has(String(b.event_id||""))?orderMap.get(String(b.event_id||"")):999999;
+      if(orderA!==orderB)return orderA-orderB;
+      return new Date(b.updated_at||0).getTime()-new Date(a.updated_at||0).getTime();
+    });
+    const seenEventBarcodes=new Set();
+    sortedItems.forEach(item=>{
+      const barcode=String(item.barcode||"").trim();
+      if(!barcode||byBarcode.has(barcode)||seenEventBarcodes.has(barcode))return;
+      seenEventBarcodes.add(barcode);
+      const quantity=getBoothCommonShelfCurrentQtyFromEventItem(item);
+      if(quantity<=0)return;
+      byBarcode.set(barcode,{
+        barcode,
+        product_name:item.product_name||"",
+        quantity,
+        updated_at:item.updated_at||"",
+        source:"booth_event_items"
+      });
+    });
+  }
   const rows=[...byBarcode.values()].filter(row=>Number(row.quantity||0)>0);
   const products=await loadBoothProductsByBarcode(rows.map(row=>row.barcode)).catch(()=>new Map());
   return rows.map(row=>{
@@ -393,7 +429,7 @@ async function loadBoothCurrentEventStorageRows(storeCode){
       ...row,
       product_name:product.name||row.product_name||"",
       quantity:Number(row.quantity||0),
-      updated_at:row.updated_at||product.updated_at||""
+      updated_at:row.updated_at||""
     };
   }).filter(row=>row.barcode&&row.quantity>0);
 }
@@ -2462,7 +2498,7 @@ async function loadBoothProductsByBarcode(barcodes){
   const unique=[...new Set((barcodes||[]).filter(Boolean).map(String))];
   if(!unique.length)return new Map();
   const inList=unique.map(v=>encodeURIComponent(v)).join(",");
-  const rows=await sb(`products?select=barcode,name,location,category,genre,department,smaregi_product_id,price,updated_at&barcode=in.(${inList})&limit=1000`).catch(()=>[]);
+  const rows=await sb(`products?select=barcode,name,location,category,genre,department,smaregi_product_id,price&barcode=in.(${inList})&limit=1000`).catch(()=>[]);
   return new Map((Array.isArray(rows)?rows:[]).map(row=>[String(row.barcode||""),row]));
 }
 
@@ -2579,7 +2615,7 @@ async function buildBoothEventInventoryRows(eventId){
       name:product.name||item.product_name||"",
       product_name:item.product_name||product.name||"",
       shelf:boothProductShelfText(product),
-      updated_at:product.updated_at||item.updated_at||"",
+      updated_at:item.updated_at||"",
       eventShelfQty:0
     };
     row.eventShelfQty+=boothEventItemCurrentQty(item);
@@ -3305,7 +3341,7 @@ async function renderBoothGachaListPanel(event){
           counted:isBoothGachaReturnCounted(item),
           returned:boothGachaReturnActualQty(item),
           used:boothGachaUsedQty(item),
-          updated_at:product.updated_at||item.updated_at||""
+          updated_at:item.updated_at||""
         };
       });
       if(!viewRows.length){
@@ -8987,7 +9023,7 @@ async function buildBoothDepartureInventoryData(eventId){
   const storeCode=getBoothCurrentStoreCode();
   const selectedEventId=String(eventId||boothCurrentEventId||"").trim();
   const [commonRows,eventNormalRows,gachaRows]=await Promise.all([
-    loadBoothCurrentEventStorageRows(storeCode).catch(()=>[]),
+    loadBoothCurrentEventStorageRows(storeCode,{eventId:selectedEventId}),
     selectedEventId
       ? sb(`booth_event_items?select=id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,updated_at&event_id=eq.${encodeURIComponent(selectedEventId)}&item_type=eq.normal&order=product_name.asc&limit=5000`).catch(()=>[])
       : Promise.resolve([]),
@@ -9151,7 +9187,10 @@ async function saveBoothDepartureCorrection(itemId,button){
   const storeCode=getBoothCurrentStoreCode();
   const baseBefore=Number(product.base_stock||0);
   const storageBefore=await findBoothEventStorageStock(storeCode,item.barcode);
-  const storageBeforeQty=Number(storageBefore?.storage_qty||0);
+  const currentStorageRows=await loadBoothCurrentEventStorageRows(storeCode,{eventId:event.id});
+  const currentStorageRow=(Array.isArray(currentStorageRows)?currentStorageRows:[])
+    .find(row=>String(row.barcode||"").trim()===String(item.barcode||"").trim());
+  const storageBeforeQty=Number(currentStorageRow?.quantity??storageBefore?.storage_qty??0);
   const patchedPayload={
     storage_takeout_qty:newStart,
     normal_takeout_qty:newAdditional,
@@ -9173,17 +9212,23 @@ async function saveBoothDepartureCorrection(itemId,button){
     if(button)button.disabled=true;
     if(additionalDelta!==0){
       await adjustBoothProductBaseStock(item.barcode,-additionalDelta);
-      await upsertBoothEventStorageStock(storeCode,{barcode:item.barcode,product_name:item.product_name||product.name||""},additionalDelta);
+      if(storageBefore){
+        await upsertBoothEventStorageStock(storeCode,{barcode:item.barcode,product_name:item.product_name||product.name||""},additionalDelta);
+      }
     }
     await patchBoothEventItem(item,patchedPayload);
-    boothShowSuccess("持ち出し数を修正しました",`開始時イベント棚：${oldStart} → ${newStart}\n追加持ち出し：${oldAdditional} → ${newAdditional}${startDelta!==0?"\n開始時イベント棚の修正では通常棚・共通イベント棚は変更していません。":""}`);
+    const nextBaseStock=baseBefore-additionalDelta;
+    const negativeNote=additionalDelta!==0&&nextBaseStock<0
+      ? `\n通常棚在庫は${nextBaseStock}になります。マイナス在庫として記録しました。`
+      : "";
+    boothShowSuccess("持ち出し数を修正しました",`開始時イベント棚：${oldStart} → ${newStart}\n追加持ち出し：${oldAdditional} → ${newAdditional}${startDelta!==0?"\n開始時イベント棚の修正では通常棚・共通イベント棚は変更していません。":""}${negativeNote}`);
     await loadBoothDepartureInventoryList(event.id);
     if(document.getElementById("boothEventReportBody"))await loadBoothEventReport(event.id);
   }catch(error){
     try{
       if(additionalDelta!==0){
         await updateBoothProductBaseStock(item.barcode,baseBefore);
-        await restoreBoothEventStorageStock(storeCode,item,storageBefore);
+        if(storageBefore)await restoreBoothEventStorageStock(storeCode,item,storageBefore);
       }
     }catch(rollbackError){console.warn("[booth departure correction rollback failed]",rollbackError);}
     boothShowError("持ち出し数修正エラー",error.message||"持ち出し数の修正に失敗しました。");

@@ -1,6 +1,6 @@
 (function(){
-  const PRODUCT_SELECT="barcode,name,smaregi_product_id,base_stock,location,price,category,genre,department,updated_at";
-  const STORAGE_SELECT="store_code,barcode,product_name,storage_qty,updated_at";
+  const PRODUCT_SELECT="barcode,name,smaregi_product_id,base_stock,location,price,category,genre,department,created_at";
+  const STORAGE_SELECT="store_code,barcode,product_name,storage_qty";
   const PAGE_SIZE=300;
   const state={
     rows:[],
@@ -62,16 +62,17 @@
     return await sbAll(`products?select=${PRODUCT_SELECT}&order=name.asc`,1000,30000);
   }
   async function fetchEventStorage(storeCode){
-    const rows=await sbAll(`event_storage_stocks?select=${STORAGE_SELECT}&store_code=eq.${encodeURIComponent(storeCode)}&order=product_name.asc`,1000,30000).catch(()=>[]);
+    const rows=typeof loadBoothCurrentEventStorageRows==="function"
+      ? await loadBoothCurrentEventStorageRows(storeCode)
+      : await sbAll(`event_storage_stocks?select=${STORAGE_SELECT}&store_code=eq.${encodeURIComponent(storeCode)}&order=product_name.asc`,1000,30000);
     const map=new Map();
     (Array.isArray(rows)?rows:[]).forEach(row=>{
       const barcode=text(row.barcode);
-      const quantity=num(row.storage_qty);
+      const quantity=num(row.quantity??row.storage_qty);
       if(!barcode||quantity===0)return;
-      const current=map.get(barcode)||{barcode,quantity:0,product_name:"",updated_at:""};
+      const current=map.get(barcode)||{barcode,quantity:0,product_name:""};
       current.quantity+=quantity;
       if(!current.product_name&&row.product_name)current.product_name=row.product_name;
-      current.updated_at=maxDate(current.updated_at,row.updated_at);
       map.set(barcode,current);
     });
     return map;
@@ -80,7 +81,7 @@
     const barcode=text(product?.barcode||storage?.barcode);
     const baseStock=num(product?.base_stock);
     const eventStock=num(storage?.quantity);
-    const comparisonStock=baseStock-eventStock;
+    const comparisonStock=baseStock+eventStock;
     const row={
       barcode,
       name:text(product?.name||storage?.product_name||"商品名未登録"),
@@ -92,7 +93,7 @@
       baseStock,
       eventStock,
       comparisonStock,
-      updatedAt:maxDate(product?.updated_at,storage?.updated_at),
+      updatedAt:"",
       rawProduct:product||null,
       searchText:""
     };
@@ -160,7 +161,6 @@
     sorted.sort((a,b)=>{
       if(sortKey==="barcode")return textCompare(a.barcode,b.barcode)||textCompare(a.name,b.name);
       if(sortKey==="shelf")return textCompare(a.shelf,b.shelf)||textCompare(a.name,b.name);
-      if(sortKey==="updated")return textCompare(b.updatedAt,a.updatedAt)||textCompare(a.name,b.name);
       if(sortKey==="base_desc")return b.baseStock-a.baseStock||textCompare(a.name,b.name);
       if(sortKey==="event_desc")return b.eventStock-a.eventStock||textCompare(a.name,b.name);
       if(sortKey==="comparison_desc")return b.comparisonStock-a.comparisonStock||textCompare(a.name,b.name);
@@ -206,7 +206,6 @@
       <td class="${rowClass(row.baseStock)}">${safeEsc(row.baseStock)}</td>
       <td>${safeEsc(row.eventStock)}</td>
       <td class="${rowClass(row.comparisonStock)}">${safeEsc(row.comparisonStock)}</td>
-      <td>${safeEsc(formatDateTime(row.updatedAt))}</td>
       <td>${admin?`<button type="button" class="secondary" data-inventory-list-edit="${safeEsc(row.barcode)}">修正</button>`:"-"}</td>
     </tr>`;
   }
@@ -227,7 +226,7 @@
     if(summary)summary.innerHTML=summaryHtml();
     const visible=state.filtered.slice(0,state.renderLimit);
     const body=byId("inventoryListTableBody");
-    if(body)body.innerHTML=visible.map(renderTableRow).join("")||`<tr><td colspan="12">条件に一致する商品はありません。</td></tr>`;
+    if(body)body.innerHTML=visible.map(renderTableRow).join("")||`<tr><td colspan="11">条件に一致する商品はありません。</td></tr>`;
     const cards=byId("inventoryListCards");
     if(cards)cards.innerHTML=visible.map(renderCard).join("")||`<div class="booth-empty">条件に一致する商品はありません。</div>`;
     const more=byId("inventoryListMoreBtn");
@@ -339,7 +338,7 @@
   }
   function exportCsv(){
     const rows=[
-      ["商品名","バーコード","商品コード","品番","カラー","サイズ","棚番","通常棚在庫","共通イベント棚在庫","比較用在庫","最終更新"],
+      ["商品名","バーコード","商品コード","品番","カラー","サイズ","棚番","通常棚在庫","共通イベント棚在庫","比較用在庫"],
       ...state.filtered.map(row=>[
         row.name,
         row.barcode,
@@ -350,8 +349,7 @@
         row.shelf,
         row.baseStock,
         row.eventStock,
-        row.comparisonStock,
-        formatDateTime(row.updatedAt)
+        row.comparisonStock
       ])
     ];
     if(typeof downloadCsvFile==="function"){
