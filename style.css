@@ -974,7 +974,8 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   padding:14px;
   background:#fbfffc;
 }
-.booth-return-draft-item:has(.booth-return-unsaved-chip){
+.booth-return-draft-item.is-dirty,
+.booth-return-draft-item:has(.booth-return-unsaved-chip:not([hidden])){
   border-color:#e2bd68;
   background:#fffdf5;
 }
@@ -1014,20 +1015,32 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
 }
 .booth-return-draft-controls{
   display:grid;
-  grid-template-columns:56px minmax(100px,160px) 56px;
+  grid-template-columns:60px minmax(120px,190px) 60px;
   justify-content:start;
-  gap:8px;
+  gap:10px;
   align-items:center;
   margin-top:6px;
 }
 .booth-return-draft-controls input{
   width:100%;
-  min-height:48px;
+  min-height:54px;
   text-align:center;
-  font-size:1.2em;
-  font-weight:800;
+  font-size:1.45em;
+  font-weight:900;
+  border-width:2px;
 }
-.booth-return-draft-controls button{min-height:48px;font-size:1.25em}
+.booth-return-draft-controls button{min-height:54px;font-size:1.35em}
+.booth-return-card-save{
+  width:100%;
+  min-height:46px;
+  margin-top:12px;
+  font-size:1.02em;
+  font-weight:900;
+}
+.booth-return-card-save:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
 .booth-return-apply-btn{
   width:100%;
   min-height:50px;
@@ -1079,7 +1092,11 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   }
   .booth-return-draft-controls{
     justify-content:stretch;
-    grid-template-columns:58px minmax(100px,1fr) 58px;
+    grid-template-columns:58px minmax(0,1fr) 58px;
+  }
+  .booth-return-draft-controls input{
+    min-width:0;
+    font-size:1.55em;
   }
 }
 

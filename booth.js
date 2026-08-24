@@ -9901,22 +9901,64 @@ exportBoothEventReportPdf=async function(event){
       const saved=Number(state.saved.get(barcode)??row.returned_qty??0);
       const dirty=value!==saved;
       const saving=state.saving?.has(barcode);
-      return `<article class="booth-return-draft-item" data-pure-return-row data-barcode="${esc(barcode)}">
+      return `<article class="booth-return-draft-item ${saving||dirty?"is-dirty":""}" data-pure-return-row data-barcode="${esc(barcode)}">
         <div class="booth-return-draft-head">
-          <div><strong>${esc(row.product_name||"-")}</strong>${saving?'<span class="booth-return-unsaved-chip">保存中</span>':dirty?'<span class="booth-return-unsaved-chip">未保存</span>':""}</div>
+          <div><strong>${esc(row.product_name||"-")}</strong><span class="booth-return-unsaved-chip" data-pure-return-dirty-chip ${saving||dirty?"":"hidden"}>${saving?"保存中":"未保存"}</span></div>
           <button type="button" class="secondary" data-pure-return-action="remove" data-barcode="${esc(barcode)}" ${closed||saving?"disabled":""}>削除</button>
         </div>
-        <div class="booth-return-draft-meta"><span>バーコード：${esc(barcode)}</span><span>持ち出し数：${esc(max)}</span><span>共有保存済み：${esc(saved)}</span></div>
-        <div class="booth-return-qty-title">戻り実数</div>
+        <div class="booth-return-draft-meta"><span>バーコード：${esc(barcode)}</span><span>持ち出し数：${esc(max)}</span><span data-pure-return-save-summary>共有保存済み：${esc(saved)}</span></div>
+        <div class="booth-return-qty-title">今回の戻り数量</div>
         <div class="booth-return-draft-controls">
           <button type="button" class="secondary" data-pure-return-action="decrease" data-barcode="${esc(barcode)}" ${closed||saving||value<=0?"disabled":""}>−</button>
           <input type="number" min="0" max="${esc(max)}" step="1" inputmode="numeric" value="${esc(value)}" data-pure-return-qty="${esc(barcode)}" ${closed||saving?"disabled":""}>
           <button type="button" class="secondary" data-pure-return-action="increase" data-barcode="${esc(barcode)}" ${closed||saving||value>=max?"disabled":""}>＋</button>
         </div>
+        <button type="button" class="booth-return-card-save" data-pure-return-action="save" data-barcode="${esc(barcode)}" ${closed||saving||!dirty?"disabled":""}>保存</button>
       </article>`;
     }).join("");
     updateSummary();
     list.scrollTop=previousScrollTop;
+  }
+
+  function pureReturnCardForBarcode(barcode){
+    const list=el("boothReturnDraftList");
+    if(!list)return null;
+    return [...list.querySelectorAll("[data-pure-return-row]")].find(node=>String(node.dataset.barcode||"")===String(barcode||""))||null;
+  }
+
+  function refreshPureReturnDraftCard(state,barcode){
+    const row=state?.rows?.get(String(barcode||""));
+    const card=pureReturnCardForBarcode(barcode);
+    if(!row||!card)return;
+    const value=Number(state.draft.get(String(barcode))??row.returned_qty??0);
+    const saved=Number(state.saved.get(String(barcode))??row.returned_qty??0);
+    const saving=state.saving?.has(String(barcode));
+    const dirty=value!==saved;
+    const chip=card.querySelector("[data-pure-return-dirty-chip]");
+    if(chip){
+      chip.textContent=saving?"保存中":"未保存";
+      chip.hidden=!(saving||dirty);
+    }
+    const summary=card.querySelector("[data-pure-return-save-summary]");
+    if(summary)summary.textContent=dirty?`共有保存済み：${saved} → 今回：${value}`:`共有保存済み：${saved}`;
+    const save=card.querySelector("[data-pure-return-action='save']");
+    if(save)save.disabled=state.loading||saving||!dirty||isBoothEventClosed(state.event);
+    const decrease=card.querySelector("[data-pure-return-action='decrease']");
+    if(decrease)decrease.disabled=state.loading||saving||value<=0||isBoothEventClosed(state.event);
+    const increase=card.querySelector("[data-pure-return-action='increase']");
+    if(increase)increase.disabled=state.loading||saving||value>=takeoutQty(row)||isBoothEventClosed(state.event);
+    card.classList.toggle("is-dirty",dirty);
+  }
+
+  function focusPureReturnQty(barcode){
+    setTimeout(()=>{
+      const card=pureReturnCardForBarcode(barcode);
+      const input=card?.querySelector("[data-pure-return-qty]");
+      if(input){
+        input.focus({preventScroll:true});
+        input.select?.();
+      }
+    },80);
   }
 
   function renderPureReturnSearchResults(state){
@@ -10020,7 +10062,7 @@ exportBoothEventReportPdf=async function(event){
     return Array.isArray(rows)&&rows.length?rows[0]:null;
   }
 
-  async function savePureReturnQty(state,barcode,nextQty,{increment=0}={}){
+  async function savePureReturnQty(state,barcode,nextQty,{increment=0,focusQty=false}={}){
     barcode=String(barcode||"");
     const event=state?.event;
     if(!event||!barcode||state.loading||isBoothEventClosed(event))return;
@@ -10056,6 +10098,7 @@ exportBoothEventReportPdf=async function(event){
       state.saving.delete(barcode);
       renderPureReturnList(state);
       renderPureReturnSearchResults(state);
+      if(focusQty)focusPureReturnQty(barcode);
     }
   }
 
@@ -10130,6 +10173,29 @@ exportBoothEventReportPdf=async function(event){
       if(button.dataset.pureReturnAction==="remove")void savePureReturnQty(state,barcode,0);
       else if(button.dataset.pureReturnAction==="increase")changePureReturnQty(state,barcode,1);
       else if(button.dataset.pureReturnAction==="decrease")changePureReturnQty(state,barcode,-1);
+      else if(button.dataset.pureReturnAction==="save"){
+        const row=state.rows.get(barcode);
+        if(!row)return;
+        const next=Number(state.draft.get(barcode)??row.returned_qty??0);
+        void savePureReturnQty(state,barcode,next);
+      }
+    });
+    el("boothReturnDraftList")?.addEventListener("input",inputEvent=>{
+      const input=inputEvent.target.closest("[data-pure-return-qty]");
+      if(!input)return;
+      const barcode=String(input.dataset.pureReturnQty||"");
+      const row=state.rows.get(barcode);
+      if(!row)return;
+      const text=String(input.value||"").trim();
+      if(text!==""&&!/^[0-9]+$/.test(text)){
+        input.value=String(state.draft.get(barcode)??row.returned_qty??0);
+        return;
+      }
+      const max=takeoutQty(row);
+      const next=text===""?0:Math.max(0,Math.min(max,Number(text)));
+      if(String(next)!==text&&text!=="")input.value=String(next);
+      state.draft.set(barcode,next);
+      refreshPureReturnDraftCard(state,barcode);
     });
     el("boothReturnDraftList")?.addEventListener("change",inputEvent=>{
       const input=inputEvent.target.closest("[data-pure-return-qty]");
@@ -10138,7 +10204,10 @@ exportBoothEventReportPdf=async function(event){
       const row=state.rows.get(barcode);
       const text=String(input.value||"").trim();
       if(!row||!/^[0-9]+$/.test(text)){renderPureReturnList(state);return;}
-      void savePureReturnQty(state,barcode,Math.max(0,Math.min(takeoutQty(row),Number(text))));
+      const next=Math.max(0,Math.min(takeoutQty(row),Number(text)));
+      input.value=String(next);
+      state.draft.set(barcode,next);
+      refreshPureReturnDraftCard(state,barcode);
     });
     el("boothReturnApplyBtn")?.addEventListener("click",()=>void root.saveBoothReturnDraft());
     el("reloadBoothReturnHistoryBtn")?.addEventListener("click",()=>void loadPureReturnState(state));
@@ -10173,11 +10242,12 @@ exportBoothEventReportPdf=async function(event){
       return;
     }
     const current=Number(state.draft.get(barcode)??row.returned_qty??0);
+    const saved=Number(state.saved.get(barcode)??row.returned_qty??0);
     if(current>=takeoutQty(row)){
       boothShowError("数量上限","戻り実数は持ち出し数を超えられません。","boothReturnBarcode");
       return;
     }
-    await savePureReturnQty(state,barcode,current+1,{increment:1});
+    await savePureReturnQty(state,barcode,current+1,{increment:current===saved?1:0,focusQty:true});
   };
 
   root.saveBoothReturnDraft=async function(){
