@@ -4179,7 +4179,12 @@ async function startBoothCarryOutCamera(){
       }
       boothZXingRunning=true;
       startBoothNoScanTimer();
-      await boothZXingReader.decodeFromConstraints(
+      const onZXingResult=async(result)=>{
+        if(result&&boothZXingRunning){
+          await handleBoothScannedCode(result.getText());
+        }
+      };
+      const zxingConstraints=[
         {video:{
           facingMode:{ideal:"environment"},
           width:{ideal:2560},
@@ -4187,13 +4192,22 @@ async function startBoothCarryOutCamera(){
           focusMode:{ideal:"continuous"},
           exposureMode:{ideal:"continuous"}
         }},
-        video,
-        async(result)=>{
-          if(result&&boothZXingRunning){
-            await handleBoothScannedCode(result.getText());
-          }
+        {video:{facingMode:{ideal:"environment"}}},
+        {video:true}
+      ];
+      let zxingStarted=false;
+      let lastZXingError=null;
+      for(const constraints of zxingConstraints){
+        try{
+          await boothZXingReader.decodeFromConstraints(constraints,video,onZXingResult);
+          zxingStarted=true;
+          break;
+        }catch(cameraError){
+          lastZXingError=cameraError;
+          try{boothZXingReader.reset();}catch(_){}
         }
-      );
+      }
+      if(!zxingStarted)throw lastZXingError||new Error("カメラを起動できませんでした。");
       improveBoothCameraTrack(video);
       showBoothLocalMessage("カメラ読取中です。赤枠にバーコードを合わせてください。","ok");
       return;
@@ -4201,7 +4215,21 @@ async function startBoothCarryOutCamera(){
 
     if("BarcodeDetector"in window){
       boothBarcodeDetector=new BarcodeDetector({formats:["ean_13","ean_8","code_128","code_39","qr_code"]});
-      boothCameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+      const constraintsList=[
+        {video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}}},
+        {video:{facingMode:"environment"}},
+        {video:true}
+      ];
+      let lastCameraError=null;
+      for(const constraints of constraintsList){
+        try{
+          boothCameraStream=await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        }catch(cameraError){
+          lastCameraError=cameraError;
+        }
+      }
+      if(!boothCameraStream)throw lastCameraError||new Error("カメラを起動できませんでした。");
       video.srcObject=boothCameraStream;
       await video.play();
       boothCameraScanning=true;
@@ -4215,7 +4243,11 @@ async function startBoothCarryOutCamera(){
     boothCameraError("カメラ起動エラー","カメラを起動できませんでした。");
   }catch(e){
     await stopBoothCarryOutCamera(false);
-    boothCameraError("カメラ起動エラー","カメラを起動できませんでした。");
+    let message="カメラを起動できませんでした。";
+    if(e?.name==="NotAllowedError")message="カメラの使用が許可されていません。ブラウザのカメラ権限を確認してください。";
+    else if(e?.name==="NotFoundError")message="使用できるカメラが見つかりません。";
+    else if(e?.message)message=e.message;
+    boothCameraError("カメラ起動エラー",message);
   }
 }
 
@@ -5417,7 +5449,10 @@ async function handleBoothScannedCode(code){
   await stopBoothCarryOutCamera(false);
   boothCameraSuccess("バーコードを読み取りました。");
   if(boothScanTarget==="departure-count")await addBoothDepartureCountFromInput();
-  else if(boothScanTarget==="return")await addBoothReturnDraftFromBarcode(code);
+  else if(boothScanTarget==="return"){
+    if(typeof window.addBoothReturnDraftFromBarcode==="function")await window.addBoothReturnDraftFromBarcode(code);
+    else await addBoothReturnDraftFromBarcode(code);
+  }
   else if(boothScanTarget==="gacha-return-count")await addBoothGachaReturnDraftFromBarcode(getBoothCurrentEvent(),code);
   else if(boothScanTarget==="storage")await previewBoothStorageProduct({popupOnError:false});
   else if(boothScanTarget==="gacha")await previewBoothGachaProduct({popupOnError:false});
@@ -9879,6 +9914,40 @@ exportBoothEventReportPdf=async function(event){
     list.scrollTop=previousScrollTop;
   }
 
+  function renderPureReturnSearchResults(state){
+    const box=el("boothReturnProductSearchResults");
+    if(!box)return;
+    const query=String(state.query||"").trim().toLowerCase();
+    if(!query){
+      box.hidden=true;
+      box.innerHTML="";
+      return;
+    }
+    box.hidden=false;
+    if(state.loading){
+      box.innerHTML='<div class="booth-empty">戻り実数を読み込み中...</div>';
+      return;
+    }
+    if(state.error){
+      box.innerHTML=`<div class="booth-error-message">${esc(state.error)}</div>`;
+      return;
+    }
+    const rows=[...state.rows.values()].filter(row=>{
+      return `${row.product_name||""} ${row.barcode||""}`.toLowerCase().includes(query);
+    }).slice(0,30);
+    if(!rows.length){
+      box.innerHTML='<div class="booth-empty">該当商品がありません。</div>';
+      return;
+    }
+    box.innerHTML=rows.map(row=>{
+      const barcode=String(row.barcode||"");
+      return `<button type="button" class="booth-return-search-result" data-pure-return-search-barcode="${esc(barcode)}">
+        <span class="booth-return-search-copy"><strong>${esc(row.product_name||"-")}</strong><small>バーコード: ${esc(barcode)} / 持ち出し数: ${esc(takeoutQty(row))}</small></span>
+        <span class="booth-return-search-action">選択</span>
+      </button>`;
+    }).join("");
+  }
+
   function renderPureReturnHistory(state,rows){
     const list=el("boothReturnHistoryList");
     if(!list)return;
@@ -9912,12 +9981,14 @@ exportBoothEventReportPdf=async function(event){
       }
       state.loading=false;
       renderPureReturnList(state);
+      renderPureReturnSearchResults(state);
       renderPureReturnHistory(state,rows);
       setPureReturnControlsDisabled(isBoothEventClosed(state.event));
     }catch(error){
       state.loading=false;
       state.error=error?.message||"戻り実績を取得できませんでした。";
       renderPureReturnList(state);
+      renderPureReturnSearchResults(state);
       renderPureReturnHistory(state,[]);
       setPureReturnControlsDisabled(true);
     }
@@ -9953,8 +10024,12 @@ exportBoothEventReportPdf=async function(event){
           <button type="button" id="boothReturnStartCameraBtn" ${closed?"disabled":""}>カメラ読取</button>
           <button type="button" id="boothReturnStopCameraBtn" class="secondary">停止</button>
         </div>
-        <div class="booth-return-product-search"><label>商品検索<input id="boothReturnProductSearch" autocomplete="off" placeholder="商品名・バーコードで検索" ${closed?"disabled":""}></label></div>
+        <div class="booth-return-product-search"><label>商品検索<input id="boothReturnProductSearch" autocomplete="off" placeholder="商品名・バーコードで検索" ${closed?"disabled":""}></label><div id="boothReturnProductSearchResults" class="booth-return-product-search-results" hidden></div></div>
         <div class="booth-return-common-fields"><label>担当者<select id="boothReturnStaff" ${closed?"disabled":""}>${staffOptions}</select></label><label>メモ<input id="boothReturnMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}></label></div>
+      </div>
+      <div class="camera-area booth-camera-area booth-return-camera-area">
+        <video id="boothCarryOutVideo" muted playsinline></video>
+        <div class="camera-guide-overlay" aria-hidden="true"></div>
       </div>
       <div class="booth-return-divider"><span>今回の棚卸</span></div>
       <div id="boothReturnDraftList" class="booth-return-draft-list"><div class="booth-empty" data-pure-return-loading>戻り実数を読み込み中...</div></div>
@@ -9971,7 +10046,18 @@ exportBoothEventReportPdf=async function(event){
     });
     el("boothReturnProductSearch")?.addEventListener("input",inputEvent=>{
       state.query=inputEvent.target.value;
+      renderPureReturnSearchResults(state);
       renderPureReturnList(state);
+    });
+    el("boothReturnProductSearchResults")?.addEventListener("click",inputEvent=>{
+      const button=inputEvent.target.closest("[data-pure-return-search-barcode]");
+      if(!button)return;
+      const barcode=String(button.dataset.pureReturnSearchBarcode||"");
+      const searchInput=el("boothReturnProductSearch");
+      if(searchInput)searchInput.value="";
+      state.query="";
+      renderPureReturnSearchResults(state);
+      void root.addBoothReturnDraftFromBarcode(barcode);
     });
     el("boothReturnDraftList")?.addEventListener("click",inputEvent=>{
       const button=inputEvent.target.closest("[data-pure-return-action]");
@@ -10003,7 +10089,16 @@ exportBoothEventReportPdf=async function(event){
     const event=currentEvent();
     const state=event?stateFor(event):null;
     const barcode=String(rawBarcode||"").trim();
-    if(!event||!state||!barcode||state.loading||isBoothEventClosed(event))return;
+    if(!barcode)return;
+    if(!event||!state){
+      boothShowError("戻り棚卸エラー","イベントを開いてから商品を追加してください。","boothReturnBarcode");
+      return;
+    }
+    if(state.loading){
+      boothShowError("戻り棚卸準備中","戻り実数の読み込み完了後に追加してください。","boothReturnBarcode");
+      return;
+    }
+    if(isBoothEventClosed(event))return;
     let row=state.rows.get(barcode);
     if(!row){
       row=await findBoothEventItemByBarcode(event.id,barcode);
