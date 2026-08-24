@@ -9830,10 +9830,11 @@ exportBoothEventReportPdf=async function(event){
     const id=key(event);
     let state=states.get(id);
     if(!state){
-      state={eventId:id,event,rows:new Map(),draft:new Map(),saved:new Map(),query:"",loading:true,error:""};
+      state={eventId:id,event,rows:new Map(),draft:new Map(),saved:new Map(),saving:new Set(),query:"",loading:true,error:"",lastSyncedAt:""};
       states.set(id,state);
     }
     state.event=event;
+    if(!state.saving)state.saving=new Set();
     return state;
   }
 
@@ -9862,15 +9863,18 @@ exportBoothEventReportPdf=async function(event){
     const previousScrollTop=list.scrollTop||0;
     const updateSummary=()=>{
       const changed=[...state.rows.entries()].filter(([barcode,row])=>Number(state.draft.get(barcode)??row.returned_qty??0)!==Number(state.saved.get(barcode)??row.returned_qty??0)).length;
+      const saving=state.saving?.size||0;
       const badge=el("boothReturnUnsavedBadge");
       if(badge){
-        badge.textContent=`未保存：${changed}商品`;
-        badge.classList.toggle("is-active",changed>0);
+        if(state.loading)badge.textContent="共有棚卸を読み込み中";
+        else if(saving>0)badge.textContent=`保存中：${saving}商品`;
+        else badge.textContent=state.lastSyncedAt?`共有棚卸中 / 最終更新：${state.lastSyncedAt}`:"共有棚卸中";
+        badge.classList.toggle("is-active",changed>0||saving>0);
       }
       const button=el("boothReturnApplyBtn");
       if(button){
-        button.textContent=changed>0?`戻り実数を一括保存（${changed}商品）`:"戻り実数を一括保存";
-        button.disabled=changed===0||state.loading||isBoothEventClosed(state.event);
+        button.textContent=saving>0?"保存中...":"戻り棚卸を確認して完了";
+        button.disabled=state.loading||saving>0||isBoothEventClosed(state.event);
       }
     };
     if(state.loading){
@@ -9896,17 +9900,18 @@ exportBoothEventReportPdf=async function(event){
       const value=Number(state.draft.get(barcode)??row.returned_qty??0);
       const saved=Number(state.saved.get(barcode)??row.returned_qty??0);
       const dirty=value!==saved;
+      const saving=state.saving?.has(barcode);
       return `<article class="booth-return-draft-item" data-pure-return-row data-barcode="${esc(barcode)}">
         <div class="booth-return-draft-head">
-          <div><strong>${esc(row.product_name||"-")}</strong>${dirty?'<span class="booth-return-unsaved-chip">未保存</span>':""}</div>
-          <button type="button" class="secondary" data-pure-return-action="remove" data-barcode="${esc(barcode)}" ${closed?"disabled":""}>削除</button>
+          <div><strong>${esc(row.product_name||"-")}</strong>${saving?'<span class="booth-return-unsaved-chip">保存中</span>':dirty?'<span class="booth-return-unsaved-chip">未保存</span>':""}</div>
+          <button type="button" class="secondary" data-pure-return-action="remove" data-barcode="${esc(barcode)}" ${closed||saving?"disabled":""}>削除</button>
         </div>
-        <div class="booth-return-draft-meta"><span>バーコード：${esc(barcode)}</span><span>持ち出し数：${esc(max)}</span><span>保存済み：${esc(saved)}</span></div>
+        <div class="booth-return-draft-meta"><span>バーコード：${esc(barcode)}</span><span>持ち出し数：${esc(max)}</span><span>共有保存済み：${esc(saved)}</span></div>
         <div class="booth-return-qty-title">戻り実数</div>
         <div class="booth-return-draft-controls">
-          <button type="button" class="secondary" data-pure-return-action="decrease" data-barcode="${esc(barcode)}" ${closed||value<=0?"disabled":""}>−</button>
-          <input type="number" min="0" max="${esc(max)}" step="1" inputmode="numeric" value="${esc(value)}" data-pure-return-qty="${esc(barcode)}" ${closed?"disabled":""}>
-          <button type="button" class="secondary" data-pure-return-action="increase" data-barcode="${esc(barcode)}" ${closed||value>=max?"disabled":""}>＋</button>
+          <button type="button" class="secondary" data-pure-return-action="decrease" data-barcode="${esc(barcode)}" ${closed||saving||value<=0?"disabled":""}>−</button>
+          <input type="number" min="0" max="${esc(max)}" step="1" inputmode="numeric" value="${esc(value)}" data-pure-return-qty="${esc(barcode)}" ${closed||saving?"disabled":""}>
+          <button type="button" class="secondary" data-pure-return-action="increase" data-barcode="${esc(barcode)}" ${closed||saving||value>=max?"disabled":""}>＋</button>
         </div>
       </article>`;
     }).join("");
@@ -9976,9 +9981,10 @@ exportBoothEventReportPdf=async function(event){
       state.rows=new Map(rows.map(row=>[String(row.barcode||""),row]).filter(([barcode])=>barcode));
       for(const [barcode,row] of state.rows){
         const returned=Math.max(0,Number(row.returned_qty||0));
-        if(!state.draft.has(barcode))state.draft.set(barcode,returned);
+        state.draft.set(barcode,returned);
         state.saved.set(barcode,returned);
       }
+      state.lastSyncedAt=new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"});
       state.loading=false;
       renderPureReturnList(state);
       renderPureReturnSearchResults(state);
@@ -9994,14 +10000,72 @@ exportBoothEventReportPdf=async function(event){
     }
   }
 
+  function applyPureReturnRow(state,row){
+    const barcode=String(row?.barcode||"");
+    if(!barcode)return;
+    const returned=Math.max(0,Number(row.returned_qty||0));
+    state.rows.set(barcode,row);
+    state.draft.set(barcode,returned);
+    state.saved.set(barcode,returned);
+    state.lastSyncedAt=new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"});
+  }
+
+  async function patchPureReturnQtyWithCurrentValue(item,currentReturned,nextReturned){
+    const returnedFilter=item.returned_qty===null||item.returned_qty===undefined?"returned_qty=is.null":`returned_qty=eq.${encodeURIComponent(currentReturned)}`;
+    const rows=await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}&${returnedFilter}&select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,returned_qty,updated_at`,{
+      method:"PATCH",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify({returned_qty:nextReturned,updated_at:new Date().toISOString()})
+    });
+    return Array.isArray(rows)&&rows.length?rows[0]:null;
+  }
+
+  async function savePureReturnQty(state,barcode,nextQty,{increment=0}={}){
+    barcode=String(barcode||"");
+    const event=state?.event;
+    if(!event||!barcode||state.loading||isBoothEventClosed(event))return;
+    if(state.saving.has(barcode))return;
+    state.saving.add(barcode);
+    renderPureReturnList(state);
+    try{
+      let latest=null;
+      let updated=null;
+      for(let attempt=0;attempt<3;attempt++){
+        latest=await findBoothEventItemByBarcode(event.id,barcode);
+        if(!latest||latest.item_type!=="normal"||takeoutQty(latest)<=0)throw new Error("このイベントの持ち出し対象商品ではありません。");
+        const max=takeoutQty(latest);
+        const base=Number(latest.returned_qty||0);
+        const rawNext=increment?base+Number(increment||0):Number(nextQty||0);
+        if(!Number.isInteger(rawNext)||rawNext<0)throw new Error("戻り実数は0以上の整数で入力してください。");
+        const safeNext=Math.max(0,Math.min(max,rawNext));
+        if(increment){
+          updated=await patchPureReturnQtyWithCurrentValue(latest,base,safeNext);
+          if(updated)break;
+          continue;
+        }
+        await patchBoothEventItem(latest,{returned_qty:safeNext});
+        updated={...latest,returned_qty:safeNext};
+        break;
+      }
+      if(!updated)throw new Error("他端末の更新と重なりました。もう一度読み取ってください。");
+      applyPureReturnRow(state,{...latest,...updated});
+      renderPureReturnHistory(state,[...state.rows.values()]);
+    }catch(error){
+      boothShowError("戻り実数保存エラー",error?.message||"戻り実数を保存できませんでした。","boothReturnBarcode");
+    }finally{
+      state.saving.delete(barcode);
+      renderPureReturnList(state);
+      renderPureReturnSearchResults(state);
+    }
+  }
+
   function changePureReturnQty(state,barcode,delta){
     const row=state.rows.get(String(barcode||""));
     if(!row)return;
     const max=takeoutQty(row);
     const current=Number(state.draft.get(barcode)??row.returned_qty??0);
     const next=Math.max(0,Math.min(max,current+delta));
-    state.draft.set(barcode,next);
-    renderPureReturnList(state);
+    void savePureReturnQty(state,barcode,next);
   }
 
   root.renderBoothReturnPanel=function(event){
@@ -10033,7 +10097,7 @@ exportBoothEventReportPdf=async function(event){
       </div>
       <div class="booth-return-divider"><span>今回の棚卸</span></div>
       <div id="boothReturnDraftList" class="booth-return-draft-list"><div class="booth-empty" data-pure-return-loading>戻り実数を読み込み中...</div></div>
-      <button type="button" id="boothReturnApplyBtn" class="booth-return-apply-btn" ${closed?"disabled":""}>戻り実数を一括保存</button>
+      <button type="button" id="boothReturnApplyBtn" class="booth-return-apply-btn" ${closed?"disabled":""}>戻り棚卸を確認して完了</button>
     </section>
     <section class="booth-work-card booth-return-history-card"><div class="booth-list-header"><div><h4>過去の戻り履歴</h4><p class="section-note">保存済みの戻り実数です。</p></div><button type="button" id="reloadBoothReturnHistoryBtn" class="secondary">再読み込み</button></div><div id="boothReturnHistoryList" class="booth-carry-history-list"><div class="booth-empty">読み込み中...</div></div></section>`;
 
@@ -10063,10 +10127,9 @@ exportBoothEventReportPdf=async function(event){
       const button=inputEvent.target.closest("[data-pure-return-action]");
       if(!button)return;
       const barcode=String(button.dataset.barcode||"");
-       if(button.dataset.pureReturnAction==="remove")state.draft.set(barcode,0);
+      if(button.dataset.pureReturnAction==="remove")void savePureReturnQty(state,barcode,0);
       else if(button.dataset.pureReturnAction==="increase")changePureReturnQty(state,barcode,1);
       else if(button.dataset.pureReturnAction==="decrease")changePureReturnQty(state,barcode,-1);
-      renderPureReturnList(state);
     });
     el("boothReturnDraftList")?.addEventListener("change",inputEvent=>{
       const input=inputEvent.target.closest("[data-pure-return-qty]");
@@ -10075,8 +10138,7 @@ exportBoothEventReportPdf=async function(event){
       const row=state.rows.get(barcode);
       const text=String(input.value||"").trim();
       if(!row||!/^[0-9]+$/.test(text)){renderPureReturnList(state);return;}
-      state.draft.set(barcode,Math.max(0,Math.min(takeoutQty(row),Number(text))));
-      renderPureReturnList(state);
+      void savePureReturnQty(state,barcode,Math.max(0,Math.min(takeoutQty(row),Number(text))));
     });
     el("boothReturnApplyBtn")?.addEventListener("click",()=>void root.saveBoothReturnDraft());
     el("reloadBoothReturnHistoryBtn")?.addEventListener("click",()=>void loadPureReturnState(state));
@@ -10103,9 +10165,7 @@ exportBoothEventReportPdf=async function(event){
     if(!row){
       row=await findBoothEventItemByBarcode(event.id,barcode);
       if(row&&row.item_type==="normal"&&takeoutQty(row)>0){
-        state.rows.set(barcode,row);
-        state.saved.set(barcode,Number(row.returned_qty||0));
-        state.draft.set(barcode,Number(row.returned_qty||0));
+        applyPureReturnRow(state,row);
       }
     }
     if(!row||row.item_type!=="normal"||takeoutQty(row)<=0){
@@ -10117,8 +10177,7 @@ exportBoothEventReportPdf=async function(event){
       boothShowError("数量上限","戻り実数は持ち出し数を超えられません。","boothReturnBarcode");
       return;
     }
-    state.draft.set(barcode,current+1);
-    renderPureReturnList(state);
+    await savePureReturnQty(state,barcode,current+1,{increment:1});
   };
 
   root.saveBoothReturnDraft=async function(){
@@ -10126,7 +10185,11 @@ exportBoothEventReportPdf=async function(event){
     const state=event?stateFor(event):null;
     if(!event||!state||state.loading||isBoothEventClosed(event))return;
     const changes=[...state.rows.entries()].map(([barcode,row])=>({barcode,row,before:Number(state.saved.get(barcode)??row.returned_qty??0),next:Number(state.draft.get(barcode)??row.returned_qty??0)})).filter(entry=>entry.before!==entry.next);
-    if(!changes.length){boothShowError("戻り実数保存","変更された商品がありません。");return;}
+    if(!changes.length){
+      await loadPureReturnState(state);
+      boothShowSuccess("戻り棚卸を確認しました。","戻り実数は共有データへ保存済みです。戻り先はイベントレポートで確定します。");
+      return;
+    }
     for(const entry of changes){
       if(!Number.isInteger(entry.next)||entry.next<0||entry.next>takeoutQty(entry.row)){
         boothShowError("戻り実数エラー","戻り実数は0以上の整数で、持ち出し数以下にしてください。");
