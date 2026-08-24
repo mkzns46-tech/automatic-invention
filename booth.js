@@ -9830,11 +9830,12 @@ exportBoothEventReportPdf=async function(event){
     const id=key(event);
     let state=states.get(id);
     if(!state){
-      state={eventId:id,event,rows:new Map(),draft:new Map(),saved:new Map(),saving:new Set(),query:"",loading:true,error:"",lastSyncedAt:""};
+      state={eventId:id,event,rows:new Map(),draft:new Map(),saved:new Map(),saving:new Set(),searchQty:new Map(),query:"",loading:true,error:"",lastSyncedAt:""};
       states.set(id,state);
     }
     state.event=event;
     if(!state.saving)state.saving=new Set();
+    if(!state.searchQty)state.searchQty=new Map();
     return state;
   }
 
@@ -9850,11 +9851,7 @@ exportBoothEventReportPdf=async function(event){
   }
 
   function pureReturnRows(state){
-    const query=String(state.query||"").trim().toLowerCase();
-    return [...state.rows.values()].filter(row=>{
-      if(!query)return true;
-      return `${row.product_name||""} ${row.barcode||""}`.toLowerCase().includes(query);
-    });
+    return [...state.rows.values()];
   }
 
   function renderPureReturnList(state){
@@ -9961,6 +9958,26 @@ exportBoothEventReportPdf=async function(event){
     },80);
   }
 
+  function focusPureReturnCandidateQty(barcode){
+    setTimeout(()=>{
+      const box=el("boothReturnProductSearchResults");
+      const card=[...(box?.querySelectorAll("[data-pure-return-candidate]")||[])].find(node=>String(node.dataset.barcode||"")===String(barcode||""));
+      const input=card?.querySelector("[data-pure-return-candidate-qty]");
+      if(input){
+        input.focus({preventScroll:true});
+        input.select?.();
+        card.scrollIntoView?.({block:"nearest",behavior:"smooth"});
+      }
+    },80);
+  }
+
+  function pureReturnCandidateQty(state,row){
+    const barcode=String(row?.barcode||"");
+    const max=takeoutQty(row);
+    const current=Number(state?.searchQty?.get(barcode)??1);
+    return Math.max(0,Math.min(max,current));
+  }
+
   function renderPureReturnSearchResults(state){
     const box=el("boothReturnProductSearchResults");
     if(!box)return;
@@ -9988,11 +10005,64 @@ exportBoothEventReportPdf=async function(event){
     }
     box.innerHTML=rows.map(row=>{
       const barcode=String(row.barcode||"");
-      return `<button type="button" class="booth-return-search-result" data-pure-return-search-barcode="${esc(barcode)}">
-        <span class="booth-return-search-copy"><strong>${esc(row.product_name||"-")}</strong><small>バーコード: ${esc(barcode)} / 持ち出し数: ${esc(takeoutQty(row))}</small></span>
-        <span class="booth-return-search-action">選択</span>
-      </button>`;
+      const max=takeoutQty(row);
+      const value=pureReturnCandidateQty(state,row);
+      return `<article class="booth-return-search-result" data-pure-return-candidate data-barcode="${esc(barcode)}">
+        <div class="booth-return-search-copy"><strong>${esc(row.product_name||"-")}</strong><small>バーコード：${esc(barcode)}</small><small>持ち出し数：${esc(max)}</small></div>
+        <div class="booth-return-qty-title">今回の戻り数量</div>
+        <div class="booth-return-draft-controls booth-return-search-qty-controls">
+          <button type="button" class="secondary" data-pure-return-candidate-action="decrease" data-barcode="${esc(barcode)}" ${value<=0?"disabled":""}>−</button>
+          <input type="number" min="0" max="${esc(max)}" step="1" inputmode="numeric" value="${esc(value)}" data-pure-return-candidate-qty="${esc(barcode)}">
+          <button type="button" class="secondary" data-pure-return-candidate-action="increase" data-barcode="${esc(barcode)}" ${value>=max?"disabled":""}>＋</button>
+        </div>
+        <button type="button" class="booth-return-search-add" data-pure-return-candidate-action="add" data-barcode="${esc(barcode)}">棚卸に追加</button>
+      </article>`;
     }).join("");
+  }
+
+  function clearPureReturnSearch(state){
+    state.query="";
+    state.searchQty.clear();
+    const searchInput=el("boothReturnProductSearch");
+    if(searchInput)searchInput.value="";
+    renderPureReturnSearchResults(state);
+    renderPureReturnList(state);
+  }
+
+  function setPureReturnCandidateQty(state,barcode,nextQty){
+    const row=state.rows.get(String(barcode||""));
+    if(!row)return;
+    const max=takeoutQty(row);
+    const value=Math.max(0,Math.min(max,Number(nextQty||0)));
+    state.searchQty.set(String(barcode),value);
+    const card=[...(el("boothReturnProductSearchResults")?.querySelectorAll("[data-pure-return-candidate]")||[])].find(node=>String(node.dataset.barcode||"")===String(barcode||""));
+    if(!card)return;
+    const input=card.querySelector("[data-pure-return-candidate-qty]");
+    if(input)input.value=String(value);
+    const decrease=card.querySelector("[data-pure-return-candidate-action='decrease']");
+    if(decrease)decrease.disabled=value<=0;
+    const increase=card.querySelector("[data-pure-return-candidate-action='increase']");
+    if(increase)increase.disabled=value>=max;
+  }
+
+  async function addPureReturnCandidateToDraft(state,barcode){
+    const row=state.rows.get(String(barcode||""));
+    if(!row)return;
+    const qty=pureReturnCandidateQty(state,row);
+    await savePureReturnQty(state,String(barcode),qty,{focusQty:true});
+    clearPureReturnSearch(state);
+    el("boothReturnBarcode")?.focus();
+  }
+
+  function showPureReturnCandidate(state,row){
+    if(!row)return;
+    const barcode=String(row.barcode||"");
+    state.query=barcode;
+    state.searchQty.set(barcode,1);
+    const searchInput=el("boothReturnProductSearch");
+    if(searchInput)searchInput.value=barcode;
+    renderPureReturnSearchResults(state);
+    focusPureReturnCandidateQty(barcode);
   }
 
   function renderPureReturnHistory(state,rows){
@@ -10154,17 +10224,29 @@ exportBoothEventReportPdf=async function(event){
     el("boothReturnProductSearch")?.addEventListener("input",inputEvent=>{
       state.query=inputEvent.target.value;
       renderPureReturnSearchResults(state);
-      renderPureReturnList(state);
     });
     el("boothReturnProductSearchResults")?.addEventListener("click",inputEvent=>{
-      const button=inputEvent.target.closest("[data-pure-return-search-barcode]");
+      const button=inputEvent.target.closest("[data-pure-return-candidate-action]");
       if(!button)return;
-      const barcode=String(button.dataset.pureReturnSearchBarcode||"");
-      const searchInput=el("boothReturnProductSearch");
-      if(searchInput)searchInput.value="";
-      state.query="";
-      renderPureReturnSearchResults(state);
-      void root.addBoothReturnDraftFromBarcode(barcode);
+      const barcode=String(button.dataset.barcode||"");
+      const row=state.rows.get(barcode);
+      if(!row)return;
+      if(button.dataset.pureReturnCandidateAction==="increase")setPureReturnCandidateQty(state,barcode,pureReturnCandidateQty(state,row)+1);
+      else if(button.dataset.pureReturnCandidateAction==="decrease")setPureReturnCandidateQty(state,barcode,pureReturnCandidateQty(state,row)-1);
+      else if(button.dataset.pureReturnCandidateAction==="add")void addPureReturnCandidateToDraft(state,barcode);
+    });
+    el("boothReturnProductSearchResults")?.addEventListener("input",inputEvent=>{
+      const input=inputEvent.target.closest("[data-pure-return-candidate-qty]");
+      if(!input)return;
+      const barcode=String(input.dataset.pureReturnCandidateQty||"");
+      const row=state.rows.get(barcode);
+      if(!row)return;
+      const text=String(input.value||"").trim();
+      if(text!==""&&!/^[0-9]+$/.test(text)){
+        input.value=String(pureReturnCandidateQty(state,row));
+        return;
+      }
+      setPureReturnCandidateQty(state,barcode,text===""?0:Number(text));
     });
     el("boothReturnDraftList")?.addEventListener("click",inputEvent=>{
       const button=inputEvent.target.closest("[data-pure-return-action]");
@@ -10247,7 +10329,11 @@ exportBoothEventReportPdf=async function(event){
       boothShowError("数量上限","戻り実数は持ち出し数を超えられません。","boothReturnBarcode");
       return;
     }
-    await savePureReturnQty(state,barcode,current+1,{increment:current===saved?1:0,focusQty:true});
+    if(current>0||saved>0){
+      await savePureReturnQty(state,barcode,current+1,{increment:current===saved?1:0,focusQty:true});
+      return;
+    }
+    showPureReturnCandidate(state,row);
   };
 
   root.saveBoothReturnDraft=async function(){
