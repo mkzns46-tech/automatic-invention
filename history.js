@@ -69,6 +69,7 @@ async function selectProductHistoryByBarcode(){
 }
 
 const historyEventShelfStockCache=new Map();
+const historyEventShelfTimelineCache=new Map();
 
 function getHistoryCurrentStoreCode(){
   if(typeof getCurrentSmaregiContext==="function"){
@@ -115,6 +116,54 @@ async function loadHistoryEventShelfStocksForLogs(sourceLogs){
     console.warn("[history event shelf stock load failed]",error);
   }
   await loadHistoryEventShelfFallbackStocks(storeCode,barcodes);
+  await loadHistoryEventShelfMovementTimeline(storeCode,barcodes);
+}
+
+async function loadHistoryEventShelfMovementTimeline(storeCode,barcodes){
+  const filter=historyInFilter(barcodes);
+  if(!storeCode||!filter)return;
+  try{
+    const rows=await sb(`event_storage_movements?select=id,store_code,barcode,movement_type,quantity,memo,created_at&store_code=eq.${encodeURIComponent(storeCode)}&barcode=in.(${filter})&order=created_at.desc&limit=5000`);
+    const grouped=new Map();
+    (Array.isArray(rows)?rows:[]).forEach(row=>{
+      const barcode=String(row?.barcode||"").trim();
+      if(!barcode)return;
+      const list=grouped.get(barcode)||[];
+      list.push(row);
+      grouped.set(barcode,list);
+    });
+    grouped.forEach((movementRows,barcode)=>{
+      let running=Number(historyEventShelfStockCache.get(historyEventShelfCacheKey(storeCode,barcode))||0);
+      const timeline=[];
+      movementRows.slice().sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0)).forEach(row=>{
+        const quantity=Math.abs(Number(row.quantity||0));
+        if(!Number.isFinite(quantity))return;
+        const type=String(row.movement_type||"").trim();
+        const after=running;
+        let before=running;
+        if(type==="storage_out")before=running+quantity;
+        else if(type==="storage_in")before=running-quantity;
+        else if(type==="adjustment"){
+          const match=String(row.memo||"").match(/(-?\d+)\s*->\s*(-?\d+)/);
+          if(match)before=Number(match[1]);
+        }else return;
+        timeline.push({
+          id:String(row.id||""),
+          barcode,
+          movementType:type,
+          createdAt:row.created_at,
+          before:Math.max(0,before),
+          after:Math.max(0,after),
+          quantity,
+          staff:String(row.staff||"")
+        });
+        running=before;
+      });
+      historyEventShelfTimelineCache.set(historyEventShelfCacheKey(storeCode,barcode),timeline);
+    });
+  }catch(error){
+    console.warn("[history event shelf timeline load failed]",error);
+  }
 }
 
 async function loadHistoryEventShelfFallbackStocks(storeCode,barcodes){
@@ -192,12 +241,44 @@ function getHistoryEventShelfStock(barcode){
   return historyEventShelfStockCache.has(key) ? historyEventShelfStockCache.get(key) : "";
 }
 
+function isHistoryEventShelfLog(log){
+  const memo=String(log?.memo||"");
+  return memo.includes("持ち出し元：イベント保管在庫")
+    || memo.includes("対象在庫：イベント棚")
+    || String(log?.takeout_source||"").trim()==="storage";
+}
+
+function getHistoryEventShelfRange(log){
+  const barcode=String(log?.barcode||"").trim();
+  const key=historyEventShelfCacheKey(getHistoryCurrentStoreCode(),barcode);
+  const timeline=historyEventShelfTimelineCache.get(key)||[];
+  const logTime=new Date(log?.created_at||0).getTime();
+  const candidates=timeline.filter(row=>row.movementType==="storage_out"||row.movementType==="storage_in"||row.movementType==="adjustment");
+  if(!isHistoryEventShelfLog(log)){
+    const linkedMovement=candidates.some(row=>Math.abs(new Date(row.createdAt||0).getTime()-logTime)<=5*60*1000);
+    if(!linkedMovement)return null;
+  }
+  let match=candidates
+    .map(row=>({...row,distance:Math.abs(new Date(row.createdAt||0).getTime()-logTime)}))
+    .filter(row=>row.distance<=5*60*1000)
+    .sort((a,b)=>a.distance-b.distance)[0];
+  if(!match&&candidates.length){
+    match=candidates.filter(row=>new Date(row.createdAt||0).getTime()<=logTime).sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0))[0];
+  }
+  if(match)return {target:"イベント棚",before:match.before,after:match.after};
+  const after=Number(historyEventShelfStockCache.get(key)||0);
+  const quantity=Math.abs(Number(log?.quantity||0));
+  return {target:"イベント棚",before:after+quantity,after};
+}
+
 function ensureHistoryEventShelfHeaders(){
   ["recentRegistrationHistoryBody","historyBody","selectedHistoryBody"].forEach(bodyId=>{
     const body=el(bodyId);
     const table=body?.closest("table");
     const row=table?.querySelector("thead tr");
     if(!row||row.querySelector("[data-history-event-shelf-header]"))return;
+    const desired=["入力日時","区分","担当者","商品名","対象在庫","処理前","数量","処理後","備考","商品転用確認"];
+    [...row.children].forEach((cell,index)=>{if(desired[index])cell.textContent=desired[index];});
     const th=document.createElement("th");
     th.textContent="イベント棚";
     th.dataset.historyEventShelfHeader="true";

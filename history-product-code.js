@@ -93,15 +93,20 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
     const key=String(log.id||log.created_at+log.type+log.quantity+log.memo);
     const row=rowsByKey.get(key);
     if(!row)return "";
+    const eventRange=getHistoryEventShelfRange(row.log);
+    const displayBefore=eventRange?eventRange.before:row.beforeStock;
+    const displayAfter=eventRange?eventRange.after:row.afterStock;
+    const displayQuantity=getHistorySignedDelta(row.log.type,Number(row.log.quantity||0));
+    const target=eventRange?"イベント棚":"通常棚";
     return `<tr>
       <td>${fmt(row.log.created_at)}</td>
       <td>${esc(String(row.log.memo||"").includes("備品転用キャンセル") ? "商品転用キャンセル" : inventoryTypeLabel(row.log.type))}</td>
       <td>${esc(row.log.staff||"-")}</td>
       <td>${buildHistoryProductCell(barcode,row.log.product_name||"")}</td>
-      <td>${row.beforeStock}</td>
-      <td class="${historyQuantityClass(row.inQty)}">${row.inQty}</td>
-      <td class="${historyQuantityClass(row.outQty)}">${row.outQty}</td>
-      <td>${row.afterStock}</td>
+      <td>${target}</td>
+      <td>${displayBefore}</td>
+      <td class="${historyQuantityClass(displayQuantity)}">${formatHistorySignedQuantity(displayQuantity)}</td>
+      <td>${displayAfter}</td>
       <td>${getHistoryEventShelfStock(row.log.barcode)}</td>
       <td>${memoCellHtml(row.log)}</td>
       <td>${equipmentCheckHtml(row.log)}</td>
@@ -133,15 +138,21 @@ function buildGlobalHistoryRows(sourceLogs=logs){
       afterStock=rawQuantity;
     }
 
+    const eventRange=getHistoryEventShelfRange(log);
+    const displayBefore=eventRange?eventRange.before:beforeStock;
+    const displayAfter=eventRange?eventRange.after:afterStock;
+    const displayQuantity=getHistorySignedDelta(displayType,rawQuantity);
+    const target=eventRange?"イベント棚":"通常棚";
+
     return `<tr>
       <td>${fmt(log.created_at)}</td>
       <td>${esc(String(log.memo||"").includes("備品転用キャンセル") ? "商品転用キャンセル" : inventoryTypeLabel(log.type))}</td>
       <td>${esc(log.staff||"-")}</td>
       <td>${buildHistoryProductCell(log.barcode,log.product_name||"")}</td>
-      <td>${beforeStock}</td>
-      <td class="${historyQuantityClass(inQty)}">${inQty}</td>
-      <td class="${historyQuantityClass(outQty)}">${outQty}</td>
-      <td>${afterStock}</td>
+      <td>${target}</td>
+      <td>${displayBefore}</td>
+      <td class="${historyQuantityClass(displayQuantity)}">${formatHistorySignedQuantity(displayQuantity)}</td>
+      <td>${displayAfter}</td>
       <td>${getHistoryEventShelfStock(log.barcode)}</td>
       <td>${memoCellHtml(log)}</td>
       <td>${equipmentCheckHtml(log)}</td>
