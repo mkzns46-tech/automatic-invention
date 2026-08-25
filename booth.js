@@ -7081,6 +7081,12 @@ async function buildBoothDiffUniverseRows(eventId){
   const map=new Map();
   const itemRows=(Array.isArray(items)?items:[]).filter(row=>String(row.item_type||"normal")==="normal");
   const salesRows=dedupeBoothSalesRows(sales).filter(row=>!isBoothGachaSaleRow(row));
+  const importedSalesByBarcode=new Map();
+  salesRows.forEach(row=>{
+    const barcode=String(row.barcode||"").trim();
+    if(!barcode)return;
+    importedSalesByBarcode.set(barcode,(importedSalesByBarcode.get(barcode)||0)+Number(row.quantity||0));
+  });
   const movementRows=(Array.isArray(movements)?movements:[]).filter(row=>String(row.item_type||"normal")!=="gacha_prize");
   const productIds=[...new Set(salesRows.map(row=>String(row.smaregi_product_id||"").trim()).filter(Boolean))];
   const saleProducts=await fetchBoothProductsBySmaregiProductIds(productIds).catch(()=>[]);
@@ -7127,7 +7133,17 @@ async function buildBoothDiffUniverseRows(eventId){
   });
   const rows=[...map.values()].map(row=>{
     const takenRegistered=row.taken_qty!==null&&row.taken_qty!==undefined;
-    const normalized={...row,taken_qty:takenRegistered?Number(row.taken_qty||0):0};
+    const barcode=String(row.barcode||"").trim();
+    const normalized={
+      ...row,
+      taken_qty:takenRegistered?Number(row.taken_qty||0):0,
+      // booth_event_items.sold_qty is the persisted result of confirmation.
+      // When event_sales_imports exists, it is the authoritative net sales
+      // value; do not add both sources together.
+      sold_qty:importedSalesByBarcode.has(barcode)
+        ?importedSalesByBarcode.get(barcode)
+        :Number(row.sold_qty||0)
+    };
     const diff=calculateBoothItemDifference(normalized);
     const flags=[...row.source_flags];
     return {
