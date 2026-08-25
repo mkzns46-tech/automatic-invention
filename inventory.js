@@ -8,6 +8,7 @@ let dataLoaded=false;
 let dataLoadError=false;
 let eventPickEvents=[];
 let equipmentTransferLogCache=new Map();
+let inventorySourceStockState={barcode:"",source:"",quantity:null,ok:false};
 
 let videoStream=null;
 let detector=null;
@@ -89,6 +90,69 @@ function getEventPickSource(){
 
 function getEventPickSourceLabel(source){
   return source==="storage" ? "イベント保管在庫" : "通常棚";
+}
+
+function ensureInventorySourceStockInfo(){
+  let node=el("inventorySourceStockInfo");
+  if(node)return node;
+  const qtyInput=el("qty");
+  if(!qtyInput?.parentElement)return null;
+  node=document.createElement("span");
+  node.id="inventorySourceStockInfo";
+  node.className="message inventory-source-stock-info";
+  node.setAttribute("aria-live","polite");
+  qtyInput.insertAdjacentElement("afterend",node);
+  return node;
+}
+
+function setInventorySourceStockInfo(text,className="message"){
+  const node=ensureInventorySourceStockInfo();
+  if(!node)return;
+  node.textContent=text||"";
+  node.className=className;
+}
+
+function clearInventorySourceStockState(){
+  inventorySourceStockState={barcode:"",source:"",quantity:null,ok:false};
+  setInventorySourceStockInfo("");
+}
+
+async function fetchLatestInventoryProduct(barcode){
+  const normalizedBarcode=String(barcode||"").trim();
+  if(!normalizedBarcode)return null;
+  const rows=await sb(`products?select=*&barcode=eq.${encodeURIComponent(normalizedBarcode)}&limit=1`);
+  const product=Array.isArray(rows)&&rows[0]?rows[0]:null;
+  if(product){
+    const cached=gp(normalizedBarcode);
+    if(cached)Object.assign(cached,product);
+    else products.push(product);
+  }
+  return product;
+}
+
+async function getInventorySourceStock(product,source){
+  const barcode=String(product?.barcode||"").trim();
+  if(!barcode)throw new Error("バーコードがありません。");
+  if(source==="storage"){
+    const row=await getEventStorageStockRow(getInventoryCurrentStoreCode(),barcode);
+    if(!row)throw new Error("イベント棚在庫を取得できませんでした。");
+    return {barcode,source,quantity:Math.max(0,Number(row.storage_qty||0)),product};
+  }
+  const latest=await fetchLatestInventoryProduct(barcode);
+  if(!latest)throw new Error("通常棚在庫を取得できませんでした。");
+  return {barcode,source,quantity:Number(latest.base_stock||0),product:latest};
+}
+
+function applyInventorySourceStockState(state){
+  inventorySourceStockState={barcode:state.barcode,source:state.source,quantity:state.quantity,ok:true};
+  const label=state.source==="storage"?"イベント棚在庫":"通常棚在庫";
+  setInventorySourceStockInfo(`${label}：${state.quantity}`,"message ok inventory-source-stock-info");
+}
+
+function applyInventorySourceStockError(source){
+  inventorySourceStockState={barcode:"",source,quantity:null,ok:false};
+  const label=source==="storage"?"イベント棚在庫":"通常棚在庫";
+  setInventorySourceStockInfo(`${label}を取得できませんでした`,"message err inventory-source-stock-info");
 }
 
 async function loadEventPickEvents(){
@@ -363,6 +427,7 @@ async function renderScanPreview(){
   if(!barcode){
     info.textContent="";
     info.className="message";
+    clearInventorySourceStockState();
     return;
   }
 
@@ -374,20 +439,20 @@ async function renderScanPreview(){
     if(!p){
       info.textContent=`未登録バーコード：${barcode}`;
       info.className="message err";
+      clearInventorySourceStockState();
       return;
     }
 
     const source=getEventPickSource();
-    if(el("type")?.value==="出荷"&&source==="storage"){
-      const eventStock=await getEventStorageStockForDisplay(barcode);
-      if(!eventStock.ok){
-        info.textContent=`${buildProductIdentityText(p)}\nイベント棚在庫を取得できませんでした`;
-        info.className="message err";
-        return;
-      }
-      info.textContent=`${buildProductIdentityText(p)}\nイベント棚現在庫：${eventStock.quantity}`;
-    }else{
-      info.textContent=`${buildProductIdentityText(p)}\n通常棚現在庫：${Number(p.base_stock||0)}`;
+    try{
+      const stockState=await getInventorySourceStock(p,source);
+      applyInventorySourceStockState(stockState);
+      info.textContent=`${buildProductIdentityText(stockState.product)}\n${source==="storage"?"イベント棚現在庫":"通常棚現在庫"}：${stockState.quantity}`;
+    }catch(stockError){
+      applyInventorySourceStockError(source);
+      info.textContent=`${buildProductIdentityText(p)}\n${source==="storage"?"イベント棚在庫":"通常棚在庫"}を取得できませんでした`;
+      info.className="message err";
+      return;
     }
     info.className="message ok";
   }catch(e){
@@ -1128,14 +1193,27 @@ async function registerBarcode(barcode){
       return;
     }
 
-    const p=await fetchProductByBarcode(barcode);
+    let p=await fetchProductByBarcode(barcode);
 
     if(!p){
       showMessage(`未登録バーコード：${barcode}。PCで商品登録してください。`,"err");
       return;
     }
 
-    const currentStock=Number(p.base_stock||0);
+    let sourceStockState=null;
+    try{
+      sourceStockState=await getInventorySourceStock(p,eventPickSource);
+      applyInventorySourceStockState(sourceStockState);
+      p=sourceStockState.product||p;
+    }catch(stockError){
+      applyInventorySourceStockError(eventPickSource);
+      showMessage(`${getEventPickSourceLabel(eventPickSource)}の在庫を取得できませんでした。登録を中止しました。`,"err");
+      return;
+    }
+
+    const currentStock=eventPickSource==="storage"
+      ? Number(sourceStockState.quantity||0)
+      : Number(p.base_stock||0);
     let newStock=currentStock;
 
     if(type==="入荷")newStock=currentStock+qty;

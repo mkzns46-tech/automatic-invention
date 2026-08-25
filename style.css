@@ -8333,3 +8333,4 @@ body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
     width:100%;
   }
 }
+.inventory-source-stock-info{display:block;margin-top:8px;padding:9px 10px;font-size:14px}
