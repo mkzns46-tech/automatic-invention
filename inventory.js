@@ -513,12 +513,36 @@ async function getEventStorageStockRow(storeCode,barcode){
   const normalizedStore=normalizeInventoryStoreCode(storeCode);
   const normalizedBarcode=String(barcode||"").trim();
   if(!normalizedStore||!normalizedBarcode)return null;
-  // The common event shelf is keyed by store + barcode. Query by barcode and
-  // normalize legacy store labels such as "東京店" to the canonical code.
+  // Prefer the explicit store-common balance. Query by barcode and normalize
+  // legacy store labels such as "東京店" to the canonical code.
   const rows=await sb(`event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty&barcode=eq.${encodeURIComponent(normalizedBarcode)}&limit=100`);
-  return Array.isArray(rows)
+  const commonRow=Array.isArray(rows)
     ? (rows.find(row=>normalizeInventoryStoreCode(row?.store_code)===normalizedStore)||null)
     : null;
+  if(commonRow)return commonRow;
+
+  // Keep inventory registration aligned with 在庫一覧確認. That screen uses
+  // the shared loader, which reconstructs the current common shelf from the
+  // latest event-item row when older data has not yet been materialized in
+  // event_storage_stocks. No event_id is used as the balance key here.
+  if(typeof loadBoothCurrentEventStorageRows==="function"){
+    const fallbackRows=await loadBoothCurrentEventStorageRows(normalizedStore);
+    const fallback=Array.isArray(fallbackRows)
+      ? fallbackRows.find(row=>String(row?.barcode||"").trim()===normalizedBarcode)
+      : null;
+    if(fallback){
+      return {
+        id:"",
+        store_code:normalizedStore,
+        barcode:normalizedBarcode,
+        product_name:fallback.product_name||"",
+        storage_qty:Math.max(0,Number(fallback.quantity||0)),
+        updated_at:fallback.updated_at||"",
+        source:fallback.source||"booth_event_items"
+      };
+    }
+  }
+  return null;
 }
 
 async function getEventStorageStockForDisplay(barcode){
@@ -542,15 +566,32 @@ async function applyEventStoragePick(event,product,qty,staff,memo){
     throw new Error(`イベント保管在庫が不足しています。現在のイベント保管在庫：${currentStorage}`);
   }
   const nextStorage=currentStorage-qty;
-  await sb(`event_storage_stocks?id=eq.${encodeURIComponent(stockRow.id)}`,{
-    method:"PATCH",
-    headers:{Prefer:"return=minimal"},
-    body:JSON.stringify({
-      product_name:product.name||stockRow.product_name||"",
-      storage_qty:nextStorage,
-      updated_at:new Date().toISOString()
-    })
-  });
+  const stockPayload={
+    product_name:product.name||stockRow.product_name||"",
+    storage_qty:nextStorage,
+    updated_at:new Date().toISOString()
+  };
+  if(stockRow.id){
+    await sb(`event_storage_stocks?id=eq.${encodeURIComponent(stockRow.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify(stockPayload)
+    });
+  }else{
+    // Materialize the same balance in the canonical common-shelf table when
+    // the shared loader had to reconstruct it from legacy event data.
+    await sb("event_storage_stocks",{
+      method:"POST",
+      headers:{Prefer:"return=representation"},
+      body:JSON.stringify([{
+        store_code:storeCode,
+        barcode:product.barcode,
+        product_name:stockPayload.product_name,
+        storage_qty:nextStorage,
+        updated_at:stockPayload.updated_at
+      }])
+    });
+  }
   const movementPayload={
     event_id:event?.id||null,
     store_code:storeCode,
