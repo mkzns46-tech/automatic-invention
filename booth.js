@@ -6719,6 +6719,33 @@ function getBoothSalesDifference(item,soldAdd=0){
   return taken-sold-returned-consumed;
 }
 
+function aggregateBoothSalesImportRows(rows){
+  const grouped=new Map();
+  (Array.isArray(rows)?rows:[]).forEach(row=>{
+    const barcode=String(row?.barcode||"").trim();
+    const status=String(row?.import_status||"").trim().toLowerCase()||"pending";
+    const key=`${barcode}::${status}`;
+    if(!barcode||key==="::")return;
+    const current=grouped.get(key)||{
+      ...row,
+      quantity:0,
+      transaction_keys:[],
+      sold_at:row.sold_at||null
+    };
+    current.quantity+=Number(row.quantity||0);
+    const transactionKey=`${row.smaregi_transaction_id||"-"} / ${row.smaregi_detail_id||"-"}`;
+    if(!current.transaction_keys.includes(transactionKey))current.transaction_keys.push(transactionKey);
+    if(!current.sold_at||String(row.sold_at||"")<String(current.sold_at||""))current.sold_at=row.sold_at||current.sold_at;
+    grouped.set(key,current);
+  });
+  return [...grouped.values()].map(row=>({
+    ...row,
+    smaregi_transaction_id:row.transaction_keys.join(", "),
+    smaregi_detail_id:"",
+    _transaction_keys:row.transaction_keys
+  })).sort((a,b)=>String(a.sold_at||"").localeCompare(String(b.sold_at||"")));
+}
+
 function renderBoothSalesPanel(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
@@ -7983,11 +8010,12 @@ function renderBoothSalesImports(rows,items){
     list.innerHTML='<div class="booth-empty">未確定の仮取り込みデータはありません。</div>';
     return;
   }
-  const tableRows=rows.map(row=>{
+  const displayRows=aggregateBoothSalesImportRows(rows);
+  const tableRows=displayRows.map(row=>{
     const item=itemMap.get(String(row.barcode||""))||{};
     const hasItem=Boolean(item.id);
     const imported=Number(row.quantity||0);
-    const diff=hasItem?getBoothSalesDifference(item,imported):"持ち出し未確定";
+    const diff=hasItem?getBoothSalesDifference(item,row.import_status==="pending"?imported:0):"持ち出し未確定";
     const statusLabel=row.import_status==="confirmed"?"確定済み":row.import_status==="cancelled"?"取消・変更":"未確定";
     return `<tr>
       <td>${esc(formatBoothDateTime(row.sold_at))}</td>
@@ -8000,14 +8028,14 @@ function renderBoothSalesImports(rows,items){
       <td>${hasItem?esc(item.returned_qty??0):"-"}</td>
       <td>${esc(diff)}</td>
       <td>${esc(statusLabel)}</td>
-      <td>${esc(row.smaregi_transaction_id||"-")} / ${esc(row.smaregi_detail_id||"-")}</td>
+      <td>${esc(row.smaregi_transaction_id||"-")}</td>
     </tr>`;
   }).join("");
-  const cardRows=rows.map(row=>{
+  const cardRows=displayRows.map(row=>{
     const item=itemMap.get(String(row.barcode||""))||{};
     const hasItem=Boolean(item.id);
     const imported=Number(row.quantity||0);
-    const diff=hasItem?getBoothSalesDifference(item,imported):"持ち出し未確定";
+    const diff=hasItem?getBoothSalesDifference(item,row.import_status==="pending"?imported:0):"持ち出し未確定";
     const statusLabel=row.import_status==="confirmed"?"確定済み":row.import_status==="cancelled"?"取消・変更":"未確定";
     return `<article class="booth-history-card booth-sales-card-row">
       <div class="booth-history-card-top">
@@ -8021,7 +8049,7 @@ function renderBoothSalesImports(rows,items){
         <span>持ち出し：${esc(item.taken_qty??0)} / 販売候補：${esc(imported)} / 戻り：${esc(item.returned_qty??0)}</span>
         <span>差異見込み：${esc(diff)}</span>
         <span>状態：${esc(statusLabel)}</span>
-        <span>取引：${esc(row.smaregi_transaction_id||"-")} / ${esc(row.smaregi_detail_id||"-")}</span>
+        <span>取引：${esc(row.smaregi_transaction_id||"-")}</span>
       </div>
     </article>`;
   }).join("");
