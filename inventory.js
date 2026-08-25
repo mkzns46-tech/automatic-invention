@@ -68,6 +68,7 @@ function updateEquipmentMemoUi(){
       renderScrollableEventPickPicker();
     }).catch(()=>{});
   }
+  renderScanPreview();
 }
 
 function ensureEventPickSourceControl(){
@@ -79,6 +80,7 @@ function ensureEventPickSourceControl(){
   label.style.display="none";
   label.innerHTML='持ち出し元 <span class="required">必須</span><select id="eventPickSourceSelect"><option value="normal">通常棚</option><option value="storage">イベント保管在庫</option></select>';
   eventLabel.insertAdjacentElement("afterend",label);
+  el("eventPickSourceSelect").addEventListener("change",()=>renderScanPreview());
 }
 
 function getEventPickSource(){
@@ -375,7 +377,18 @@ async function renderScanPreview(){
       return;
     }
 
-    info.textContent=`${buildProductIdentityText(p)}\n現在庫：${Number(p.base_stock||0)}`;
+    const source=getEventPickSource();
+    if(el("type")?.value==="出荷"&&source==="storage"){
+      const eventStock=await getEventStorageStockForDisplay(barcode);
+      if(!eventStock.ok){
+        info.textContent=`${buildProductIdentityText(p)}\nイベント棚在庫を取得できませんでした`;
+        info.className="message err";
+        return;
+      }
+      info.textContent=`${buildProductIdentityText(p)}\nイベント棚現在庫：${eventStock.quantity}`;
+    }else{
+      info.textContent=`${buildProductIdentityText(p)}\n通常棚現在庫：${Number(p.base_stock||0)}`;
+    }
     info.className="message ok";
   }catch(e){
     info.textContent="商品確認エラー。\n"+e.message;
@@ -488,16 +501,44 @@ function getInventoryCurrentStoreCode(){
   return "tokyo";
 }
 
+function normalizeInventoryStoreCode(value){
+  const text=String(value||"").trim().toLowerCase();
+  if(text==="東京"||text==="東京店"||text==="tokyo")return "tokyo";
+  if(text==="愛知"||text==="愛知店"||text==="aichi")return "aichi";
+  if(text==="長野"||text==="長野店"||text==="nagano")return "nagano";
+  return text;
+}
+
 async function getEventStorageStockRow(storeCode,barcode){
-  const rows=await sb(`event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty&store_code=eq.${encodeURIComponent(storeCode)}&barcode=eq.${encodeURIComponent(barcode)}&limit=1`);
-  return Array.isArray(rows)&&rows[0] ? rows[0] : null;
+  const normalizedStore=normalizeInventoryStoreCode(storeCode);
+  const normalizedBarcode=String(barcode||"").trim();
+  if(!normalizedStore||!normalizedBarcode)return null;
+  // The common event shelf is keyed by store + barcode. Query by barcode and
+  // normalize legacy store labels such as "東京店" to the canonical code.
+  const rows=await sb(`event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty&barcode=eq.${encodeURIComponent(normalizedBarcode)}&limit=100`);
+  return Array.isArray(rows)
+    ? (rows.find(row=>normalizeInventoryStoreCode(row?.store_code)===normalizedStore)||null)
+    : null;
+}
+
+async function getEventStorageStockForDisplay(barcode){
+  try{
+    const row=await getEventStorageStockRow(getInventoryCurrentStoreCode(),barcode);
+    return {ok:true,quantity:Math.max(0,Number(row?.storage_qty||0))};
+  }catch(error){
+    console.warn("[inventory event shelf lookup failed]",error);
+    return {ok:false,error};
+  }
 }
 
 async function applyEventStoragePick(event,product,qty,staff,memo){
   const storeCode=getInventoryCurrentStoreCode();
   const stockRow=await getEventStorageStockRow(storeCode,product.barcode);
-  const currentStorage=Number(stockRow?.storage_qty||0);
-  if(!stockRow||currentStorage<qty){
+  if(!stockRow){
+    throw new Error("イベント棚在庫を取得できませんでした。店舗またはバーコードを確認してください。");
+  }
+  const currentStorage=Number(stockRow.storage_qty||0);
+  if(currentStorage<qty){
     throw new Error(`イベント保管在庫が不足しています。現在のイベント保管在庫：${currentStorage}`);
   }
   const nextStorage=currentStorage-qty;
