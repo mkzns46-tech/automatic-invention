@@ -6813,6 +6813,52 @@ function calculateBoothItemDifference(item){
   return taken-Number(item?.sold_qty||0)-Number(item?.returned_qty||0)-gachaConsumed;
 }
 
+async function resolveBoothSalesEventShelfStock(event,item,barcode){
+  const storeCode=getBoothCurrentStoreCode();
+  const common=await findBoothEventStorageStock(storeCode,barcode);
+  if(common){
+    return {storeCode,stock:common,currentQty:Math.max(0,Number(common.storage_qty||0)),source:"common-event-shelf"};
+  }
+  // Older events may have a valid event-specific shelf balance in
+  // booth_event_items before a store-common event_storage_stocks row exists.
+  // Use only the selected event item; never borrow another event's balance.
+  const legacyQty=Math.max(0,Number(getBoothCommonShelfCurrentQtyFromEventItem(item)||0));
+  return {
+    storeCode,
+    stock:null,
+    currentQty:legacyQty,
+    source:"selected-event-item",
+    legacyStock:{
+      store_code:storeCode,
+      barcode:String(barcode||"").trim(),
+      product_name:item?.product_name||"",
+      storage_qty:legacyQty
+    }
+  };
+}
+
+async function decrementBoothSalesEventShelfStock(resolved,product,quantity){
+  const nextQty=Number(resolved.currentQty||0)-Number(quantity||0);
+  if(nextQty<0)throw new Error("event_storage_stocks.storage_qty would be negative");
+  if(resolved.stock){
+    await upsertBoothEventStorageStock(resolved.storeCode,product,-quantity);
+    return;
+  }
+  // Materialize the already-verified selected-event balance in the canonical
+  // common shelf table, then apply the sale as the single decrement.
+  await sb("event_storage_stocks",{
+    method:"POST",
+    headers:{Prefer:"return=minimal"},
+    body:JSON.stringify([{
+      store_code:resolved.storeCode,
+      barcode:product.barcode,
+      product_name:product.name||resolved.legacyStock?.product_name||"",
+      storage_qty:nextQty,
+      updated_at:new Date().toISOString()
+    }])
+  });
+}
+
 async function confirmBoothNegativeCarryOut(currentQty,takeoutQty,afterQty){
   const body=[
     "通常棚在庫が不足しています。",
@@ -9022,20 +9068,22 @@ async function confirmBoothSalesImport(){
       if(!item)throw new Error(`${barcode}: イベント商品として登録されていません。`);
       const product=await findBoothProductByBarcode(barcode);
       if(!product)throw new Error(`${barcode}: 商品マスターが見つかりません。`);
-      const stock=await findBoothEventStorageStock(getBoothCurrentStoreCode(),barcode);
-      const currentQty=Number(stock?.storage_qty||0);
-      if(!stock||currentQty<addQty){
+      const resolvedStorage=await resolveBoothSalesEventShelfStock(event,item,barcode);
+      const currentQty=resolvedStorage.currentQty;
+      if(currentQty<addQty){
         throw new Error(`${product.name||item.product_name||barcode}: 共通イベント棚在庫が不足しています（現在 ${currentQty} / 販売 ${addQty}）。`);
       }
-      prepared.push({barcode,addQty,item,product,stock});
+      prepared.push({barcode,addQty,item,product,resolvedStorage});
     }
     if(!prepared.length)throw new Error("販売確定できる数量がありません。");
     const applied=[];
     try{
       for(const preparedRow of prepared){
-        const {barcode,addQty,item,product,stock}=preparedRow;
-        const storageBefore=stock?{...stock}:null;
-        await upsertBoothEventStorageStock(getBoothCurrentStoreCode(),product,-addQty);
+        const {barcode,addQty,item,product,resolvedStorage}=preparedRow;
+        const storageBefore=resolvedStorage.stock
+          ? {...resolvedStorage.stock}
+          : {...resolvedStorage.legacyStock};
+        await decrementBoothSalesEventShelfStock(resolvedStorage,product,addQty);
         const storageMovement=await insertBoothCommonEventMovement(event,product,addQty,staff,"\u30a4\u30d9\u30f3\u30c8\u8ca9\u58f2","storage_out");
         const nextSold=Number(item.sold_qty||0)+Number(addQty||0);
         await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({sold_qty:nextSold,difference_qty:calculateBoothItemDifference({...item,sold_qty:nextSold}),updated_at:new Date().toISOString()})});
