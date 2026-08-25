@@ -228,11 +228,15 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
       const productId = String(pick(detail, ["productId", "product_id"]) || "").trim();
       if (!productId || (productIdSet.size && !productIdSet.has(productId))) return;
       const rawQuantity = toSignedInteger(pick(detail, ["quantity", "salesQuantity", "sales_quantity", "unitSalesQuantity", "unit_sales_quantity"], 0));
-      const quantity = Math.abs(rawQuantity) * sign;
+      // Smaregi can represent a cancellation/return either with a return
+      // division or as a separately returned negative detail. Preserve the
+      // latter's sign instead of turning it back into a positive sale.
+      const quantitySign = rawQuantity < 0 ? -1 : sign;
+      const quantity = Math.abs(rawQuantity) * quantitySign;
       if (!quantity) return;
       const unitPrice = toNumber(pick(detail, ["unitPrice", "unit_price", "salesPrice", "sales_price", "price"], 0));
       const amountInfo = getDetailAmountInfo(detail, quantity);
-      const amount = Math.abs(amountInfo.amount) * sign;
+      const amount = Math.abs(amountInfo.amount) * quantitySign;
       const detailId = String(pick(detail, [
         "transactionDetailId",
         "transaction_detail_id",
