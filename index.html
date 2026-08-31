@@ -205,7 +205,12 @@
     <button type="button" id="inventoryListSelectVisibleBtn" class="secondary">表示中を選択</button>
     <button type="button" id="inventoryListClearSelectionBtn" class="secondary">選択解除</button>
     <span id="inventoryListSelectedCount">選択：0件</span>
-    <button type="button" id="inventoryListBulkEditBtn">選択商品を一括編集</button>
+    <button type="button" id="inventoryListBulkZeroSelectedBtn" class="secondary">選択イベント棚を0</button>
+    <button type="button" id="inventoryListBulkZeroVisibleBtn" class="secondary">表示中イベント棚を0</button>
+    <span id="inventoryListChangedCount">変更なし</span>
+    <label>修正理由<select id="inventoryListInlineReason"><option value="イベント終了後の残留在庫整理">イベント終了後の残留在庫整理</option><option value="実棚確認">実棚確認</option><option value="入力ミス修正">入力ミス修正</option><option value="その他">その他</option></select></label>
+    <button type="button" id="inventoryListInlineDiscardBtn" class="secondary" disabled>変更を破棄</button>
+    <button type="button" id="inventoryListInlineSaveBtn" disabled>変更を保存</button>
   </div>
   <div id="inventoryListSummary" class="inventory-list-summary"></div>
   <div id="inventoryListMessage" class="message"></div>

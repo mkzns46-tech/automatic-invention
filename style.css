@@ -8377,6 +8377,12 @@ body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
 /* v2.92.00: compact inventory-list bulk editing controls */
 .inventory-list-bulk-toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:.75rem 0;padding:.7rem;border:1px solid #b7dfc5;border-radius:.65rem;background:#f0fbf3}
 .inventory-list-bulk-toolbar[hidden],.inventory-list-bulk-panel[hidden]{display:none}
+.inventory-list-bulk-toolbar label{display:flex;align-items:center;gap:.35rem;font-weight:800}
+.inventory-list-bulk-toolbar select{min-height:34px}
+.inventory-list-inline-input{width:6.5rem;min-height:34px;padding:.25rem .4rem;border:1px solid #b8dcca;border-radius:.4rem;font-weight:800;background:#fff}
+.inventory-list-inline-input.is-dirty{border-color:#c58b19;background:#fff8e8;box-shadow:0 0 0 2px rgba(197,139,25,.12)}
+.inventory-list-changed-note{display:block;color:#8a5b00;font-size:.72rem;font-weight:800;white-space:normal}
+.inventory-list-bulk-toolbar button:disabled{opacity:.5;cursor:not-allowed}
 .inventory-list-bulk-rows{display:grid;gap:.55rem;margin:.7rem 0}
 .inventory-list-bulk-row{display:grid;grid-template-columns:minmax(12rem,1fr) 8rem 8rem;gap:.6rem;align-items:center;padding:.55rem;border:1px solid #d5e9db;border-radius:.5rem}
 .inventory-list-bulk-row strong{display:flex;flex-direction:column;gap:.2rem}
