@@ -10636,10 +10636,11 @@ async function loadBoothCloseCommonStockSummary(event,summary){
       const current=commonStock
         ? Number(commonStock.storage_qty||0)
         : getBoothCommonShelfCurrentQtyFromEventItem(row);
-      const taken=Number(row.taken_qty||0);
-      const sold=Number(row.sold_qty||0);
-      const returned=Number(row.returned_qty||0);
-      const unreturned=Math.max(0,taken-sold-returned);
+      const counts=getBoothEventCloseEffectiveCounts(row);
+      const taken=counts.taken;
+      const sold=counts.sold;
+      const returned=counts.returned;
+      const unreturned=Math.max(0,taken-sold-returned-counts.consumed);
       const closeRemoval=returned+unreturned;
       return {...row,event_shelf_current_qty:current,common_event_shelf_current_qty:current,event_shelf_store_code:storeCode,unreturned_qty:unreturned,event_storage_shortage_qty:Math.max(0,closeRemoval-current),event_shelf_planned_after_close:0};
     }),
@@ -11715,8 +11716,9 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
     const applied=[];
     try{
       for(const item of rows){
-        const returned=Math.max(0,Number(item.returned_qty||0));
-        const unreturned=Math.max(0,Number(item.taken_qty||0)-Number(item.sold_qty||0)-Number(item.returned_qty||0));
+        const counts=getBoothEventCloseEffectiveCounts(item);
+        const returned=Math.max(0,counts.returned);
+        const unreturned=Math.max(0,counts.taken-counts.sold-counts.returned-counts.consumed);
         const operation={item,before:{...item},storageDelta:0,baseDelta:0,baseMoved:false,storageMoved:false,movement:null,logs:[]};
         applied.push(operation);
         const beforeBase=Number((await findBoothProductByBarcode(String(item.barcode||"").trim()))?.base_stock||0);
@@ -11902,6 +11904,41 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
   root.confirmBoothEventReopen=confirmBoothEventReopen;
 })(window);
 
+// Ver 2.93.03: event-report discrepancy corrections are additive metadata.
+(function(root){
+  function readAdjustment(item){
+    try{
+      const raw=String(item?.diff_memo||"");
+      const prefix="ARICO_EVENT_ADJUSTMENT:";
+      const value=raw.startsWith(prefix)?JSON.parse(raw.slice(prefix.length)):{};
+      return {equipment:Math.max(0,Number(value.equipment||0)),damage:Math.max(0,Number(value.damage||0)),lost:Math.max(0,Number(value.lost||0)),sample:Math.max(0,Number(value.sample||0)),other:Math.max(0,Number(value.other||0)),returnAdjustment:Number(value.returnAdjustment||0),salesAdjustment:Number(value.salesAdjustment||0),memo:String(value.memo||"")};
+    }catch{return {equipment:0,damage:0,lost:0,sample:0,other:0,returnAdjustment:0,salesAdjustment:0,memo:""};}
+  }
+  getBoothEventCloseEffectiveCounts=function(item){
+    const a=readAdjustment(item);
+    return {taken:Number(item?.taken_qty||0),sold:Math.max(0,Number(item?.sold_qty||0)+a.salesAdjustment),returned:Math.max(0,Number(item?.returned_qty||0)+a.returnAdjustment),consumed:Number(item?.consumed_qty||0)+a.equipment+a.damage+a.lost+a.sample+a.other};
+  };
+  calculateBoothDifference=function(item,returnInput=0){const c=getBoothEventCloseEffectiveCounts(item);return c.taken-c.sold-c.returned-Number(returnInput||0)-c.consumed;};
+  renderBoothReportDiffRows=function(rows){
+    const list=(Array.isArray(rows)?rows:[]).filter(row=>calculateBoothDifference(row)!==0||!row.taken_registered);
+    if(!list.length)return '<div class="booth-empty">在庫差異はありません。</div>';
+    return `<div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table"><thead><tr><th>商品名</th><th>バーコード</th><th>比較店舗</th><th>持ち出し</th><th>販売</th><th>戻り</th><th>消費</th><th>差異</th><th>状態</th><th>操作</th></tr></thead><tbody>${list.map(row=>{const a=readAdjustment(row),diff=calculateBoothDifference(row),state=diff===0?"解消済み":(a.equipment||a.damage||a.lost||a.sample||a.other||a.returnAdjustment||a.salesAdjustment?"補正済み":"要確認");return `<tr><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.store_code||"-")}</td><td>${row.taken_registered?esc(row.taken_qty??0):"未登録"}</td><td>${esc(Number(row.sold_qty||0)+a.salesAdjustment)}</td><td>${esc(Number(row.returned_qty||0)+a.returnAdjustment)}</td><td>${esc(Number(row.consumed_qty||0)+a.equipment+a.damage+a.lost+a.sample+a.other)}</td><td><strong>${esc(diff)}</strong></td><td>${state}</td><td><button type="button" class="secondary" data-booth-diff-correction data-item-id="${esc(row.id||"")}" data-event-id="${esc(row.event_id||"")}">補正</button></td></tr>`;}).join("")}</tbody></table></div>`;
+  };
+  async function saveCorrection(button){
+    const id=button?.dataset.itemId;if(!id)return;
+    const rows=await sb(`booth_event_items?select=*&id=eq.${encodeURIComponent(id)}&limit=1`);const item=Array.isArray(rows)&&rows[0]?rows[0]:null;if(!item)throw new Error("差異商品が見つかりません。");
+    const a=readAdjustment(item), ask=(label,value)=>window.prompt(`${label}（整数）`,String(value)) ?? null;
+    const values={equipment:ask("備品化",a.equipment),damage:ask("破損",a.damage),lost:ask("紛失",a.lost),sample:ask("サンプル使用",a.sample),other:ask("その他消費",a.other),returnAdjustment:ask("戻り数量修正（+/-可）",a.returnAdjustment),salesAdjustment:ask("販売数量補正（+/-可）",a.salesAdjustment)};
+    if(Object.values(values).some(value=>value===null))return;
+    for(const [key,value] of Object.entries(values)){if(!/^-?\d+$/.test(String(value))||(["equipment","damage","lost","sample","other"].includes(key)&&Number(value)<0))throw new Error("補正数量は正しい整数で入力してください。");}
+    const next={...values,memo:window.prompt("補正メモ（任意）",a.memo)||"",adjusted_by:window.__aricoCurrentStaff||"イベントレポート補正",adjusted_at:new Date().toISOString()};
+    if(calculateBoothDifference({...item,diff_memo:"ARICO_EVENT_ADJUSTMENT:"+JSON.stringify(next)})<0)throw new Error("補正合計が持出数を超えています。");
+    await patchBoothEventItem(item,{diff_memo:"ARICO_EVENT_ADJUSTMENT:"+JSON.stringify(next)});
+    await refreshBoothEventRelatedViews(item.event_id);await loadBoothEventReport(item.event_id);boothShowSuccess("補正を保存しました","補正後の数量をイベントレポートへ反映しました。");
+  }
+  if(!root.__aricoEventDiffCorrectionBound){document.addEventListener("click",event=>{const button=event.target.closest("[data-booth-diff-correction]");if(button)saveCorrection(button).catch(error=>boothShowError("差異補正エラー",error.message||"補正に失敗しました。"));});root.__aricoEventDiffCorrectionBound=true;}
+})(window);
+
 // Ver 2.93.02 emergency close override: counted returns always go to the
 // normal shelf; a shared-shelf shortage is recorded and does not block close.
 (function(root){
@@ -11927,9 +11964,9 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
       if(isBoothEventClosed(latestEvent))throw new Error("このイベントはすでに締め済みです。");
       const summary=await loadBoothCloseCommonStockSummary(latestEvent,await loadBoothCloseSummary(latestEvent));
       const rows=(summary.rows||[]).filter(row=>row.item_type==="normal"&&(Number(row.taken_qty||0)>0||Number(row.normal_takeout_qty||0)>0||Number(row.storage_takeout_qty||0)>0));
-      const invalid=rows.find(row=>Number(row.returned_qty||0)>Number(row.taken_qty||0)||Number(row.sold_qty||0)+Number(row.returned_qty||0)>Number(row.taken_qty||0));
+      const invalid=rows.find(row=>{const c=getBoothEventCloseEffectiveCounts(row);return c.returned>c.taken||c.sold+c.returned+c.consumed>c.taken;});
       if(invalid){
-        const taken=Number(invalid.taken_qty||0),sold=Number(invalid.sold_qty||0),returned=Number(invalid.returned_qty||0);
+        const c=getBoothEventCloseEffectiveCounts(invalid),taken=c.taken,sold=c.sold,returned=c.returned;
         throw new Error(returned>taken?`${invalid.product_name||invalid.barcode}: 戻り実数(${returned})が持出数(${taken})を超えています。`:`${invalid.product_name||invalid.barcode}: 販売数(${sold})と戻り実数(${returned})の合計が持出数(${taken})を超えています。`);
       }
       const shortage=rows.reduce((sum,row)=>sum+Number(row.event_storage_shortage_qty||0),0);
