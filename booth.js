@@ -990,7 +990,9 @@ function mergeBoothCloseRows(normalItems,gachaItems,products,salesRows=[]){
       storage_takeout_qty:Number(item.storage_takeout_qty||0),
       taken_qty:Number(item.taken_qty||0),
       sold_qty:soldQty,
-      returned_qty:Number(item.returned_qty||0),
+       returned_qty:Number(item.returned_qty||0)>0
+         ?Number(item.returned_qty||0)
+         :Math.max(Number(item.shelf_return_qty||0),Number(item.return_reflected_qty||0),Number(item.shelf_return_reflected_qty||0)),
       shelf_return_qty:Number(item.shelf_return_qty||0),
       event_storage_qty:Number(item.event_storage_qty||0),
       shelf_return_effective_qty:getBoothCloseShelfReturnQty(item),
