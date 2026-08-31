@@ -64,17 +64,21 @@
     return await sbAll(`products?select=${PRODUCT_SELECT}&order=name.asc`,1000,30000);
   }
   async function fetchEventStorage(storeCode){
-    const rows=typeof loadBoothCurrentEventStorageRows==="function"
-      ? await loadBoothCurrentEventStorageRows(storeCode)
-      : await sbAll(`event_storage_stocks?select=${STORAGE_SELECT}&store_code=eq.${encodeURIComponent(storeCode)}&order=product_name.asc`,1000,30000);
+    // Inventory-list editing writes the canonical common-shelf balance here.
+    // Do not use loadBoothCurrentEventStorageRows: it reconstructs positive
+    // balances from booth_event_items when a canonical row is zero, which
+    // would make a saved 0 appear as an old event quantity after reload.
+    const rows=await sbAll(`event_storage_stocks?select=${STORAGE_SELECT}&store_code=eq.${encodeURIComponent(storeCode)}&order=product_name.asc`,1000,30000);
     const map=new Map();
     (Array.isArray(rows)?rows:[]).forEach(row=>{
       const barcode=text(row.barcode);
       const quantity=num(row.quantity??row.storage_qty);
-      if(!barcode||quantity===0)return;
+      if(!barcode)return;
       const current=map.get(barcode)||{barcode,quantity:0,product_name:""};
       current.quantity+=quantity;
       if(!current.product_name&&row.product_name)current.product_name=row.product_name;
+      current.id=row.id||current.id||"";
+      current.updated_at=maxDate(current.updated_at,row.updated_at);
       map.set(barcode,current);
     });
     return map;
