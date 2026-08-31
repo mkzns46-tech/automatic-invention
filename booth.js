@@ -11904,6 +11904,30 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
   root.confirmBoothEventReopen=confirmBoothEventReopen;
 })(window);
 
+// Direct quantity editing for event-report discrepancy rows.
+(function(root){
+  renderBoothReportDiffRows=function(rows){
+    const list=(Array.isArray(rows)?rows:[]).filter(row=>calculateBoothDifference(row)!==0||!row.taken_registered);
+    if(!list.length)return '<div class="booth-empty">在庫差異はありません。</div>';
+    const input=(name,value)=>`<input class="booth-history-qty-input" data-booth-direct-qty="${name}" type="number" min="0" step="1" value="${esc(value??0)}" inputmode="numeric">`;
+    return `<div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table"><thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し</th><th>販売</th><th>戻り</th><th>消費</th><th>差異</th><th>状態</th><th>操作</th></tr></thead><tbody>${list.map(row=>`<tr data-booth-direct-row data-item-id="${esc(row.id||"")}" data-event-id="${esc(row.event_id||"")}"><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${input("taken",row.taken_qty)}</td><td>${input("sold",row.sold_qty)}</td><td>${input("returned",row.returned_qty)}</td><td>${input("consumed",row.consumed_qty)}</td><td><strong data-booth-direct-difference>${esc(calculateBoothDifference(row))}</strong></td><td>${calculateBoothDifference(row)===0?"解消済み":"要確認"}</td><td><button type="button" class="secondary" data-booth-direct-save>保存</button></td></tr>`).join("")}</tbody></table></div>`;
+  };
+  root.__aricoDirectDiffRenderer=renderBoothReportDiffRows;
+  async function saveDirect(button){
+    const row=button.closest("[data-booth-direct-row]"),id=row?.dataset.itemId;if(!id)return;
+    const values={};row.querySelectorAll("[data-booth-direct-qty]").forEach(input=>values[input.dataset.boothDirectQty]=String(input.value||"").trim());
+    if(Object.values(values).some(value=>!/^[0-9]+$/.test(value)))throw new Error("持ち出し・販売・戻り・消費は0以上の整数で入力してください。");
+    const found=await sb(`booth_event_items?select=*&id=eq.${encodeURIComponent(id)}&limit=1`),item=Array.isArray(found)&&found[0]?found[0]:null;if(!item)throw new Error("対象商品が見つかりません。");
+    const next={taken:Number(values.taken),sold:Number(values.sold),returned:Number(values.returned),consumed:Number(values.consumed)};
+    if(next.sold+next.returned+next.consumed>next.taken)throw new Error("補正合計が持出数を超えています。");
+    const beforeConsumed=Number(item.consumed_qty||0),delta=next.consumed-beforeConsumed;
+    await patchBoothEventItem(item,{taken_qty:next.taken,sold_qty:next.sold,returned_qty:next.returned,consumed_qty:next.consumed,difference_qty:next.taken-next.sold-next.returned-next.consumed,diff_memo:`イベントレポート直接補正 / 持出${item.taken_qty||0}->${next.taken} / 販売${item.sold_qty||0}->${next.sold} / 戻り${item.returned_qty||0}->${next.returned} / 消費${beforeConsumed}->${next.consumed}`});
+    if(delta)await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"備品転用",staff:window.__aricoCurrentStaff||"イベントレポート補正",barcode:item.barcode,product_name:item.product_name||"",quantity:delta,memo:`イベントレポート消費補正（商品転用と同じ履歴） ${beforeConsumed} -> ${next.consumed}`,event_id:item.event_id,affects_smaregi:false,smaregi_delta:0})});
+    await refreshBoothEventRelatedViews(item.event_id);await loadBoothEventReport(item.event_id);boothShowSuccess("数量を保存しました","イベントレポートの数量と差異を更新しました。");
+  }
+  if(!root.__aricoDirectEventQtyBound){document.addEventListener("click",event=>{const button=event.target.closest("[data-booth-direct-save]");if(button)saveDirect(button).catch(error=>boothShowError("数量補正エラー",error.message||"保存に失敗しました。"));});root.__aricoDirectEventQtyBound=true;}
+})(window);
+
 // Ver 2.93.03: event-report discrepancy corrections are additive metadata.
 (function(root){
   function readAdjustment(item){
@@ -11996,3 +12020,6 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
     catch(error){boothShowError("戻り実績保存エラー",error.message||"戻り実績の保存に失敗しました。");}finally{window.__aricoBoothReportReturnBatchSaving=false;}
   };
 })(window);
+
+// Keep direct quantity inputs as the final report renderer.
+if(window.__aricoDirectDiffRenderer){renderBoothReportDiffRows=window.__aricoDirectDiffRenderer;}
