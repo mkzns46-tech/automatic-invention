@@ -1054,20 +1054,30 @@ function mergeBoothCloseRows(normalItems,gachaItems,products,salesRows=[]){
 
 async function loadBoothCloseSummary(event){
   const eventId=encodeURIComponent(event.id);
-  const [normalItems,gachaItems,salesRows]=await Promise.all([
+  const [normalItems,gachaItems,salesRows,returnMovements]=await Promise.all([
     sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,shelf_return_reflected_by,return_process_type,return_reflected,return_reflected_qty,return_reflected_at,return_reflected_by,updated_at&event_id=eq.${eventId}&item_type=eq.normal&order=product_name.asc`),
     sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,difference_qty,updated_at&event_id=eq.${eventId}&item_type=eq.gacha_prize&order=product_name.asc`),
     // Event close uses the same event-scoped sales details as the report.
     // A failed read must not be treated as zero sales.
-    sb(`event_sales_imports?select=*&event_id=eq.${eventId}&import_status=in.(pending,confirmed)&order=sold_at.asc&limit=3000`)
+    sb(`event_sales_imports?select=*&event_id=eq.${eventId}&import_status=in.(pending,confirmed)&order=sold_at.asc&limit=3000`),
+    sb(`booth_stock_movements?select=barcode,quantity&event_id=eq.${eventId}&movement_type=eq.return&item_type=eq.normal&limit=5000`).catch(()=>[])
   ]);
   const products=await fetchBoothProductsForItems([...(normalItems||[]),...(gachaItems||[])]);
+  const returnByBarcode=new Map();
+  (Array.isArray(returnMovements)?returnMovements:[]).forEach(row=>{
+    const barcode=String(row.barcode||"").trim();
+    if(barcode)returnByBarcode.set(barcode,Number(returnByBarcode.get(barcode)||0)+Math.max(0,Number(row.quantity||0)));
+  });
   const rows=mergeBoothCloseRows(
     normalItems||[],
     gachaItems||[],
     products||[],
     dedupeBoothSalesRows(salesRows||[])
-  );
+  ).map(row=>{
+    const movementReturn=Number(returnByBarcode.get(String(row.barcode||"").trim())||0);
+    if(Number(row.returned_qty||0)>0||movementReturn<=0)return row;
+    return {...row,returned_qty:movementReturn,difference_qty:calculateBoothItemDifference({...row,returned_qty:movementReturn})};
+  });
   const diffRows=rows.filter(row=>Number(row.difference_qty||0)!==0);
   const unconfirmedRows=diffRows.filter(row=>!String(row.diff_memo||"").trim());
   const returnPendingRows=rows.filter(row=>row.item_type==="normal"&&getBoothReturnReflectDelta(row)!==0);
