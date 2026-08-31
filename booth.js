@@ -11564,7 +11564,9 @@ async function saveBoothReportReturnBatch(){
           method:"POST",
           headers:{Prefer:"return=representation"},
           body:JSON.stringify({
-            type:"inventory adjustment",
+            // Use the production-approved type.  The event context remains
+            // explicit in memo/event_id/inventory_scope fields.
+            type:"在庫修正",
             staff,
             barcode:item.barcode,
             product_name:item.product_name||"",
@@ -11748,7 +11750,7 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
         if(returned){await adjustBoothProductBaseStock(item.barcode,returned); operation.baseMoved=true; operation.baseDelta=returned;}
         if(actualOut){await upsertBoothEventStorageStock(storeCode,item,-actualOut); operation.storageMoved=true; operation.storageDelta=actualOut; operation.movement=await insertBoothCommonEventMovement({id:item.event_id||boothCurrentEventId},item,actualOut,staff,`イベント締め / 戻り実数を通常棚へ戻す${unreturned?` / 未帰還${unreturned}`:""}${shortage?` / 不足${shortage}`:""}`,"storage_out",{beforeQty:beforeEvent,afterQty:beforeEvent-actualOut});}
         if(returned)operation.logs.push(...await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({type:"在庫修正",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:returned,memo:"イベント締め / 戻り棚卸実数を通常棚へ反映",event_id:item.event_id||boothCurrentEventId,store_code:storeCode,inventory_scope:"normal",before_stock:beforeBase,after_stock:beforeBase+returned,event_shelf_before:beforeEvent,event_shelf_after:beforeEvent-actualOut,affects_smaregi:false,smaregi_delta:0})})||[]);
-        if(unreturned)operation.logs.push(...await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"イベント差異",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:-unreturned,memo:`イベント差異 / 未帰還${unreturned} / 原因未確認`,event_id:item.event_id||boothCurrentEventId,store_code:storeCode,inventory_scope:"event_shelf",event_shelf_before:beforeEvent-actualOut,event_shelf_after:beforeEvent-actualOut,affects_smaregi:false,smaregi_delta:0})})||[]);
+        if(unreturned)operation.logs.push(...await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"event_close_return",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:-unreturned,memo:`イベント差異 / 未帰還${unreturned} / 原因未確認`,event_id:item.event_id||boothCurrentEventId,store_code:storeCode,inventory_scope:"event_shelf",event_shelf_before:beforeEvent-actualOut,event_shelf_after:beforeEvent-actualOut,affects_smaregi:false,smaregi_delta:0})})||[]);
         if(shortage)operation.logs.push(...await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"在庫修正",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:0,memo:`イベント棚データ不足 / 不足数量${shortage} / 戻り実数を正として通常棚へ反映`,event_id:item.event_id||boothCurrentEventId,store_code:storeCode,inventory_scope:"event_shelf",before_stock:beforeBase,after_stock:beforeBase,event_shelf_before:beforeEvent,event_shelf_after:beforeEvent-actualOut,affects_smaregi:false,smaregi_delta:0})})||[]);
         await patchBoothEventItem(item,{return_process_type:"shelf",return_reflected:returned>0,return_reflected_qty:returned,return_reflected_at:returned?new Date().toISOString():null,return_reflected_by:returned?staff:null,shelf_return_qty:returned,event_storage_qty:0,shelf_return_reflected:returned>0,shelf_return_reflected_qty:returned,shelf_return_reflected_at:returned?new Date().toISOString():null,shelf_return_reflected_by:returned?staff:null,diff_memo:[unreturned?`イベント差異 / 未帰還${unreturned} / 原因未確認`:"",shortage?`イベント棚データ不足 / 不足${shortage}`:""].filter(Boolean).join(" / ")||item.diff_memo||null});
       }
