@@ -4263,6 +4263,13 @@ async function startBoothCarryOutCamera(){
   }
 }
 
+// One display value for both the close summary and each product row.
+function getBoothCloseDisplayedReturnQty(row){
+  const direct=Number(row?.returned_qty||0);
+  if(direct>0)return direct;
+  return Math.max(0,Number(row?.shelf_return_qty||0),Number(row?.return_reflected_qty||0),Number(row?.shelf_return_reflected_qty||0));
+}
+
 async function stopBoothCarryOutCamera(showOk=true){
   clearTimeout(boothNoScanTimer);
   boothCameraScanning=false;
@@ -10678,20 +10685,20 @@ function renderBoothCloseConfirmPanel(event,summary){
   const normalRows=rows.filter(row=>Number(row.normal_takeout_qty||0)>0||Number(row.storage_takeout_qty||0)>0||Number(row.taken_qty||0)>0);
   const savedReturnRows=normalRows.filter(row=>Number(row.returned_qty||0)>0&&normalizeBoothReportReturnDestination(getBoothReturnProcessType(row)));
   const returnDestinationState=getBoothReportReturnDestinationState(savedReturnRows);
-  const returnTotal=normalRows.reduce((sum,row)=>sum+Number(row.returned_qty||0),0);
+  const returnTotal=normalRows.reduce((sum,row)=>sum+getBoothCloseDisplayedReturnQty(row),0);
   const remainingRows=normalRows.filter(row=>Number(row.event_shelf_current_qty||0)>0);
   const remainingQty=remainingRows.reduce((sum,row)=>sum+Number(row.event_shelf_current_qty||0),0);
   const commonShelfTotal=(summary.commonShelfStocks||[]).reduce((sum,row)=>sum+Number(row.storage_qty||0),0);
   const eventTakeoutTotal=normalRows.reduce((sum,row)=>sum+Number(row.taken_qty||0),0);
   const eventSalesTotal=normalRows.reduce((sum,row)=>sum+Number(row.sold_qty||0),0);
-  const eventReturnTotal=normalRows.reduce((sum,row)=>sum+Number(row.returned_qty||0),0);
+  const eventReturnTotal=normalRows.reduce((sum,row)=>sum+getBoothCloseDisplayedReturnQty(row),0);
   const eventUnreturnedTotal=normalRows.reduce((sum,row)=>sum+Number(row.unreturned_qty||0),0);
   const plannedAfterCloseTotal=normalRows.reduce((sum,row)=>sum+Number(row.event_shelf_planned_after_close??(row.event_shelf_current_qty||0)),0);
   const tableRows=normalRows.length?normalRows.map(row=>{
     const current=Number(row.event_shelf_current_qty||0);
     const taken=Number(row.taken_qty||0);
     const sold=Number(row.sold_qty||0);
-    const returned=Number(row.returned_qty||0);
+    const returned=getBoothCloseDisplayedReturnQty(row);
     const unreturned=Number(row.unreturned_qty||Math.max(0,taken-sold-returned));
     const plannedAfter=Number(row.event_shelf_planned_after_close??current);
     const destination=getBoothCloseReturnProcessType(row);
