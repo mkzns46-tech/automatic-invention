@@ -963,17 +963,17 @@ function getBoothShelfReturnReflectDelta(item){
 }
 
 function mergeBoothCloseRows(normalItems,gachaItems,products,salesRows=[]){
-  const productMap=new Map((products||[]).map(product=>[String(product.barcode||""),product]));
+  const productMap=new Map((products||[]).map(product=>[getBoothCloseItemBarcode(product.barcode),product]));
   const salesByBarcode=new Map();
   (Array.isArray(salesRows)?salesRows:[]).forEach(sale=>{
     if(isBoothGachaSaleRow(sale))return;
-    const barcode=String(sale?.barcode||"").trim();
+    const barcode=getBoothCloseItemBarcode(sale?.barcode);
     if(!barcode)return;
     salesByBarcode.set(barcode,(salesByBarcode.get(barcode)||0)+Number(sale?.quantity||0));
   });
   const rowsByBarcode=new Map();
   (normalItems||[]).forEach(item=>{
-    const barcode=String(item.barcode||"");
+    const barcode=getBoothCloseItemBarcode(item.barcode);
     const product=productMap.get(barcode)||{};
     const soldQty=salesByBarcode.has(barcode)
       ? salesByBarcode.get(barcode)
@@ -990,9 +990,9 @@ function mergeBoothCloseRows(normalItems,gachaItems,products,salesRows=[]){
       storage_takeout_qty:Number(item.storage_takeout_qty||0),
       taken_qty:Number(item.taken_qty||0),
       sold_qty:soldQty,
-       returned_qty:Number(item.returned_qty||0)>0
-         ?Number(item.returned_qty||0)
-         :Math.max(Number(item.shelf_return_qty||0),Number(item.return_reflected_qty||0),Number(item.shelf_return_reflected_qty||0)),
+      returned_qty:item.returned_qty===null||item.returned_qty===undefined
+        ?null
+        :Math.max(0,Number(item.returned_qty)||0),
       shelf_return_qty:Number(item.shelf_return_qty||0),
       event_storage_qty:Number(item.event_storage_qty||0),
       shelf_return_effective_qty:getBoothCloseShelfReturnQty(item),
@@ -1013,7 +1013,7 @@ function mergeBoothCloseRows(normalItems,gachaItems,products,salesRows=[]){
     });
   });
   (gachaItems||[]).forEach(item=>{
-    const barcode=String(item.barcode||"");
+    const barcode=getBoothCloseItemBarcode(item.barcode);
     const product=productMap.get(barcode)||{};
     const existing=rowsByBarcode.get(barcode)||{
       id:"",
@@ -1054,30 +1054,20 @@ function mergeBoothCloseRows(normalItems,gachaItems,products,salesRows=[]){
 
 async function loadBoothCloseSummary(event){
   const eventId=encodeURIComponent(event.id);
-  const [normalItems,gachaItems,salesRows,returnMovements]=await Promise.all([
+  const [normalItems,gachaItems,salesRows]=await Promise.all([
     sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo,shelf_return_qty,event_storage_qty,shelf_return_reflected,shelf_return_reflected_qty,shelf_return_reflected_at,shelf_return_reflected_by,return_process_type,return_reflected,return_reflected_qty,return_reflected_at,return_reflected_by,updated_at&event_id=eq.${eventId}&item_type=eq.normal&order=product_name.asc`),
     sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,returned_qty,consumed_qty,difference_qty,updated_at&event_id=eq.${eventId}&item_type=eq.gacha_prize&order=product_name.asc`),
     // Event close uses the same event-scoped sales details as the report.
     // A failed read must not be treated as zero sales.
-    sb(`event_sales_imports?select=*&event_id=eq.${eventId}&import_status=in.(pending,confirmed)&order=sold_at.asc&limit=3000`),
-    sb(`booth_stock_movements?select=barcode,quantity&event_id=eq.${eventId}&movement_type=eq.return&item_type=eq.normal&limit=5000`).catch(()=>[])
+    sb(`event_sales_imports?select=*&event_id=eq.${eventId}&import_status=in.(pending,confirmed)&order=sold_at.asc&limit=3000`)
   ]);
   const products=await fetchBoothProductsForItems([...(normalItems||[]),...(gachaItems||[])]);
-  const returnByBarcode=new Map();
-  (Array.isArray(returnMovements)?returnMovements:[]).forEach(row=>{
-    const barcode=String(row.barcode||"").trim();
-    if(barcode)returnByBarcode.set(barcode,Number(returnByBarcode.get(barcode)||0)+Math.max(0,Number(row.quantity||0)));
-  });
   const rows=mergeBoothCloseRows(
     normalItems||[],
     gachaItems||[],
     products||[],
     dedupeBoothSalesRows(salesRows||[])
-  ).map(row=>{
-    const movementReturn=Number(returnByBarcode.get(String(row.barcode||"").trim())||0);
-    if(Number(row.returned_qty||0)>0||movementReturn<=0)return row;
-    return {...row,returned_qty:movementReturn,difference_qty:calculateBoothItemDifference({...row,returned_qty:movementReturn})};
-  });
+  );
   const diffRows=rows.filter(row=>Number(row.difference_qty||0)!==0);
   const unconfirmedRows=diffRows.filter(row=>!String(row.diff_memo||"").trim());
   const returnPendingRows=rows.filter(row=>row.item_type==="normal"&&getBoothReturnReflectDelta(row)!==0);
@@ -4265,9 +4255,16 @@ async function startBoothCarryOutCamera(){
 
 // One display value for both the close summary and each product row.
 function getBoothCloseDisplayedReturnQty(row){
-  const direct=Number(row?.returned_qty||0);
-  if(direct>0)return direct;
-  return Math.max(0,Number(row?.shelf_return_qty||0),Number(row?.return_reflected_qty||0),Number(row?.shelf_return_reflected_qty||0));
+  // returned_qty is the saved return count. Reflection/movement fields are
+  // later destination operations and must not be used as a fallback value.
+  if(row&&row.returned_qty!==null&&row.returned_qty!==undefined){
+    return Math.max(0,Number(row.returned_qty)||0);
+  }
+  return 0;
+}
+
+function getBoothCloseItemBarcode(value){
+  return String(value??"").trim();
 }
 
 async function stopBoothCarryOutCamera(showOk=true){
@@ -10648,11 +10645,11 @@ async function loadBoothCloseCommonStockSummary(event,summary){
   if(barcodes.length){
     stocks=await sb("event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty,updated_at&store_code=eq."+encodeURIComponent(storeCode)+"&barcode=in.("+buildInFilter(barcodes)+")&limit=5000");
   }
-  const byBarcode=new Map((Array.isArray(stocks)?stocks:[]).map(stock=>[String(stock.barcode||""),stock]));
+  const byBarcode=new Map((Array.isArray(stocks)?stocks:[]).map(stock=>[getBoothCloseItemBarcode(stock.barcode),stock]));
   return {
     ...summary,
     rows:rows.map(row=>{
-      const barcode=String(row.barcode||"");
+      const barcode=getBoothCloseItemBarcode(row.barcode);
       const commonStock=byBarcode.get(barcode);
       const current=commonStock
         ? Number(commonStock.storage_qty||0)
