@@ -239,8 +239,37 @@
     const selected=state.rows.filter(row=>state.selected.has(row.barcode));
     if(!selected.length){panel.hidden=true;panel.innerHTML="";return;}
     panel.hidden=false;
-    panel.innerHTML=`<div class="inventory-list-edit-card"><h3>在庫一括編集（${selected.length}商品）</h3><p class="section-note">表示中の選択商品だけを編集します。変更のない行は保存しません。</p><div class="inventory-list-bulk-rows">${selected.map(row=>`<div class="inventory-list-bulk-row" data-bulk-row="${safeEsc(row.barcode)}"><strong>${safeEsc(row.name)}<small>${safeEsc(row.barcode)}</small></strong><label>通常棚<input data-bulk-base type="number" step="1" value="${safeEsc(row.baseStock)}"></label><label>イベント棚<input data-bulk-event type="number" step="1" value="${safeEsc(row.eventStock)}"></label></div>`).join("")}</div><label>修正理由（必須）<select id="inventoryListBulkReason"><option value="">選択してください</option><option>実棚確認</option><option>入力ミス修正</option><option>過去処理漏れ</option><option>移動処理漏れ</option><option>その他</option></select></label><label>備考<input id="inventoryListBulkMemo" type="text" placeholder="任意メモ"></label><div class="inventory-list-edit-actions"><button type="button" id="inventoryListBulkSaveBtn">変更を保存</button><button type="button" class="secondary" id="inventoryListBulkCancelBtn">キャンセル</button></div></div>`;
+    const positive=selected.filter(row=>row.eventStock>0).length;
+    const negative=selected.filter(row=>row.eventStock<0).length;
+    panel.innerHTML=`<div class="inventory-list-edit-card"><h3>在庫一括編集（${selected.length}商品）</h3><p class="section-note">変更なしの行は保存しません。イベント棚：正数 ${positive}商品 / 負数 ${negative}商品（負数は自動修正しません）。</p><div class="inventory-list-bulk-rows">${selected.map(row=>`<div class="inventory-list-bulk-row" data-bulk-row="${safeEsc(row.barcode)}"><strong>${safeEsc(row.name)}<small>${safeEsc(row.barcode)}</small></strong><label>通常棚<input data-bulk-base type="number" step="1" value="${safeEsc(row.baseStock)}"></label><label>イベント棚<input data-bulk-event type="number" step="1" value="${safeEsc(row.eventStock)}"></label></div>`).join("")}</div><div class="inventory-list-edit-actions"><button type="button" id="inventoryListBulkSaveBtn">変更を保存</button><button type="button" id="inventoryListBulkZeroSelectedBtn" class="secondary" ${positive?"":"disabled"}>選択商品のイベント棚を0</button><button type="button" id="inventoryListBulkZeroVisibleBtn" class="secondary">表示中商品のイベント棚を0</button><button type="button" class="secondary" id="inventoryListBulkCancelBtn">キャンセル</button></div><label>修正理由（必須）<select id="inventoryListBulkReason"><option value="">選択してください</option><option>実棚確認</option><option>入力ミス修正</option><option>過去処理漏れ</option><option>移動処理漏れ</option><option>イベント終了後の残留在庫整理</option><option>その他</option></select></label><label>備考<input id="inventoryListBulkMemo" type="text" placeholder="任意メモ"></label></div>`;
     panel.scrollIntoView({behavior:"smooth",block:"nearest"});
+  }
+  async function zeroEventStocks(mode){
+    const candidates=(mode==="selected"?state.rows.filter(row=>state.selected.has(row.barcode)):state.filtered.slice(0,state.renderLimit)).filter(row=>row.eventStock>0);
+    if(!candidates.length){message("イベント棚在庫が正数の商品はありません。","err");return;}
+    const allFilter=byId("inventoryListFilter")?.value==="all"&&!text(byId("inventoryListSearchInput")?.value);
+    const warning=allFilter?"現在、全商品表示です。表示中の全商品を対象にします。\n":"";
+    const reason=text(byId("inventoryListBulkReason")?.value)||"イベント終了後の残留在庫整理";
+    const memo=text(byId("inventoryListBulkMemo")?.value);
+    const total=candidates.reduce((sum,row)=>sum+row.eventStock,0);
+    const ok=typeof confirmAppAction==="function"?await confirmAppAction("イベント棚残留データを整理",`${warning}対象：${candidates.length}商品\nイベント棚数量合計：${total}個\n変更：イベント棚在庫 → 0\n通常棚：変更しません\n理由：${reason}`,{okText:`${candidates.length}商品を0にする`,cancelText:"キャンセル"}):window.confirm(`${warning}${candidates.length}商品のイベント棚を0にします。通常棚は変更しません。`);
+    if(!ok)return;
+    const storeCode=currentStoreCode(); let completed=0;
+    try{
+      for(const row of candidates){
+        const latest=await fetchLatestInventoryRow(row.barcode);
+        const before=latest.eventStock;
+        if(before<=0)continue;
+        await setEventStorageStock(storeCode,row.barcode,latest.name,0);
+        const staff=window.currentStaffName||"管理者";
+        const memoText=["イベント棚在庫修正",reason,memo,"通常棚は変更なし"].filter(Boolean).join(" / ");
+        await sb("event_storage_movements",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify([{event_id:null,store_code:storeCode,smaregi_product_id:null,barcode:row.barcode,product_name:latest.name||row.name||"",movement_type:"adjustment",quantity:before,staff,memo:memoText,before_qty:before,after_qty:0}])});
+        await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"イベント棚在庫修正",staff,barcode:row.barcode,product_name:latest.name||row.name||"",quantity:-before,memo:memoText,store_code:storeCode,inventory_scope:"event_shelf",before_stock:latest.baseStock,after_stock:latest.baseStock,event_shelf_before:before,event_shelf_after:0,affects_smaregi:false,smaregi_delta:0})});
+        completed++;
+      }
+      await loadInventoryListData(true);
+      message(`イベント棚を0にしました：${completed}商品。通常棚は変更していません。`,"ok");
+    }catch(error){await loadInventoryListData(true);message(`一括0化は${completed}商品まで反映しました。残りは未処理です。${error.message||error}`,"err");}
   }
   async function saveBulkCorrection(){
     const reason=text(byId("inventoryListBulkReason")?.value);
@@ -260,6 +289,7 @@
         if(eventDelta)await setEventStorageStock(storeCode,entry.next.barcode,before.name,entry.next.event);
         if(baseDelta)await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"在庫修正",staff:window.currentStaffName||"管理者",barcode:entry.next.barcode,product_name:before.name||"",quantity:baseDelta,memo:["在庫一括編集",reason,memo].filter(Boolean).join(" / "),store_code:storeCode,inventory_scope:"normal",before_stock:before.baseStock,after_stock:entry.next.base,event_shelf_before:before.eventStock,event_shelf_after:entry.next.event,affects_smaregi:false,smaregi_delta:0})});
         if(eventDelta)await sb("event_storage_movements",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify([{event_id:null,store_code:storeCode,smaregi_product_id:null,barcode:entry.next.barcode,product_name:before.name||"",movement_type:"adjustment",quantity:Math.abs(eventDelta),staff:window.currentStaffName||"管理者",memo:["イベント棚在庫一括修正",reason,memo,`${before.eventStock} → ${entry.next.event}`].filter(Boolean).join(" / "),before_qty:before.eventStock,after_qty:entry.next.event}])});
+        if(eventDelta)await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"イベント棚在庫修正",staff:window.currentStaffName||"管理者",barcode:entry.next.barcode,product_name:before.name||"",quantity:eventDelta,memo:["イベント棚在庫一括修正",reason,memo].filter(Boolean).join(" / "),store_code:storeCode,inventory_scope:"event_shelf",before_stock:before.baseStock,after_stock:before.baseStock,event_shelf_before:before.eventStock,event_shelf_after:entry.next.event,affects_smaregi:false,smaregi_delta:0})});
         applied.push(entry);
       }
       state.selected.clear(); closeEditPanel(); renderBulkPanel(); await loadInventoryListData(true); message(`${changed.length}商品を一括修正しました。`,"ok");
@@ -525,6 +555,7 @@
       }
       if(eventChanged){
         await logEventStorageCorrection({storeCode,barcode,productName:latestRow.name,before:beforeEvent,next:nextEvent,reason,memo});
+        await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"イベント棚在庫修正",staff:window.currentStaffName||"管理者",barcode,product_name:latestRow.name||"",quantity:nextEvent-beforeEvent,memo:["イベント棚在庫修正",reason,memo].filter(Boolean).join(" / "),store_code:storeCode,inventory_scope:"event_shelf",before_stock:beforeBase,after_stock:beforeBase,event_shelf_before:beforeEvent,event_shelf_after:nextEvent,affects_smaregi:false,smaregi_delta:0})});
       }
       closeEditPanel();
       await loadInventoryListData(true);
@@ -570,6 +601,7 @@
     byId("inventoryListSelectVisibleBtn")?.addEventListener("click",()=>{state.filtered.slice(0,state.renderLimit).forEach(row=>state.selected.add(row.barcode));renderInventoryListRows();});
     byId("inventoryListClearSelectionBtn")?.addEventListener("click",()=>{state.selected.clear();renderInventoryListRows();renderBulkPanel();});
     byId("inventoryListBulkEditBtn")?.addEventListener("click",renderBulkPanel);
+    document.addEventListener("click",event=>{if(event.target.closest("#inventoryListBulkZeroSelectedBtn"))void zeroEventStocks("selected");if(event.target.closest("#inventoryListBulkZeroVisibleBtn"))void zeroEventStocks("visible");});
     document.addEventListener("change",event=>{const checkbox=event.target.closest("[data-inventory-list-select]");if(!checkbox)return;const barcode=checkbox.dataset.inventoryListSelect;if(checkbox.checked)state.selected.add(barcode);else state.selected.delete(barcode);renderInventoryListRows();});
     document.addEventListener("click",event=>{if(event.target.closest("#inventoryListBulkSaveBtn"))void saveBulkCorrection();if(event.target.closest("#inventoryListBulkCancelBtn")){state.selected.clear();renderBulkPanel();renderInventoryListRows();}});
     document.addEventListener("input",event=>{

@@ -6,6 +6,7 @@ function inventoryTypeLabel(type){
     event_pick:"イベント持ち出し",
     event_return:"イベント戻し",
     event_close_return:"イベント締め棚戻し",
+    "イベント棚在庫修正":"イベント棚在庫修正",
     equipment_transfer:"商品転用",
     "備品転用":"商品転用",
     "蛯吝刀霆｢逕ｨ":"商品転用",
@@ -15,7 +16,7 @@ function inventoryTypeLabel(type){
   return labels[type]||String(type||"");
 }
 function isInventoryOutType(type){
-  return type==="出荷"||type==="備品転用"||type==="equipment_transfer"||type==="event_pick"||type==="gacha_pick";
+  return type==="出荷"||type==="備品転用"||type==="equipment_transfer"||type==="event_pick"||type==="gacha_pick"||type==="イベント棚在庫修正";
 }
 
 function isInventoryInType(type){
@@ -277,7 +278,7 @@ function ensureHistoryEventShelfHeaders(){
     const table=body?.closest("table");
     const row=table?.querySelector("thead tr");
     if(!row||row.querySelector("[data-history-event-shelf-header]"))return;
-    const desired=["入力日時","区分","担当者","商品名","対象在庫","処理前","数量","処理後","備考","商品転用確認"];
+    const desired=["入力日時","区分","担当者","商品名","対象在庫","処理前","数量","処理後","イベント棚","備考","商品転用確認"];
     [...row.children].forEach((cell,index)=>{if(desired[index])cell.textContent=desired[index];});
     const th=document.createElement("th");
     th.textContent="イベント棚";
@@ -289,7 +290,7 @@ function ensureHistoryEventShelfHeaders(){
 }
 
 function getHistoryCsvHeaders(){
-  return ["入力日時","区分","担当者","商品名","在庫数","入荷","出荷","現在庫","イベント棚","備考","商品転用確認","確認者","確認日時"];
+  return ["入力日時","区分","担当者","商品名","対象在庫","処理前","数量","処理後","イベント棚処理前後","備考","商品転用確認","確認者","確認日時"];
 }
 
 
@@ -742,6 +743,11 @@ function getFixedHistoryStockValues(log){
   const after=event?log?.event_shelf_after:log?.after_stock;
   return {event,before:before==null?"-":Number(before),after:after==null?"-":Number(after)};
 }
+function getFixedHistoryDelta(log){
+  const stock=getFixedHistoryStockValues(log);
+  if(stock.before!=="-"&&stock.after!=="-"&&(["在庫修正","イベント棚在庫修正"].includes(String(log?.type||""))))return stock.after-stock.before;
+  return Number(log?.quantity||0);
+}
 
 function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode){
   const p=gp(barcode);
@@ -788,17 +794,17 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
 
     if(!r)return "";
     const fixed=getFixedHistoryStockValues(r.log);
-    const quantity=Number(r.log.quantity||0);
+    const quantity=getFixedHistoryDelta(r.log);
 
     return `<tr>
       <td>${fmt(r.log.created_at)}</td>
       <td>${esc(inventoryTypeLabel(r.log.type))}</td>
       <td>${esc(r.log.staff)}</td>
       <td>${esc(p?.name||r.log.product_name||"")}</td>
-      <td>${fixed.event?"-":fixed.before}</td>
-      <td>${isInventoryInType(r.log.type)?quantity:""}</td>
-      <td>${isInventoryOutType(r.log.type)?quantity:""}</td>
-      <td>${fixed.event?"-":fixed.after}</td>
+      <td>${fixed.event?"イベント棚":"通常棚"}</td>
+      <td>${fixed.before}</td>
+      <td>${quantity>0?`+${quantity}`:quantity}</td>
+      <td>${fixed.after}</td>
       <td>${fixed.event?`${fixed.before} → ${fixed.after}`:"-"}</td>
       <td>${memoCellHtml(r.log)}</td>
       <td>${equipmentCheckHtml(r.log)}</td>
@@ -856,43 +862,18 @@ async function renderRecentRegistrationHistory(){
 
 function buildGlobalHistoryRows(sourceLogs=logs){
   return sourceLogs.map(log=>{
-    const q=Number(log.quantity||0);
-
-    let beforeStock="";
-    let afterStock="";
-    let inQty="";
-    let outQty="";
-
-    const current=Number(gp(log.barcode)?.base_stock||0);
     const fixed=getFixedHistoryStockValues(log);
-
-    if(fixed.event){
-      return `<tr><td>${fmt(log.created_at)}</td><td>${esc(inventoryTypeLabel(log.type))}</td><td>${esc(log.staff)}</td><td>${esc(gp(log.barcode)?.name||log.product_name||"")}</td><td>-</td><td>${isInventoryInType(log.type)?q:""}</td><td>${isInventoryOutType(log.type)?q:""}</td><td>-</td><td>${fixed.before} → ${fixed.after}</td><td>${memoCellHtml(log)}</td><td>${equipmentCheckHtml(log)}</td></tr>`;
-    }
-
-    if(isInventoryInType(log.type)){
-      beforeStock=current-q;
-      afterStock=current;
-      inQty=q;
-    }else if(isInventoryOutType(log.type)){
-      beforeStock=current+q;
-      afterStock=current;
-      outQty=q;
-    }else if(log.type==="在庫修正"){
-      beforeStock="-";
-      afterStock=q;
-    }
-
+    const delta=getFixedHistoryDelta(log);
     return `<tr>
       <td>${fmt(log.created_at)}</td>
       <td>${esc(inventoryTypeLabel(log.type))}</td>
       <td>${esc(log.staff)}</td>
       <td>${esc(gp(log.barcode)?.name||log.product_name||"")}</td>
-      <td>${beforeStock}</td>
-      <td>${inQty}</td>
-      <td>${outQty}</td>
-      <td>${afterStock}</td>
-      <td>${getHistoryEventShelfStock(log.barcode)}</td>
+      <td>${fixed.event?"イベント棚":"通常棚"}</td>
+      <td>${fixed.before}</td>
+      <td>${delta>0?`+${delta}`:delta}</td>
+      <td>${fixed.after}</td>
+      <td>${fixed.event?`${fixed.before} → ${fixed.after}`:"-"}</td>
       <td>${memoCellHtml(log)}</td>
       <td>${equipmentCheckHtml(log)}</td>
     </tr>`;
@@ -1044,13 +1025,14 @@ function buildHistoryExportRows(sourceLogs){
     for(const log of desc){
       const q=Number(log.quantity||0);
       const fixed=getFixedHistoryStockValues(log);
+      const fixedDelta=getFixedHistoryDelta(log);
       let beforeStock="";
       let inQty="";
       let outQty="";
       beforeStock=fixed.before;
       const afterStock=fixed.after;
-      if(isInventoryInType(log.type))inQty=q;
-      if(isInventoryOutType(log.type))outQty=q;
+      if(fixedDelta>0)inQty=fixedDelta;
+      if(fixedDelta<0)outQty=fixedDelta;
 
       resultRows.push({
         created_at:log.created_at,
@@ -1059,10 +1041,10 @@ function buildHistoryExportRows(sourceLogs){
           inventoryTypeLabel(log.type),
           log.staff||"",
           gp(log.barcode)?.name || log.product_name || "",
-          fixed.event?"-":beforeStock,
-          inQty,
-          outQty,
-          fixed.event?"-":afterStock,
+          fixed.event?"イベント棚":"通常棚",
+          beforeStock,
+          fixedDelta>0?`+${fixedDelta}`:fixedDelta,
+          afterStock,
           fixed.event?`${fixed.before} → ${fixed.after}`:"-",
           String(log.memo||"").replace(/蛯吝刀霆｢逕ｨ/g,"蝠・刀霆｢逕ｨ"),
           (log.type==="蛯吝刀霆｢逕ｨ"||log.type==="equipment_transfer") ? (isEquipmentTransferChecked(log) ? "確認済み" : "未確認") : "",
