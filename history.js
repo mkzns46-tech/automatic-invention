@@ -140,13 +140,13 @@ async function loadHistoryEventShelfMovementTimeline(storeCode,barcodes){
         const quantity=Math.abs(Number(row.quantity||0));
         if(!Number.isFinite(quantity))return;
         const type=String(row.movement_type||"").trim();
-        const after=running;
+        let after=running;
         let before=running;
         if(type==="storage_out")before=running+quantity;
         else if(type==="storage_in")before=running-quantity;
         else if(type==="adjustment"){
           const match=String(row.memo||"").match(/(-?\d+)\s*->\s*(-?\d+)/);
-          if(match)before=Number(match[1]);
+          if(match){before=Number(match[1]);after=Number(match[2]);}
         }else return;
         timeline.push({
           id:String(row.id||""),
@@ -251,6 +251,11 @@ function isHistoryEventShelfLog(log){
 
 function getHistoryEventShelfRange(log){
   const barcode=String(log?.barcode||"").trim();
+  const explicitBefore=log?.event_shelf_before;
+  const explicitAfter=log?.event_shelf_after;
+  if(explicitBefore!=null&&explicitAfter!=null){
+    return {target:"イベント棚",before:Number(explicitBefore),after:Number(explicitAfter)};
+  }
   const key=historyEventShelfCacheKey(getHistoryCurrentStoreCode(),barcode);
   const timeline=historyEventShelfTimelineCache.get(key)||[];
   const logTime=new Date(log?.created_at||0).getTime();
