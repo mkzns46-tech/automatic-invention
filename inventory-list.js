@@ -555,7 +555,7 @@
       }
       if(eventChanged){
         await logEventStorageCorrection({storeCode,barcode,productName:latestRow.name,before:beforeEvent,next:nextEvent,reason,memo});
-        await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"イベント棚在庫修正",staff:window.currentStaffName||"管理者",barcode,product_name:latestRow.name||"",quantity:nextEvent-beforeEvent,memo:["イベント棚在庫修正",reason,memo].filter(Boolean).join(" / "),store_code:storeCode,inventory_scope:"event_shelf",before_stock:beforeBase,after_stock:beforeBase,event_shelf_before:beforeEvent,event_shelf_after:nextEvent,affects_smaregi:false,smaregi_delta:0})});
+      await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"在庫修正",staff:window.currentStaffName||"管理者",barcode,product_name:latestRow.name||"",quantity:nextEvent-beforeEvent,memo:["イベント棚在庫修正",reason,memo].filter(Boolean).join(" / "),store_code:storeCode,inventory_scope:"event_shelf",before_stock:beforeBase,after_stock:beforeBase,event_shelf_before:beforeEvent,event_shelf_after:nextEvent,affects_smaregi:false,smaregi_delta:0})});
       }
       closeEditPanel();
       await loadInventoryListData(true);
