@@ -271,24 +271,54 @@
     const reason=text(byId("inventoryListInlineReason")?.value)||"イベント終了後の残留在庫整理";
     const changed=changedRows();
     if(!changed.length){message("変更された商品がありません。","err");return;}
-    if(changed.some(row=>effectiveBase(row)<0||effectiveEvent(row)<0)){message("マイナス在庫は保存できません。入力値を確認してください。","err");return;}
-    const totalEventBefore=changed.reduce((sum,row)=>sum+row.eventStock,0);
-    const totalEventAfter=changed.reduce((sum,row)=>sum+effectiveEvent(row),0);
+    const validationErrors=[];
+    const planned=changed.map(row=>{
+      const draft=state.drafts.get(row.barcode);
+      if(!draft){validationErrors.push(`${row.name||row.barcode||"不明"}：編集後スナップショットがありません。`);return {row,next:null};}
+      const next={base:draft.base,event:draft.event};
+      const fields=["barcode","name","baseStock","eventStock"];
+      fields.forEach(field=>{if(field==="barcode"?!text(row[field]):row[field]===undefined||row[field]===null)validationErrors.push(`${row.name||row.barcode||"不明"}：${field}が不足`);});
+      if(!Number.isInteger(next.base)||!Number.isInteger(next.event))validationErrors.push(`${row.name}：通常棚/イベント棚は整数で入力してください。`);
+      if(next.base<0||next.event<0)validationErrors.push(`${row.name}：マイナス在庫は保存できません。`);
+      return {row,next};
+    });
+    if(validationErrors.length){message(`保存前検証で停止しました。\n${validationErrors.join("\n")}`,"err");return;}
+    const latestRows=await Promise.all(planned.map(entry=>fetchLatestInventoryRow(entry.row.barcode)));
+    planned.forEach((entry,index)=>{
+      if(!entry.next)return;
+      entry.latest=latestRows[index];
+      if(!entry.latest||!entry.latest.barcode)validationErrors.push(`${entry.row.name}：商品/店舗在庫の取得結果がありません。`);
+      else if(entry.next.base!==entry.latest.baseStock)validationErrors.push(`${entry.row.name}：通常棚在庫が保存前に変更されています（${entry.latest.baseStock}）。再読み込みしてください。`);
+      else if(!Number.isInteger(entry.latest.eventStock))validationErrors.push(`${entry.row.name}：イベント棚の編集前値が不正です。`);
+    });
+    if(validationErrors.length){message(`保存前検証で停止しました。DBは変更していません。\n${validationErrors.join("\n")}`,"err");return;}
+    const totalEventBefore=planned.reduce((sum,entry)=>sum+entry.latest.eventStock,0);
+    const totalEventAfter=planned.reduce((sum,entry)=>sum+entry.next.event,0);
     const ok=typeof confirmAppAction==="function"?await confirmAppAction("在庫変更確認",`対象：${changed.length}商品\n通常棚：変更なし\nイベント棚：${totalEventBefore} → ${totalEventAfter}（差分 ${totalEventAfter-totalEventBefore}）\n修正理由：${reason}`,{okText:"保存する",cancelText:"キャンセル"}):true;
     if(!ok)return;
     const storeCode=currentStoreCode(); const applied=[];
     try{
-      for(const row of changed){
-        const next=state.drafts.get(row.barcode); const latest=await fetchLatestInventoryRow(row.barcode);
-        if(next.base!==latest.baseStock)throw new Error(`${row.name}の通常棚在庫が更新済みです。再読み込みしてください。`);
-        if(next.event!==latest.eventStock)await setEventStorageStock(storeCode,row.barcode,latest.name, next.event);
+      for(const entry of planned){
+        const {row,next,latest}=entry;
+        applied.push(entry);
+        if(next.event!==latest.eventStock){await setEventStorageStock(storeCode,row.barcode,latest.name,next.event);entry.stockChanged=true;}
         const delta=next.event-latest.eventStock;
         if(delta)await logEventStorageCorrection({storeCode,barcode:row.barcode,productName:latest.name,before:latest.eventStock,next:next.event,reason,memo:"在庫一覧上の直接編集"});
         if(delta)await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"在庫修正",staff:window.currentStaffName||"管理者",barcode:row.barcode,product_name:latest.name||row.name||"",quantity:delta,memo:["イベント棚在庫修正",reason,"在庫一覧上の直接編集"].join(" / "),store_code:storeCode,inventory_scope:"event_shelf",before_stock:latest.baseStock,after_stock:latest.baseStock,event_shelf_before:latest.eventStock,event_shelf_after:next.event,affects_smaregi:false,smaregi_delta:0})});
-        applied.push(row);
       }
       state.drafts.clear();state.selected.clear();await loadInventoryListData(true);message(`${applied.length}商品を保存しました。`,`ok`);
-    }catch(error){message(`保存に失敗しました。反映済み：${applied.length}商品。${error.message||error}`,"err");}
+    }catch(error){
+      let rollbackErrors=0;
+      for(const entry of applied.slice().reverse()){
+        try{
+          if(entry.stockChanged){
+            await setEventStorageStock(storeCode,entry.row.barcode,entry.latest.name,entry.latest.eventStock);
+            await logEventStorageCorrection({storeCode,barcode:entry.row.barcode,productName:entry.latest.name,before:entry.next.event,next:entry.latest.eventStock,reason,memo:"一括保存失敗の補償復元"});
+          }
+        }catch(_){rollbackErrors++;}
+      }
+      message(`保存に失敗しました。DB更新を元に戻しました。${rollbackErrors?` 復元失敗：${rollbackErrors}商品。`:""}${error.message||error}`,"err");
+    }
   }
   function discardInlineChanges(){state.drafts.clear();renderInventoryListRows();message("画面上の変更を破棄しました。","ok");}
   function closeEditPanel(){
