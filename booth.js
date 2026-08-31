@@ -10003,7 +10003,7 @@ exportBoothEventReportPdf=async function(event){
       return;
     }
     const closed=isBoothEventClosed(state.event);
-    list.innerHTML=rows.map(row=>{
+    list.innerHTML='<div class="booth-return-draft-list-header" aria-hidden="true"><span>商品名 / バーコード</span><span>持出</span><span>保存済み</span><span>今回数量</span><span>操作</span></div>'+rows.map(row=>{
       const barcode=String(row.barcode||"");
       const max=takeoutQty(row);
       const value=Number(state.draft.get(barcode)??row.returned_qty??0);
