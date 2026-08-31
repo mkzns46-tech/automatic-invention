@@ -409,12 +409,29 @@ function isInventoryAdminAuthenticated(){
   return valid;
 }
 
-function authenticateInventoryAdmin(){
+async function authenticateInventoryAdmin(){
   if(isInventoryAdminAuthenticated()){
     showPopup("管理者認証","認証済みです。認証後12時間は再入力不要です。");
     return true;
   }
-  const password=prompt("管理者パスワードを入力してください。");
+  const password=await new Promise(resolve=>{
+    const popup=document.createElement("div");
+    popup.className="app-popup app-confirm-popup";
+    popup.style.display="flex";
+    popup.innerHTML=`<div class="app-popup-card">
+      <div class="app-popup-title">管理者認証</div>
+      <div class="app-popup-body"><label>管理者パスワード<input type="password" autocomplete="current-password" data-inventory-admin-password></label></div>
+      <div class="app-confirm-actions app-popup-footer"><button type="button" class="secondary" data-inventory-admin-cancel>キャンセル</button><button type="button" data-inventory-admin-ok>認証する</button></div>
+    </div>`;
+    const input=popup.querySelector("[data-inventory-admin-password]");
+    const close=value=>{try{document.body.removeChild(popup);}catch(_){} resolve(value);};
+    popup.querySelector("[data-inventory-admin-cancel]")?.addEventListener("click",()=>close(null));
+    popup.querySelector("[data-inventory-admin-ok]")?.addEventListener("click",()=>close(input?.value??""));
+    input?.addEventListener("keydown",event=>{if(event.key==="Enter")close(input.value);});
+    popup.addEventListener("click",event=>{if(event.target===popup)close(null);});
+    document.body.appendChild(popup);
+    input?.focus();
+  });
   if(String(password||"").trim()!==INVENTORY_ADMIN_PASSWORD){
     if(password!==null)showMessage("パスワードが違います。","err");
     return false;
