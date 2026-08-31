@@ -8334,3 +8334,11 @@ body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
   }
 }
 .inventory-source-stock-info{display:block;margin-top:8px;padding:9px 10px;font-size:14px}
+/* v2.92.00: compact inventory-list bulk editing controls */
+.inventory-list-bulk-toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:.75rem 0;padding:.7rem;border:1px solid #b7dfc5;border-radius:.65rem;background:#f0fbf3}
+.inventory-list-bulk-toolbar[hidden],.inventory-list-bulk-panel[hidden]{display:none}
+.inventory-list-bulk-rows{display:grid;gap:.55rem;margin:.7rem 0}
+.inventory-list-bulk-row{display:grid;grid-template-columns:minmax(12rem,1fr) 8rem 8rem;gap:.6rem;align-items:center;padding:.55rem;border:1px solid #d5e9db;border-radius:.5rem}
+.inventory-list-bulk-row strong{display:flex;flex-direction:column;gap:.2rem}
+.inventory-list-bulk-row small{font-weight:400;color:#527060}
+@media(max-width:640px){.inventory-list-bulk-row{grid-template-columns:1fr 1fr}.inventory-list-bulk-row strong{grid-column:1/-1}}

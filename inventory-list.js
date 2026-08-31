@@ -7,7 +7,8 @@
     filtered:[],
     renderLimit:PAGE_SIZE,
     loading:false,
-    bound:false
+    bound:false,
+    selected:new Set()
   };
 
   function byId(id){return document.getElementById(id);}
@@ -191,7 +192,7 @@
   function renderTableRow(row){
     const admin=isAdmin()&&row.barcode;
     return `<tr>
-      <td class="inventory-list-name-cell"><strong>${safeEsc(row.name)}</strong></td>
+      <td class="inventory-list-name-cell">${admin?`<input type="checkbox" data-inventory-list-select="${safeEsc(row.barcode)}" ${state.selected.has(row.barcode)?"checked":""} aria-label="${safeEsc(row.name)}を選択">`:""}<strong>${safeEsc(row.name)}</strong></td>
       <td>${safeEsc(row.barcode)}</td>
       <td>${safeEsc(row.productCode||"-")}</td>
       <td>${safeEsc(row.shelf||"-")}</td>
@@ -204,6 +205,7 @@
   function renderCard(row){
     const admin=isAdmin()&&row.barcode;
     return `<article class="inventory-list-card">
+      ${admin?`<label><input type="checkbox" data-inventory-list-select="${safeEsc(row.barcode)}" ${state.selected.has(row.barcode)?"checked":""}>選択</label>`:""}
       <div><strong>${safeEsc(row.name)}</strong><small>バーコード：${safeEsc(row.barcode)}</small><small>棚番：${safeEsc(row.shelf||"-")}</small></div>
       <dl>
         <div><dt>通常棚</dt><dd class="${rowClass(row.baseStock)}">${safeEsc(row.baseStock)}</dd></div>
@@ -221,11 +223,47 @@
     if(body)body.innerHTML=visible.map(renderTableRow).join("")||`<tr><td colspan="8">条件に一致する商品はありません。</td></tr>`;
     const cards=byId("inventoryListCards");
     if(cards)cards.innerHTML=visible.map(renderCard).join("")||`<div class="booth-empty">条件に一致する商品はありません。</div>`;
+    const toolbar=byId("inventoryListBulkToolbar");
+    if(toolbar)toolbar.hidden=!isAdmin();
+    const count=byId("inventoryListSelectedCount");
+    if(count)count.textContent=`選択：${state.selected.size}件`;
     const more=byId("inventoryListMoreBtn");
     if(more){
       more.hidden=state.renderLimit>=state.filtered.length;
       more.textContent=`さらに表示（${Math.min(PAGE_SIZE,state.filtered.length-state.renderLimit)}件）`;
     }
+  }
+  function renderBulkPanel(){
+    const panel=byId("inventoryListBulkPanel");
+    if(!panel)return;
+    const selected=state.rows.filter(row=>state.selected.has(row.barcode));
+    if(!selected.length){panel.hidden=true;panel.innerHTML="";return;}
+    panel.hidden=false;
+    panel.innerHTML=`<div class="inventory-list-edit-card"><h3>在庫一括編集（${selected.length}商品）</h3><p class="section-note">表示中の選択商品だけを編集します。変更のない行は保存しません。</p><div class="inventory-list-bulk-rows">${selected.map(row=>`<div class="inventory-list-bulk-row" data-bulk-row="${safeEsc(row.barcode)}"><strong>${safeEsc(row.name)}<small>${safeEsc(row.barcode)}</small></strong><label>通常棚<input data-bulk-base type="number" step="1" value="${safeEsc(row.baseStock)}"></label><label>イベント棚<input data-bulk-event type="number" step="1" value="${safeEsc(row.eventStock)}"></label></div>`).join("")}</div><label>修正理由（必須）<select id="inventoryListBulkReason"><option value="">選択してください</option><option>実棚確認</option><option>入力ミス修正</option><option>過去処理漏れ</option><option>移動処理漏れ</option><option>その他</option></select></label><label>備考<input id="inventoryListBulkMemo" type="text" placeholder="任意メモ"></label><div class="inventory-list-edit-actions"><button type="button" id="inventoryListBulkSaveBtn">変更を保存</button><button type="button" class="secondary" id="inventoryListBulkCancelBtn">キャンセル</button></div></div>`;
+    panel.scrollIntoView({behavior:"smooth",block:"nearest"});
+  }
+  async function saveBulkCorrection(){
+    const reason=text(byId("inventoryListBulkReason")?.value);
+    if(!reason){message("一括修正理由を入力してください。","err");return;}
+    const memo=text(byId("inventoryListBulkMemo")?.value);
+    const rows=[...document.querySelectorAll("[data-bulk-row]")].map(node=>({barcode:node.dataset.bulkRow,base:Number(node.querySelector("[data-bulk-base]")?.value),event:Number(node.querySelector("[data-bulk-event]")?.value)})).filter(row=>Number.isInteger(row.base)&&Number.isInteger(row.event));
+    const latest=await Promise.all(rows.map(row=>fetchLatestInventoryRow(row.barcode)));
+    const changed=rows.map((row,i)=>({next:row,latest:latest[i]})).filter(row=>row.next.base!==row.latest.baseStock||row.next.event!==row.latest.eventStock);
+    if(!changed.length){message("変更された商品がありません。","err");return;}
+    const ok=typeof confirmAppAction==="function"?await confirmAppAction("在庫一括編集を保存",`変更商品：${changed.length}件\n通常棚変更：${changed.filter(x=>x.next.base!==x.latest.baseStock).length}件\nイベント棚変更：${changed.filter(x=>x.next.event!==x.latest.eventStock).length}件\n理由：${reason}`,{okText:"保存",cancelText:"キャンセル"}):true;
+    if(!ok)return;
+    const storeCode=currentStoreCode(); const applied=[];
+    try{
+      for(const entry of changed){
+        const before=entry.latest; const baseDelta=entry.next.base-before.baseStock; const eventDelta=entry.next.event-before.eventStock;
+        if(baseDelta)await updateProductCurrentStock(entry.next.barcode,entry.next.base);
+        if(eventDelta)await setEventStorageStock(storeCode,entry.next.barcode,before.name,entry.next.event);
+        if(baseDelta)await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"在庫修正",staff:window.currentStaffName||"管理者",barcode:entry.next.barcode,product_name:before.name||"",quantity:baseDelta,memo:["在庫一括編集",reason,memo].filter(Boolean).join(" / "),store_code:storeCode,inventory_scope:"normal",before_stock:before.baseStock,after_stock:entry.next.base,event_shelf_before:before.eventStock,event_shelf_after:entry.next.event,affects_smaregi:false,smaregi_delta:0})});
+        if(eventDelta)await sb("event_storage_movements",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify([{event_id:null,store_code:storeCode,smaregi_product_id:null,barcode:entry.next.barcode,product_name:before.name||"",movement_type:"adjustment",quantity:Math.abs(eventDelta),staff:window.currentStaffName||"管理者",memo:["イベント棚在庫一括修正",reason,memo,`${before.eventStock} → ${entry.next.event}`].filter(Boolean).join(" / "),before_qty:before.eventStock,after_qty:entry.next.event}])});
+        applied.push(entry);
+      }
+      state.selected.clear(); closeEditPanel(); renderBulkPanel(); await loadInventoryListData(true); message(`${changed.length}商品を一括修正しました。`,"ok");
+    }catch(error){message(`一括修正に失敗しました。${error.message||error}`,"err");}
   }
   function closeEditPanel(){
     const panel=byId("inventoryListEditPanel");
@@ -394,7 +432,9 @@
         movement_type:"adjustment",
         quantity:Math.abs(delta),
         staff:window.currentStaffName||"管理者",
-        memo:["イベント棚在庫修正",`${before} -> ${next}`,`差分 ${delta}`,reason,memo].filter(Boolean).join(" / ")
+        memo:["イベント棚在庫修正",`${before} -> ${next}`,`差分 ${delta}`,reason,memo].filter(Boolean).join(" / "),
+        before_qty:before,
+        after_qty:next
       }])
     });
   }
@@ -473,7 +513,13 @@
             barcode,
             product_name:latest?.name||latestRow.name||"",
             quantity:nextBase,
-            memo:logMemo
+            memo:logMemo,
+            store_code:storeCode,
+            inventory_scope:"normal",
+            before_stock:beforeBase,
+            after_stock:nextBase,
+            event_shelf_before:beforeEvent,
+            event_shelf_after:nextEvent
           })
         });
       }
@@ -517,10 +563,15 @@
     if(state.bound)return;
     byId("inventoryListRefreshBtn")?.addEventListener("click",()=>loadInventoryListData(true));
     byId("inventoryListCsvBtn")?.addEventListener("click",exportCsv);
-    byId("inventoryListSearchInput")?.addEventListener("input",()=>{state.renderLimit=PAGE_SIZE;applyInventoryListFilterSort();});
-    byId("inventoryListFilter")?.addEventListener("change",()=>{state.renderLimit=PAGE_SIZE;applyInventoryListFilterSort();});
+    byId("inventoryListSearchInput")?.addEventListener("input",()=>{state.selected.clear();state.renderLimit=PAGE_SIZE;applyInventoryListFilterSort();});
+    byId("inventoryListFilter")?.addEventListener("change",()=>{state.selected.clear();state.renderLimit=PAGE_SIZE;applyInventoryListFilterSort();});
     byId("inventoryListSort")?.addEventListener("change",()=>{state.renderLimit=PAGE_SIZE;applyInventoryListFilterSort();});
     byId("inventoryListMoreBtn")?.addEventListener("click",()=>{state.renderLimit+=PAGE_SIZE;renderInventoryListRows();});
+    byId("inventoryListSelectVisibleBtn")?.addEventListener("click",()=>{state.filtered.slice(0,state.renderLimit).forEach(row=>state.selected.add(row.barcode));renderInventoryListRows();});
+    byId("inventoryListClearSelectionBtn")?.addEventListener("click",()=>{state.selected.clear();renderInventoryListRows();renderBulkPanel();});
+    byId("inventoryListBulkEditBtn")?.addEventListener("click",renderBulkPanel);
+    document.addEventListener("change",event=>{const checkbox=event.target.closest("[data-inventory-list-select]");if(!checkbox)return;const barcode=checkbox.dataset.inventoryListSelect;if(checkbox.checked)state.selected.add(barcode);else state.selected.delete(barcode);renderInventoryListRows();});
+    document.addEventListener("click",event=>{if(event.target.closest("#inventoryListBulkSaveBtn"))void saveBulkCorrection();if(event.target.closest("#inventoryListBulkCancelBtn")){state.selected.clear();renderBulkPanel();renderInventoryListRows();}});
     document.addEventListener("input",event=>{
       if(event.target.closest("#inventoryListEditBaseStock,#inventoryListEditEventStock"))syncEditComparison();
     });

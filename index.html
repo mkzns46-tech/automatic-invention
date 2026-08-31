@@ -201,9 +201,16 @@
     <button type="button" id="inventoryListRefreshBtn" class="secondary">再読み込み</button>
     <button type="button" id="inventoryListCsvBtn" class="secondary">在庫一覧CSV</button>
   </div>
+  <div class="inventory-list-bulk-toolbar" id="inventoryListBulkToolbar" hidden>
+    <button type="button" id="inventoryListSelectVisibleBtn" class="secondary">表示中を選択</button>
+    <button type="button" id="inventoryListClearSelectionBtn" class="secondary">選択解除</button>
+    <span id="inventoryListSelectedCount">選択：0件</span>
+    <button type="button" id="inventoryListBulkEditBtn">選択商品を一括編集</button>
+  </div>
   <div id="inventoryListSummary" class="inventory-list-summary"></div>
   <div id="inventoryListMessage" class="message"></div>
   <div id="inventoryListEditPanel" class="inventory-list-edit-panel" hidden></div>
+  <div id="inventoryListBulkPanel" class="inventory-list-bulk-panel" hidden></div>
   <div class="inventory-list-table-wrap">
     <table class="inventory-list-table">
       <thead><tr><th>商品名</th><th>バーコード</th><th>商品コード</th><th>棚番</th><th>通常棚在庫</th><th>イベント棚在庫</th><th>比較用在庫</th><th>操作</th></tr></thead>

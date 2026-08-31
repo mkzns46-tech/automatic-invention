@@ -735,6 +735,14 @@ async function renderSelectedProductHistoryWithData(productLogs){
 
 }
 
+function getFixedHistoryStockValues(log){
+  const scope=String(log?.inventory_scope||"").toLowerCase();
+  const event=scope.includes("event")||isHistoryEventShelfLog(log)||log?.event_shelf_before!=null||log?.event_shelf_after!=null;
+  const before=event?log?.event_shelf_before:log?.before_stock;
+  const after=event?log?.event_shelf_after:log?.after_stock;
+  return {event,before:before==null?"-":Number(before),after:after==null?"-":Number(after)};
+}
+
 function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode){
   const p=gp(barcode);
   let running=Number(p?.base_stock||0);
@@ -779,17 +787,19 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
     const r=rowsByKey.get(key);
 
     if(!r)return "";
+    const fixed=getFixedHistoryStockValues(r.log);
+    const quantity=Number(r.log.quantity||0);
 
     return `<tr>
       <td>${fmt(r.log.created_at)}</td>
       <td>${esc(inventoryTypeLabel(r.log.type))}</td>
       <td>${esc(r.log.staff)}</td>
       <td>${esc(p?.name||r.log.product_name||"")}</td>
-      <td>${r.beforeStock}</td>
-      <td>${r.inQty}</td>
-      <td>${r.outQty}</td>
-      <td>${r.afterStock}</td>
-      <td>${getHistoryEventShelfStock(r.log.barcode)}</td>
+      <td>${fixed.event?"-":fixed.before}</td>
+      <td>${isInventoryInType(r.log.type)?quantity:""}</td>
+      <td>${isInventoryOutType(r.log.type)?quantity:""}</td>
+      <td>${fixed.event?"-":fixed.after}</td>
+      <td>${fixed.event?`${fixed.before} → ${fixed.after}`:"-"}</td>
       <td>${memoCellHtml(r.log)}</td>
       <td>${equipmentCheckHtml(r.log)}</td>
     </tr>`;
@@ -854,6 +864,11 @@ function buildGlobalHistoryRows(sourceLogs=logs){
     let outQty="";
 
     const current=Number(gp(log.barcode)?.base_stock||0);
+    const fixed=getFixedHistoryStockValues(log);
+
+    if(fixed.event){
+      return `<tr><td>${fmt(log.created_at)}</td><td>${esc(inventoryTypeLabel(log.type))}</td><td>${esc(log.staff)}</td><td>${esc(gp(log.barcode)?.name||log.product_name||"")}</td><td>-</td><td>${isInventoryInType(log.type)?q:""}</td><td>${isInventoryOutType(log.type)?q:""}</td><td>-</td><td>${fixed.before} → ${fixed.after}</td><td>${memoCellHtml(log)}</td><td>${equipmentCheckHtml(log)}</td></tr>`;
+    }
 
     if(isInventoryInType(log.type)){
       beforeStock=current-q;
@@ -1024,28 +1039,18 @@ function buildHistoryExportRows(sourceLogs){
 
   for(const [barcode,list] of grouped.entries()){
     const p=gp(barcode);
-    let running=Number(p?.base_stock||0);
     const desc=list.slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
 
     for(const log of desc){
       const q=Number(log.quantity||0);
+      const fixed=getFixedHistoryStockValues(log);
       let beforeStock="";
-      let afterStock=running;
       let inQty="";
       let outQty="";
-
-      if(isInventoryInType(log.type)){
-        beforeStock=running-q;
-        inQty=q;
-        running-=q;
-      }else if(isInventoryOutType(log.type)){
-        beforeStock=running+q;
-        outQty=q;
-        running+=q;
-      }else if(log.type==="蝨ｨ蠎ｫ菫ｮ豁｣"){
-        beforeStock="-";
-        afterStock=q;
-      }
+      beforeStock=fixed.before;
+      const afterStock=fixed.after;
+      if(isInventoryInType(log.type))inQty=q;
+      if(isInventoryOutType(log.type))outQty=q;
 
       resultRows.push({
         created_at:log.created_at,
@@ -1054,11 +1059,11 @@ function buildHistoryExportRows(sourceLogs){
           inventoryTypeLabel(log.type),
           log.staff||"",
           gp(log.barcode)?.name || log.product_name || "",
-          beforeStock,
+          fixed.event?"-":beforeStock,
           inQty,
           outQty,
-          afterStock,
-          getHistoryEventShelfStock(log.barcode),
+          fixed.event?"-":afterStock,
+          fixed.event?`${fixed.before} → ${fixed.after}`:"-",
           String(log.memo||"").replace(/蛯吝刀霆｢逕ｨ/g,"蝠・刀霆｢逕ｨ"),
           (log.type==="蛯吝刀霆｢逕ｨ"||log.type==="equipment_transfer") ? (isEquipmentTransferChecked(log) ? "確認済み" : "未確認") : "",
           log.equipment_checked_by||"",

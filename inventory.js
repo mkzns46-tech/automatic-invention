@@ -666,7 +666,9 @@ async function applyEventStoragePick(event,product,qty,staff,memo){
     movement_type:"storage_out",
     quantity:qty,
     staff,
-    memo
+    memo,
+    before_qty:currentStorage,
+    after_qty:nextStorage
   };
   if(event?.id){
     await sb("event_storage_movements",{
@@ -783,6 +785,10 @@ async function registerEventPickFromInventory({event,product,barcode,qty,staff,m
           quantity:qty,
           memo,
           event_id:event.id,
+          store_code:(typeof getCurrentSmaregiContext==="function"?getCurrentSmaregiContext()?.storeCode:window.currentStore)||"tokyo",
+          inventory_scope:"normal",
+          before_stock:currentStock,
+          after_stock:newStock,
           affects_smaregi:false,
           smaregi_delta:0
         })
@@ -1279,7 +1285,13 @@ async function registerBarcode(barcode){
         barcode,
         product_name:p.name,
         quantity:logQuantity,
-        memo:inventoryMemo
+        memo:inventoryMemo,
+        store_code:(typeof getCurrentSmaregiContext==="function"?getCurrentSmaregiContext()?.storeCode:window.currentStore)||"tokyo",
+        inventory_scope:(type==="出荷"&&eventPickSource==="storage")?"event_shelf":"normal",
+        before_stock:currentStock,
+        after_stock:newStock,
+        event_shelf_before:directStorageOutResult?.currentStorage??null,
+        event_shelf_after:directStorageOutResult?.nextStorage??null
       })
     });
 
