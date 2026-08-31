@@ -11922,7 +11922,11 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
     if(next.sold+next.returned+next.consumed>next.taken)throw new Error("補正合計が持出数を超えています。");
     const beforeConsumed=Number(item.consumed_qty||0),delta=next.consumed-beforeConsumed;
     await patchBoothEventItem(item,{taken_qty:next.taken,sold_qty:next.sold,returned_qty:next.returned,consumed_qty:next.consumed,difference_qty:next.taken-next.sold-next.returned-next.consumed,diff_memo:`イベントレポート直接補正 / 持出${item.taken_qty||0}->${next.taken} / 販売${item.sold_qty||0}->${next.sold} / 戻り${item.returned_qty||0}->${next.returned} / 消費${beforeConsumed}->${next.consumed}`});
-    if(delta)await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"備品転用",staff:window.__aricoCurrentStaff||"イベントレポート補正",barcode:item.barcode,product_name:item.product_name||"",quantity:delta,memo:`イベントレポート消費補正（商品転用と同じ履歴） ${beforeConsumed} -> ${next.consumed}`,event_id:item.event_id,affects_smaregi:false,smaregi_delta:0})});
+    if(delta){
+      const storeCode=getBoothEventStoreCode(item);
+      const currentStock=Number((await findBoothProductByBarcode(String(item.barcode||"").trim()))?.base_stock||0);
+      await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"備品転用",staff:window.__aricoCurrentStaff||"イベントレポート補正",barcode:item.barcode,product_name:item.product_name||"",quantity:delta,memo:`対象在庫：イベント棚 / イベントレポート消費補正（商品転用と同じ履歴） ${beforeConsumed} -> ${next.consumed}`,event_id:item.event_id,store_code:storeCode,inventory_scope:"event_shelf",before_stock:currentStock,after_stock:currentStock,event_shelf_before:beforeConsumed,event_shelf_after:next.consumed,affects_smaregi:false,smaregi_delta:0})});
+    }
     await refreshBoothEventRelatedViews(item.event_id);await loadBoothEventReport(item.event_id);boothShowSuccess("数量を保存しました","イベントレポートの数量と差異を更新しました。");
   }
   if(!root.__aricoDirectEventQtyBound){document.addEventListener("click",event=>{const button=event.target.closest("[data-booth-direct-save]");if(button)saveDirect(button).catch(error=>boothShowError("数量補正エラー",error.message||"保存に失敗しました。"));});root.__aricoDirectEventQtyBound=true;}
