@@ -10640,8 +10640,8 @@ async function loadBoothCloseCommonStockSummary(event,summary){
       const sold=Number(row.sold_qty||0);
       const returned=Number(row.returned_qty||0);
       const unreturned=Math.max(0,taken-sold-returned);
-      const destination=getBoothCloseReturnProcessType(row);
-      return {...row,event_shelf_current_qty:current,common_event_shelf_current_qty:current,event_shelf_store_code:storeCode,unreturned_qty:unreturned,event_shelf_planned_after_close:Math.max(0,current-(destination==="shelf"?returned:0))};
+      const closeRemoval=returned+unreturned;
+      return {...row,event_shelf_current_qty:current,common_event_shelf_current_qty:current,event_shelf_store_code:storeCode,unreturned_qty:unreturned,event_storage_shortage_qty:Math.max(0,closeRemoval-current),event_shelf_planned_after_close:0};
     }),
     commonShelfStocks:Array.isArray(stocks)?stocks:[],
     event_shelf_store_code:storeCode
@@ -11691,8 +11691,8 @@ exportBoothEventReportPdf=async function(event){
   }
 };
 
-// Ver 2.75: event close is status-only. Return stock movements are completed
-// when the return destination is confirmed in the event report.
+// Ver 2.93.02: return facts are recorded in the report, then event close moves
+// counted returns to the normal shelf. Common event stock is store-shared.
 async function getBoothEventStorageCurrentQty(storeCode,barcode){
   const rows=await sb(`event_storage_stocks?select=storage_qty&store_code=eq.${encodeURIComponent(storeCode)}&barcode=eq.${encodeURIComponent(String(barcode||"").trim())}&limit=1`);
   return Number(Array.isArray(rows)&&rows[0]?.storage_qty||0);
@@ -11708,49 +11708,36 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
     ));
   }
 
-  function aricoCloseRowsWithoutDestination(rows){
-    return rows.filter(row=>Number(row.returned_qty||0)>0&&!normalizeBoothReportReturnDestination(getBoothReturnProcessType(row)));
-  }
-
-  function aricoCloseHasNoReturnSaved(rows){
-    return rows.length>0
-      && !rows.some(row=>Number(row.returned_qty||0)>0)
-      && !rows.some(row=>normalizeBoothReportReturnDestination(getBoothReturnProcessType(row)));
-  }
-
   // Return input is metadata only. Physical movement is applied at event close.
   reflectBoothShelfReturnsOnClose=async function(summary,staff){
     const rows=(summary?.rows||summary?.returnPendingRows||summary?.shelfReturnPendingRows||[])
-      .filter(row=>row.item_type==="normal"&&(getBoothReturnReflectDelta(row)!==0||Math.max(0,Number(row.taken_qty||0)-Number(row.sold_qty||0)-Number(row.returned_qty||0))>0));
+      .filter(row=>row.item_type==="normal"&&(Number(row.returned_qty||0)>0||Math.max(0,Number(row.taken_qty||0)-Number(row.sold_qty||0)-Number(row.returned_qty||0))>0));
     const applied=[];
     try{
       for(const item of rows){
-        const destination=getBoothCloseReturnProcessType(item);
-        if(!destination)throw new Error("戻り先が未選択の商品があります。");
-        const delta=getBoothReturnReflectDelta(item);
-        const returned=getBoothReturnReflectQty(item);
+        const returned=Math.max(0,Number(item.returned_qty||0));
         const unreturned=Math.max(0,Number(item.taken_qty||0)-Number(item.sold_qty||0)-Number(item.returned_qty||0));
-        const operation={item,before:{...item},delta,baseDelta:0,baseMoved:false,storageMoved:false,movement:null,logs:[]};
+        const operation={item,before:{...item},storageDelta:0,baseDelta:0,baseMoved:false,storageMoved:false,movement:null,logs:[]};
         applied.push(operation);
-        if(destination==="shelf"||unreturned>0){
-          const beforeBase=Number((await findBoothProductByBarcode(item.barcode))?.base_stock||0);
-          const beforeEvent=await getBoothEventStorageCurrentQty(getBoothEventStoreCode({store_code:item.store_code}),item.barcode);
-          const returnedToNormal=destination==="shelf"?returned:0;
-          const storageOut=returnedToNormal+unreturned;
-          if(beforeEvent<storageOut)throw new Error(`${item.product_name||item.barcode}: 共通イベント棚在庫が不足しています（現在 ${beforeEvent} / 締め処理 ${storageOut}）。`);
-          if(returnedToNormal){await adjustBoothProductBaseStock(item.barcode,returnedToNormal); operation.baseMoved=true; operation.baseDelta=returnedToNormal;}
-          if(storageOut){await upsertBoothEventStorageStock(getBoothEventStoreCode({store_code:item.store_code}),item,-storageOut); operation.storageMoved=true; operation.delta=storageOut; operation.movement=await insertBoothCommonEventMovement({id:item.event_id||boothCurrentEventId},item,storageOut,staff,unreturned?"イベント締め（未帰還・戻り）":"イベント締め戻り（共通イベント棚→通常棚）","storage_out",{beforeQty:beforeEvent,afterQty:beforeEvent-storageOut});}
-          if(returnedToNormal)operation.logs.push(...await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({type:"在庫修正",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:returnedToNormal,memo:"イベント締め戻り",event_id:item.event_id||boothCurrentEventId,store_code:getBoothEventStoreCode({store_code:item.store_code}),inventory_scope:"normal",before_stock:beforeBase,after_stock:beforeBase+returnedToNormal,event_shelf_before:beforeEvent,event_shelf_after:beforeEvent-storageOut,affects_smaregi:false,smaregi_delta:0})})||[]);
-          if(unreturned)operation.logs.push(...await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"イベント差異",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:-unreturned,memo:`イベント差異 / 未帰還${unreturned} / 原因未確認`,event_id:item.event_id||boothCurrentEventId,store_code:getBoothEventStoreCode({store_code:item.store_code}),inventory_scope:"event_shelf",event_shelf_before:beforeEvent-(returnedToNormal),event_shelf_after:beforeEvent-storageOut,affects_smaregi:false,smaregi_delta:0})})||[]);
-        }
-        await patchBoothEventItem(item,{return_process_type:destination,return_reflected:true,return_reflected_qty:returned,return_reflected_at:new Date().toISOString(),return_reflected_by:staff,shelf_return_qty:destination==="shelf"?returned:0,event_storage_qty:destination==="storage"?returned:0,shelf_return_reflected:destination==="shelf",shelf_return_reflected_qty:destination==="shelf"?returned:0,shelf_return_reflected_at:destination==="shelf"?new Date().toISOString():null,shelf_return_reflected_by:destination==="shelf"?staff:null,diff_memo:unreturned?`イベント差異 / 未帰還${unreturned} / 原因未確認`:item.diff_memo||null});
+        const beforeBase=Number((await findBoothProductByBarcode(String(item.barcode||"").trim()))?.base_stock||0);
+        const storeCode=getBoothEventStoreCode({store_code:item.store_code});
+        const beforeEvent=await getBoothEventStorageCurrentQty(storeCode,item.barcode);
+        const requestedOut=returned+unreturned;
+        const actualOut=Math.min(Math.max(0,beforeEvent),requestedOut);
+        const shortage=Math.max(0,requestedOut-actualOut);
+        if(returned){await adjustBoothProductBaseStock(item.barcode,returned); operation.baseMoved=true; operation.baseDelta=returned;}
+        if(actualOut){await upsertBoothEventStorageStock(storeCode,item,-actualOut); operation.storageMoved=true; operation.storageDelta=actualOut; operation.movement=await insertBoothCommonEventMovement({id:item.event_id||boothCurrentEventId},item,actualOut,staff,`イベント締め / 戻り実数を通常棚へ戻す${unreturned?` / 未帰還${unreturned}`:""}${shortage?` / 不足${shortage}`:""}`,"storage_out",{beforeQty:beforeEvent,afterQty:beforeEvent-actualOut});}
+        if(returned)operation.logs.push(...await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({type:"イベント戻り",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:returned,memo:"イベント締め / 戻り棚卸実数を通常棚へ反映",event_id:item.event_id||boothCurrentEventId,store_code:storeCode,inventory_scope:"normal",before_stock:beforeBase,after_stock:beforeBase+returned,event_shelf_before:beforeEvent,event_shelf_after:beforeEvent-actualOut,affects_smaregi:false,smaregi_delta:0})})||[]);
+        if(unreturned)operation.logs.push(...await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"イベント差異",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:-unreturned,memo:`イベント差異 / 未帰還${unreturned} / 原因未確認`,event_id:item.event_id||boothCurrentEventId,store_code:storeCode,inventory_scope:"event_shelf",event_shelf_before:beforeEvent-actualOut,event_shelf_after:beforeEvent-actualOut,affects_smaregi:false,smaregi_delta:0})})||[]);
+        if(shortage)operation.logs.push(...await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"イベント棚不整合",staff,barcode:item.barcode,product_name:item.product_name||"",quantity:-shortage,memo:`イベント棚データ不足 / 不足数量${shortage} / 戻り実数を正として通常棚へ反映`,event_id:item.event_id||boothCurrentEventId,store_code:storeCode,inventory_scope:"event_shelf",event_shelf_before:beforeEvent,event_shelf_after:beforeEvent-actualOut,affects_smaregi:false,smaregi_delta:0})})||[]);
+        await patchBoothEventItem(item,{return_process_type:"shelf",return_reflected:returned>0,return_reflected_qty:returned,return_reflected_at:returned?new Date().toISOString():null,return_reflected_by:returned?staff:null,shelf_return_qty:returned,event_storage_qty:0,shelf_return_reflected:returned>0,shelf_return_reflected_qty:returned,shelf_return_reflected_at:returned?new Date().toISOString():null,shelf_return_reflected_by:returned?staff:null,diff_memo:[unreturned?`イベント差異 / 未帰還${unreturned} / 原因未確認`:"",shortage?`イベント棚データ不足 / 不足${shortage}`:""].filter(Boolean).join(" / ")||item.diff_memo||null});
       }
     }catch(error){
       for(const operation of applied.reverse()){
         try{
           for(const log of operation.logs||[]){if(log?.id)await sb(`inventory_logs?id=eq.${encodeURIComponent(log.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});}
           if(operation.movement?.id)await sb(`event_storage_movements?id=eq.${encodeURIComponent(operation.movement.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
-          if(operation.storageMoved)await upsertBoothEventStorageStock(getBoothEventStoreCode({store_code:operation.item.store_code}),operation.item,operation.delta);
+          if(operation.storageMoved)await upsertBoothEventStorageStock(getBoothEventStoreCode({store_code:operation.item.store_code}),operation.item,operation.storageDelta);
           if(operation.baseMoved)await adjustBoothProductBaseStock(operation.item.barcode,-operation.baseDelta);
           await patchBoothEventItem(operation.item,getBoothCloseRestorePayload(operation.before));
         }catch(rollbackError){console.warn("[booth close rollback failed]",rollbackError);}
@@ -11913,4 +11900,62 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
   root.reflectBoothShelfReturnsOnClose=reflectBoothShelfReturnsOnClose;
   root.rollbackBoothCloseReflection=rollbackBoothCloseReflection;
   root.confirmBoothEventReopen=confirmBoothEventReopen;
+})(window);
+
+// Ver 2.93.02 emergency close override: counted returns always go to the
+// normal shelf; a shared-shelf shortage is recorded and does not block close.
+(function(root){
+  const originalCloseRender=renderBoothCloseConfirmPanel;
+  root.renderBoothCloseConfirmPanel=function(event,summary){
+    originalCloseRender(event,summary);
+    const card=el("boothCloseCard")||document.querySelector(".booth-close-card");
+    card?.querySelectorAll(".booth-close-warning,[data-booth-return-destination-change]").forEach(node=>node.remove());
+    const table=card?.querySelector(".booth-close-table");
+    if(table){
+      table.querySelectorAll("tr").forEach(row=>row.children[6]?.remove());
+      const head=table.querySelector("thead th:nth-child(6)");
+      if(head)head.textContent="戻り実数";
+    }
+  };
+
+  root.confirmBoothEventClose=confirmBoothEventClose=async function(event){
+    const staff=String(event?.closed_by||event?.created_by||"イベント締め").trim()||"イベント締め";
+    try{
+      const latestRows=await sb("booth_events?select=*&id=eq."+encodeURIComponent(event.id)+"&limit=1");
+      const latestEvent=Array.isArray(latestRows)&&latestRows[0]?latestRows[0]:null;
+      if(!latestEvent)throw new Error("イベントが見つかりません。");
+      if(isBoothEventClosed(latestEvent))throw new Error("このイベントはすでに締め済みです。");
+      const summary=await loadBoothCloseCommonStockSummary(latestEvent,await loadBoothCloseSummary(latestEvent));
+      const rows=(summary.rows||[]).filter(row=>row.item_type==="normal"&&(Number(row.taken_qty||0)>0||Number(row.normal_takeout_qty||0)>0||Number(row.storage_takeout_qty||0)>0));
+      const invalid=rows.find(row=>Number(row.returned_qty||0)>Number(row.taken_qty||0)||Number(row.sold_qty||0)+Number(row.returned_qty||0)>Number(row.taken_qty||0));
+      if(invalid){
+        const taken=Number(invalid.taken_qty||0),sold=Number(invalid.sold_qty||0),returned=Number(invalid.returned_qty||0);
+        throw new Error(returned>taken?`${invalid.product_name||invalid.barcode}: 戻り実数(${returned})が持出数(${taken})を超えています。`:`${invalid.product_name||invalid.barcode}: 販売数(${sold})と戻り実数(${returned})の合計が持出数(${taken})を超えています。`);
+      }
+      const shortage=rows.reduce((sum,row)=>sum+Number(row.event_storage_shortage_qty||0),0);
+      const body=[`イベント：${latestEvent.name||"-"}`,`対象商品数：${rows.length}`,`戻り実数はすべて通常棚へ戻します。`,`未帰還：${rows.reduce((s,r)=>s+Number(r.unreturned_qty||0),0)}`,`共通イベント棚データ不足：${shortage}`,"不足があっても戻り実数を正として締めます。"].join("\n");
+      const ok=typeof confirmAppAction==="function"?await confirmAppAction("イベント締め確認",body,{okText:"イベントを締める",cancelText:"キャンセル"}):true;
+      if(ok)await finalizeBoothEventClose(latestEvent,summary,staff);
+    }catch(error){boothShowError("イベント締めエラー",error.message||"イベント締めに失敗しました。");}
+  };
+
+  root.saveBoothReportReturnBatch=saveBoothReportReturnBatch=async function(){
+    if(window.__aricoBoothReportReturnBatchSaving)return;
+    const section=document.querySelector("[data-booth-report-return-section]"),event=getBoothCurrentEvent();
+    if(!section||!event){boothShowError("戻り実績保存エラー","イベントレポートを開いてください。");return;}
+    const entries=[...section.querySelectorAll("[data-booth-report-return-input]")].map(input=>({id:String(input.dataset.itemId||""),value:String(input.value||"").trim(),saved:String(input.dataset.savedReturned||0)})).filter(row=>row.id);
+    const changed=entries.filter(row=>row.value!==row.saved);
+    if(!changed.length){boothShowError("戻り実績保存エラー","変更した戻り実績がありません。");return;}
+    if(changed.some(row=>!/^[0-9]+$/.test(row.value))){boothShowError("戻り実績保存エラー","戻り実数は0以上の整数で入力してください。");return;}
+    const ok=typeof confirmAppAction==="function"?await confirmAppAction("戻り実績を保存",`変更商品：${changed.length}件\n戻り実数はイベント締め時に通常棚へ戻します。`,{okText:"保存",cancelText:"キャンセル"}):true;
+    if(!ok)return;
+    window.__aricoBoothReportReturnBatchSaving=true;
+    try{for(const entry of changed){
+      const found=await sb(`booth_event_items?select=*&event_id=eq.${encodeURIComponent(event.id)}&id=eq.${encodeURIComponent(entry.id)}&item_type=eq.normal&limit=1`);
+      const item=Array.isArray(found)&&found[0]?found[0]:null;if(!item)throw new Error("対象の戻り商品が見つかりません。");
+      const next=Number(entry.value);if(next>calculateBoothReturnPlannedQty(item))throw new Error(`${item.product_name||item.barcode}: 戻り数が戻り予定数を超えています。`);
+      await patchBoothEventItem(item,{returned_qty:next,difference_qty:calculateBoothDifference({...item,returned_qty:next}),return_process_type:"shelf",return_reflected:false,return_reflected_qty:0,return_reflected_at:null,return_reflected_by:null,shelf_return_qty:0,event_storage_qty:0,shelf_return_reflected:false,shelf_return_reflected_qty:0,shelf_return_reflected_at:null,shelf_return_reflected_by:null});
+    }await refreshBoothEventRelatedViews(event.id);await loadBoothEventReport(event.id);boothShowSuccess("戻り実績を保存しました","在庫移動はイベント締め時に通常棚へ反映します。");}
+    catch(error){boothShowError("戻り実績保存エラー",error.message||"戻り実績の保存に失敗しました。");}finally{window.__aricoBoothReportReturnBatchSaving=false;}
+  };
 })(window);
