@@ -5977,11 +5977,13 @@ function getBoothEventShelfCurrentQty(item){
 }
 
 async function patchBoothEventItem(item,payload){
-  await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
+  const rows=await sb(`booth_event_items?id=eq.${encodeURIComponent(item.id)}`,{
     method:"PATCH",
-    headers:{Prefer:"return=minimal"},
+    headers:{Prefer:"return=representation"},
     body:JSON.stringify({...payload,updated_at:new Date().toISOString()})
   });
+  if(!Array.isArray(rows)||!rows[0])throw new Error("戻り実数の保存結果を確認できませんでした。");
+  return rows[0];
 }
 
 async function moveBoothEventShelfQtyToGacha(event,product,quantity){
@@ -10261,8 +10263,8 @@ exportBoothEventReportPdf=async function(event){
           if(updated)break;
           continue;
         }
-        await patchBoothEventItem(latest,{returned_qty:safeNext});
-        updated={...latest,returned_qty:safeNext};
+        updated=await patchBoothEventItem(latest,{returned_qty:safeNext});
+        if(Number(updated.returned_qty||0)!==safeNext)throw new Error("戻り実数の保存結果が一致しません。");
         break;
       }
       if(!updated)throw new Error("他端末の更新と重なりました。もう一度読み取ってください。");
