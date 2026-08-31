@@ -237,9 +237,11 @@ async function loadHistoryEventShelfFallbackStocks(storeCode,barcodes){
   }
 }
 
-function getHistoryEventShelfStock(barcode){
-  const key=historyEventShelfCacheKey(getHistoryCurrentStoreCode(),barcode);
-  return historyEventShelfStockCache.has(key) ? historyEventShelfStockCache.get(key) : "";
+function getHistoryEventShelfAfter(log){
+  const event=isHistoryEventShelfLog(log)||log?.event_shelf_before!=null||log?.event_shelf_after!=null;
+  if(!event||log?.event_shelf_after==null)return "-";
+  const value=Number(log.event_shelf_after);
+  return Number.isFinite(value)?value:"-";
 }
 
 function isHistoryEventShelfLog(log){
@@ -256,6 +258,9 @@ function getHistoryEventShelfRange(log){
   if(explicitBefore!=null&&explicitAfter!=null){
     return {target:"イベント棚",before:Number(explicitBefore),after:Number(explicitAfter)};
   }
+  // Historical rows without fixed shelf snapshots must remain unknown. Never
+  // replace a NULL historical value with today's common-shelf balance.
+  if(isHistoryEventShelfLog(log))return {target:"イベント棚",before:"-",after:"-"};
   const key=historyEventShelfCacheKey(getHistoryCurrentStoreCode(),barcode);
   const timeline=historyEventShelfTimelineCache.get(key)||[];
   const logTime=new Date(log?.created_at||0).getTime();
@@ -283,7 +288,7 @@ function ensureHistoryEventShelfHeaders(){
     const table=body?.closest("table");
     const row=table?.querySelector("thead tr");
     if(!row||row.querySelector("[data-history-event-shelf-header]"))return;
-    const desired=["入力日時","区分","担当者","商品名","対象在庫","処理前","数量","処理後","イベント棚","備考","商品転用確認"];
+    const desired=["入力日時","区分","担当者","商品名","対象在庫","処理前","数量","処理後","イベント棚処理後","備考","商品転用確認"];
     [...row.children].forEach((cell,index)=>{if(desired[index])cell.textContent=desired[index];});
     const th=document.createElement("th");
     th.textContent="イベント棚";

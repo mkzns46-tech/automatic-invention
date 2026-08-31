@@ -107,7 +107,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
       <td>${displayBefore}</td>
       <td class="${historyQuantityClass(displayQuantity)}">${formatHistorySignedQuantity(displayQuantity)}</td>
       <td>${displayAfter}</td>
-      <td>${getHistoryEventShelfStock(row.log.barcode)}</td>
+      <td>${getHistoryEventShelfAfter(row.log)}</td>
       <td>${memoCellHtml(row.log)}</td>
       <td>${equipmentCheckHtml(row.log)}</td>
     </tr>`;
@@ -153,7 +153,7 @@ function buildGlobalHistoryRows(sourceLogs=logs){
       <td>${displayBefore}</td>
       <td class="${historyQuantityClass(displayQuantity)}">${formatHistorySignedQuantity(displayQuantity)}</td>
       <td>${displayAfter}</td>
-      <td>${getHistoryEventShelfStock(log.barcode)}</td>
+      <td>${getHistoryEventShelfAfter(log)}</td>
       <td>${memoCellHtml(log)}</td>
       <td>${equipmentCheckHtml(log)}</td>
     </tr>`;
