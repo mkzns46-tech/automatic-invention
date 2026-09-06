@@ -28,6 +28,7 @@
   let draftCreationPromise=null;
   let refreshPromise=null;
   let draftReady=false;
+  const saveQueues=new Map();
 
   function safe(value){
     return typeof esc==="function" ? esc(value) : String(value??"")
@@ -96,7 +97,6 @@
       "saveAppInventoryCountBtn",
       "appInventoryCameraBtn",
       "appInventoryCloseCameraBtn",
-      "appInventoryApplyBtn",
       "appInventoryClearBtn"
     ];
     controls.forEach(id=>{
@@ -273,9 +273,8 @@
     const last=document.getElementById("appInventoryLastSaved");
     const lastItem=[...state.items].sort((a,b)=>String(b.updated_at||b.counted_at||"").localeCompare(String(a.updated_at||a.counted_at||"")))[0];
     if(last)last.textContent=lastItem?formatDate(lastItem.updated_at||lastItem.counted_at):"未保存";
-    const apply=document.getElementById("appInventoryApplyBtn");
     const clear=document.getElementById("appInventoryClearBtn");
-    [apply,clear].forEach(button=>{
+    [clear].forEach(button=>{
       if(!button)return;
       button.classList.toggle("admin-required",!hasAdminAccess());
       button.title=hasAdminAccess()?"":"管理者のみ操作できます";
@@ -451,8 +450,6 @@
       document.getElementById("appInventoryCountStaff")?.focus();
       return;
     }
-    try{await refreshRemote();}catch(_){return;}
-    if(!requireDraft())return;
     const existing=latestRows(state.items).find(row=>row.key===normalizeKey(product.barcode));
     const qtyInput=document.getElementById("appInventoryCountQty");
     const raw=String(qtyInput?.value??"").trim();
@@ -467,27 +464,66 @@
       return;
     }
     const details=productDetails(product);
+    const operation=()=>{
+      const currentExisting=latestRows(state.items).find(row=>row.key===normalizeKey(details.barcode));
+      return saveAndReflectCount({details,qty:result.qty,existing:currentExisting||existing,session,staff});
+    };
+    const previous=saveQueues.get(details.barcode)||Promise.resolve();
+    const queued=previous.catch(()=>{}).then(operation);
+    saveQueues.set(details.barcode,queued.finally(()=>{if(saveQueues.get(details.barcode)===queued)saveQueues.delete(details.barcode);}));
+    try{await queued;clearScanForm(`在庫反映済み：${details.product_name} / ${result.qty}`,"ok");}
+    catch(error){setMessage("appInventoryCountProductInfo",`保存失敗：${error.message||error}`,"err");}
+  }
+
+  async function fetchLatestProductForCount(barcode){
+    const rows=await sb(`products?select=*&barcode=eq.${encodeURIComponent(String(barcode||"").trim())}&limit=1`);
+    const product=Array.isArray(rows)?rows[0]:null;
+    if(!product)throw new Error(`商品マスターが見つかりません：${barcode}`);
+    return product;
+  }
+
+  async function hasCountReflectionLog(memo,barcode){
+    const rows=await sb(`inventory_logs?select=id&barcode=eq.${encodeURIComponent(barcode)}&memo=eq.${encodeURIComponent(memo)}&limit=1`).catch(()=>[]);
+    return Array.isArray(rows)&&rows.length>0;
+  }
+
+  async function saveAndReflectCount({details,qty,existing,session,staff}){
+    setMessage("appInventoryCountProductInfo",`保存中：${details.product_name}`,"ok");
+    const timestamp=nowIso();
+    if(session.staff!==staff)await updateDraftStaff(session,staff);
+    const latest=await fetchLatestProductForCount(details.barcode);
+    const currentBefore=Number(latest.base_stock||0);
+    const payload={...details,count_qty:qty,staff,counted_at:timestamp,updated_at:timestamp,reflected_at:null,reflected_by:null};
+    let itemId=existing?.id||"";
+    if(itemId){
+      await sb(`inventory_count_items?id=eq.${encodeURIComponent(itemId)}&session_id=eq.${encodeURIComponent(session.id)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(payload)});
+    }else{
+      const inserted=await sb("inventory_count_items",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({...payload,session_id:session.id,before_stock:currentBefore,memo:"",adopted:false})});
+      itemId=Array.isArray(inserted)?inserted[0]?.id:inserted?.id;
+      if(!itemId)throw new Error("棚卸明細の保存結果を取得できませんでした。");
+    }
+    const before=currentBefore;
+    const after=Number(qty);
+    const diff=after-before;
+    const reflectionMemo=`アプリ内棚卸自動反映 / session:${session.id} / barcode:${details.barcode} / count:${after} / 更新前:${before} / 更新後:${after}`;
+    let stockUpdated=false;
     try{
-      await updateDraftStaff(session,staff);
-      const payload={...details,count_qty:result.qty,staff,counted_at:nowIso(),updated_at:nowIso()};
-      if(existing){
-        await sb(`inventory_count_items?id=eq.${encodeURIComponent(existing.id)}&session_id=eq.${encodeURIComponent(session.id)}`,{
-          method:"PATCH",
-          headers:{Prefer:"return=minimal"},
-          body:JSON.stringify(payload)
-        });
-      }else{
-        await sb("inventory_count_items",{
-          method:"POST",
-          headers:{Prefer:"return=minimal"},
-          body:JSON.stringify({...payload,session_id:sessionId,before_stock:Number(product.base_stock||0),memo:"",adopted:false})
-        });
+      if(diff!==0){
+        await updateProductCurrentStock(details.barcode,after);
+        stockUpdated=true;
+        if(!await hasCountReflectionLog(reflectionMemo,details.barcode)){
+          await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"在庫修正",staff,barcode:details.barcode,product_name:details.product_name,quantity:diff,memo:reflectionMemo,before_stock:before,after_stock:after,store_code:currentStoreCode(),inventory_scope:"normal",affects_smaregi:false,smaregi_delta:0})});
+        }
       }
-      state.items=[];
-      await refreshRemote();
-      renderAll();
-      clearScanForm(`保存しました：${details.product_name} / ${result.qty}`,"ok");
-    }catch(error){setRemoteError(error);}
+      await sb(`inventory_count_items?id=eq.${encodeURIComponent(itemId)}&session_id=eq.${encodeURIComponent(session.id)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({reflected_at:timestamp,reflected_by:staff,before_stock:before,updated_at:timestamp})});
+      const local={...payload,id:itemId,session_id:session.id,before_stock:before,reflected_at:timestamp,reflected_by:staff};
+      state.items=[...state.items.filter(item=>String(item.id)!==String(itemId)),local];
+      renderDraftInfo();renderCountedRows();
+      setMessage("appInventoryCountCsvInfo",diff===0?"在庫変更なし（棚卸数量と実在庫が一致）":"在庫反映済み","ok");
+    }catch(error){
+      if(stockUpdated){try{await updateProductCurrentStock(details.barcode,before);}catch(_){} }
+      throw error;
+    }
   }
 
   async function updateDraftItem(itemId,rawQty){
@@ -496,20 +532,18 @@
     const result=validateQty(rawQty);
     if(result.error){setMessage("appInventoryCountProductInfo",result.error,"err");await refreshRemote();renderAll();return;}
     try{
-      await refreshRemote();
       const session=currentSession();
       if(!session?.id)throw new Error("棚卸ドラフトのsession_idを取得できませんでした。");
       const row=latestRows(state.items).find(item=>String(item.id)===String(itemId));
-      if(!row)throw new Error("入力行が別端末で変更されています。最新状態を再取得しました。");
-      await updateDraftStaff(session,getStaffValue()||row.staff);
-      await sb(`inventory_count_items?id=eq.${encodeURIComponent(row.id)}&session_id=eq.${encodeURIComponent(session.id)}`,{
-        method:"PATCH",
-        headers:{Prefer:"return=minimal"},
-        body:JSON.stringify({count_qty:result.qty,staff:getStaffValue()||row.staff,counted_at:nowIso(),updated_at:nowIso()})
+      if(!row)throw new Error("入力行が別端末で変更されています。最新状態に更新してください。");
+      await saveAndReflectCount({
+        details:{product_code:row.productCode,barcode:row.barcode,product_id:row.productId,product_name:row.name},
+        qty:result.qty,
+        existing:row,
+        session,
+        staff:getStaffValue()||row.staff
       });
-      await refreshRemote();
-      renderAll();
-      setMessage("appInventoryCountProductInfo",`保存しました：${row.name} / ${result.qty}`,"ok");
+      setMessage("appInventoryCountProductInfo",`在庫反映済み：${row.name} / ${result.qty}`,"ok");
     }catch(error){setRemoteError(error);}
   }
 
@@ -814,7 +848,6 @@
   async function bindAppInventoryCountEvents(){
     setInventoryControlsEnabled(false);
     setMessage("appInventoryCountProductInfo","棚卸データを準備中...","ok");
-    document.getElementById("appInventoryApplyBtn")?.addEventListener("click",applyCurrentDraft);
     document.getElementById("appInventoryClearBtn")?.addEventListener("click",clearCurrentDraft);
     document.getElementById("appInventoryRefreshBtn")?.addEventListener("click",async()=>{
       try{
