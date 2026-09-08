@@ -2941,7 +2941,10 @@ async function renderBoothEventInventoryPanel(event){
     <div class="button-row booth-camera-button-row">
       <button type="button" id="boothDepartureCameraBtn" ${closed?"disabled":""}>カメラ読取</button>
       <button type="button" id="boothDepartureStopCameraBtn" class="secondary">停止</button>
+      <label class="secondary booth-file-button">CSV取込<input type="file" id="boothDepartureCsvInput" accept=".csv,text/csv" hidden ${closed?"disabled":""}></label>
+      <button type="button" id="boothDepartureCsvTemplateBtn" class="secondary">CSVテンプレート</button>
     </div>
+    <div id="boothDepartureCsvPreview" class="message" hidden></div>
     <div class="camera-area booth-camera-area">
       <video id="boothCarryOutVideo" muted playsinline></video>
       <div id="boothCameraGuideOverlay" class="camera-guide-overlay">
@@ -3008,6 +3011,16 @@ async function renderBoothEventInventoryPanel(event){
     startBoothCarryOutCamera();
   });
   el("boothDepartureStopCameraBtn")?.addEventListener("click",()=>stopBoothCarryOutCamera());
+  el("boothDepartureCsvTemplateBtn")?.addEventListener("click",downloadInventoryCsvTemplate);
+  el("boothDepartureCsvInput")?.addEventListener("change",async inputEvent=>{
+    const file=inputEvent.target.files?.[0];if(!file)return;const preview=el("boothDepartureCsvPreview");
+    try{
+      const rows=parseInventoryCsv(await file.text());const products=await resolveInventoryCsvProducts(rows);const invalid=[];const counts=readBoothDepartureCounts(event.id);
+      rows.forEach(row=>{const product=products.get(row.productCode);if(!product){invalid.push(`${row.line}行目 ${row.productCode||"(空欄)"}：商品未登録`);return;}if(!/^\d+$/.test(row.quantityText)){invalid.push(`${row.line}行目 ${row.productCode}：数量不正`);return;}const qty=Number(row.quantityText);if(qty<=0)return;const key=String(product.barcode||"").trim();const current=counts[key]||{barcode:key,product_name:product.name||"",quantity:0};current.quantity+=qty;counts[key]=current;});
+      if(invalid.length)throw new Error(invalid.join("\n"));writeBoothDepartureCounts(event.id,counts);await renderBoothDepartureCountList(event.id);if(preview){preview.hidden=false;preview.textContent=`CSV ${rows.length}行を入力へ反映しました。DB確定は「持ち出しを確定」実行時です。`;}
+    }catch(error){if(preview){preview.hidden=false;preview.className="message err";preview.textContent=`CSV取込エラー：${error.message||error}`;}}
+    inputEvent.target.value="";
+  });
   el("boothDepartureBarcode")?.addEventListener("keydown",keydownEvent=>{
     if(keydownEvent.key==="Enter"){
       keydownEvent.preventDefault();
@@ -4267,6 +4280,32 @@ async function startBoothCarryOutCamera(){
     else if(e?.message)message=e.message;
     boothCameraError("カメラ起動エラー",message);
   }
+}
+
+function parseInventoryCsv(text){
+  const lines=String(text||"").replace(/^\uFEFF/,"").split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+  if(!lines.length)throw new Error("CSVが空です。");
+  const split=line=>line.split(",").map(value=>String(value||"").trim().replace(/^"|"$/g,""));
+  const first=split(lines[0]).map(value=>value.toLowerCase());
+  const hasHeader=(first[0]==="商品コード"||first[0]==="product_code")&&(first[1]==="数量"||first[1]==="quantity");
+  const start=hasHeader?1:0;
+  return lines.slice(start).map((line,index)=>{const values=split(line);return {line:start+index+1,productCode:String(values[0]||"").trim(),quantityText:String(values[1]??"").trim()};});
+}
+
+async function resolveInventoryCsvProducts(rows){
+  const codes=[...new Set(rows.map(row=>row.productCode).filter(Boolean))];
+  if(!codes.length)return new Map();
+  const result=new Map();
+  for(let offset=0;offset<codes.length;offset+=500){
+    const found=await sb(`products?select=*&product_code=in.(${buildInFilter(codes.slice(offset,offset+500))})&limit=1000`);
+    (Array.isArray(found)?found:[]).forEach(product=>result.set(String(product.product_code||"").trim(),product));
+  }
+  return result;
+}
+
+function downloadInventoryCsvTemplate(){
+  const blob=new Blob(["\uFEFF商品コード,数量\r\n"],{type:"text/csv;charset=utf-8"});
+  const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download="inventory-template.csv";link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);
 }
 
 // One display value for both the close summary and each product row.
@@ -10380,6 +10419,8 @@ exportBoothEventReportPdf=async function(event){
           <button type="button" id="boothReturnStopCameraBtn" class="secondary">停止</button>
         </div>
         <div class="booth-return-product-search"><label>商品検索<input id="boothReturnProductSearch" autocomplete="off" placeholder="商品名・バーコードで検索" ${closed?"disabled":""}></label><div id="boothReturnProductSearchResults" class="booth-return-product-search-results" hidden></div></div>
+        <div class="button-row"><label class="secondary booth-file-button">CSV取込<input type="file" id="boothReturnCsvInput" accept=".csv,text/csv" hidden ${closed?"disabled":""}></label><button type="button" id="boothReturnCsvTemplateBtn" class="secondary">CSVテンプレート</button></div>
+        <div id="boothReturnCsvPreview" class="message" hidden></div>
         <div class="booth-return-common-fields"><label>担当者<select id="boothReturnStaff" ${closed?"disabled":""}>${staffOptions}</select></label><label>メモ<input id="boothReturnMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}></label></div>
       </div>
       <div class="camera-area booth-camera-area booth-return-camera-area">
@@ -10402,6 +10443,16 @@ exportBoothEventReportPdf=async function(event){
     el("boothReturnProductSearch")?.addEventListener("input",inputEvent=>{
       state.query=inputEvent.target.value;
       renderPureReturnSearchResults(state);
+    });
+    el("boothReturnCsvTemplateBtn")?.addEventListener("click",downloadInventoryCsvTemplate);
+    el("boothReturnCsvInput")?.addEventListener("change",async inputEvent=>{
+      const file=inputEvent.target.files?.[0];if(!file)return;const preview=el("boothReturnCsvPreview");
+      try{
+        const csvRows=parseInventoryCsv(await file.text());const products=await resolveInventoryCsvProducts(csvRows);const errors=[];
+        csvRows.forEach(row=>{const product=products.get(row.productCode);if(!product){errors.push(`${row.line}行目 ${row.productCode||"(空欄)"}：商品未登録`);return;}if(!/^\d+$/.test(row.quantityText)){errors.push(`${row.line}行目 ${row.productCode}：数量不正`);return;}const item=state.rows.get(String(product.barcode||""));if(!item){errors.push(`${row.line}行目 ${row.productCode}：このイベントの持ち出し対象外`);return;}const qty=Number(row.quantityText);if(qty>takeoutQty(item))errors.push(`${row.line}行目 ${row.productCode}：持ち出し数超過`);else state.draft.set(String(product.barcode||""),qty);});
+        if(errors.length)throw new Error(errors.join("\n"));renderPureReturnList(state);if(preview){preview.hidden=false;preview.className="message";preview.textContent=`CSV ${csvRows.length}行を今回の棚卸入力へ反映しました。DB保存は「戻り棚卸を確認して完了」実行時です。`;}
+      }catch(error){if(preview){preview.hidden=false;preview.className="message err";preview.textContent=`CSV取込エラー：${error.message||error}`;}}
+      inputEvent.target.value="";
     });
     el("boothReturnProductSearchResults")?.addEventListener("click",inputEvent=>{
       const button=inputEvent.target.closest("[data-pure-return-candidate-action]");
