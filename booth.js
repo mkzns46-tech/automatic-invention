@@ -4407,10 +4407,8 @@ async function findBoothEventStorageStock(storeCode,barcode){
   const normalizedStore=normalizeBoothStoreCode(storeCode);
   const normalizedBarcode=String(barcode||"").trim();
   if(!normalizedStore||!normalizedBarcode)return null;
-  const rows=await sb(`event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty&barcode=eq.${encodeURIComponent(normalizedBarcode)}&limit=100`);
-  return Array.isArray(rows)
-    ? (rows.find(row=>normalizeBoothStoreCode(row?.store_code)===normalizedStore)||null)
-    : null;
+  const rows=await sb(`event_storage_stocks?select=id,store_code,barcode,product_name,storage_qty&store_code=eq.${encodeURIComponent(normalizedStore)}&barcode=eq.${encodeURIComponent(normalizedBarcode)}&limit=1`);
+  return Array.isArray(rows)&&rows[0]?rows[0]:null;
 }
 
 // Older event rows were created before the store-wide event shelf table was
@@ -7703,17 +7701,36 @@ async function upsertBoothEventStorageStock(storeCode,item,delta){
     boothShowError("イベント保管エラー","イベント保管在庫が不足するため修正できません。");
     throw new Error("event_storage_stocks row not found");
   }
-  await sb("event_storage_stocks",{
-    method:"POST",
-    headers:{Prefer:"return=minimal"},
-    body:JSON.stringify([{
-      store_code:storeCode,
-      barcode:item.barcode,
-      product_name:item.product_name||"",
-      storage_qty:delta,
-      updated_at:now
-    }])
-  });
+  try{
+    await sb("event_storage_stocks",{
+      method:"POST",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify([{
+        store_code:storeCode,
+        barcode:item.barcode,
+        product_name:item.product_name||"",
+        storage_qty:delta,
+        updated_at:now
+      }])
+    });
+  }catch(insertError){
+    // Another request may have created the unique (store_code, barcode) row
+    // between the lookup and INSERT. Re-read and apply the same delta instead
+    // of surfacing a duplicate-key error or attempting a second insert.
+    const raced=await findBoothEventStorageStock(storeCode,item.barcode);
+    if(!raced)throw insertError;
+    const racedQty=Number(raced.storage_qty||0)+delta;
+    if(racedQty<0)throw new Error("event_storage_stocks.storage_qty would be negative");
+    await sb(`event_storage_stocks?id=eq.${encodeURIComponent(raced.id)}`,{
+      method:"PATCH",
+      headers:{Prefer:"return=minimal"},
+      body:JSON.stringify({
+        product_name:item.product_name||raced.product_name||"",
+        storage_qty:racedQty,
+        updated_at:now
+      })
+    });
+  }
 }
 
 async function saveBoothStorageSplit(itemId,suffix){
