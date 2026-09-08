@@ -7868,6 +7868,26 @@ body[data-inventory-screen="shelf-location"] .shelf-history-actions button{
 .booth-gacha-return-count-panel .booth-product-preview{
   margin-top:0;
 }
+.booth-gacha-pick-panel{
+  display:grid;
+  gap:10px;
+  border:1px solid #b8dfc9;
+  border-radius:10px;
+  padding:12px;
+  background:#f7fcf8;
+}
+.booth-gacha-pick-grid{
+  display:grid;
+  grid-template-columns:minmax(220px,2fr) minmax(180px,1fr) 120px minmax(180px,1fr);
+  gap:10px;
+  align-items:end;
+}
+.booth-gacha-pick-grid label,.booth-gacha-pick-panel>label{display:grid;gap:4px;font-weight:700;color:var(--main-dark)}
+.booth-gacha-pick-panel input,.booth-gacha-pick-panel select{width:100%;box-sizing:border-box}
+.booth-gacha-pick-panel .booth-return-draft-list{margin-top:2px}
+@media (max-width:760px){
+  .booth-gacha-pick-grid{grid-template-columns:1fr}
+}
 .booth-gacha-confirmation-panel{
   display:grid;
   gap:10px;

@@ -675,7 +675,7 @@
     await refreshRemote();
     if(!requireDraft())return;
     const session=currentSession();
-    if(!confirm("現在の入力内容をすべてクリアします。反映前の入力だけが削除されます。よろしいですか？"))return;
+    if(!confirm("現在の入力内容をすべてクリアします。自動反映済みの在庫は変更されません。よろしいですか？"))return;
     try{
       await sb(`inventory_count_items?session_id=eq.${encodeURIComponent(session.id)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
       await sb(`inventory_count_sessions?id=eq.${encodeURIComponent(session.id)}&status=eq.${encodeURIComponent(STATUS_ACTIVE)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}});
