@@ -11461,14 +11461,6 @@ function syncBoothReportReturnInput(input){
 function renderBoothReportReturnBatchSection(rows){
   const list=buildBoothReportReturnRows(rows);
   if(!list.length)return `<section class="booth-report-section" data-booth-report-return-section><h5>通常商品戻り実績</h5><div class="booth-empty">通常商品の戻り実績はありません。</div></section>`;
-  const state=getBoothReportReturnDestinationState(list);
-  const locked=state.locked;
-  const adminAuthed=typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
-  const destinationLabel=locked?getBoothReportReturnDestinationLabel(locked):"未選択";
-  const destinationButtons=["shelf","storage"].map(type=>`<button type="button" class="booth-report-return-destination-btn${locked===type?" is-selected":""}" data-booth-report-return-destination="${type}" aria-pressed="${locked===type?"true":"false"}" ${locked&&!state.mixed?"disabled":""}>${getBoothReportReturnDestinationLabel(type)}</button>`).join("");
-  const destinationChangeButton=locked&&!state.mixed&&adminAuthed
-    ?`<button type="button" class="secondary" data-booth-return-destination-change data-event-id="${esc(boothCurrentEventId||"")}">戻り先を変更</button>`
-    :"";
   const tableRows=list.map(row=>{
     const id=String(row.id||"");
     const returned=Number(row.returned_qty||0);
@@ -11488,11 +11480,9 @@ function renderBoothReportReturnBatchSection(rows){
       <label>戻り実数<input class="booth-history-qty-input" data-booth-report-return-input type="number" min="0" step="1" inputmode="numeric" data-item-id="${esc(id)}" data-product-name="${esc(row.product_name||"")}" data-barcode="${esc(row.barcode||"")}" data-saved-returned="${esc(returned)}" data-planned-returned="${esc(row.planned_return_qty)}" value="${esc(returned)}"></label>
       <span class="booth-report-return-status" data-booth-report-return-status>${saved?"保存済み":"未保存"}</span></article>`;
   }).join("");
-  return `<section class="booth-report-section booth-report-return-batch" data-booth-report-return-section data-selected-destination="${esc(locked)}" data-destination-mixed="${state.mixed?"true":"false"}">
-    <div class="booth-report-return-header"><div><h5>通常商品戻り実績</h5><p class="section-note">戻り実数を入力して、最後に一括保存します。保存後の戻り先はイベント単位で固定され、管理者が変更できます。</p></div><strong data-booth-report-return-unsaved-count>未保存：0件</strong></div>
-    <div class="booth-report-return-destination"><strong>戻り先（イベント単位で固定）</strong><span data-booth-report-return-destination-label>${esc(destinationLabel)}</span><div class="booth-report-return-destination-options" role="group" aria-label="戻り先">${destinationButtons}</div>${destinationChangeButton}${state.mixed?'<p class="form-error">既存データの戻り先が混在しています。戻り先を選ぶとイベント単位で統一できます。</p>':""}</div>
+  return `<section class="booth-report-section booth-report-return-batch" data-booth-report-return-section>
+    <div class="booth-report-return-header"><div><h5>通常商品戻り実績</h5><p class="section-note">戻り在庫処理で保存した実数です。イベント終了時にすべて通常棚へ戻します。</p></div><strong data-booth-report-return-unsaved-count>未保存：0件</strong></div>
     <div class="button-row"><button type="button" class="secondary" data-booth-report-return-filter="all" aria-pressed="true">全件</button><button type="button" class="secondary" data-booth-report-return-filter="diff" aria-pressed="false">差異のみ</button></div>
-    <div class="booth-report-return-actions"><button type="button" class="primary" data-booth-report-return-batch-save disabled>戻り実績を一括保存（0件）</button><span>変更した商品のみ保存します。</span></div>
     <div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table booth-report-return-table"><thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し数</th><th>販売数</th><th>ガチャ移動数</th><th>戻り予定数</th><th>戻り実数</th><th>差異</th><th>状態</th></tr></thead><tbody>${tableRows}</tbody></table></div>
     <div class="booth-history-cards booth-scroll-cards">${cards}</div>
   </section>`;
@@ -11741,33 +11731,6 @@ async function saveBoothReportReturnBatch(){
 
 if(!window.__aricoBoothReportReturnBatchHandlersBound){
   document.addEventListener("click",event=>{
-    const destinationChange=event.target.closest("[data-booth-return-destination-change]");
-    if(destinationChange){
-      const eventId=String(destinationChange.dataset.eventId||boothCurrentEventId||"");
-      const reportSection=destinationChange.closest("[data-booth-report-return-section]");
-      const currentDestination=normalizeBoothReportReturnDestination(reportSection?.dataset.selectedDestination||destinationChange.dataset.currentDestination||"");
-      const nextDestination=currentDestination==="shelf"?"storage":"shelf";
-      void changeBoothEventReturnDestination(eventId,nextDestination);
-      return;
-    }
-    const destinationButton=event.target.closest("[data-booth-report-return-destination]");
-    if(destinationButton){
-      const section=destinationButton.closest("[data-booth-report-return-section]");
-      const selected=normalizeBoothReportReturnDestination(destinationButton.dataset.boothReportReturnDestination||"");
-      if(!section)return;
-      const locked=normalizeBoothReportReturnDestination(section.dataset.selectedDestination||"");
-      if(locked&&locked!==selected&&section.dataset.destinationMixed!=="true"&&section.dataset.returnDestinationDirty!=="true"){boothShowError("戻り先固定エラー","このイベントの戻り先は既に固定されています。");return;}
-      section.dataset.selectedDestination=selected;
-      if(section.dataset.destinationMixed==="true")section.dataset.destinationMixed="false";
-      section.dataset.returnDestinationDirty="true";
-      section.querySelectorAll("[data-booth-report-return-destination]").forEach(button=>{button.setAttribute("aria-pressed",button===destinationButton?"true":"false");button.classList.toggle("is-selected",button===destinationButton);});
-      const label=section.querySelector("[data-booth-report-return-destination-label]");
-      if(label)label.textContent=getBoothReportReturnDestinationLabel(selected);
-      updateBoothReportReturnBatchSummary(section);
-      return;
-    }
-    const save=event.target.closest("[data-booth-report-return-batch-save]");
-    if(save){void saveBoothReportReturnBatch();return;}
     const filter=event.target.closest("[data-booth-report-return-filter]");
     if(!filter)return;
     const section=filter.closest("[data-booth-report-return-section]");
