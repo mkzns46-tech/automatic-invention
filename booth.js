@@ -2901,15 +2901,14 @@ async function searchBoothDepartureProducts(query){
   const safeTerm=term.replace(/[(),*]/g," ").trim();
   if(!safeTerm)return [];
   const pattern=encodeURIComponent(`*${safeTerm}*`);
-  const select="barcode,name,base_stock,smaregi_product_id,product_code";
-  const [nameRows,barcodeRows,codeRows,legacyCodeRows]=await Promise.all([
+  const select="barcode,name,base_stock,smaregi_product_id";
+  const [nameRows,barcodeRows,codeRows]=await Promise.all([
     sb(`products?select=${select}&name=ilike.${pattern}&limit=20`).catch(()=>[]),
     sb(`products?select=${select}&barcode=ilike.${pattern}&limit=20`).catch(()=>[]),
-    sb(`products?select=${select}&smaregi_product_id=ilike.${pattern}&limit=20`).catch(()=>[]),
-    sb(`products?select=${select}&product_code=ilike.${pattern}&limit=20`).catch(()=>[])
+    sb(`products?select=${select}&smaregi_product_id=ilike.${pattern}&limit=20`).catch(()=>[])
   ]);
   const map=new Map();
-  [...(Array.isArray(nameRows)?nameRows:[]),...(Array.isArray(barcodeRows)?barcodeRows:[]),...(Array.isArray(codeRows)?codeRows:[]),...(Array.isArray(legacyCodeRows)?legacyCodeRows:[])].forEach(product=>{
+  [...(Array.isArray(nameRows)?nameRows:[]),...(Array.isArray(barcodeRows)?barcodeRows:[]),...(Array.isArray(codeRows)?codeRows:[])].forEach(product=>{
     const barcode=String(product?.barcode||"").trim();
     if(barcode&&!map.has(barcode))map.set(barcode,product);
   });
@@ -4285,11 +4284,11 @@ async function startBoothCarryOutCamera(){
 function parseInventoryCsv(text){
   const lines=String(text||"").replace(/^\uFEFF/,"").split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
   if(!lines.length)throw new Error("CSVが空です。");
-  const split=line=>line.split(",").map(value=>String(value||"").trim().replace(/^"|"$/g,""));
+  const split=line=>{const values=[];let value="",quoted=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(quoted&&line[i+1]==='"'){value+='"';i++;}else quoted=!quoted;}else if(ch===','&&!quoted){values.push(value.trim());value="";}else value+=ch;}values.push(value.trim());return values;};
   const first=split(lines[0]).map(value=>value.toLowerCase());
   const hasHeader=(first[0]==="商品コード"||first[0]==="product_code")&&(first[1]==="数量"||first[1]==="quantity");
   const start=hasHeader?1:0;
-  return lines.slice(start).map((line,index)=>{const values=split(line);return {line:start+index+1,productCode:String(values[0]||"").trim(),quantityText:String(values[1]??"").trim()};});
+  return lines.slice(start).map((line,index)=>{const values=split(line);if(values.length!==2)throw new Error(`${start+index+1}行目：CSVは商品コードと数量の2列で指定してください。`);return {line:start+index+1,productCode:String(values[0]||"").trim(),quantityText:String(values[1]??"").trim()};});
 }
 
 async function resolveInventoryCsvProducts(rows){
@@ -4297,8 +4296,10 @@ async function resolveInventoryCsvProducts(rows){
   if(!codes.length)return new Map();
   const result=new Map();
   for(let offset=0;offset<codes.length;offset+=500){
-    const found=await sb(`products?select=*&product_code=in.(${buildInFilter(codes.slice(offset,offset+500))})&limit=1000`);
-    (Array.isArray(found)?found:[]).forEach(product=>result.set(String(product.product_code||"").trim(),product));
+    // The live products table exposes the user-facing 商品コード as
+    // smaregi_product_id; products.product_code is not a live column.
+    const found=await sb(`products?select=*&smaregi_product_id=in.(${buildInFilter(codes.slice(offset,offset+500))})&limit=1000`);
+    (Array.isArray(found)?found:[]).forEach(product=>result.set(String(product.smaregi_product_id||"").trim(),product));
   }
   return result;
 }
@@ -10449,7 +10450,9 @@ exportBoothEventReportPdf=async function(event){
       const file=inputEvent.target.files?.[0];if(!file)return;const preview=el("boothReturnCsvPreview");
       try{
         const csvRows=parseInventoryCsv(await file.text());const products=await resolveInventoryCsvProducts(csvRows);const errors=[];
-        csvRows.forEach(row=>{const product=products.get(row.productCode);if(!product){errors.push(`${row.line}行目 ${row.productCode||"(空欄)"}：商品未登録`);return;}if(!/^\d+$/.test(row.quantityText)){errors.push(`${row.line}行目 ${row.productCode}：数量不正`);return;}const item=state.rows.get(String(product.barcode||""));if(!item){errors.push(`${row.line}行目 ${row.productCode}：このイベントの持ち出し対象外`);return;}const qty=Number(row.quantityText);if(qty>takeoutQty(item))errors.push(`${row.line}行目 ${row.productCode}：持ち出し数超過`);else state.draft.set(String(product.barcode||""),qty);});
+        const merged=new Map();
+        csvRows.forEach(row=>{const product=products.get(row.productCode);if(!product){errors.push(`${row.line}行目 ${row.productCode||"(空欄)"}：商品未登録`);return;}if(!/^\d+$/.test(row.quantityText)){errors.push(`${row.line}行目 ${row.productCode}：数量不正`);return;}const item=state.rows.get(String(product.barcode||""));if(!item){errors.push(`${row.line}行目 ${row.productCode}：このイベントの持ち出し対象外`);return;}const key=String(product.barcode||"");merged.set(key,(merged.get(key)||0)+Number(row.quantityText));});
+        merged.forEach((qty,barcode)=>{const item=state.rows.get(barcode);if(qty>takeoutQty(item))errors.push(`${barcode}：持ち出し数超過`);else state.draft.set(barcode,qty);});
         if(errors.length)throw new Error(errors.join("\n"));renderPureReturnList(state);if(preview){preview.hidden=false;preview.className="message";preview.textContent=`CSV ${csvRows.length}行を今回の棚卸入力へ反映しました。DB保存は「戻り棚卸を確認して完了」実行時です。`;}
       }catch(error){if(preview){preview.hidden=false;preview.className="message err";preview.textContent=`CSV取込エラー：${error.message||error}`;}}
       inputEvent.target.value="";

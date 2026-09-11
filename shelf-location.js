@@ -60,6 +60,25 @@
       .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];
     return latest && String(latest.id)===String(log.id);
   }
+
+  async function saveSingleShelfLocation(product,code,staff){
+    const locations=await loadProductLocations(product);
+    const active=locations.filter(loc=>!loc.deleted_at);
+    const current=String(product?.location||active.find(loc=>loc.is_primary)?.shelf_code||active[0]?.shelf_code||"").trim();
+    if(current===code){showShelfMessage(`この商品はすでに${code}です` ,"ok");return false;}
+    const target=active.find(loc=>loc.is_primary)||active[0];
+    if(target){
+      await sb(`product_locations?id=eq.${encodeURIComponent(target.id)}`,{method:"PATCH",body:JSON.stringify({shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,updated_by:staff,updated_at:new Date().toISOString()})});
+      for(const other of active.filter(loc=>String(loc.id)!==String(target.id))){
+        await sb(`product_locations?id=eq.${encodeURIComponent(other.id)}`,{method:"PATCH",body:JSON.stringify({is_primary:false,deleted_at:new Date().toISOString(),updated_by:staff,updated_at:new Date().toISOString()})});
+      }
+    }else{
+      await sb("product_locations",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({product_id:product.id||null,barcode:product.barcode,shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,created_by:staff,updated_by:staff})});
+    }
+    await patchProductLocation(product,code);
+    await insertLocationLog({product_id:product.id||null,barcode:product.barcode,product_name:product.name||"",action_type:"棚番追加",before_shelf_code:current,after_shelf_code:code,staff});
+    return true;
+  }
   function canCancelLog(log){
     return !!log && !log.cancelled_at && log.action_type!=="取消" && (isAdmin() || isLatestOwnAddLog(log));
   }
@@ -526,36 +545,8 @@
     const [shelf,column]=normalized.split("-");
     if(button)button.disabled=true;
     try{
-      const locations=await loadProductLocations(product);
-      if(locations.some(loc=>loc.shelf_code===normalized && !loc.deleted_at)){
-        showShelfMessage(`この商品はすでに${normalized}へ登録されています`,"err");
-        return;
-      }
-      const isFirst=locations.filter(loc=>!loc.deleted_at).length===0 && !String(product.location||"").trim();
-      const inserted=await upsertLocation({
-        product_id:product.id||null,
-        barcode:product.barcode,
-        shelf_code:normalized,
-        shelf_group:shelf,
-        shelf_column:Number(column),
-        is_primary:isFirst,
-        created_by:staff,
-        updated_by:staff
-      });
-      if(!inserted){
-        showShelfMessage(`この商品はすでに${normalized}へ登録されています`,"err");
-        return;
-      }
-      if(isFirst)await patchProductLocation(product,normalized);
-      await insertLocationLog({
-        product_id:product.id||null,
-        barcode:product.barcode,
-        product_name:product.name||"",
-        action_type:"棚番追加",
-        before_shelf_code:"",
-        after_shelf_code:normalized,
-        staff
-      });
+      const saved=await saveSingleShelfLocation(product,normalized,staff);
+      if(!saved)return;
       await loadShelfLocationLogs();
       resetProductOnly();
       await loadShelfPriorityProducts({silent:true});
@@ -597,37 +588,8 @@
     if(!product){showShelfMessage("商品を選択してください","err"); return;}
     if(!applyDirectShelfCodeInput({showError:true,showSuccess:false}))return;
     const code=shelfCode();
-    await loadProductLocations(product);
-    if(state.locations.some(loc=>loc.shelf_code===code && !loc.deleted_at)){
-      showShelfMessage(`この商品はすでに${code}へ登録されています`,"err");
-      return;
-    }
-    const isFirst=state.locations.length===0 && !String(product.location||"").trim();
-    const payload={
-      product_id:product.id||null,
-      barcode:product.barcode,
-      shelf_code:code,
-      shelf_group:String($("shelfLocationShelf")?.value||""),
-      shelf_column:Number($("shelfLocationColumn")?.value||1),
-      is_primary:isFirst,
-      created_by:staff,
-      updated_by:staff
-    };
-    const inserted=await upsertLocation(payload);
-    if(!inserted){
-      showShelfMessage(`この商品はすでに${code}へ登録されています`,"err");
-      return;
-    }
-    if(isFirst)await patchProductLocation(product,code);
-    await insertLocationLog({
-      product_id:product.id||null,
-      barcode:product.barcode,
-      product_name:product.name||"",
-      action_type:"棚番追加",
-      before_shelf_code:"",
-      after_shelf_code:code,
-      staff
-    });
+    const saved=await saveSingleShelfLocation(product,code,staff);
+    if(!saved)return;
     await loadProductLocations(product);
     await loadShelfLocationLogs();
     showPopup?.("棚番登録完了",`${product.name||product.barcode}を${code}へ登録しました`);
