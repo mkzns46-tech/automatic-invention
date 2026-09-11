@@ -4285,21 +4285,25 @@ function parseInventoryCsv(text){
   const lines=String(text||"").replace(/^\uFEFF/,"").split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
   if(!lines.length)throw new Error("CSVが空です。");
   const split=line=>{const values=[];let value="",quoted=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(quoted&&line[i+1]==='"'){value+='"';i++;}else quoted=!quoted;}else if(ch===','&&!quoted){values.push(value.trim());value="";}else value+=ch;}values.push(value.trim());return values;};
-  const first=split(lines[0]).map(value=>value.toLowerCase());
-  const hasHeader=(first[0]==="商品コード"||first[0]==="product_code")&&(first[1]==="数量"||first[1]==="quantity");
+  const first=split(lines[0]).map(value=>value.toLowerCase().replace(/\s+/g,""));
+  const identityType=first[0]==="バーコード"||first[0]==="barcode"?"barcode":"product_code";
+  const hasHeader=(first[0]==="商品コード"||first[0]==="product_code"||first[0]==="バーコード"||first[0]==="barcode")&&(first[1]==="数量"||first[1]==="quantity");
+  if(!hasHeader&&lines.length===1&&first[0]&&first[1]===undefined)throw new Error("CSVヘッダーまたは商品コード・数量の2列が必要です。");
   const start=hasHeader?1:0;
-  return lines.slice(start).map((line,index)=>{const values=split(line);if(values.length!==2)throw new Error(`${start+index+1}行目：CSVは商品コードと数量の2列で指定してください。`);return {line:start+index+1,productCode:String(values[0]||"").trim(),quantityText:String(values[1]??"").trim()};});
+  return lines.slice(start).map((line,index)=>{const values=split(line);if(values.length!==2)throw new Error(`${start+index+1}行目：CSVは識別子と数量の2列で指定してください。`);return {line:start+index+1,identityType,identity:String(values[0]||"").trim(),productCode:String(values[0]||"").trim(),quantityText:String(values[1]??"").trim()};});
 }
 
 async function resolveInventoryCsvProducts(rows){
-  const codes=[...new Set(rows.map(row=>row.productCode).filter(Boolean))];
+  const codes=[...new Set(rows.filter(row=>row.identity).map(row=>row.identity).filter(Boolean))];
   if(!codes.length)return new Map();
   const result=new Map();
   for(let offset=0;offset<codes.length;offset+=500){
-    // The live products table exposes the user-facing 商品コード as
-    // smaregi_product_id; products.product_code is not a live column.
-    const found=await sb(`products?select=*&smaregi_product_id=in.(${buildInFilter(codes.slice(offset,offset+500))})&limit=1000`);
-    (Array.isArray(found)?found:[]).forEach(product=>result.set(String(product.smaregi_product_id||"").trim(),product));
+    const chunk=buildInFilter(codes.slice(offset,offset+500));
+    const useBarcode=rows.some(row=>row.identityType==="barcode");
+    const found=useBarcode
+      ? await sb(`products?select=*&barcode=in.(${chunk})&limit=1000`)
+      : await sb(`products?select=*&smaregi_product_id=in.(${chunk})&limit=1000`);
+    (Array.isArray(found)?found:[]).forEach(product=>{const key=useBarcode?String(product.barcode||"").trim():String(product.smaregi_product_id||"").trim();if(key)result.set(key,product);});
   }
   return result;
 }
