@@ -406,9 +406,10 @@ function getSmaregiEventShelfCurrentQty(item,movements=[],salesQty=null){
   const sold= salesQty===null
     ? normalizeInventoryQuantity(item?.sold_qty)
     : normalizeInventoryQuantity(salesQty);
+  const consumed=normalizeInventoryQuantity(item?.consumed_qty);
   // Gacha inventory is managed separately and is never part of the common
   // event-shelf balance used by Smaregi difference checks.
-  return Math.max(0,eventTakeoutQty-sold-shelfReturnQty);
+  return Math.max(0,eventTakeoutQty-sold-shelfReturnQty-consumed);
 }
 
 window.calculateSmaregiEventShelfCurrentQty=getSmaregiEventShelfCurrentQty;
@@ -427,13 +428,11 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
   const storeCode=normalizeSmaregiStoreCodeForStorage(getSmaregiCurrentStoreCode());
   smaregiEventInventoryStoreCode=storeCode;
   let activeEventIds=[];
-  let storeEventIds=[];
   // Pending sales are a read-only adjustment for comparison only.
   try{
     const now=new Date();
     const events=await sbAll(`booth_events?select=id,event_start,event_end,status,store_code&store_code=eq.${encodeURIComponent(storeCode)}&limit=1000`,1000,5000);
     const storeEvents=(Array.isArray(events)?events:[]).filter(event=>String(event?.id||"").trim());
-    storeEventIds=storeEvents.map(event=>String(event.id||"").trim()).filter(Boolean);
     activeEventIds=storeEvents.filter(event=>{
       if(String(event.status||"").toLowerCase()==="closed")return false;
       const start=String(event.event_start||"").slice(0,10);
@@ -442,7 +441,7 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
       return (!start||today>=start)&&(!end||today<=end);
     }).map(event=>String(event.id||"").trim()).filter(Boolean);
     const ongoingSalesState=window.__smaregiOngoingSalesState;
-    if(activeEventIds.length&&(!ongoingSalesState||ongoingSalesState.ok!==false)){
+    if(activeEventIds.length===1&&(!ongoingSalesState||ongoingSalesState.ok!==false)){
       const eventFilter=buildSmaregiInFilter(activeEventIds);
       const pendingSales=await sbAll(`event_sales_imports?select=event_id,barcode,quantity,import_status&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&import_status=eq.pending&limit=50000`,1000,50000).catch(()=>[]);
       (Array.isArray(pendingSales)?pendingSales:[]).forEach(row=>{
@@ -453,89 +452,42 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     console.warn("[Smaregi ongoing event sales lookup failed]",error);
   }
 
-  // event_storage_stocks is the canonical current balance for the
-  // store-common event shelf. Legacy event-item rows are used only when no
-  // common-shelf row exists, so an ended event cannot overwrite the balance.
+  // Difference checks use only the one currently running event. The shared
+  // event shelf and all ended/paused event rows are deliberately excluded.
+  if(activeEventIds.length!==1)return;
   try{
-    const commonStocks=await sbAll(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty,updated_at&store_code=eq.${encodeURIComponent(storeCode)}&barcode=in.(${barcodeFilter})`,1000,50000);
-    (Array.isArray(commonStocks)?commonStocks:[]).forEach(row=>{
-      if(normalizeSmaregiStoreCodeForStorage(row.store_code)!==storeCode)return;
-      smaregiEventStorageStockByBarcode.set(String(row.barcode||"").trim(),Number(row.storage_qty||0));
+    const eventId=activeEventIds[0];
+    const [eventItems,movementRows,salesRows]=await Promise.all([
+      sbAll(`booth_event_items?select=id,event_id,barcode,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,shelf_return_qty,event_storage_qty,consumed_qty,updated_at&event_id=eq.${encodeURIComponent(eventId)}&barcode=in.(${barcodeFilter})&item_type=eq.normal`,1000,50000),
+      sbAll(`booth_stock_movements?select=id,event_id,barcode,movement_type,item_type,quantity,takeout_source&event_id=eq.${encodeURIComponent(eventId)}&barcode=in.(${barcodeFilter})&movement_type=in.(departure_count,take_out,event_pick,return,event_close_return)`,1000,50000).catch(()=>[]),
+      sbAll(`event_sales_imports?select=id,event_id,barcode,quantity,import_status&event_id=eq.${encodeURIComponent(eventId)}&barcode=in.(${barcodeFilter})&import_status=eq.confirmed`,1000,50000).catch(()=>[])
+    ]);
+    const movementByBarcode=new Map();
+    (Array.isArray(movementRows)?movementRows:[]).forEach(row=>{
+      const barcode=String(row.barcode||"").trim();
+      const rows=movementByBarcode.get(barcode)||[]; rows.push(row); movementByBarcode.set(barcode,rows);
     });
-  }catch(error){
-    console.warn("[Smaregi common event shelf lookup failed]",error);
-  }
-
-  if(storeEventIds.length){
-    const eventItemFallbackByBarcode=new Map();
-    try{
-      const eventFilter=buildSmaregiInFilter(storeEventIds);
-      const [eventItems,movementRows,salesRows]=await Promise.all([
-      sbAll(`booth_event_items?select=id,event_id,barcode,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,shelf_return_qty,event_storage_qty,consumed_qty,updated_at&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&item_type=eq.normal`,1000,50000),
-       sbAll(`booth_stock_movements?select=id,event_id,barcode,movement_type,item_type,quantity,takeout_source&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&movement_type=in.(departure_count,take_out,event_pick,return,event_close_return)`,1000,50000).catch(()=>[]),
-      sbAll(`event_sales_imports?select=id,event_id,barcode,quantity,import_status&event_id=in.(${eventFilter})&barcode=in.(${barcodeFilter})&import_status=eq.confirmed`,1000,50000).catch(()=>[])
-      ]);
-      const eventItemByKey=new Map();
-      (Array.isArray(eventItems)?eventItems:[]).forEach(row=>{
+    const salesByBarcode=new Map();
+    (Array.isArray(salesRows)?salesRows:[]).forEach(row=>{
+      const barcode=String(row.barcode||"").trim();
+      salesByBarcode.set(barcode,(salesByBarcode.get(barcode)||0)+normalizeInventoryQuantity(row.quantity));
+    });
+    (Array.isArray(eventItems)?eventItems:[]).forEach(row=>{
       if(String(row.item_type||"normal")!=="normal")return;
-      const key=`${row.event_id}::${row.barcode}`;
-      const existing=eventItemByKey.get(key);
-      if(!existing||new Date(row.updated_at||0).getTime()>=new Date(existing.updated_at||0).getTime()){
-        eventItemByKey.set(key,row);
-      }
-      });
-      const movementByKey=new Map();
-      (Array.isArray(movementRows)?movementRows:[]).forEach(row=>{
-      const key=`${row.event_id}::${row.barcode}`;
-      const rows=movementByKey.get(key)||[];
-      rows.push(row);
-      movementByKey.set(key,rows);
-      });
-      const confirmedSalesByKey=new Map();
-      (Array.isArray(salesRows)?salesRows:[]).forEach(row=>{
-      const key=`${row.event_id}::${row.barcode}`;
-      const rows=confirmedSalesByKey.get(key)||[];
-      rows.push(row);
-      confirmedSalesByKey.set(key,rows);
-      });
-      eventItemByKey.forEach(row=>{
-      const key=`${row.event_id}::${row.barcode}`;
-      const movements=movementByKey.get(key)||[];
-      const confirmedSales=confirmedSalesByKey.get(key)||[];
-      const savedSoldQty=normalizeInventoryQuantity(row.sold_qty);
-      const importedSoldQty=confirmedSales.reduce((sum,sale)=>sum+normalizeInventoryQuantity(sale.quantity),0);
-      // booth_event_items.sold_qty is updated when a sale import is applied.
-      // Use confirmed imports only for older rows where that denormalized
-      // value has not been written yet, avoiding a double subtraction.
-      const salesQty=savedSoldQty>0 ? savedSoldQty : (importedSoldQty>0 ? importedSoldQty : 0);
-      const qty=getSmaregiEventShelfCurrentQty(row,movements,salesQty);
       const barcode=String(row.barcode||"").trim();
       if(!barcode)return;
-      const hasEventActivity=[
-        row.taken_qty,row.normal_takeout_qty,row.storage_takeout_qty,
-        row.sold_qty,row.returned_qty
-      ].some(value=>normalizeInventoryQuantity(value)>0)
-        || movements.some(movement=>["event_pick","take_out","departure_count"].includes(String(movement?.movement_type||"").trim()));
-      if(!hasEventActivity)return;
-       const updatedAt=new Date(row.updated_at||0).getTime();
-       const previous=eventItemFallbackByBarcode.get(barcode);
-       if(!previous||updatedAt>=previous.updatedAt){
-         eventItemFallbackByBarcode.set(barcode,{qty,updatedAt});
-       }
-       });
-
-      // Do not add event_storage_stocks and booth_event_items together. The
-      // latest event-item row is only a compatibility fallback when the
-      // store-common row is absent. This keeps ended-event legacy data visible
-      // without summing the same common shelf balance more than once.
-      eventItemFallbackByBarcode.forEach(({qty},barcode)=>{
-        if(!smaregiEventStorageStockByBarcode.has(barcode)){
-          smaregiEventStorageStockByBarcode.set(barcode,Math.max(0,Number(qty||0)));
-        }
-      });
-    }catch(error){
-      console.warn("[Smaregi event shelf item lookup failed]",error);
-    }
+      const hasActivity=[row.taken_qty,row.normal_takeout_qty,row.storage_takeout_qty,row.sold_qty,row.returned_qty,row.consumed_qty]
+        .some(value=>normalizeInventoryQuantity(value)>0)
+        || (movementByBarcode.get(barcode)||[]).some(movement=>["event_pick","take_out","departure_count"].includes(String(movement?.movement_type||"").trim()));
+      if(!hasActivity)return;
+      const savedSoldQty=normalizeInventoryQuantity(row.sold_qty);
+      const importedSoldQty=salesByBarcode.get(barcode)||0;
+      const salesQty=savedSoldQty>0?savedSoldQty:importedSoldQty;
+      const qty=getSmaregiEventShelfCurrentQty(row,movementByBarcode.get(barcode)||[],salesQty);
+      if(qty>0)smaregiEventStorageStockByBarcode.set(barcode,qty);
+    });
+  }catch(error){
+    console.warn("[Smaregi current event shelf lookup failed]",error);
   }
 
 }
