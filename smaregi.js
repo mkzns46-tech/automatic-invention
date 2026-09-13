@@ -389,12 +389,14 @@ function getSmaregiEventShelfCurrentQty(item,movements=[],salesQty=null){
     return String(row?.item_type||"normal")==="normal"
       && String(row?.movement_type||"").trim()==="departure_count";
   });
-  const fallbackTakeoutQty=normalizeInventoryQuantity(item?.normal_takeout_qty)
-    +normalizeInventoryQuantity(item?.storage_takeout_qty);
+  const hasCanonicalTaken=item?.taken_qty!==null&&item?.taken_qty!==undefined&&String(item.taken_qty).trim()!=="";
+  const fallbackTakeoutQty=hasCanonicalTaken
+    ? normalizeInventoryQuantity(item?.taken_qty)
+    : normalizeInventoryQuantity(item?.normal_takeout_qty)+normalizeInventoryQuantity(item?.storage_takeout_qty);
   const movementTakeoutQty=eventPickQty>0 ? eventPickQty : legacyDepartureQty;
-  const eventTakeoutQty=movementTakeoutQty>0
-    ? movementTakeoutQty
-    : (fallbackTakeoutQty>0 ? fallbackTakeoutQty : normalizeInventoryQuantity(item?.taken_qty));
+  const eventTakeoutQty=hasCanonicalTaken
+    ? fallbackTakeoutQty
+    : (movementTakeoutQty>0 ? movementTakeoutQty : fallbackTakeoutQty);
 
   // A normal-shelf return is explicit when the return workflow has recorded
   // shelf_return_qty. Storage returns remain event stock and are not removed.

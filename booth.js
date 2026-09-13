@@ -9714,9 +9714,16 @@ function getBoothNormalCarryOutAdditionalQty(row){
 }
 
 function getBoothNormalCarryOutTotalQty(row){
+  // taken_qty is the canonical, editable total for the current event.  The
+  // split fields are retained for legacy rows but must not override a later
+  // 5 -> 4 correction to taken_qty.
+  const takenValue=row?.taken_qty;
+  if(takenValue!==null&&takenValue!==undefined&&String(takenValue).trim()!==""){
+    return Math.max(0,Number(takenValue)||0);
+  }
   const splitTotal=getBoothNormalCarryOutStartQty(row)+getBoothNormalCarryOutAdditionalQty(row);
   if(splitTotal>0)return splitTotal;
-  return Math.max(0,Number(row?.taken_qty||0));
+  return 0;
 }
 
 function normalizeBoothNormalCarryOutRow(row){
