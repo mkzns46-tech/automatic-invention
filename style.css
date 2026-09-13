@@ -808,6 +808,8 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   padding:8px 12px;
 }
 .app-count-history-table{min-width:760px}
+.app-count-input-title{margin-bottom:8px}
+.app-count-input-title .compact{padding:6px 12px;font-size:12px;min-height:34px}
 .app-count-history-cards{display:none}
 
 @media(max-width:800px){

@@ -410,13 +410,6 @@
         <h2>アプリ内棚卸</h2>
         <p class="section-note">開いたらすぐ入力できます。保存した内容は店舗ごとに共有されます。</p>
       </div>
-      <div id="appInventoryCountStatus" class="badge">棚卸中</div>
-    </div>
-    <div class="app-count-draft-bar">
-      <div><span>対象店舗</span><strong id="appInventoryStoreName">東京</strong></div>
-      <div><span>入力済み</span><strong id="appInventoryDraftCount">0商品</strong></div>
-      <div><span>最終保存</span><strong id="appInventoryLastSaved">未保存</strong></div>
-      <button type="button" id="appInventoryRefreshBtn" class="secondary">最新状態に更新</button>
     </div>
     <div class="app-count-staff-row">
       <label>担当者 <span class="required">必須</span><select id="appInventoryCountStaff" disabled><option value="">担当者を選択</option></select><div id="appInventoryCountStaffPicker" class="staff-picker"></div></label>
@@ -427,7 +420,7 @@
     </div>
     <div class="app-count-workflow">
       <section class="app-count-block">
-        <h3>カウント入力</h3>
+        <div class="section-title app-count-input-title"><h3>カウント入力</h3><button type="button" id="appInventoryRefreshBtn" class="secondary compact">再読み込み</button></div>
         <div class="app-count-input-grid">
           <label class="app-count-scan-label">商品スキャン・バーコード<span class="app-count-scan-row"><input id="appInventoryCountBarcode" autocomplete="off" placeholder="バーコードをスキャン、または手入力" disabled><button type="button" id="appInventoryCameraBtn" class="secondary app-count-camera-btn" disabled>📷カメラ</button></span></label>
           <label>商品名検索<input id="appInventoryCountSearch" autocomplete="off" placeholder="商品名の一部を入力" disabled></label>
