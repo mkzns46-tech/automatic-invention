@@ -8312,7 +8312,12 @@ async function importBoothSalesDraft(){
 
     const salesTotalQty=rows.reduce((sum,row)=>sum+Number(row.quantity||0),0);
     const salesTotalAmount=rows.reduce((sum,row)=>sum+Number(row.amount||0),0);
-    const unmatchedLines=unmatched.slice(0,10).map(({sale,reason})=>`${sale.smaregi_transaction_id||"-"}/${sale.smaregi_detail_id||"-"}: ${reason}`);
+    const unmatchedLines=unmatched.slice(0,20).map(({sale,reason})=>{
+      const productId=sale.smaregi_product_id||"-";
+      const productName=sale.product_name||"商品名不明";
+      const barcode=sale.barcode||((productBySmaregiId.get(normalizeBoothSalesIdentity(productId))||[])[0]?.barcode)||"barcode未照合";
+      return `${sale.smaregi_transaction_id||"-"}/${sale.smaregi_detail_id||"-"}：${productName} / ${barcode} / 商品ID ${productId} / 数量 ${sale.quantity??0} / ${reason}`;
+    });
     const summary=[
       `最新取得：${Number(body.transactionsCount||0)}取引 / ${uniqueSales.size}明細`,
       `照合済み：${rows.length}明細 / 販売数量：${salesTotalQty}個 / 売上：${salesTotalAmount}`,
