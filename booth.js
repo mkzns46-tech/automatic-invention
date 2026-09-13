@@ -313,7 +313,12 @@ async function loadBoothCurrentEventStorageRows(storeCode,options={}){
   if(!normalizedStore)return [];
   const byBarcode=new Map();
   const selectedEventId=String(options.eventId||"").trim();
-  const commonRows=await sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty&store_code=eq.${encodeURIComponent(normalizedStore)}&storage_qty=gt.0&order=product_name.asc&limit=5000`);
+  // With an event id this loader is an event-scoped view: common shelf stock
+  // is not evidence that the current event took the item out. The no-event
+  // form remains the store-wide common-shelf view used by inventory screens.
+  const commonRows=selectedEventId
+    ? []
+    : await sb(`event_storage_stocks?select=store_code,barcode,product_name,storage_qty&store_code=eq.${encodeURIComponent(normalizedStore)}&storage_qty=gt.0&order=product_name.asc&limit=5000`);
   (Array.isArray(commonRows)?commonRows:[]).forEach(row=>{
     const barcode=String(row.barcode||"").trim();
     const quantity=Number(row.storage_qty||0);
@@ -333,14 +338,9 @@ async function loadBoothCurrentEventStorageRows(storeCode,options={}){
   const events=(Array.isArray(eventRows)?eventRows:[])
     .filter(event=>normalizeBoothStoreCode(event?.store_code)===normalizedStore)
     .filter(event=>String(event?.status||"").toLowerCase()!=="deleted");
-  const eventOrderIds=[];
-  if(selectedEventId&&events.some(event=>String(event.id||"")===selectedEventId)){
-    eventOrderIds.push(selectedEventId);
-  }
-  events.forEach(event=>{
-    const id=String(event.id||"").trim();
-    if(id&&!eventOrderIds.includes(id))eventOrderIds.push(id);
-  });
+  const eventOrderIds=selectedEventId&&events.some(event=>String(event.id||"")===selectedEventId)
+    ? [selectedEventId]
+    : selectedEventId ? [] : events.map(event=>String(event.id||"").trim()).filter(Boolean);
   if(eventOrderIds.length){
     const orderMap=new Map(eventOrderIds.map((id,index)=>[id,index]));
     const itemRows=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,sold_qty,returned_qty,shelf_return_qty,event_storage_qty,return_process_type,updated_at&event_id=in.(${buildInFilter(eventOrderIds)})&item_type=eq.normal&order=updated_at.desc&limit=50000`);
