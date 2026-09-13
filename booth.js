@@ -3174,10 +3174,10 @@ async function renderBoothGachaListPanel(event){
         <label>担当者<span class="required">必須</span><select id="boothGachaStaff" ${closed?"disabled":""}>${getBoothGachaStaffOptions()}</select></label>
       </div>
       <div id="boothGachaPickSearchResults" class="booth-return-product-search-results" hidden></div>
-      <div class="button-row"><button type="button" id="boothGachaStartCameraBtn" ${closed?"disabled":""}>カメラ読取</button><button type="button" id="boothGachaStopCameraBtn" class="secondary">停止</button><button type="button" id="boothGachaPickAddBtn" ${closed?"disabled":""}>入力に追加</button></div>
+      <div id="boothGachaProductPreview" class="booth-product-preview" hidden></div>
+      <div class="button-row"><button type="button" id="boothGachaStartCameraBtn" ${closed?"disabled":""}>カメラ読取</button><button type="button" id="boothGachaStopCameraBtn" class="secondary">停止</button><button type="button" id="boothGachaPickAddBtn" ${closed?"disabled":""}>この商品を追加</button></div>
       <label>メモ<input id="boothGachaMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}></label>
-      <div id="boothGachaPickDraftList" class="booth-return-draft-list"><div class="booth-empty">商品を検索またはバーコード入力して追加してください。</div></div>
-      <button type="button" id="boothGachaPickConfirmBtn" ${closed?"disabled":""}>ガチャ持ち出しを確定</button>
+      <section class="booth-gacha-pick-draft-panel"><div class="booth-list-header"><h5>今回の持ち出し予定</h5><span id="boothGachaPickDraftSummary" class="inventory-count-pill">0商品 / 0個</span></div><div id="boothGachaPickDraftList" class="booth-return-draft-list"><div class="booth-empty">商品を追加するとここに表示されます。</div></div><button type="button" id="boothGachaPickConfirmBtn" ${closed?"disabled":""}>ガチャ持ち出しを確定</button></section>
       <div id="boothGachaPickMessage" class="message" aria-live="polite"></div>
     </section>
     <div class="booth-list-header">
@@ -5956,6 +5956,7 @@ function renderBoothGachaPreview(product,smaregiStock,summary){
   preview.innerHTML=`<div><span>商品名：</span><strong>${esc(product.name||"-")}</strong></div>
     <div><span>バーコード：</span><strong>${esc(product.barcode||"-")}</strong></div>
     <div><span>スマレジ商品ID：</span><strong>${esc(product.smaregi_product_id||"未登録")}</strong></div>
+    <div><span>通常棚在庫：</span><strong>${esc(product.base_stock??0)}</strong></div>
     <div><span>スマレジ在庫：</span><strong>${smaregiStock===null?"未取込":esc(smaregiStock)}</strong></div>
     <div><span>現在ガチャ持ち出し数：</span><strong>${esc(summary?.current??0)}</strong></div>
     <div><span>ガチャ消費見込み：</span><strong>${esc(summary?.consumed??0)}</strong></div>`;
@@ -6676,7 +6677,11 @@ function renderBoothGachaPickDraft(event){
   const list=el("boothGachaPickDraftList");
   if(!list)return;
   const items=[...getBoothGachaPickDraft(event).values()];
-  if(!items.length){list.innerHTML='<div class="booth-empty">商品を検索またはバーコード入力して追加してください。</div>';return;}
+  const summary=el("boothGachaPickDraftSummary");
+  if(summary)summary.textContent=`${items.length}商品 / ${items.reduce((sum,item)=>sum+Number(item.quantity||0),0)}個`;
+  const confirm=el("boothGachaPickConfirmBtn");
+  if(confirm)confirm.disabled=items.length===0||confirm.disabled&&Boolean(event&&isBoothEventClosed(event));
+  if(!items.length){list.innerHTML='<div class="booth-empty">商品を追加するとここに表示されます。</div>';return;}
   list.innerHTML=items.map(item=>`<article class="booth-return-draft-item"><div class="booth-return-draft-head"><strong>${esc(item.product.name||"-")}</strong><button type="button" class="secondary" data-gacha-pick-remove="${esc(item.barcode)}">削除</button></div><div class="booth-return-draft-meta"><span>バーコード：${esc(item.barcode)}</span><span>数量：${esc(item.quantity)}</span></div><div class="booth-return-draft-controls"><button type="button" class="secondary" data-gacha-pick-change="-1" data-gacha-pick-barcode="${esc(item.barcode)}">−</button><input type="number" min="1" step="1" value="${esc(item.quantity)}" data-gacha-pick-qty="${esc(item.barcode)}"><button type="button" class="secondary" data-gacha-pick-change="1" data-gacha-pick-barcode="${esc(item.barcode)}">＋</button></div></article>`).join("");
 }
 
@@ -6721,9 +6726,10 @@ async function saveBoothGachaPickDraft(event){
 }
 
 function setupBoothGachaPickInput(event){
-  const search=el("boothGachaPickSearch"), results=el("boothGachaPickSearchResults"); let timer=null;
+  const search=el("boothGachaPickSearch"), results=el("boothGachaPickSearchResults"); let timer=null, barcodeTimer=null;
   search?.addEventListener("input",()=>{clearTimeout(timer);timer=setTimeout(async()=>{const q=String(search.value||"").trim();if(!q){results.hidden=true;results.innerHTML="";return;}results.hidden=false;results.innerHTML='<div class="booth-empty">検索中...</div>';const rows=await searchBoothDepartureProducts(q);results.innerHTML=rows.length?rows.map(p=>`<button type="button" class="booth-return-search-result" data-gacha-pick-select="${esc(p.barcode)}"><strong>${esc(p.name||"-")}</strong><span>${esc(p.barcode||"-")} / 商品コード ${esc(p.smaregi_product_id||"-")}</span></button>`).join(""):'<div class="booth-empty">該当する商品がありません。</div>';},180);});
-  results?.addEventListener("click",e=>{const b=e.target.closest("[data-gacha-pick-select]");if(!b)return;el("boothGachaBarcode").value=b.dataset.gachaPickSelect||"";search.value="";results.hidden=true;results.innerHTML="";el("boothGachaQty")?.focus();});
+  results?.addEventListener("click",e=>{const b=e.target.closest("[data-gacha-pick-select]");if(!b)return;el("boothGachaBarcode").value=b.dataset.gachaPickSelect||"";search.value="";results.hidden=true;results.innerHTML="";previewBoothGachaProduct({popupOnError:false});el("boothGachaQty")?.focus();});
+  el("boothGachaBarcode")?.addEventListener("input",()=>{clearTimeout(barcodeTimer);barcodeTimer=setTimeout(()=>previewBoothGachaProduct({popupOnError:false}),180);});
   el("boothGachaPickAddBtn")?.addEventListener("click",()=>addBoothGachaPickDraft(event));
   el("boothGachaBarcode")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addBoothGachaPickDraft(event);}});
   el("boothGachaPickConfirmBtn")?.addEventListener("click",()=>saveBoothGachaPickDraft(event));
