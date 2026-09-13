@@ -2798,19 +2798,13 @@ async function renderBoothEventInventoryPanel(event){
         <h4>イベント持ち出し登録</h4>
         <p class="section-note">イベントへ持ち出す通常商品を入力します。入力中は下書きとして保持し、確定時に通常棚から共通イベント棚へ移動します。</p>
       </div>
-      <span id="boothDepartureSummary" class="inventory-count-pill">0商品 / 0個</span>
+      <span id="boothDepartureSummary" class="inventory-count-pill">持ち出し予定：0商品 / 0個</span>
     </div>
     <div class="booth-return-product-search">
       <label class="booth-return-product-search-label">商品名検索
         <input id="boothDepartureSearch" autocomplete="off" placeholder="商品名・バーコードで検索" ${closed?"disabled":""}>
       </label>
       <div id="boothDepartureSearchResults" class="booth-return-product-search-results" hidden></div>
-    </div>
-    <div class="button-row booth-camera-button-row">
-      <button type="button" id="boothDepartureCameraBtn" ${closed?"disabled":""}>カメラ読取</button>
-      <button type="button" id="boothDepartureStopCameraBtn" class="secondary">停止</button>
-      <label class="secondary booth-file-button">CSV取込<input type="file" id="boothDepartureCsvInput" accept=".csv,text/csv" hidden ${closed?"disabled":""}></label>
-      <button type="button" id="boothDepartureCsvTemplateBtn" class="secondary">CSVテンプレート</button>
     </div>
     <div id="boothDepartureCsvPreview" class="message" hidden></div>
     <div class="camera-area booth-camera-area">
@@ -2820,21 +2814,28 @@ async function renderBoothEventInventoryPanel(event){
         <div class="camera-guide-text">赤線にバーコードを合わせてください</div>
       </div>
     </div>
-    <div class="booth-scan-row">
+    <div class="booth-departure-entry-row">
       <label>バーコード
         <input id="boothDepartureBarcode" autocomplete="off" inputmode="numeric" placeholder="バーコードを入力してEnter" ${closed?"disabled":""}>
       </label>
       <label>数量
         <input id="boothDepartureQty" type="number" min="1" step="1" value="1" ${closed?"disabled":""}>
       </label>
-      <button type="button" id="boothDepartureAddBtn" ${closed?"disabled":""}>入力に追加</button>
+      <button type="button" id="boothDepartureAddBtn" ${closed?"disabled":""}>この商品を追加</button>
+    </div>
+    <div class="booth-departure-tools">
+      <button type="button" id="boothDepartureCameraBtn" ${closed?"disabled":""}>カメラ読取</button>
+      <button type="button" id="boothDepartureStopCameraBtn" class="secondary">停止</button>
+      <label class="secondary booth-file-button">CSV取込<input type="file" id="boothDepartureCsvInput" accept=".csv,text/csv" hidden ${closed?"disabled":""}></label>
+      <button type="button" id="boothDepartureCsvTemplateBtn" class="secondary">CSVテンプレート</button>
     </div>
     <div class="booth-return-common-fields">
       <label>担当者<span class="required">必須</span><select id="boothDepartureStaff" ${closed?"disabled":""}>${getBoothSalesStaffOptions()}</select></label>
       <label>メモ<input id="boothDepartureMemo" autocomplete="off" placeholder="任意メモ" ${closed?"disabled":""}></label>
     </div>
     <div id="boothDepartureCountList" class="booth-return-draft-list"><div class="booth-empty">バーコードを読み取ると、ここに持ち出し対象商品が追加されます。</div></div>
-    <button type="button" id="boothDepartureCompleteBtn" class="booth-return-apply-btn" ${closed?"disabled":""}>持ち出しを確定</button>
+    <p class="booth-departure-confirm-note">通常棚 → イベント棚へ移動します。確定するまで在庫は変わりません。</p>
+    <button type="button" id="boothDepartureCompleteBtn" class="booth-return-apply-btn" disabled>持ち出しを確定</button>
   </section>
   <section class="booth-work-card booth-carry-history-card">
     <div class="booth-list-header">
@@ -2843,6 +2844,11 @@ async function renderBoothEventInventoryPanel(event){
     </div>
     <div id="boothCarryOutHistoryList" class="booth-carry-history-list"><div class="booth-empty">読み込み中...</div></div>
   </section>`;
+
+  const departureStaff=el("boothDepartureStaff");
+  const savedDepartureStaff=sessionStorage.getItem("arico_booth_departure_staff")||"";
+  if(savedDepartureStaff && [...(departureStaff?.options||[])].some(option=>option.value===savedDepartureStaff))departureStaff.value=savedDepartureStaff;
+  departureStaff?.addEventListener("change",()=>sessionStorage.setItem("arico_booth_departure_staff",String(departureStaff.value||"")));
 
   const searchInput=el("boothDepartureSearch");
   const searchResults=el("boothDepartureSearchResults");
@@ -2869,7 +2875,7 @@ async function renderBoothEventInventoryPanel(event){
     if(searchInput)searchInput.value="";
     searchResults.hidden=true;
     searchResults.innerHTML="";
-    await addBoothDepartureCountFromInput();
+    el("boothDepartureQty")?.focus();
   });
   el("boothDepartureAddBtn")?.addEventListener("click",addBoothDepartureCountFromInput);
   el("boothDepartureCompleteBtn")?.addEventListener("click",completeBoothDepartureCount);
@@ -2934,12 +2940,14 @@ async function renderBoothDepartureCountList(eventId){
   const counts=Object.values(readBoothDepartureCounts(eventId)).filter(row=>Number(row.quantity||0)>0);
   const total=counts.reduce((sum,row)=>sum+Number(row.quantity||0),0);
   const summary=el("boothDepartureSummary");
-  if(summary)summary.textContent=`${counts.length}商品 / ${total}個`;
+  if(summary)summary.textContent=`持ち出し予定：${counts.length}商品 / ${total}個`;
+  const completeButton=el("boothDepartureCompleteBtn");
+  if(completeButton)completeButton.disabled=isBoothEventClosed(getBoothCurrentEvent()||{})||counts.length===0;
   if(!counts.length){
     list.innerHTML='<div class="booth-empty">バーコードを読み取ると、ここに持ち出し対象商品が追加されます。</div>';
     return;
   }
-  list.innerHTML=`<div class="booth-history-table-wrap"><table class="booth-history-table booth-departure-draft-table">
+  list.innerHTML=`<div class="booth-history-table-wrap booth-departure-draft-table-wrap"><table class="booth-history-table booth-departure-draft-table">
     <thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し数</th><th>操作</th></tr></thead>
     <tbody>${counts.map(row=>`<tr>
       <td>${esc(row.product_name||"-")}</td>
