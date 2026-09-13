@@ -808,6 +808,7 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   padding:8px 12px;
 }
 .app-count-history-table{min-width:760px}
+.app-count-history-cards{display:none}
 
 @media(max-width:800px){
   .app-count-draft-bar{
@@ -829,6 +830,57 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   body[data-inventory-screen="app-inventory-count"] .app-count-history-table{
     min-width:0;
   }
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-table-wrap{
+    display:none;
+  }
+  body[data-inventory-screen="app-inventory-count"] .app-count-history-cards{
+    display:grid;
+    gap:10px;
+  }
+  .app-count-history-card{
+    display:grid;
+    gap:8px;
+    padding:14px;
+    border:1px solid #cfe1d6;
+    border-radius:12px;
+    background:#fff;
+  }
+  .app-count-history-card-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+  .app-count-history-card-date{
+    color:#587566;
+    font-size:13px;
+  }
+  .app-count-history-card-stats{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:6px;
+  }
+  .app-count-history-card-stats span{
+    padding:8px 6px;
+    border-radius:8px;
+    background:#f2faf5;
+    color:#315f4a;
+    text-align:center;
+    font-size:12px;
+  }
+  .app-count-history-card-stats b{
+    display:block;
+    color:#113b2b;
+    font-size:18px;
+  }
+  .app-count-history-card details{
+    border-top:1px solid #e3eee7;
+    padding-top:8px;
+  }
+  .app-count-history-card dl{margin:8px 0 0;display:grid;gap:6px}
+  .app-count-history-card dl div{display:flex;justify-content:space-between;gap:12px}
+  .app-count-history-card dt{color:#587566;font-size:12px}
+  .app-count-history-card dd{margin:0;text-align:right;font-weight:800}
   body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(1)::before{content:"店舗" !important;}
   body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(2)::before{content:"担当者" !important;}
   body[data-inventory-screen="app-inventory-count"] .app-count-history-table td:nth-child(3)::before{content:"入力開始" !important;}

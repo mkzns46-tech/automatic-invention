@@ -325,6 +325,7 @@
 
   function renderHistoryRows(){
     const body=document.getElementById("appInventoryHistoryBody");
+    const cards=document.getElementById("appInventoryHistoryCards");
     const summary=document.getElementById("appInventoryHistorySummary");
     if(!body)return;
     const nameFilter=normalizeSearchText(document.getElementById("appInventoryHistoryNameFilter")?.value||"");
@@ -367,8 +368,20 @@
         <td>${safe(row.items.length)}</td>
         <td>${safe(row.diffCount)}</td>
         <td>${safe(row.reflectedCount)}</td>
+        <td>${safe(row.unresolvedCount)}</td>
         <td>${safe(row.unresolvedCount?`${statusLabel(row.session.status)}（未反映${row.unresolvedCount}）`:(row.items.length?"完了":"未入力"))}</td>
-      </tr>`).join(""):'<tr><td colspan="8" class="app-count-empty">棚卸履歴はありません。</td></tr>';
+      </tr>`).join(""):'<tr><td colspan="9" class="app-count-empty">棚卸履歴はありません。</td></tr>';
+    if(cards){
+      cards.innerHTML=rows.length?rows.map(row=>{
+        const state=row.unresolvedCount?`${statusLabel(row.session.status)}（未反映${row.unresolvedCount}）`:(row.items.length?"完了":"未入力");
+        return `<article class="app-count-history-card">
+          <div class="app-count-history-card-head"><strong>${safe(row.session.staff||"担当者未設定")}</strong><span class="badge ${row.unresolvedCount?"warn":"ok"}">${safe(state)}</span></div>
+          <div class="app-count-history-card-date">${safe(formatDate(row.session.started_at))}</div>
+          <div class="app-count-history-card-stats"><span><b>${safe(row.items.length)}</b>商品</span><span><b>${safe(row.reflectedCount)}</b>反映済み</span><span><b>${safe(row.unresolvedCount)}</b>未反映</span></div>
+          <details><summary>詳細</summary><dl><div><dt>店舗</dt><dd>${safe(row.store?getStoreLabel(row.store):"")}</dd></div><div><dt>差異商品</dt><dd>${safe(row.diffCount)}</dd></div><div><dt>最終更新</dt><dd>${safe(formatDate(row.lastUpdated||row.session.ended_at||row.session.finished_at))}</dd></div></dl></details>
+        </article>`;
+      }).join(""):"<div class=\"app-count-empty\">棚卸履歴はありません。</div>";
+    }
   }
 
   function getStoreLabel(code){
