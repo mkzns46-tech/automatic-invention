@@ -2891,7 +2891,7 @@ async function renderBoothEventInventoryPanel(event){
     const file=inputEvent.target.files?.[0];if(!file)return;const preview=el("boothDepartureCsvPreview");
     try{
       const rows=parseInventoryCsv(await file.text());const products=await resolveInventoryCsvProducts(rows);const invalid=[];const counts=readBoothDepartureCounts(event.id);
-      rows.forEach(row=>{const product=products.get(row.productCode);if(!product){invalid.push(`${row.line}行目 ${row.productCode||"(空欄)"}：商品未登録`);return;}if(!/^\d+$/.test(row.quantityText)){invalid.push(`${row.line}行目 ${row.productCode}：数量不正`);return;}const qty=Number(row.quantityText);if(qty<=0)return;const key=String(product.barcode||"").trim();const current=counts[key]||{barcode:key,product_name:product.name||"",quantity:0};current.quantity+=qty;counts[key]=current;});
+      rows.forEach(row=>{const identity=String(row.identity||row.productCode||"").trim();const lookupKey=`${row.identityType==="barcode"?"barcode":"product_code"}:${identity}`;const product=products.get(lookupKey);if(!product){invalid.push(`${row.line}行目 ${identity||"(空欄)"}：${row.identityType==="barcode"?"バーコード":"商品コード"}に一致する商品がありません`);return;}if(!/^\d+$/.test(row.quantityText)){invalid.push(`${row.line}行目 ${identity}：数量不正`);return;}const qty=Number(row.quantityText);if(qty<=0)return;const key=String(product.barcode||"").trim();const current=counts[key]||{barcode:key,product_name:product.name||"",quantity:0};current.quantity+=qty;counts[key]=current;});
       if(invalid.length)throw new Error(invalid.join("\n"));writeBoothDepartureCounts(event.id,counts);await renderBoothDepartureCountList(event.id);if(preview){preview.hidden=false;preview.textContent=`CSV ${rows.length}行を入力へ反映しました。DB確定は「持ち出しを確定」実行時です。`;}
     }catch(error){if(preview){preview.hidden=false;preview.className="message err";preview.textContent=`CSV取込エラー：${error.message||error}`;}}
     inputEvent.target.value="";
@@ -4194,23 +4194,46 @@ function parseInventoryCsv(text){
   const split=line=>{const values=[];let value="",quoted=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(quoted&&line[i+1]==='"'){value+='"';i++;}else quoted=!quoted;}else if(ch===','&&!quoted){values.push(value.trim());value="";}else value+=ch;}values.push(value.trim());return values;};
   const first=split(lines[0]).map(value=>value.toLowerCase().replace(/\s+/g,""));
   const identityType=first[0]==="バーコード"||first[0]==="barcode"?"barcode":"product_code";
-  const hasHeader=(first[0]==="商品コード"||first[0]==="product_code"||first[0]==="バーコード"||first[0]==="barcode")&&(first[1]==="数量"||first[1]==="quantity");
+  const hasIdentityHeader=["商品コード","product_code","productcode","バーコード","barcode"].includes(first[0]);
+  const hasQuantityHeader=["数量","quantity"].includes(first[1]);
+  const hasHeader=hasIdentityHeader&&hasQuantityHeader;
+  if(hasIdentityHeader&&!hasQuantityHeader)throw new Error("CSVヘッダーの2列目は数量にしてください。");
   if(!hasHeader&&lines.length===1&&first[0]&&first[1]===undefined)throw new Error("CSVヘッダーまたは商品コード・数量の2列が必要です。");
   const start=hasHeader?1:0;
   return lines.slice(start).map((line,index)=>{const values=split(line);if(values.length!==2)throw new Error(`${start+index+1}行目：CSVは識別子と数量の2列で指定してください。`);return {line:start+index+1,identityType,identity:String(values[0]||"").trim(),productCode:String(values[0]||"").trim(),quantityText:String(values[1]??"").trim()};});
 }
 
 async function resolveInventoryCsvProducts(rows){
-  const codes=[...new Set(rows.filter(row=>row.identity).map(row=>row.identity).filter(Boolean))];
-  if(!codes.length)return new Map();
+  const normalize=value=>String(value??"").trim();
+  const groups=new Map();
+  (rows||[]).forEach(row=>{
+    const identity=normalize(row.identity);
+    if(!identity)return;
+    const type=row.identityType==="barcode"?"barcode":"product_code";
+    if(!groups.has(type))groups.set(type,new Set());
+    groups.get(type).add(identity);
+  });
+  if(!groups.size)return new Map();
   const result=new Map();
-  for(let offset=0;offset<codes.length;offset+=500){
-    const chunk=buildInFilter(codes.slice(offset,offset+500));
-    const useBarcode=rows.some(row=>row.identityType==="barcode");
-    const found=useBarcode
-      ? await sb(`products?select=*&barcode=in.(${chunk})&limit=1000`)
-      : await sb(`products?select=*&smaregi_product_id=in.(${chunk})&limit=1000`);
-    (Array.isArray(found)?found:[]).forEach(product=>{const key=useBarcode?String(product.barcode||"").trim():String(product.smaregi_product_id||"").trim();if(key)result.set(key,product);});
+  for(const [type,identitySet] of groups){
+    const identities=[...identitySet];
+    for(let offset=0;offset<identities.length;offset+=500){
+      const chunk=buildInFilter(identities.slice(offset,offset+500));
+      const useBarcode=type==="barcode";
+      const found=useBarcode
+        ? await sb(`products?select=*&barcode=in.(${chunk})&limit=1000`)
+        : await sb(`products?select=*&smaregi_product_id=in.(${chunk})&limit=1000`);
+      (Array.isArray(found)?found:[]).forEach(product=>{
+        const key=normalize(useBarcode?product.barcode:product.smaregi_product_id);
+        if(!key)return;
+        const resultKey=`${type}:${key}`;
+        const previous=result.get(resultKey);
+        if(previous && String(previous.barcode||"").trim()!==String(product.barcode||"").trim()){
+          throw new Error(`${useBarcode?"バーコード":"商品コード"}「${key}」に複数の商品が一致しました。対象を特定できないため取込を中止します。`);
+        }
+        result.set(resultKey,product);
+      });
+    }
   }
   return result;
 }
