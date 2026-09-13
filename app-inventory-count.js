@@ -369,11 +369,11 @@
         <td>${safe(row.diffCount)}</td>
         <td>${safe(row.reflectedCount)}</td>
         <td>${safe(row.unresolvedCount)}</td>
-        <td>${safe(row.unresolvedCount?`${statusLabel(row.session.status)}（未反映${row.unresolvedCount}）`:(row.items.length?"完了":"未入力"))}</td>
+        <td>${safe(historyStatus(row))}</td>
       </tr>`).join(""):'<tr><td colspan="9" class="app-count-empty">棚卸履歴はありません。</td></tr>';
     if(cards){
       cards.innerHTML=rows.length?rows.map(row=>{
-        const state=row.unresolvedCount?`${statusLabel(row.session.status)}（未反映${row.unresolvedCount}）`:(row.items.length?"完了":"未入力");
+        const state=historyStatus(row);
         return `<article class="app-count-history-card">
           <div class="app-count-history-card-head"><strong>${safe(row.session.staff||"担当者未設定")}</strong><span class="badge ${row.unresolvedCount?"warn":"ok"}">${safe(state)}</span></div>
           <div class="app-count-history-card-date">${safe(formatDate(row.session.started_at))}</div>
@@ -395,6 +395,15 @@
     if(status===STATUS_COMPARED)return "比較済み";
     if(status===STATUS_CLOSED)return "反映済み";
     return status||"";
+  }
+
+  function historyStatus(row){
+    if(row.unresolvedCount){
+      if(row.reflectedCount)return `一部未反映（未反映${row.unresolvedCount}）`;
+      if(row.session.status===STATUS_CLOSED)return `旧方式（未反映${row.unresolvedCount}）`;
+      return `${statusLabel(row.session.status)}（未反映${row.unresolvedCount}）`;
+    }
+    return row.items.length?(row.reflectedCount?"反映済み":"未入力"):"未入力";
   }
 
   function renderAll(){
