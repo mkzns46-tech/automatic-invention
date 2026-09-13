@@ -3096,6 +3096,25 @@ async function completeBoothDepartureCount(){
       : true;
     if(!ok)return;
     window.__aricoBoothDepartureSaving=true;
+    // The database function performs the stock, event-item, and movement
+    // writes in one transaction. Keep the client-side checks above for fast
+    // feedback, but do not apply the individual REST mutations here.
+    const rpcResult=await sb("rpc/confirm_booth_takeout",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        p_event_id:event.id,
+        p_staff:staff,
+        p_memo:memo,
+        p_items:checked.map(row=>({barcode:row.product.barcode,quantity:row.quantity}))
+      })
+    });
+    if(!rpcResult||typeof rpcResult!=="object")throw new Error("持ち出し一括確定RPCの応答が不正です。");
+    localStorage.removeItem(getBoothDepartureCountStorageKey(event.id));
+    if(el("boothDepartureMemo"))el("boothDepartureMemo").value="";
+    await renderBoothEventInventoryPanel(event);
+    boothShowSuccess("イベント持ち出し確定",`${checked.length}商品・${total}個を共通イベント棚へ移動しました。`);
+    return;
     const applied=[];
     try{
       for(const row of checked){
@@ -3943,8 +3962,18 @@ async function exportBoothDepartureInventoryPdf(event){
 }
 
 async function findBoothProductByBarcode(barcode){
-  const rows=await sb(`products?select=barcode,name,base_stock,smaregi_product_id&barcode=eq.${encodeURIComponent(barcode)}&limit=1`);
-  return Array.isArray(rows)&&rows[0]?rows[0]:null;
+  const normalized=String(barcode||"").trim();
+  if(!normalized)return null;
+  // `products` uses barcode as its primary key; there is no generic `id`
+  // column. Keep the select list aligned with the production schema so a
+  // normal lookup cannot fail before the ambiguity check runs.
+  const rows=await sb(`products?select=barcode,name,base_stock,smaregi_product_id&barcode=eq.${encodeURIComponent(normalized)}&limit=2`);
+  if(!Array.isArray(rows)||!rows.length)return null;
+  if(rows.length>1){
+    const products=rows.map(row=>`${row.name||"商品名未登録"}（商品コード：${row.smaregi_product_id||"不明"}）`).join("、");
+    throw new Error(`同じバーコードの商品が複数あります：${normalized}。対象を特定できません。${products}`);
+  }
+  return rows[0];
 }
 
 async function loadBoothCarryOutHistory(eventId){
