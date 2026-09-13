@@ -433,13 +433,21 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     const now=new Date();
     const events=await sbAll(`booth_events?select=id,event_start,event_end,status,store_code&store_code=eq.${encodeURIComponent(storeCode)}&limit=1000`,1000,5000);
     const storeEvents=(Array.isArray(events)?events:[]).filter(event=>String(event?.id||"").trim());
-    activeEventIds=storeEvents.filter(event=>{
+    const selectedEvent=typeof window.getBoothCurrentEvent==="function" ? window.getBoothCurrentEvent() : null;
+    const selectedEventId=String(selectedEvent?.id||"").trim();
+    const selectedEventStore=normalizeSmaregiStoreCodeForStorage(selectedEvent?.store_code||"");
+    const selectedEventIsValid=selectedEventId
+      && selectedEventStore===storeCode
+      && !new Set(["closed","cancelled","canceled","deleted","invalid"]).has(String(selectedEvent?.status||"").trim().toLowerCase());
+    activeEventIds=selectedEventIsValid
+      ? [selectedEventId]
+      : storeEvents.filter(event=>{
       if(String(event.status||"").toLowerCase()==="closed")return false;
       const start=String(event.event_start||"").slice(0,10);
       const end=String(event.event_end||event.event_start||"").slice(0,10);
       const today=now.toISOString().slice(0,10);
       return (!start||today>=start)&&(!end||today<=end);
-    }).map(event=>String(event.id||"").trim()).filter(Boolean);
+      }).map(event=>String(event.id||"").trim()).filter(Boolean);
     const ongoingSalesState=window.__smaregiOngoingSalesState;
     if(activeEventIds.length===1&&(!ongoingSalesState||ongoingSalesState.ok!==false)){
       const eventFilter=buildSmaregiInFilter(activeEventIds);

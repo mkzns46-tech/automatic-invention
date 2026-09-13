@@ -489,6 +489,7 @@ function getBoothStatusLabel(status){
 function getBoothCurrentEvent(){
   return boothEvents.find(row=>String(row.id)===String(boothCurrentEventId||""))||null;
 }
+window.getBoothCurrentEvent=getBoothCurrentEvent;
 
 async function exportPreviousBoothEventPlanCsv(targetEventId){
   const sourceEventId=String(el("boothCopySourceEvent")?.value||"").trim();
