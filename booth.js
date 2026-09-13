@@ -6681,16 +6681,20 @@ function renderBoothGachaPickDraft(event){
 }
 
 async function addBoothGachaPickDraft(event){
-  const barcode=String(el("boothGachaBarcode")?.value||"").trim();
-  const qtyText=String(el("boothGachaQty")?.value||"").trim();
-  if(!barcode){boothShowError("ガチャ登録エラー","バーコードを入力してください。","boothGachaBarcode");return;}
-  if(!/^[1-9]\d*$/.test(qtyText)){boothShowError("ガチャ登録エラー","数量は1以上の整数を入力してください。","boothGachaQty");return;}
-  const product=await findBoothProductByBarcode(barcode);
-  if(!product){boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothGachaBarcode");return;}
-  if(!product.smaregi_product_id){boothShowError("スマレジ商品ID未登録","商品マスターを再取り込みしてください。","boothGachaBarcode");return;}
-  const items=getBoothGachaPickDraft(event); const key=String(product.barcode||barcode).trim();
-  const current=items.get(key); items.set(key,{barcode:key,product,quantity:Number(qtyText)+(current?.quantity||0)});
-  renderBoothGachaPickDraft(event); el("boothGachaBarcode").value=""; el("boothGachaQty").value=""; el("boothGachaBarcode")?.focus();
+  try{
+    const barcode=String(el("boothGachaBarcode")?.value||"").trim();
+    const qtyText=String(el("boothGachaQty")?.value||"").trim();
+    if(!barcode){boothShowError("ガチャ登録エラー","バーコードを入力してください。","boothGachaBarcode");return;}
+    if(!/^[1-9]\d*$/.test(qtyText)){boothShowError("ガチャ登録エラー","数量は1以上の整数を入力してください。","boothGachaQty");return;}
+    const product=await findBoothProductByBarcode(barcode);
+    if(!product){boothShowError("商品未登録","このバーコードの商品は登録されていません。","boothGachaBarcode");return;}
+    if(!product.smaregi_product_id){boothShowError("スマレジ商品ID未登録","商品マスターを再取り込みしてください。","boothGachaBarcode");return;}
+    const items=getBoothGachaPickDraft(event); const key=String(product.barcode||barcode).trim();
+    const current=items.get(key); items.set(key,{barcode:key,product,quantity:Number(qtyText)+(current?.quantity||0)});
+    renderBoothGachaPickDraft(event); el("boothGachaBarcode").value=""; el("boothGachaQty").value=""; el("boothGachaBarcode")?.focus();
+  }catch(error){
+    boothShowError("ガチャ登録エラー",`商品検索に失敗しました。\n${error?.message||String(error)}`,"boothGachaBarcode");
+  }
 }
 
 async function saveBoothGachaPickDraft(event){
