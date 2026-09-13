@@ -6842,7 +6842,7 @@ async function saveBoothGachaPickDraft(event){
     const body=checked.map(item=>`${item.product.name||item.barcode} / ${item.quantity}`).join("\n");
     showBoothConfirmPopup("ガチャ持ち出し確認",`${body}\n\nまとめてガチャ持ち出し登録します。\nよろしいですか？`,async()=>{
       for(const item of checked)await registerBoothGachaMovement("pick",{event,product:item.product,quantity:item.quantity,staff,memo,currentStock:Number(item.product.base_stock||0),summary:{}} ,{silent:true,skipRefresh:true});
-      boothGachaPickDraftItems=new Map(); renderBoothGachaPickDraft(event); await refreshBoothEventRelatedViews(event.id); showBoothSuccess("ガチャ持ち出し登録完了",`${checked.length}商品を登録しました。`);
+      boothGachaPickDraftItems=new Map(); renderBoothGachaPickDraft(event); await refreshBoothEventRelatedViews(event.id); boothShowSuccess("ガチャ持ち出し登録完了",`${checked.length}商品を登録しました。`);
     });
   }catch(error){boothShowError("ガチャ登録エラー",error.message||String(error));}
 }
@@ -8624,7 +8624,9 @@ async function confirmBoothSalesImport(){
         })
       });
     }
-    await sb(`event_sales_imports?event_id=eq.${encodeURIComponent(event.id)}&import_status=eq.pending`,{
+    const confirmedImportIds=rows.map(row=>String(row?.id||"").trim()).filter(Boolean);
+    if(!confirmedImportIds.length)throw new Error("確定対象の販売明細がありません。");
+    await sb(`event_sales_imports?event_id=eq.${encodeURIComponent(event.id)}&id=in.(${confirmedImportIds.map(id=>encodeURIComponent(id)).join(",")})&import_status=eq.pending`,{
       method:"PATCH",
       body:JSON.stringify({
         import_status:"confirmed",

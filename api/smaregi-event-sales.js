@@ -199,13 +199,27 @@ function getDetails(row) {
   return Array.isArray(details) ? details : [];
 }
 
-function normalizeSales(transactions, productIdSet, targetTerminalId) {
+function normalizeSales(transactions, productIdSet, targetTerminalId, diagnostics = null) {
   const sales = [];
+  const stats = diagnostics || {};
+  stats.transactions = Array.isArray(transactions) ? transactions.length : 0;
+  stats.cancelledTransactions = 0;
+  stats.terminalMatchedTransactions = 0;
+  stats.details = 0;
+  stats.cancelledDetails = 0;
+  stats.productMatchedDetails = 0;
+  stats.productUnmatchedDetails = 0;
+  stats.normalizedQuantity = 0;
   for (const transaction of transactions) {
-    if (!transaction || isCancelledTransaction(transaction)) continue;
+    if (!transaction) continue;
+    if (isCancelledTransaction(transaction)) {
+      stats.cancelledTransactions += 1;
+      continue;
+    }
     const transactionSign = isReturnTransaction(transaction) ? -1 : 1;
     const terminalId = String(pick(transaction, ["terminalId", "terminal_id"], "") || "").trim();
     if (String(targetTerminalId || "").trim() && terminalId !== String(targetTerminalId || "").trim()) continue;
+    stats.terminalMatchedTransactions += 1;
     const transactionId = String(pick(transaction, [
       "transactionHeadId",
       "transaction_head_id",
@@ -223,10 +237,19 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
     if (!transactionId) continue;
 
     getDetails(transaction).forEach((detail, index) => {
-      if (!detail || isCancelledDetail(detail)) return;
+      stats.details += 1;
+      if (!detail) return;
+      if (isCancelledDetail(detail)) {
+        stats.cancelledDetails += 1;
+        return;
+      }
       const sign = transactionSign * (isReturnDetail(detail) ? -1 : 1);
       const productId = String(pick(detail, ["productId", "product_id"]) || "").trim();
-      if (!productId || (productIdSet.size && !productIdSet.has(productId))) return;
+      if (!productId || (productIdSet.size && !productIdSet.has(productId))) {
+        stats.productUnmatchedDetails += 1;
+        return;
+      }
+      stats.productMatchedDetails += 1;
       const rawQuantity = toSignedInteger(pick(detail, ["quantity", "salesQuantity", "sales_quantity", "unitSalesQuantity", "unit_sales_quantity"], 0));
       // Smaregi can represent a cancellation/return either with a return
       // division or as a separately returned negative detail. Preserve the
@@ -234,6 +257,7 @@ function normalizeSales(transactions, productIdSet, targetTerminalId) {
       const quantitySign = rawQuantity < 0 ? -1 : sign;
       const quantity = Math.abs(rawQuantity) * quantitySign;
       if (!quantity) return;
+      stats.normalizedQuantity += quantity;
       const unitPrice = toNumber(pick(detail, ["unitPrice", "unit_price", "salesPrice", "sales_price", "price"], 0));
       const amountInfo = getDetailAmountInfo(detail, quantity);
       const amount = Math.abs(amountInfo.amount) * quantitySign;
@@ -331,7 +355,8 @@ module.exports = async function handler(req, res) {
     const result = await fetchTransactions(apiBase, token, context, fromDateTime, toDateTime);
     const transactions = result.rows;
     const productIdSet = new Set(productIds);
-    const sales = dedupeSales(normalizeSales(transactions, productIdSet, context.targetTerminalId));
+    const normalization = {};
+    const sales = dedupeSales(normalizeSales(transactions, productIdSet, context.targetTerminalId, normalization));
 
     return res.status(200).json({
       sales,
@@ -341,6 +366,7 @@ module.exports = async function handler(req, res) {
       toDateTime,
       transactionsCount: transactions.length,
       pages: result.pageCount,
+      normalization,
       context: {
         accountKey: context.accountKey,
         accountName: context.accountName,
