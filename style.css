@@ -833,6 +833,19 @@ body[data-inventory-screen="app-inventory-count"] .product-search-item span{
   body[data-inventory-screen="app-inventory-count"] .app-count-history-table-wrap{
     display:none;
   }
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table{min-width:0;table-layout:fixed}
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table th:nth-child(4),
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table td:nth-child(4),
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table th:nth-child(5),
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table td:nth-child(5),
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table th:nth-child(6),
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table td:nth-child(6),
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table th:nth-child(8),
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table td:nth-child(8){display:none}
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table td:nth-child(1){width:26%}
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table td:nth-child(2){width:48%}
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table td:nth-child(3){width:26%}
+  body[data-inventory-screen="app-inventory-count"] .app-count-recent-history-table td:nth-child(7){width:26%}
   body[data-inventory-screen="app-inventory-count"] .app-count-history-cards{
     display:grid;
     gap:10px;

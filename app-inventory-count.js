@@ -15,6 +15,7 @@
     sessions:[],
     items:[],
     historyItems:[],
+    recentLogs:[],
     currentSessionId:""
   };
 
@@ -226,6 +227,15 @@
     }catch(_){state.historyItems=[];}
   }
 
+  async function loadRecentCountLogs(){
+    try{
+      const rows=await sbAll("inventory_logs?select=*&order=created_at.desc",100,500);
+      state.recentLogs=(Array.isArray(rows)?rows:[])
+        .filter(row=>String(row?.memo||"").includes("アプリ内棚卸"))
+        .slice(0,20);
+    }catch(_){state.recentLogs=[];}
+  }
+
   async function refreshRemote(){
     if(refreshPromise)return refreshPromise;
     setInventoryControlsEnabled(false);
@@ -233,6 +243,7 @@
       await loadSessions();
       await loadItems();
       await loadHistoryItems();
+      await loadRecentCountLogs();
       if(!currentSession()?.id)throw new Error("棚卸ドラフトのsession_idを取得できませんでした。");
       draftReady=true;
       return currentSession();
@@ -384,6 +395,23 @@
     }
   }
 
+  function renderRecentCountLogs(){
+    const body=document.getElementById("appInventoryRecentHistoryBody");
+    if(!body)return;
+    const rows=Array.isArray(state.recentLogs)?state.recentLogs:[];
+    body.innerHTML=rows.length?rows.map(row=>`
+      <tr>
+        <td>${safe(formatDate(row.created_at||row.updated_at))}</td>
+        <td>${safe(row.product_name||"")}</td>
+        <td>${safe(row.barcode||"")}</td>
+        <td>${safe(row.staff||"")}</td>
+        <td>${safe(row.before_stock==null?"-":row.before_stock)}</td>
+        <td>${safe(row.after_stock==null?"-":row.after_stock)}</td>
+        <td>${safe(row.quantity==null?"-":row.quantity)}</td>
+        <td>アプリ棚卸</td>
+      </tr>`).join(""):"<tr><td colspan=\"8\" class=\"app-count-empty\">棚卸履歴はありません。</td></tr>";
+  }
+
   function getStoreLabel(code){
     if(typeof getStoreInfoByCode==="function")return getStoreInfoByCode(code)?.label||code;
     return code;
@@ -410,6 +438,7 @@
     renderStaffSelect();
     renderDraftInfo();
     renderCountedRows();
+    renderRecentCountLogs();
     renderHistoryRows();
   }
 
