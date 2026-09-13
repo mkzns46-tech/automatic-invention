@@ -147,11 +147,11 @@
       productId:String(item.product_id||""),
       name:String(item.product_name||""),
       count:Number(item.count_qty||0),
-      beforeStock:item.before_stock==null?null:Number(item.before_stock),
+      beforeStock:item.before_stock!=null?Number(item.before_stock):item.beforeStock!=null?Number(item.beforeStock):null,
       staff:String(item.staff||""),
       updatedAt:item.updated_at||item.counted_at||item.created_at||"",
-      reflectedAt:item.reflected_at||"",
-      reflectedBy:item.reflected_by||""
+      reflectedAt:item.reflected_at||item.reflectedAt||"",
+      reflectedBy:item.reflected_by||item.reflectedBy||""
     };
   }
 
