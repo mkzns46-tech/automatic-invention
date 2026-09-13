@@ -389,10 +389,12 @@ function getSmaregiEventShelfCurrentQty(item,movements=[],salesQty=null){
     return String(row?.item_type||"normal")==="normal"
       && String(row?.movement_type||"").trim()==="departure_count";
   });
-  const hasCanonicalTaken=item?.taken_qty!==null&&item?.taken_qty!==undefined&&String(item.taken_qty).trim()!=="";
+  const legacySplitQty=normalizeInventoryQuantity(item?.normal_takeout_qty)+normalizeInventoryQuantity(item?.storage_takeout_qty);
+  const hasCanonicalTaken=item?.taken_qty!==null&&item?.taken_qty!==undefined&&String(item.taken_qty).trim()!==""
+    && (normalizeInventoryQuantity(item.taken_qty)>0||legacySplitQty===0);
   const fallbackTakeoutQty=hasCanonicalTaken
     ? normalizeInventoryQuantity(item?.taken_qty)
-    : normalizeInventoryQuantity(item?.normal_takeout_qty)+normalizeInventoryQuantity(item?.storage_takeout_qty);
+    : legacySplitQty;
   const movementTakeoutQty=eventPickQty>0 ? eventPickQty : legacyDepartureQty;
   const eventTakeoutQty=hasCanonicalTaken
     ? fallbackTakeoutQty
