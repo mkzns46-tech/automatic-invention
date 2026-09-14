@@ -335,7 +335,7 @@ async function fetchTransactions(apiBase, token, context, fromDateTime, toDateTi
     url.searchParams.set("limit", String(DEFAULT_LIMIT));
     url.searchParams.set("page", String(page));
     url.searchParams.set("with_details", "all");
-    url.searchParams.set("sort", "terminal_tran_date_time:asc,transaction_head_id:asc");
+    url.searchParams.set("sort", "terminalTranDateTime:asc,transactionHeadId:asc");
     url.searchParams.set("store_id", context.storeId);
     url.searchParams.set("terminal_tran_date_time-from", fromDateTime);
     url.searchParams.set("terminal_tran_date_time-to", toDateTime);
