@@ -349,8 +349,9 @@ function renderInventoryAppMenu(){
     showInventoryScreen("shelf-location","shelf-location");
     if(typeof renderShelfLocation==="function")renderShelfLocation();
   });
-  const boothButton=menu.querySelector('[data-menu-action="booth"]');
-  if(boothButton)boothButton.addEventListener("click",()=>{
+  const openBoothManagement=event=>{
+    if(event?.__aricoBoothMenuHandled)return;
+    if(event)event.__aricoBoothMenuHandled=true;
     if(typeof showBoothManagement==="function"){
       showBoothManagement();
       return;
@@ -361,13 +362,22 @@ function renderInventoryAppMenu(){
       return;
     }
     const script=document.createElement("script");
-    script.src="./booth.js?v=2.93.73&lazy=1";
+    script.src="./booth.js?v=2.93.74&lazy=1";
     script.defer=false;
     script.dataset.boothLazyLoader="1";
     script.onload=()=>typeof showBoothManagement==="function"?showBoothManagement():showMessage("イベント管理を読み込めませんでした。","err");
     script.onerror=()=>showMessage("イベント管理スクリプトの読み込みに失敗しました。","err");
     document.head.appendChild(script);
-  });
+  };
+  const boothButton=menu.querySelector('[data-menu-action="booth"]');
+  if(boothButton)boothButton.addEventListener("click",openBoothManagement);
+  if(!window.__aricoBoothMenuDelegated){
+    document.addEventListener("click",event=>{
+      const button=event.target.closest?.('[data-menu-action="booth"]');
+      if(button)openBoothManagement(event);
+    });
+    window.__aricoBoothMenuDelegated=true;
+  }
   const adminAuthButton=menu.querySelector('[data-menu-action="admin-auth"]');
   if(adminAuthButton)adminAuthButton.addEventListener("click",authenticateInventoryAdmin);
   const inventoryAnalyticsButton=menu.querySelector('[data-menu-action="inventory-analytics"]');
