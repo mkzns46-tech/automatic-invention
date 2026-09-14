@@ -482,7 +482,7 @@ function getBoothCurrentEvent(){
 }
 window.getBoothCurrentEvent=getBoothCurrentEvent;
 
-async function exportPreviousBoothEventPlanCsv(targetEventId){
+async function exportPreviousBoothEventPlanCsvLegacy(targetEventId){
   const sourceEventId=String(el("boothCopySourceEvent")?.value||"").trim();
   if(!sourceEventId){
     boothShowError("前回イベントCSV出力エラー","コピー元イベントを選択してください。","boothCopySourceEvent");
@@ -1207,7 +1207,7 @@ async function loadBoothReflectedShelfReturnRows(eventId){
   }));
 }
 
-async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
+async function unreflectBoothShelfReturnsOnReopenLegacy(eventId,staff){
   const now=new Date().toISOString();
   const reflectedRows=await loadBoothReflectedShelfReturnRows(eventId);
   for(const item of reflectedRows){
@@ -1252,7 +1252,7 @@ async function unreflectBoothShelfReturnsOnReopen(eventId,staff){
   return reflectedRows.reduce((sum,row)=>sum+getBoothReturnReflectedQty(row),0);
 }
 
-async function finalizeBoothEventClose(event,summary,staff){
+async function finalizeBoothEventCloseLegacy(event,summary,staff){
   const now=new Date().toISOString();
   await reflectBoothShelfReturnsOnClose(summary,staff);
   await ensureBoothCloseReturnHistory(summary,staff);
@@ -1494,7 +1494,7 @@ async function buildBoothEventReportData(eventId){
   };
 }
 
-async function renderBoothEventReportPanel(event){
+async function renderBoothEventReportPanelLegacyInitial(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   area.innerHTML=`<section class="booth-work-card booth-event-report-card">
@@ -1517,7 +1517,7 @@ async function renderBoothEventReportPanel(event){
   loadBoothEventReport(event.id);
 }
 
-async function loadBoothEventReport(eventId){
+async function loadBoothEventReportLegacyInitial(eventId){
   const body=el("boothEventReportBody");
   if(!body)return;
   try{
@@ -1542,7 +1542,7 @@ async function loadBoothEventReport(eventId){
   }
 }
 
-async function renderBoothEventReportPanel(event){
+async function renderBoothEventReportPanelLegacyIntermediate(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   area.innerHTML=`<section class="booth-work-card booth-event-report-card">
@@ -1565,7 +1565,7 @@ async function renderBoothEventReportPanel(event){
   loadBoothEventReport(event.id);
 }
 
-async function loadBoothEventReport(eventId){
+async function loadBoothEventReportLegacyIntermediate(eventId){
   const body=el("boothEventReportBody");
   if(!body)return;
   try{
@@ -1669,7 +1669,7 @@ async function exportBoothEventReportPdf(event){
   }
 }
 
-async function deleteBoothEvent(eventId){
+async function deleteBoothEventLegacy(eventId){
   eventId=String(eventId||"");
   if(!eventId)return;
   if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
@@ -2054,7 +2054,7 @@ async function saveBoothPlannedItem(eventId,item){
   return true;
 }
 
-async function loadBoothPlannedItems(eventId){
+async function loadBoothPlannedItemsLegacy(eventId){
   const list=el("boothPlannedList");
   if(!list)return;
   try{
@@ -2084,7 +2084,7 @@ async function loadBoothPlannedItems(eventId){
   }
 }
 
-async function loadBoothPlannedItems(eventId){
+async function loadBoothPlannedItemsLegacyIntermediate(eventId){
   const list=el("boothPlannedList");
   if(!list)return;
   list.innerHTML='<div class="booth-empty">予定リストを読み込み中...</div>';
@@ -2472,7 +2472,7 @@ async function buildBoothEventInventoryRows(eventId){
   return [...map.values()].filter(row=>row.eventShelfQty!==0);
 }
 
-async function renderBoothEventInventoryPanel(event){
+async function renderBoothEventInventoryPanelLegacy(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   area.innerHTML=`<section class="booth-work-card booth-event-inventory-card">
@@ -2601,7 +2601,7 @@ function writeBoothDepartureCounts(eventId,data){
   localStorage.setItem(getBoothDepartureCountStorageKey(eventId),JSON.stringify(data||{}));
 }
 
-async function addBoothDepartureCountFromInput(){
+async function addBoothDepartureCountFromInputLegacyIntermediate(){
   const event=getBoothCurrentEvent();
   if(!event)return;
   const barcode=String(el("boothDepartureBarcode")?.value||"").trim();
@@ -2632,7 +2632,7 @@ async function addBoothDepartureCountFromInput(){
   el("boothDepartureBarcode")?.focus();
 }
 
-async function renderBoothDepartureCountList(eventId){
+async function renderBoothDepartureCountListLegacyIntermediate(eventId){
   const list=el("boothDepartureCountList");
   if(!list)return;
   const counts=Object.values(readBoothDepartureCounts(eventId));
@@ -2768,7 +2768,7 @@ function isBoothDepartureGachaProduct(product){
   return BOOTH_GACHA_SMAREGI_PRODUCT_IDS.has(String(product?.smaregi_product_id||"").trim());
 }
 
-async function renderBoothEventInventoryPanel(event){
+async function renderBoothEventInventoryPanelLegacyIntermediate(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   const closed=isBoothEventClosed(event);
@@ -2885,7 +2885,7 @@ async function renderBoothEventInventoryPanel(event){
   await loadBoothCarryOutHistory(event.id);
 }
 
-async function addBoothDepartureCountFromInput(){
+async function addBoothDepartureCountFromInputLegacy(){
   const event=getBoothCurrentEvent();
   if(!event)return;
   const barcode=String(el("boothDepartureBarcode")?.value||"").trim();
@@ -2914,7 +2914,7 @@ async function addBoothDepartureCountFromInput(){
   el("boothDepartureBarcode")?.focus();
 }
 
-async function renderBoothDepartureCountList(eventId){
+async function renderBoothDepartureCountListLegacy(eventId){
   const list=el("boothDepartureCountList");
   if(!list)return;
   const counts=Object.values(readBoothDepartureCounts(eventId)).filter(row=>Number(row.quantity||0)>0);
@@ -3567,7 +3567,7 @@ async function saveBoothGachaReturnCount(event,button,afterSave){
   }
 }
 
-async function renderBoothDepartureInventoryListPanel(event){
+async function renderBoothDepartureInventoryListPanelLegacy(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   area.innerHTML=`<section class="booth-work-card booth-departure-list-card">
@@ -3584,7 +3584,7 @@ async function renderBoothDepartureInventoryListPanel(event){
   loadBoothDepartureInventoryList(event.id);
 }
 
-async function loadBoothDepartureInventoryList(eventId){
+async function loadBoothDepartureInventoryListLegacy(eventId){
   const list=el("boothDepartureInventoryList");
   if(!list)return;
   try{
@@ -3696,7 +3696,7 @@ function renderBoothDepartureGachaSection(rows){
   </section>`;
 }
 
-async function renderBoothDepartureInventoryListPanel(event){
+async function renderBoothDepartureInventoryListPanelLegacyIntermediate(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   area.innerHTML=`<section class="booth-work-card booth-departure-list-card">
@@ -3754,7 +3754,7 @@ async function renderBoothDepartureInventoryListPanel(event){
   loadBoothDepartureInventoryList(event.id);
 }
 
-async function loadBoothDepartureInventoryList(eventId){
+async function loadBoothDepartureInventoryListLegacyIntermediate(eventId){
   const list=el("boothDepartureInventoryList");
   if(!list)return;
   try{
@@ -3788,7 +3788,7 @@ async function loadBoothDepartureInventoryList(eventId){
   }
 }
 
-async function exportBoothDepartureInventoryCsv(event){
+async function exportBoothDepartureInventoryCsvLegacy(event){
   try{
     const data=await buildBoothDepartureInventoryData(event.id);
     const rows=[
@@ -3819,7 +3819,7 @@ async function exportBoothDepartureInventoryCsv(event){
   }
 }
 
-async function exportBoothDepartureInventoryPdf(event){
+async function exportBoothDepartureInventoryPdfLegacy(event){
   try{
     const data=await buildBoothDepartureInventoryData(event.id);
     const html=`<h1>持ち出し在庫一覧</h1>
@@ -3863,7 +3863,7 @@ async function findBoothProductByBarcode(barcode){
   return rows[0];
 }
 
-async function loadBoothCarryOutHistory(eventId){
+async function loadBoothCarryOutHistoryLegacy(eventId){
   const list=el("boothCarryOutHistoryList");
   if(!list)return;
   const requestId=++boothCarryOutHistoryRequestId;
@@ -4177,7 +4177,7 @@ async function boothScanLoop(){
   if(boothCameraScanning)requestAnimationFrame(boothScanLoop);
 }
 
-async function handleBoothScannedCode(code){
+async function handleBoothScannedCodeLegacy(code){
   code=String(code||"").trim();
   if(!code)return;
   const t=Date.now();
@@ -4618,7 +4618,7 @@ function formatBoothDateTimeShort(value){
   return `${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,"0")}:${String(date.getMinutes()).padStart(2,"0")}`;
 }
 
-async function loadBoothCarryOutHistory(eventId){
+async function loadBoothCarryOutHistoryLegacyIntermediate(eventId){
   const list=el("boothCarryOutHistoryList");
   if(!list)return;
   try{
@@ -4834,7 +4834,7 @@ function renderBoothReturnDraftCards(event){
   </article>`).join("");
 }
 
-async function addBoothReturnDraftFromBarcode(rawBarcode){
+async function addBoothReturnDraftFromBarcodeLegacy(rawBarcode){
   const event=getBoothCurrentEvent();
   const barcode=String(rawBarcode||"").trim();
   if(!event||!barcode)return;
@@ -5040,7 +5040,7 @@ async function removeBoothReturnDestinationItem(result,quantity){
   });
 }
 
-async function applyBoothReturnDraft(){
+async function applyBoothReturnDraftLegacy(){
   if(window.__aricoBoothReturnSaving){
     boothShowError("戻り登録エラー","戻り登録処理中です。完了までお待ちください。");
     return;
@@ -5330,7 +5330,7 @@ async function saveBoothReturnProcess(event){
   }
 }
 
-async function handleBoothScannedCode(code){
+async function handleBoothScannedCodeLegacyIntermediate(code){
   code=String(code||"").trim();
   if(!code)return;
   const t=Date.now();
@@ -5867,7 +5867,7 @@ async function patchBoothEventItem(item,payload){
   return rows[0];
 }
 
-async function moveBoothEventShelfQtyToGacha(event,product,quantity){
+async function moveBoothEventShelfQtyToGachaLegacy(event,product,quantity){
   return null;
   const item=await findBoothEventItemByBarcode(event.id,product.barcode);
   const stock=await findBoothEventStorageStock(getBoothCurrentStoreCode(),product.barcode);
@@ -5891,7 +5891,7 @@ async function moveBoothEventShelfQtyToGacha(event,product,quantity){
   return {item,previous,storageBefore:stock};
 }
 
-async function rollbackBoothEventShelfQty(moveResult){
+async function rollbackBoothEventShelfQtyLegacy(moveResult){
   if(!moveResult?.item||!moveResult?.previous)return;
   await patchBoothEventItem(moveResult.item,moveResult.previous);
   if(moveResult.storageBefore){
@@ -6913,7 +6913,7 @@ function renderBoothDiffPanel(event){
   loadBoothDiffList(event.id);
 }
 
-async function loadBoothDiffList(eventId){
+async function loadBoothDiffListLegacy(eventId){
   const list=el("boothDiffList");
   if(!list)return;
   try{
@@ -8382,7 +8382,7 @@ async function refreshBoothOngoingSalesCache(apiContext={}){
 
 window.refreshBoothOngoingSalesCache=refreshBoothOngoingSalesCache;
 
-async function confirmBoothSalesImport(){
+async function confirmBoothSalesImportLegacy(){
   const form=validateBoothSalesForm();
   if(!form)return;
   const {event,fromDate,toDate,staff}=form;
@@ -8965,7 +8965,7 @@ async function applyBoothReturnDraft(){
   }finally{window.__aricoBoothReturnSaving=false;}
 }
 
-async function reflectBoothShelfReturnsOnClose(summary,staff){
+async function reflectBoothShelfReturnsOnCloseLegacyInitial(summary,staff){
   const now=new Date().toISOString();
   for(const item of summary.returnPendingRows||summary.shelfReturnPendingRows||[]){
     const processType=getBoothCloseReturnProcessType(item);
@@ -9291,7 +9291,7 @@ async function saveBoothDepartureCorrection(itemId,button){
   }
 }
 
-async function loadBoothReturnHistory(eventId){
+async function loadBoothReturnHistoryLegacy(eventId){
   const list=el("boothReturnHistoryList");
   if(!list)return;
   try{
@@ -10751,7 +10751,7 @@ function getBoothCloseRestorePayload(before){
   };
 }
 
-async function reflectBoothShelfReturnsOnClose(summary,staff){
+async function reflectBoothShelfReturnsOnCloseLegacyIntermediate(summary,staff){
   const pending=(summary.returnPendingRows||summary.shelfReturnPendingRows||[]).filter(row=>row.item_type==="normal"&&getBoothReturnReflectDelta(row)!==0);
   const applied=[];
   try{
@@ -11292,7 +11292,7 @@ function renderBoothReportReturnBatchSection(rows){
     <div class="booth-history-cards booth-scroll-cards">${cards}</div>
   </section>`;
 }
-async function saveBoothReportReturnBatch(){
+async function saveBoothReportReturnBatchLegacy(){
   if(window.__aricoBoothReportReturnBatchSaving)return;
   const section=document.querySelector("[data-booth-report-return-section]");
   const event=getBoothCurrentEvent();
