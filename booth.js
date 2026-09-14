@@ -9345,7 +9345,7 @@ async function exportBoothDepartureInventoryPdf(event){
   }
 }
 
-const legacyLoadBoothDepartureInventoryList=async function(eventId){
+var legacyLoadBoothDepartureInventoryList=async function(eventId){
   const list=el("boothDepartureInventoryList");
   if(!list)return;
   try{
@@ -9379,7 +9379,7 @@ const legacyLoadBoothDepartureInventoryList=async function(eventId){
   }
 };
 
-const legacyLoadBoothDepartureInventoryListWithFilter=async function(eventId){
+var legacyLoadBoothDepartureInventoryListWithFilter=async function(eventId){
   const list=el("boothDepartureInventoryList");
   if(!list)return;
   try{
@@ -9507,7 +9507,7 @@ if(!window.__aricoBoothDepartureCorrectionHandlersBound){
   window.__aricoBoothDepartureCorrectionHandlersBound=true;
 }
 
-const legacyLoadBoothEventReport=async function(eventId){
+var legacyLoadBoothEventReport=async function(eventId){
   const body=el("boothEventReportBody");
   if(!body)return;
   try{
@@ -9786,7 +9786,7 @@ loadBoothEventReport=async function(eventId){
   }
 };
 
-const legacyExportBoothEventReportCsv=async function(event){
+var legacyExportBoothEventReportCsv=async function(event){
   try{
     const data=await buildBoothEventReportData(event.id);
     const diffRows=data.diffRows.filter(row=>calculateBoothItemDifference(row)!==0||!row.taken_registered);
@@ -9825,7 +9825,7 @@ const legacyExportBoothEventReportCsv=async function(event){
   }
 };
 
-const legacyExportBoothEventReportPdf=async function(event){
+var legacyExportBoothEventReportPdf=async function(event){
   try{
     const data=await buildBoothEventReportData(event.id);
     const normalProducts=aggregateBoothSalesByProduct(data.normalSales);
