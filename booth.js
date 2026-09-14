@@ -8208,7 +8208,15 @@ async function importBoothSalesDraft(){
     if(!response.ok)throw new Error(body?.error||`スマレジ販売データ取得エラー ${response.status}`);
 
     const salesProductIds=[...new Set((body.sales||[]).map(sale=>String(sale.smaregi_product_id||"").trim()).filter(Boolean))];
-    const saleProducts=await fetchBoothProductsBySmaregiProductIds(salesProductIds);
+    const saleBarcodes=[...new Set((body.sales||[]).map(sale=>String(sale.barcode||"").trim()).filter(Boolean))];
+    const [saleProductsById,saleProductsByBarcode]=await Promise.all([
+      fetchBoothProductsBySmaregiProductIds(salesProductIds),
+      fetchBoothProductsForItems(saleBarcodes.map(barcode=>({barcode})))
+    ]);
+    const saleProducts=[...(saleProductsById||[])];
+    (saleProductsByBarcode||[]).forEach(product=>{
+      if(!saleProducts.some(candidate=>String(candidate.barcode||"").trim()===String(product.barcode||"").trim()))saleProducts.push(product);
+    });
     (saleProducts||[]).forEach(product=>{
       const productId=normalizeBoothSalesIdentity(product.smaregi_product_id);
       if(productId)addCandidate(productBySmaregiId,productId,product);

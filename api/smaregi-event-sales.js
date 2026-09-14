@@ -209,6 +209,7 @@ function normalizeSales(transactions, productIdSet, targetTerminalId, diagnostic
   stats.cancelledDetails = 0;
   stats.productMatchedDetails = 0;
   stats.productUnmatchedDetails = 0;
+  stats.barcodeMatchedDetails = 0;
   stats.eventProductMatchedDetails = 0;
   stats.eventProductUnmatchedDetails = 0;
   stats.normalizedQuantity = 0;
@@ -247,15 +248,27 @@ function normalizeSales(transactions, productIdSet, targetTerminalId, diagnostic
       }
       const sign = transactionSign * (isReturnDetail(detail) ? -1 : 1);
       const productId = String(pick(detail, ["productId", "product_id"]) || "").trim();
+      // Some Smaregi transaction details can carry the sale identity as a
+      // barcode without a productId (for example a newly registered item).
+      // Keep that identity so the client can resolve it against products.barcode
+      // instead of silently dropping a real sale.
+      const barcode = String(pick(detail, [
+        "barcode",
+        "productBarcode",
+        "product_barcode",
+        "janCode",
+        "jan_code"
+      ]) || "").trim();
       // Do not discard a real Smaregi sale merely because the product was not
       // carried into the selected event. The event UI needs those rows as
       // explicit "持ち出し未登録" candidates; event membership is decided
       // after import, not in the API transport/normalization layer.
-      if (!productId) {
+      if (!productId && !barcode) {
         stats.productUnmatchedDetails += 1;
         return;
       }
-      stats.productMatchedDetails += 1;
+      if (productId) stats.productMatchedDetails += 1;
+      else stats.barcodeMatchedDetails += 1;
       if (productIdSet.size && productIdSet.has(productId)) {
         stats.eventProductMatchedDetails += 1;
       } else if (productIdSet.size) {
@@ -282,6 +295,7 @@ function normalizeSales(transactions, productIdSet, targetTerminalId, diagnostic
         smaregi_transaction_id: transactionId,
         smaregi_detail_id: detailId,
         smaregi_product_id: productId,
+        barcode,
         smaregi_terminal_id: terminalId,
         quantity,
         unit_price: unitPrice,
@@ -321,6 +335,7 @@ async function fetchTransactions(apiBase, token, context, fromDateTime, toDateTi
     url.searchParams.set("limit", String(DEFAULT_LIMIT));
     url.searchParams.set("page", String(page));
     url.searchParams.set("with_details", "all");
+    url.searchParams.set("sort", "terminal_tran_date_time:asc,transaction_head_id:asc");
     url.searchParams.set("store_id", context.storeId);
     url.searchParams.set("terminal_tran_date_time-from", fromDateTime);
     url.searchParams.set("terminal_tran_date_time-to", toDateTime);
