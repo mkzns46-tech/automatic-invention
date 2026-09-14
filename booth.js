@@ -3046,7 +3046,18 @@ async function restoreBoothConfirmedTakeoutStorage(operation){
 }
 
 async function completeBoothDepartureCount(){
-  const event=getBoothCurrentEvent();
+  // Resolve the event from the visible detail heading before confirming.  The
+  // event list can be re-rendered after a newly-created event is opened; using
+  // a stale in-memory selection here can send a valid draft to another event.
+  let event=getBoothCurrentEvent();
+  const visibleEventName=String(el("boothEventDetailRoot")?.querySelector("h2")?.textContent||"").trim();
+  if(visibleEventName){
+    const latestEventRows=await sb(`booth_events?select=*&name=eq.${encodeURIComponent(visibleEventName)}&limit=1`).catch(()=>[]);
+    if(Array.isArray(latestEventRows)&&latestEventRows[0]){
+      event=latestEventRows[0];
+      boothCurrentEventId=String(event.id);
+    }
+  }
   if(!event)return;
   if(isBoothEventClosed(event)){showBoothClosedError();return;}
   const staff=String(el("boothDepartureStaff")?.value||"").trim();
