@@ -485,9 +485,9 @@
 
   function productDetails(product){
     return {
-      product_code:String(product?.barcode||""),
+      product_code:String(product?.smaregi_product_id||""),
       barcode:String(product?.barcode||""),
-      product_id:String(product?.smaregi_product_id||product?.id||""),
+      product_id:String(product?.barcode||""),
       product_name:String(product?.name||product?.product_name||"")
     };
   }
