@@ -8020,7 +8020,14 @@ async function loadBoothSalesImports(eventId){
       sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed,cancelled)&order=sold_at.asc&limit=2000`),
       fetchBoothEventItems(eventId)
     ]);
-    renderBoothSalesImports(Array.isArray(imports)?imports:[],items);
+    const unmatched=window.__boothSalesUnmatched?.eventId===eventId
+      ?(window.__boothSalesUnmatched.rows||[]).map(entry=>({
+        ...entry.sale,
+        import_status:"unmatched",
+        unmatched_reason:entry.reason
+      }))
+      :[];
+    renderBoothSalesImports([...(Array.isArray(imports)?imports:[]),...unmatched],items);
   }catch(e){
     list.innerHTML='<div class="booth-empty">販売取り込み一覧を読み込めませんでした。</div>';
     boothShowError("販売取り込みエラー","販売取り込み一覧の読み込みに失敗しました。\nevent_sales_imports SQLが未実行の場合は先に実行してください。\n"+e.message);
@@ -8041,7 +8048,7 @@ function renderBoothSalesImports(rows,items){
     const hasItem=Boolean(item.id);
     const imported=Number(row.quantity||0);
     const diff=hasItem?getBoothSalesDifference(item,row.import_status==="pending"?imported:0):"持ち出し未確定";
-    const statusLabel=row.import_status==="confirmed"?"確定済み":row.import_status==="cancelled"?"取消・変更":"未確定";
+    const statusLabel=row.import_status==="confirmed"?"確定済み":row.import_status==="cancelled"?"取消・変更":row.import_status==="unmatched"?`未持ち出し（${row.unmatched_reason||"イベント対象外"}）`:"未確定";
     return `<tr>
       <td>${esc(formatBoothDateTime(row.sold_at))}</td>
       <td>${esc(row.product_name||"-")}</td>
@@ -8061,7 +8068,7 @@ function renderBoothSalesImports(rows,items){
     const hasItem=Boolean(item.id);
     const imported=Number(row.quantity||0);
     const diff=hasItem?getBoothSalesDifference(item,row.import_status==="pending"?imported:0):"持ち出し未確定";
-    const statusLabel=row.import_status==="confirmed"?"確定済み":row.import_status==="cancelled"?"取消・変更":"未確定";
+    const statusLabel=row.import_status==="confirmed"?"確定済み":row.import_status==="cancelled"?"取消・変更":row.import_status==="unmatched"?`未持ち出し（${row.unmatched_reason||"イベント対象外"}）`:"未確定";
     return `<article class="booth-history-card booth-sales-card-row">
       <div class="booth-history-card-top">
         <strong>${esc(row.product_name||"-")}</strong>
@@ -8081,8 +8088,9 @@ function renderBoothSalesImports(rows,items){
   const pendingCount=rows.filter(row=>row.import_status==="pending").length;
   const confirmedCount=rows.filter(row=>row.import_status==="confirmed").length;
   const cancelledCount=rows.filter(row=>row.import_status==="cancelled").length;
+  const unmatchedCount=rows.filter(row=>row.import_status==="unmatched").length;
   list.innerHTML=`
-    <div class="booth-sales-import-summary">未確定 ${esc(pendingCount)} 件 / 確定済み ${esc(confirmedCount)} 件 / 取消・変更 ${esc(cancelledCount)} 件。未確定分だけを販売確定できます。</div>
+    <div class="booth-sales-import-summary">未確定 ${esc(pendingCount)} 件 / 確定済み ${esc(confirmedCount)} 件 / 取消・変更 ${esc(cancelledCount)} 件 / 未持ち出し販売 ${esc(unmatchedCount)} 件。未持ち出し販売は確定対象外です。</div>
     <div class="booth-history-table-wrap"><table class="booth-history-table booth-sales-table">
       <thead><tr><th>販売日時</th><th>商品名</th><th>バーコード</th><th>商品ID</th><th>対象レジ</th><th>持ち出し</th><th>販売候補</th><th>戻り</th><th>差異見込み</th><th>状態</th><th>取引ID</th></tr></thead>
       <tbody>${tableRows}</tbody>
@@ -9530,6 +9538,7 @@ exportBoothDepartureInventoryCsv=async function(event){
       ["商品名","バーコード","ガチャ持ち出し数","戻り実数","使用数","現在ガチャ在庫"],
       ...data.gachaRows.map(row=>[row.product_name||"",row.barcode||"",row.taken,boothGachaDisplayQty(row.returned),boothGachaDisplayQty(row.used),row.remain])
     ];
+    window.__boothSalesUnmatched={eventId:event.id,rows:unmatched};
     downloadBoothCsvFile(`${boothEventExportBaseName(event,"持ち出し在庫一覧")}.csv`,rows);
   }catch(error){
     boothShowError("CSV出力エラー",error.message||"持ち出し在庫一覧CSVの出力に失敗しました。");
