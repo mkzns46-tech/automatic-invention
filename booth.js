@@ -2084,7 +2084,7 @@ async function loadBoothPlannedItemsLegacy(eventId){
   }
 }
 
-async function loadBoothPlannedItemsLegacyIntermediate(eventId){
+async function loadBoothPlannedItems(eventId){
   const list=el("boothPlannedList");
   if(!list)return;
   list.innerHTML='<div class="booth-empty">予定リストを読み込み中...</div>';
@@ -2768,7 +2768,7 @@ function isBoothDepartureGachaProduct(product){
   return BOOTH_GACHA_SMAREGI_PRODUCT_IDS.has(String(product?.smaregi_product_id||"").trim());
 }
 
-async function renderBoothEventInventoryPanelLegacyIntermediate(event){
+async function renderBoothEventInventoryPanel(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   const closed=isBoothEventClosed(event);
@@ -2885,7 +2885,7 @@ async function renderBoothEventInventoryPanelLegacyIntermediate(event){
   await loadBoothCarryOutHistory(event.id);
 }
 
-async function addBoothDepartureCountFromInputLegacy(){
+async function addBoothDepartureCountFromInput(){
   const event=getBoothCurrentEvent();
   if(!event)return;
   const barcode=String(el("boothDepartureBarcode")?.value||"").trim();
@@ -2914,7 +2914,7 @@ async function addBoothDepartureCountFromInputLegacy(){
   el("boothDepartureBarcode")?.focus();
 }
 
-async function renderBoothDepartureCountListLegacy(eventId){
+async function renderBoothDepartureCountList(eventId){
   const list=el("boothDepartureCountList");
   if(!list)return;
   const counts=Object.values(readBoothDepartureCounts(eventId)).filter(row=>Number(row.quantity||0)>0);
@@ -3754,7 +3754,7 @@ async function renderBoothDepartureInventoryListPanelLegacyIntermediate(event){
   loadBoothDepartureInventoryList(event.id);
 }
 
-async function loadBoothDepartureInventoryListLegacyIntermediate(eventId){
+async function loadBoothDepartureInventoryList(eventId){
   const list=el("boothDepartureInventoryList");
   if(!list)return;
   try{
@@ -4618,9 +4618,10 @@ function formatBoothDateTimeShort(value){
   return `${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,"0")}:${String(date.getMinutes()).padStart(2,"0")}`;
 }
 
-async function loadBoothCarryOutHistoryLegacyIntermediate(eventId){
+async function loadBoothCarryOutHistory(eventId){
   const list=el("boothCarryOutHistoryList");
   if(!list)return;
+  const requestId=++boothCarryOutHistoryRequestId;
   try{
     list.innerHTML='<div class="booth-empty">読み込み中...</div>';
     const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,takeout_source,movement_type&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(take_out,event_pick)&item_type=eq.normal&order=created_at.desc&limit=50`);
@@ -4834,7 +4835,7 @@ function renderBoothReturnDraftCards(event){
   </article>`).join("");
 }
 
-async function addBoothReturnDraftFromBarcodeLegacy(rawBarcode){
+async function addBoothReturnDraftFromBarcodeLegacyInitial(rawBarcode){
   const event=getBoothCurrentEvent();
   const barcode=String(rawBarcode||"").trim();
   if(!event||!barcode)return;
@@ -5040,7 +5041,7 @@ async function removeBoothReturnDestinationItem(result,quantity){
   });
 }
 
-async function applyBoothReturnDraftLegacy(){
+async function applyBoothReturnDraftLegacyInitial(){
   if(window.__aricoBoothReturnSaving){
     boothShowError("戻り登録エラー","戻り登録処理中です。完了までお待ちください。");
     return;
@@ -5330,7 +5331,7 @@ async function saveBoothReturnProcess(event){
   }
 }
 
-async function handleBoothScannedCodeLegacyIntermediate(code){
+async function handleBoothScannedCode(code){
   code=String(code||"").trim();
   if(!code)return;
   const t=Date.now();
@@ -8382,7 +8383,7 @@ async function refreshBoothOngoingSalesCache(apiContext={}){
 
 window.refreshBoothOngoingSalesCache=refreshBoothOngoingSalesCache;
 
-async function confirmBoothSalesImportLegacy(){
+async function confirmBoothSalesImportLegacyInitial(){
   const form=validateBoothSalesForm();
   if(!form)return;
   const {event,fromDate,toDate,staff}=form;
