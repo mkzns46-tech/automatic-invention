@@ -11692,6 +11692,14 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({p_event_id:event.id,p_staff:staff})
       });
+      // The RPC owns the physical stock transaction. Clear the per-event
+      // residual marker only after it succeeds; the shared event shelf row
+      // remains untouched for other events.
+      await sb(`booth_event_items?event_id=eq.${encodeURIComponent(event.id)}&item_type=eq.normal`,{
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({event_storage_qty:0,updated_at:now})
+      });
       const snapshotSummary=await loadBoothCloseCommonStockSummary(event,await loadBoothCloseSummary(event));
       snapshots=await createBoothEventCloseSnapshots(event,snapshotSummary,staff,now).catch(error=>{
         console.warn("[booth close snapshot skipped]",error);
