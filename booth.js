@@ -4733,14 +4733,6 @@ async function findBoothEventItemByBarcode(eventId,barcode){
   return Array.isArray(rows)&&rows[0]?rows[0]:null;
 }
 
-function calculateBoothDifference(item,returnInput=0){
-  const taken=Number(item?.taken_qty||0);
-  const sold=Number(item?.sold_qty||0);
-  const returned=Number(item?.returned_qty||0)+Number(returnInput||0);
-  const consumed=Number(item?.consumed_qty||0);
-  return taken-sold-returned-consumed;
-}
-
 function renderBoothReturnPreview(item,returnInput=0){
   const preview=el("boothReturnProductPreview");
   if(!preview||!item)return;
