@@ -351,8 +351,22 @@ function renderInventoryAppMenu(){
   });
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
   if(boothButton)boothButton.addEventListener("click",()=>{
-    if(typeof showBoothManagement==="function")showBoothManagement();
-    else showPopup("イベント管理","準備中です。");
+    if(typeof showBoothManagement==="function"){
+      showBoothManagement();
+      return;
+    }
+    const existing=document.querySelector('script[data-booth-lazy-loader="1"]');
+    if(existing){
+      showMessage("イベント管理を読み込み中です。少し待ってから再度お試しください。","err");
+      return;
+    }
+    const script=document.createElement("script");
+    script.src="./booth.js?v=2.93.59&lazy=1";
+    script.defer=false;
+    script.dataset.boothLazyLoader="1";
+    script.onload=()=>typeof showBoothManagement==="function"?showBoothManagement():showMessage("イベント管理を読み込めませんでした。","err");
+    script.onerror=()=>showMessage("イベント管理スクリプトの読み込みに失敗しました。","err");
+    document.head.appendChild(script);
   });
   const adminAuthButton=menu.querySelector('[data-menu-action="admin-auth"]');
   if(adminAuthButton)adminAuthButton.addEventListener("click",authenticateInventoryAdmin);
