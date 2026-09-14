@@ -16,6 +16,7 @@
     items:[],
     historyItems:[],
     recentLogs:[],
+    reflectionLogs:new Map(),
     currentSessionId:""
   };
 
@@ -140,6 +141,12 @@
   }
 
   function itemDisplay(item){
+    const memo=String(item.memo||"");
+    const log=state.reflectionLogs.get(`${String(item.session_id||"")}|${String(item.barcode||item.product_code||item.product_id||"").trim()}`)||null;
+    const effectiveMemo=log?.memo||memo;
+    const effectiveAdopted=Boolean(item.adopted||log);
+    const beforeMemo=effectiveMemo.match(/(?:更新前|before)[:：]\s*(-?\d+)/i);
+    const afterMemo=effectiveMemo.match(/(?:更新後|after)[:：]\s*(-?\d+)/i);
     return {
       id:item.id,
       key:itemKey(item),
@@ -148,11 +155,12 @@
       productId:String(item.product_id||""),
       name:String(item.product_name||""),
       count:Number(item.count_qty||0),
-      beforeStock:item.before_stock!=null?Number(item.before_stock):item.beforeStock!=null?Number(item.beforeStock):null,
+      beforeStock:item.before_stock!=null?Number(item.before_stock):item.beforeStock!=null?Number(item.beforeStock):beforeMemo?Number(beforeMemo[1]):null,
       staff:String(item.staff||""),
       updatedAt:item.updated_at||item.counted_at||item.created_at||"",
-      reflectedAt:item.reflected_at||item.reflectedAt||"",
-      reflectedBy:item.reflected_by||item.reflectedBy||""
+      reflectedAt:item.reflected_at||item.reflectedAt||(effectiveAdopted?(log?.created_at||item.counted_at||""):""),
+      reflectedBy:item.reflected_by||item.reflectedBy||(effectiveAdopted?(log?.staff||item.staff||""):""),
+      afterStock:item.after_stock!=null?Number(item.after_stock):item.afterStock!=null?Number(item.afterStock):afterMemo?Number(afterMemo[1]):Number(item.count_qty||0)
     };
   }
 
@@ -211,7 +219,7 @@
     const session=currentSession();
     if(!session){state.items=[];return;}
     try{
-      const rows=await sbAll(`inventory_count_items?select=*&session_id=eq.${encodeURIComponent(session.id)}&order=updated_at.desc,counted_at.desc`,1000,10000);
+      const rows=await sbAll(`inventory_count_items?select=*&session_id=eq.${encodeURIComponent(session.id)}&order=counted_at.desc`,1000,10000);
       state.items=Array.isArray(rows)?rows:[];
     }catch(error){
       state.items=[];
@@ -224,6 +232,13 @@
     try{
       const rows=await sbAll("inventory_count_items?select=*&order=counted_at.desc",1000,20000);
       state.historyItems=Array.isArray(rows)?rows:[];
+      state.reflectionLogs=new Map();
+      const logs=await sbAll("inventory_logs?select=id,created_at,staff,barcode,memo,before_stock,after_stock&memo=ilike.*アプリ内棚卸*&order=created_at.desc",1000,50000).catch(()=>[]);
+      (Array.isArray(logs)?logs:[]).forEach(log=>{
+        const session=String(log.memo||"").match(/session:([0-9a-f-]{36})/i)?.[1]||"";
+        const barcode=String(log.barcode||"").trim();
+        if(session&&barcode&&!state.reflectionLogs.has(`${session}|${barcode}`))state.reflectionLogs.set(`${session}|${barcode}`,log);
+      });
     }catch(_){state.historyItems=[];}
   }
 
@@ -546,12 +561,21 @@
     if(session.staff!==staff)await updateDraftStaff(session,staff);
     const latest=await fetchLatestProductForCount(details.barcode);
     const currentBefore=Number(latest.base_stock||0);
-    const payload={...details,count_qty:qty,staff,counted_at:timestamp,updated_at:timestamp,reflected_at:null,reflected_by:null};
+    const payload={
+      product_code:String(details.product_code||details.smaregi_product_id||details.barcode||""),
+      barcode:String(details.barcode||""),
+      product_id:String(details.barcode||""),
+      product_name:String(details.product_name||details.name||""),
+      count_qty:qty,staff,counted_at:timestamp,
+      memo:"",
+      adopted:false
+    };
+    payload.memo=`アプリ内棚卸 / before:${currentBefore} / after:${Number(qty)}`;
     let itemId=existing?.id||"";
     if(itemId){
       await sb(`inventory_count_items?id=eq.${encodeURIComponent(itemId)}&session_id=eq.${encodeURIComponent(session.id)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify(payload)});
     }else{
-      const inserted=await sb("inventory_count_items",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({...payload,session_id:session.id,before_stock:currentBefore,memo:"",adopted:false})});
+      const inserted=await sb("inventory_count_items",{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify({...payload,session_id:session.id})});
       itemId=Array.isArray(inserted)?inserted[0]?.id:inserted?.id;
       if(!itemId)throw new Error("棚卸明細の保存結果を取得できませんでした。");
     }
@@ -568,8 +592,8 @@
           await sb("inventory_logs",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({type:"在庫修正",staff,barcode:details.barcode,product_name:details.product_name,quantity:diff,memo:reflectionMemo,before_stock:before,after_stock:after,store_code:currentStoreCode(),inventory_scope:"normal",affects_smaregi:false,smaregi_delta:0})});
         }
       }
-      await sb(`inventory_count_items?id=eq.${encodeURIComponent(itemId)}&session_id=eq.${encodeURIComponent(session.id)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({reflected_at:timestamp,reflected_by:staff,before_stock:before,updated_at:timestamp})});
-      const local={...payload,id:itemId,session_id:session.id,before_stock:before,reflected_at:timestamp,reflected_by:staff};
+      await sb(`inventory_count_items?id=eq.${encodeURIComponent(itemId)}&session_id=eq.${encodeURIComponent(session.id)}`,{method:"PATCH",headers:{Prefer:"return=minimal"},body:JSON.stringify({adopted:true,memo:reflectionMemo.replace("アプリ内棚卸自動反映","アプリ内棚卸")})});
+      const local={...payload,id:itemId,session_id:session.id,adopted:true,memo:reflectionMemo.replace("アプリ内棚卸自動反映","アプリ内棚卸")};
       state.items=[...state.items.filter(item=>String(item.id)!==String(itemId)),local];
       renderDraftInfo();renderCountedRows();
       setMessage("appInventoryCountCsvInfo",diff===0?"在庫変更なし（棚卸数量と実在庫が一致）":"在庫反映済み","ok");
