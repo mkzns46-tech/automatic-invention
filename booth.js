@@ -25,6 +25,7 @@ let boothGachaReturnDraftEventId="";
 let boothGachaReturnDraftItems=new Map();
 let boothGachaPickDraftEventId="";
 let boothGachaPickDraftItems=new Map();
+let boothCarryOutHistoryRequestId=0;
 
 function showBoothManagement(){
   showInventoryScreen("booth");
@@ -3865,6 +3866,7 @@ async function findBoothProductByBarcode(barcode){
 async function loadBoothCarryOutHistory(eventId){
   const list=el("boothCarryOutHistoryList");
   if(!list)return;
+  const requestId=++boothCarryOutHistoryRequestId;
   try{
     list.innerHTML='<div class="booth-empty">読み込み中...</div>';
     const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,takeout_source&event_id=eq.${encodeURIComponent(eventId)}&movement_type=eq.take_out&item_type=eq.normal&order=created_at.desc&limit=50`);
@@ -4622,6 +4624,7 @@ async function loadBoothCarryOutHistory(eventId){
   try{
     list.innerHTML='<div class="booth-empty">読み込み中...</div>';
     const rows=await sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,takeout_source,movement_type&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(take_out,event_pick)&item_type=eq.normal&order=created_at.desc&limit=50`);
+    if(requestId!==boothCarryOutHistoryRequestId)return;
     if(!Array.isArray(rows)||!rows.length){
       list.innerHTML='<div class="booth-empty">まだ持ち出し履歴はありません。</div>';
       return;
