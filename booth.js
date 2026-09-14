@@ -11917,6 +11917,8 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
   };
 
   root.confirmBoothEventClose=confirmBoothEventClose=async function(event){
+    if(window.__aricoBoothEventCloseInFlight)return;
+    window.__aricoBoothEventCloseInFlight=true;
     const staff=String(event?.closed_by||event?.created_by||"イベント締め").trim()||"イベント締め";
     try{
       const latestRows=await sb("booth_events?select=*&id=eq."+encodeURIComponent(event.id)+"&limit=1");
@@ -11935,6 +11937,7 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
       const ok=typeof confirmAppAction==="function"?await confirmAppAction("イベント締め確認",body,{okText:"イベントを締める",cancelText:"キャンセル"}):true;
       if(ok)await finalizeBoothEventClose(latestEvent,summary,staff);
     }catch(error){boothShowError("イベント締めエラー",error.message||"イベント締めに失敗しました。");}
+    finally{window.__aricoBoothEventCloseInFlight=false;}
   };
 
   root.saveBoothReportReturnBatch=saveBoothReportReturnBatch=async function(){
