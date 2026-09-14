@@ -104,7 +104,7 @@ function ensureBoothManagementBundle(){
   if(typeof window.showBoothManagement==="function")return;
   if(document.querySelector('script[data-booth-lazy-loader="1"]'))return;
   const script=document.createElement("script");
-  script.src="./booth.js?v=2.93.79&lazy=1";
+  script.src="./booth.js?v=2.93.84&lazy=1";
   script.defer=false;
   script.dataset.boothLazyLoader="1";
   script.onload=()=>{
