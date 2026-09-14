@@ -725,11 +725,6 @@ function isBoothShelfReturnReflected(item){
     || Boolean(item?.shelf_return_reflected_at);
 }
 
-function getBoothExplicitReturnProcessType(item){
-  const value=String(item?.return_process_type||"").toLowerCase().trim();
-  return value==="storage"||value==="shelf"||value==="event"||value==="keep"?value:"";
-}
-
 function getBoothReturnProcessType(item){
   const explicit=getBoothExplicitReturnProcessType(item);
   if(explicit)return explicit;
@@ -744,13 +739,6 @@ function getBoothCloseReturnProcessType(item){
       ? "shelf"
       : ""
   );
-}
-
-function getBoothReturnProcessLabel(type){
-  const value=String(type||"");
-  if(value==="storage")return "イベント保管";
-  if(value==="event")return "別イベント棚へ移動";
-  return "通常棚へ戻す";
 }
 
 function getBoothCommonShelfCurrentQtyFromEventItem(item){
