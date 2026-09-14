@@ -6937,62 +6937,6 @@ async function loadBoothDiffList(eventId){
   }
 }
 
-function renderBoothDiffList(rows){
-  const list=el("boothDiffList");
-  if(!list)return;
-  if(!rows.length){
-    list.innerHTML='<div class="booth-empty">表示対象の商品はありません。</div>';
-    return;
-  }
-  const tableRows=rows.map(row=>{
-    const status=getBoothDiffStatus(row);
-    const diff=calculateBoothItemDifference(row);
-    return `<tr class="booth-diff-row ${esc(status.className)}">
-      <td>${esc(row.product_name||"-")}</td>
-      <td>${esc(row.barcode||"-")}</td>
-      <td>${esc(row.smaregi_product_id||"-")}</td>
-      <td>${esc(row.taken_qty??0)}</td>
-      <td>${esc(row.sold_qty??0)}</td>
-      <td>${esc(row.returned_qty??0)}</td>
-      <td>${esc(row.consumed_qty??0)}</td>
-      <td><strong>${esc(diff)}</strong></td>
-      <td><span class="booth-diff-status ${esc(status.className)}">${esc(status.label)}</span></td>
-      <td><textarea id="boothDiffMemo_${esc(row.id)}" class="booth-diff-memo" placeholder="差異確認メモ">${esc(row.diff_memo||"")}</textarea></td>
-      <td>${esc(formatBoothDateTime(row.updated_at))}</td>
-      <td><button type="button" class="secondary booth-diff-save-btn" data-diff-item-id="${esc(row.id)}">メモ保存</button></td>
-    </tr>`;
-  }).join("");
-  const cardRows=rows.map(row=>{
-    const status=getBoothDiffStatus(row);
-    const diff=calculateBoothItemDifference(row);
-    return `<article class="booth-history-card booth-diff-item-card ${esc(status.className)}">
-      <div class="booth-history-card-top">
-        <strong>${esc(row.product_name||"-")}</strong>
-        <span class="booth-diff-status ${esc(status.className)}">${esc(status.label)}</span>
-      </div>
-      <div class="booth-history-card-meta">
-        <span>バーコード：${esc(row.barcode||"-")}</span>
-        <span>スマレジ商品ID：${esc(row.smaregi_product_id||"-")}</span>
-        <span>持ち出し：${esc(row.taken_qty??0)} / 販売：${esc(row.sold_qty??0)} / 戻り：${esc(row.returned_qty??0)} / 消費：${esc(row.consumed_qty??0)}</span>
-        <span>差異：${esc(diff)}</span>
-        <span>最終更新：${esc(formatBoothDateTimeShort(row.updated_at))}</span>
-      </div>
-      <textarea id="boothDiffMemoCard_${esc(row.id)}" class="booth-diff-memo" placeholder="差異確認メモ">${esc(row.diff_memo||"")}</textarea>
-      <button type="button" class="secondary booth-diff-save-btn" data-diff-item-id="${esc(row.id)}">メモ保存</button>
-    </article>`;
-  }).join("");
-  list.innerHTML=`
-    <div class="booth-diff-summary">表示 ${esc(rows.length)} 件。差異数は「持ち出し - 販売 - 戻り - 消費」で表示しています。</div>
-    <div class="booth-history-table-wrap"><table class="booth-history-table booth-diff-table">
-      <thead><tr><th>商品名</th><th>バーコード</th><th>商品ID</th><th>持ち出し</th><th>販売</th><th>戻り</th><th>消費</th><th>差異</th><th>状態</th><th>メモ</th><th>最終更新</th><th>操作</th></tr></thead>
-      <tbody>${tableRows}</tbody>
-    </table></div>
-    <div class="booth-history-cards">${cardRows}</div>`;
-  list.querySelectorAll("[data-diff-item-id]").forEach(button=>{
-    button.addEventListener("click",()=>saveBoothDiffMemo(button.dataset.diffItemId));
-  });
-}
-
 function boothDiffRowKey(row){
   const store=String(row.store_code||row.source_store_code||"").trim().toLowerCase();
   const product=String(row.barcode||row.smaregi_product_id||row.product_id||"").trim();
