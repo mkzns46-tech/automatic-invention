@@ -209,6 +209,8 @@ function normalizeSales(transactions, productIdSet, targetTerminalId, diagnostic
   stats.cancelledDetails = 0;
   stats.productMatchedDetails = 0;
   stats.productUnmatchedDetails = 0;
+  stats.eventProductMatchedDetails = 0;
+  stats.eventProductUnmatchedDetails = 0;
   stats.normalizedQuantity = 0;
   for (const transaction of transactions) {
     if (!transaction) continue;
@@ -245,11 +247,20 @@ function normalizeSales(transactions, productIdSet, targetTerminalId, diagnostic
       }
       const sign = transactionSign * (isReturnDetail(detail) ? -1 : 1);
       const productId = String(pick(detail, ["productId", "product_id"]) || "").trim();
-      if (!productId || (productIdSet.size && !productIdSet.has(productId))) {
+      // Do not discard a real Smaregi sale merely because the product was not
+      // carried into the selected event. The event UI needs those rows as
+      // explicit "持ち出し未登録" candidates; event membership is decided
+      // after import, not in the API transport/normalization layer.
+      if (!productId) {
         stats.productUnmatchedDetails += 1;
         return;
       }
       stats.productMatchedDetails += 1;
+      if (productIdSet.size && productIdSet.has(productId)) {
+        stats.eventProductMatchedDetails += 1;
+      } else if (productIdSet.size) {
+        stats.eventProductUnmatchedDetails += 1;
+      }
       const rawQuantity = toSignedInteger(pick(detail, ["quantity", "salesQuantity", "sales_quantity", "unitSalesQuantity", "unit_sales_quantity"], 0));
       // Smaregi can represent a cancellation/return either with a return
       // division or as a separately returned negative detail. Preserve the
