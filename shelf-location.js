@@ -73,10 +73,10 @@
         await sb(`product_locations?id=eq.${encodeURIComponent(other.id)}`,{method:"PATCH",body:JSON.stringify({is_primary:false,deleted_at:new Date().toISOString(),updated_by:staff,updated_at:new Date().toISOString()})});
       }
     }else{
-      await sb("product_locations",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({product_id:product.id||null,barcode:product.barcode,shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,created_by:staff,updated_by:staff})});
+      await sb("product_locations",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({product_id:product.barcode||null,barcode:product.barcode,shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,created_by:staff,updated_by:staff})});
     }
     await patchProductLocation(product,code);
-    await insertLocationLog({product_id:product.id||null,barcode:product.barcode,product_name:product.name||"",action_type:"棚番追加",before_shelf_code:current,after_shelf_code:code,staff});
+    await insertLocationLog({product_id:product.barcode||null,barcode:product.barcode,product_name:product.name||"",action_type:"棚番追加",before_shelf_code:current,after_shelf_code:code,staff});
     return true;
   }
   function canCancelLog(log){
@@ -206,7 +206,7 @@
     if(results){results.innerHTML=""; results.classList.remove("is-active");}
     renderProductInfo();
   }
-  function productKey(product){return String(product?.barcode||product?.smaregi_product_id||product?.id||"");}
+  function productKey(product){return String(product?.barcode||product?.smaregi_product_id||"");}
   async function loadProductLocations(product){
     const barcode=productKey(product);
     if(!barcode)return [];
@@ -322,7 +322,7 @@
     });
   }
   function priorityProductKey(product){
-    return String(product?.barcode||product?.smaregi_product_id||product?.id||"").trim();
+    return String(product?.barcode||product?.smaregi_product_id||"").trim();
   }
   function priorityStock(product){
     const value=Number(product?.base_stock||0);
@@ -606,7 +606,7 @@
     await sb(`product_locations?barcode=eq.${encodeURIComponent(loc.barcode)}`,{method:"PATCH",body:JSON.stringify({is_primary:false,updated_by:staff,updated_at:new Date().toISOString()})});
     await sb(`product_locations?id=eq.${encodeURIComponent(loc.id)}`,{method:"PATCH",body:JSON.stringify({is_primary:true,updated_by:staff,updated_at:new Date().toISOString()})});
     await patchProductLocation(state.product,loc.shelf_code);
-    await insertLocationLog({product_id:state.product.id||null,barcode:loc.barcode,product_name:state.product.name||"",action_type:"主棚番変更",before_shelf_code:old?.shelf_code||"",after_shelf_code:loc.shelf_code,staff});
+    await insertLocationLog({product_id:loc.barcode||null,barcode:loc.barcode,product_name:state.product.name||"",action_type:"主棚番変更",before_shelf_code:old?.shelf_code||"",after_shelf_code:loc.shelf_code,staff});
     await selectProduct(state.product);
     await loadShelfLocationLogs();
     showShelfMessage(`主棚番を${loc.shelf_code}に変更しました`,"ok");
@@ -645,7 +645,7 @@
       showShelfMessage("棚番削除エラー。\n"+error.message,"err");
       return;
     }
-    await insertLocationLog({product_id:state.product.id||null,barcode:loc.barcode,product_name:state.product.name||"",action_type:"棚番削除",before_shelf_code:loc.shelf_code,after_shelf_code:nextPrimary?.shelf_code||"",staff});
+    await insertLocationLog({product_id:loc.barcode||null,barcode:loc.barcode,product_name:state.product.name||"",action_type:"棚番削除",before_shelf_code:loc.shelf_code,after_shelf_code:nextPrimary?.shelf_code||"",staff});
     await selectProduct(state.product);
     await loadShelfLocationLogs();
     showShelfMessage(`${loc.shelf_code}を削除しました`,"ok");
@@ -682,7 +682,7 @@
     }else if(log.action_type==="棚番変更"||log.action_type==="一括棚番変更"||log.action_type==="主棚番変更"){
       await changeProductShelf(product,log.after_shelf_code,log.before_shelf_code,staff,{log:false});
     }else if(log.action_type==="棚番削除" && log.before_shelf_code){
-      await upsertLocation({product_id:product?.id||null,barcode:log.barcode,shelf_code:log.before_shelf_code,shelf_group:String(log.before_shelf_code).split("-")[0],shelf_column:Number(String(log.before_shelf_code).split("-")[1]||1),is_primary:!product?.location,created_by:staff,updated_by:staff});
+      await upsertLocation({product_id:product?.barcode||log.barcode||null,barcode:log.barcode,shelf_code:log.before_shelf_code,shelf_group:String(log.before_shelf_code).split("-")[0],shelf_column:Number(String(log.before_shelf_code).split("-")[1]||1),is_primary:!product?.location,created_by:staff,updated_by:staff});
     }
   }
   async function changeProductShelf(product,fromShelf,toShelf,staff,{bulk=false,log=true}={}){
@@ -694,7 +694,7 @@
     if(!loc)return false;
     await sb(`product_locations?id=eq.${encodeURIComponent(loc.id)}`,{method:"PATCH",body:JSON.stringify({shelf_code:toShelf,shelf_group:String(toShelf).split("-")[0],shelf_column:Number(String(toShelf).split("-")[1]||1),updated_by:staff,updated_at:new Date().toISOString()})});
     if(loc.is_primary)await patchProductLocation(product,toShelf);
-    if(log)await insertLocationLog({product_id:product.id||null,barcode:product.barcode,product_name:product.name||"",action_type:bulk?"一括棚番変更":"棚番変更",before_shelf_code:fromShelf,after_shelf_code:toShelf,staff});
+    if(log)await insertLocationLog({product_id:product.barcode||null,barcode:product.barcode,product_name:product.name||"",action_type:bulk?"一括棚番変更":"棚番変更",before_shelf_code:fromShelf,after_shelf_code:toShelf,staff});
     return true;
   }
   async function promptChangeFromLog(logId,bulk=false){
