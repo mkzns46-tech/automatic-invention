@@ -23,7 +23,7 @@ const INVENTORY_APP_MENU_SECTIONS=[
     {key:"smaregi",label:"スマレジ変動商品チェック",id:"openSmaregiStockCheckBtn"}
   ]},
   {label:"イベント販売",items:[
-    {key:"booth",label:"イベント管理",action:"booth",title:"準備中"}
+    {key:"booth",label:"イベント管理",action:"booth"}
   ]},
   {label:"分析",items:[
     {key:"inventory-analytics",label:"棚卸分析",action:"inventory-analytics"},
@@ -362,7 +362,7 @@ function renderInventoryAppMenu(){
       return;
     }
     const script=document.createElement("script");
-    script.src="./booth.js?v=2.93.86&lazy=1";
+    script.src="./booth.js?v=2.93.87&lazy=1";
     script.defer=false;
     script.dataset.boothLazyLoader="1";
     script.onload=()=>typeof showBoothManagement==="function"?showBoothManagement():showMessage("イベント管理を読み込めませんでした。","err");
