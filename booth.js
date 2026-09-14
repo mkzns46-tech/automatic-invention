@@ -1319,7 +1319,7 @@ function renderBoothReopenPanel(event){
   el("boothReopenConfirmBtn")?.addEventListener("click",()=>confirmBoothEventReopen(event));
 }
 
-async function confirmBoothEventReopen(event){
+async function confirmBoothEventReopenBase(event){
   if(typeof requireInventoryPrivilegedAccess==="function"&&!requireInventoryPrivilegedAccess())return;
   const staff=String(el("boothReopenStaff")?.value||"").trim();
   const reason=String(el("boothReopenReason")?.value||"").trim();
@@ -1558,14 +1558,14 @@ async function loadBoothEventReportLegacyIntermediate(eventId){
   }
 }
 
-function renderBoothReportSalesSummary(rows){
+function renderBoothReportSalesSummaryBase(rows){
   const list=Array.isArray(rows)?rows:[];
   if(!list.length)return '<div class="booth-empty">対象売上はありません。</div>';
   const qty=list.reduce((sum,row)=>sum+Number(row.quantity||0),0);
   return `<div class="booth-report-mini-summary"><div><span>明細数</span><strong>${esc(list.length)}</strong></div><div><span>販売数</span><strong>${esc(qty)}</strong></div></div>`;
 }
 
-function renderBoothReportDiffRows(rows){
+function renderBoothReportDiffRowsBase(rows){
   const list=(Array.isArray(rows)?rows:[]).filter(row=>calculateBoothItemDifference(row)!==0||!row.taken_registered);
   if(!list.length)return '<div class="booth-empty">在庫差異はありません。</div>';
   return `<div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table">
@@ -1574,7 +1574,7 @@ function renderBoothReportDiffRows(rows){
   </table></div>`;
 }
 
-async function exportBoothEventReportCsv(event){
+async function exportBoothEventReportCsvBase(event){
   try{
     const data=await buildBoothEventReportData(event.id);
     const diffRows=data.diffRows.filter(row=>calculateBoothItemDifference(row)!==0||!row.taken_registered);
@@ -1611,7 +1611,7 @@ async function exportBoothEventReportCsv(event){
   }
 }
 
-async function exportBoothEventReportPdf(event){
+async function exportBoothEventReportPdfBase(event){
   try{
     const data=await buildBoothEventReportData(event.id);
     const diffRows=data.diffRows.filter(row=>calculateBoothItemDifference(row)!==0||!row.taken_registered);
@@ -3734,7 +3734,7 @@ async function renderBoothDepartureInventoryListPanelLegacyIntermediate(event){
   loadBoothDepartureInventoryList(event.id);
 }
 
-async function loadBoothDepartureInventoryList(eventId){
+async function loadBoothDepartureInventoryListBase(eventId){
   const list=el("boothDepartureInventoryList");
   if(!list)return;
   try{
@@ -8484,7 +8484,7 @@ function renderBoothReportGachaItems(rows){
   </table></div>`;
 }
 
-function renderBoothReportSalesRows(rows){
+function renderBoothReportSalesRowsBase(rows){
   if(!rows.length)return '<div class="booth-empty">確定済み販売履歴はありません。</div>';
   return `<div class="booth-history-table-wrap"><table class="booth-history-table">
     <thead><tr><th>販売日時</th><th>商品名</th><th>バーコード</th><th>数量</th><th>端末ID</th></tr></thead>
@@ -9275,7 +9275,7 @@ async function loadBoothReturnHistoryLegacy(eventId){
   }catch(error){list.innerHTML=`<div class="booth-empty">${esc(error.message||"\u623b\u308a\u5c65\u6b74\u3092\u8aad\u307f\u8fbc\u3081\u307e\u305b\u3093\u3002")}</div>`;}
 }
 
-async function exportBoothDepartureInventoryCsv(event){
+async function exportBoothDepartureInventoryCsvBase(event){
   try{
     const data=await buildBoothDepartureInventoryData(event?.id);
     const rows=[
@@ -9293,7 +9293,7 @@ async function exportBoothDepartureInventoryCsv(event){
   }
 }
 
-async function exportBoothDepartureInventoryPdf(event){
+async function exportBoothDepartureInventoryPdfBase(event){
   try{
     const data=await buildBoothDepartureInventoryData(event?.id);
     const html=`<h1>\u6301\u3061\u51fa\u3057\u5728\u5eab\u4e00\u89a7</h1>
@@ -10673,7 +10673,7 @@ async function createBoothEventCloseSnapshots(event,summary,staff,closedAt){
   return Array.isArray(inserted)?inserted:[];
 }
 
-async function confirmBoothEventClose(event){
+async function confirmBoothEventCloseBase(event){
   const staff=String(event?.closed_by||event?.created_by||"イベント終了処理").trim()||"イベント終了処理";
   try{
     const latestRows=await sb("booth_events?select=*&id=eq."+encodeURIComponent(event.id)+"&limit=1");
@@ -10693,7 +10693,7 @@ async function confirmBoothEventClose(event){
   }catch(error){boothShowError("イベント終了エラー",error.message||"イベント終了に失敗しました。");}
 }
 
-async function finalizeBoothEventClose(event,summary,staff){
+async function finalizeBoothEventCloseBase(event,summary,staff){
   const now=new Date().toISOString();
   let reflected=false;
   let snapshots=[];
@@ -10785,7 +10785,7 @@ async function reflectBoothShelfReturnsOnCloseLegacyIntermediate(summary,staff){
   }
 }
 
-async function rollbackBoothCloseReflection(summary,staff){
+async function rollbackBoothCloseReflectionBase(summary,staff){
   const pending=(summary.returnPendingRows||summary.shelfReturnPendingRows||[]).filter(row=>row.item_type==="normal"&&getBoothReturnReflectDelta(row)!==0);
   for(const item of pending.reverse()){
     const processType=getBoothCloseReturnProcessType(item);
@@ -11372,7 +11372,7 @@ async function saveBoothReportReturnBatchLegacy(){
 
 // Final batch-save implementation: keep booth_event_items as the return
 // record and update the store-common event shelf by destination delta.
-async function saveBoothReportReturnBatch(){
+async function saveBoothReportReturnBatchBase(){
   if(window.__aricoBoothReportReturnBatchSaving)return;
   const section=document.querySelector("[data-booth-report-return-section]");
   const event=getBoothCurrentEvent();
@@ -11818,13 +11818,13 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
 
 // Direct quantity editing for event-report discrepancy rows.
 (function(root){
-  renderBoothReportDiffRows=function(rows){
+  const directDiffRenderer=function(rows){
     const list=(Array.isArray(rows)?rows:[]).filter(row=>calculateBoothDifference(row)!==0||!row.taken_registered);
     if(!list.length)return '<div class="booth-empty">在庫差異はありません。</div>';
     const input=(name,value,readonly=false)=>`<input class="booth-history-qty-input" data-booth-direct-qty="${name}" type="number" min="0" step="1" value="${esc(value??0)}" inputmode="numeric" ${readonly?"readonly aria-readonly=\"true\"":""}>`;
     return `<div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table"><thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し</th><th>販売（スマレジ取込・変更不可）</th><th>戻り</th><th>消費</th><th>差異</th><th>状態</th><th>操作</th></tr></thead><tbody>${list.map(row=>`<tr data-booth-direct-row data-item-id="${esc(row.id||"")}" data-event-id="${esc(row.event_id||"")}"><td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${input("taken",row.taken_qty)}</td><td>${esc(row.sold_qty??0)}</td><td>${input("returned",row.returned_qty)}</td><td>${input("consumed",row.consumed_qty)}</td><td><strong data-booth-direct-difference>${esc(calculateBoothDifference(row))}</strong></td><td>${calculateBoothDifference(row)===0?"解消済み":"要確認"}</td><td><button type="button" class="secondary" data-booth-direct-save>保存</button></td></tr>`).join("")}</tbody></table></div>`;
   };
-  root.__aricoDirectDiffRenderer=renderBoothReportDiffRows;
+  root.__aricoDirectDiffRenderer=directDiffRenderer;
   async function saveDirect(button){
     const row=button.closest("[data-booth-direct-row]"),id=row?.dataset.itemId;if(!id)return;
     const values={};row.querySelectorAll("[data-booth-direct-qty]").forEach(input=>values[input.dataset.boothDirectQty]=String(input.value||"").trim());
