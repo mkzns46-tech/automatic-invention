@@ -10455,7 +10455,11 @@ var legacyExportBoothEventReportPdf=async function(event){
     if(label)label.textContent=selected?getBoothReportReturnDestinationLabel(selected):"未確定";
   };
 
-  root.renderBoothReportReturnBatchSection=function(rows){
+  // Retain the legacy renderer for old callers without replacing the
+  // canonical report renderer below.  Assigning the global name here made
+  // loadBoothEventReport depend on load order and reintroduced the retired
+  // event-level destination UI.
+  root.renderBoothReportReturnBatchSectionLegacy=function(rows){
     const list=(typeof buildBoothReportReturnRows==="function"?buildBoothReportReturnRows(rows):Array.isArray(rows)?rows:[]).filter(row=>row.item_type==="normal"||row.item_type==null);
     if(!list.length)return '<section class="booth-report-section" data-booth-report-return-section><h5>戻り実績</h5><div class="booth-empty">戻り対象商品はありません。</div></section>';
     const state=typeof getBoothReportReturnDestinationState==="function"?getBoothReportReturnDestinationState(list):{locked:"",mixed:false};
@@ -10472,7 +10476,7 @@ var legacyExportBoothEventReportPdf=async function(event){
     </section>`;
   };
 
-  root.saveBoothReportReturnBatch=async function(){
+  root.saveBoothReportReturnBatchLegacy=async function(){
     if(root.__aricoBoothReportReturnBatchSaving)return;
     const section=document.querySelector("[data-booth-report-return-section]");
     const event=currentEvent();
