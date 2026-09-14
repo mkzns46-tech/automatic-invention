@@ -114,7 +114,7 @@ function getSmaregiSnapshotFields({item,barcode,appStock,eventShelfStock,smaregi
   const rawStoreId=item?.store_id ?? context?.storeId ?? context?.store_id ?? currentStoreCode;
   return {
     store_id:rawStoreId===undefined||rawStoreId===null||String(rawStoreId).trim()==="" ? null : String(rawStoreId),
-    product_id:item?.product_id ?? product?.product_id ?? product?.id ?? null,
+    product_id:item?.product_id ?? product?.product_id ?? product?.barcode ?? null,
     product_name:item?.product_name ?? product?.product_name ?? product?.name ?? null,
     app_stock_at_check:snapshot.appStockAtCheck,
     event_shelf_stock_at_check:snapshot.eventShelfStockAtCheck,
