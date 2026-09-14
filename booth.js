@@ -3688,33 +3688,6 @@ async function loadBoothDepartureInventoryList(eventId){
   }
 }
 
-function renderBoothDepartureNormalSection(rows){
-  const body=rows.length?rows.map(row=>`<tr>
-    <td>${esc(row.product_name||"-")}${row.status==="unconfirmed"?'<div class="booth-status-note">持ち出し未登録</div>':""}</td>
-    <td>${esc(row.barcode||"-")}</td>
-    <td>${row.taken===null?"未登録":esc(row.taken)}</td>
-    <td>${esc(row.soldQty??0)}</td>
-    <td>${row.remain===null?"算出不可":esc(row.remain)}</td>
-  </tr>`).join(""):`<tr><td colspan="5">通常持ち出し在庫はありません。</td></tr>`;
-  const cards=rows.map(row=>`<article class="booth-history-card booth-departure-card">
-    <div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong>${row.status==="unconfirmed"?'<span class="booth-diff-status is-warn">持ち出し未登録</span>':""}</div>
-    <div class="booth-history-card-meta">
-      <span>バーコード：${esc(row.barcode||"-")}</span>
-      <span>持ち出し数：${row.taken===null?"未登録":esc(row.taken)}</span>
-      <span>販売数：${esc(row.soldQty??0)}</span>
-      <span>現在残数：${row.remain===null?"算出不可":esc(row.remain)}</span>
-    </div>
-  </article>`).join("");
-  return `<section class="booth-split-list-section">
-    <h5>通常持ち出し在庫</h5>
-    <div class="booth-history-table-wrap booth-scroll-table"><table class="booth-history-table booth-departure-list-table">
-      <thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し数</th><th>販売数</th><th>現在残数</th></tr></thead>
-      <tbody>${body}</tbody>
-    </table></div>
-    <div class="booth-history-cards booth-scroll-cards">${cards||'<div class="booth-empty">通常持ち出し在庫はありません。</div>'}</div>
-  </section>`;
-}
-
 function renderBoothDepartureGachaSection(rows){
   const body=rows.length?rows.map(row=>`<tr>
     <td>${esc(row.product_name||"-")}</td>
