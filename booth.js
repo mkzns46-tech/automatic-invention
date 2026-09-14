@@ -9477,7 +9477,6 @@ exportBoothDepartureInventoryCsv=async function(event){
       ["商品名","バーコード","ガチャ持ち出し数","戻り実数","使用数","現在ガチャ在庫"],
       ...data.gachaRows.map(row=>[row.product_name||"",row.barcode||"",row.taken,boothGachaDisplayQty(row.returned),boothGachaDisplayQty(row.used),row.remain])
     ];
-    window.__boothSalesUnmatched={eventId:event.id,rows:unmatched};
     downloadBoothCsvFile(`${boothEventExportBaseName(event,"持ち出し在庫一覧")}.csv`,rows);
   }catch(error){
     boothShowError("CSV出力エラー",error.message||"持ち出し在庫一覧CSVの出力に失敗しました。");
