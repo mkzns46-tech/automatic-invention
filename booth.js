@@ -531,7 +531,7 @@ async function exportPreviousBoothEventPlanCsv(targetEventId){
   }
 }
 
-function renderBoothEventDetail(event){
+function renderBoothEventDetailLegacyInitial(event){
   const detail=el("boothEventDetailRoot");
   if(!detail)return;
   if(!event){
@@ -639,7 +639,7 @@ function renderBoothEventDetail(event){
   el("boothCarryOutRegisterBtn")?.addEventListener("click",registerBoothCarryOutDraft);
 }
 
-function switchBoothEventMenu(menu){
+function switchBoothEventMenuLegacyInitial(menu){
   const event=getBoothCurrentEvent();
   if(!event){
     if(typeof showMessage==="function")showMessage("イベントを開いてから操作してください。","err");
@@ -2177,7 +2177,7 @@ async function copyPreviousBoothEventPlan(targetEventId){
   else await execute();
 }
 
-function renderBoothEventDetail(event){
+function renderBoothEventDetailLegacyIntermediate(event){
   const detail=el("boothEventDetailRoot");
   if(!detail)return;
   if(!event){
@@ -5134,7 +5134,7 @@ async function applyBoothReturnDraft(){
   }
 }
 
-function renderBoothReturnPanel(event){
+function renderBoothReturnPanelLegacy(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   const closed=isBoothEventClosed(event);
@@ -8716,7 +8716,7 @@ function renderBoothReturnPanel(event){
   loadBoothReturnHistory(event.id);
 }
 
-function setBoothReturnDestination(destination){
+function setBoothReturnDestinationLegacy(destination){
   if(boothReturnDraftItems.size&&destination!==boothReturnDraftDestination){
     boothShowError("\u623b\u3057\u5148\u5909\u66f4\u30a8\u30e9\u30fc","\u8ffd\u52a0\u6e08\u307f\u5546\u54c1\u3092\u524a\u9664\u3057\u3066\u304b\u3089\u623b\u3057\u5148\u3092\u5909\u66f4\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
     return false;
