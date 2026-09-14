@@ -1055,7 +1055,7 @@ async function confirmLegacyBoothEventClose(event){
   }
 }
 
-async function reflectBoothShelfReturnsOnClose(summary,staff){
+async function reflectBoothShelfReturnsOnCloseBase(summary,staff){
   const now=new Date().toISOString();
   for(const item of summary.returnPendingRows||summary.shelfReturnPendingRows||[]){
     const processType=getBoothCloseReturnProcessType(item);
@@ -8410,7 +8410,7 @@ async function confirmBoothSalesImportLegacyInitial(){
   }
 }
 
-async function renderBoothEventReportPanel(event){
+async function renderBoothEventReportPanelBase(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   area.innerHTML=`<section class="booth-work-card booth-event-report-card">
@@ -8427,7 +8427,7 @@ async function renderBoothEventReportPanel(event){
   loadBoothEventReport(event.id);
 }
 
-async function loadBoothEventReport(eventId){
+async function loadBoothEventReportBase(eventId){
   const body=el("boothEventReportBody");
   if(!body)return;
   try{
