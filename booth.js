@@ -1462,38 +1462,6 @@ async function boothEventHasWorkLogs(eventId){
   return checks.some(rows=>Array.isArray(rows)&&rows.length>0);
 }
 
-async function buildBoothEventReportData(eventId){
-  const [items,imports,movements,diffRows]=await Promise.all([
-    sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,sold_qty,returned_qty,consumed_qty,difference_qty,diff_memo,event_storage_qty,shelf_return_qty,updated_at&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc&limit=3000`).catch(()=>[]),
-    sb(`event_sales_imports?select=*&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed)&order=sold_at.asc&limit=3000`).catch(()=>[]),
-    sb(`booth_stock_movements?select=created_at,product_name,barcode,quantity,staff,memo,movement_type,item_type&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(departure_count,return,gacha_pick,gacha_return,event_close_return)&order=created_at.desc&limit=3000`).catch(()=>[]),
-    buildBoothDiffUniverseRows(eventId).catch(()=>[])
-  ]);
-  const rows=Array.isArray(items)?items:[];
-  const normal=rows.filter(row=>String(row.item_type||"normal")==="normal");
-  const gacha=rows.filter(row=>String(row.item_type||"")==="gacha_prize");
-  const salesRows=dedupeBoothSalesRows(imports);
-  const normalSales=salesRows.filter(row=>!isBoothGachaSaleRow(row));
-  const gachaSales=salesRows.filter(isBoothGachaSaleRow);
-  return {
-    normal,
-    gacha,
-    salesRows,
-    normalSales,
-    gachaSales,
-    movements:Array.isArray(movements)?movements:[],
-    diffRows:Array.isArray(diffRows)?diffRows:[],
-    totals:{
-      normalSalesQty:normalSales.reduce((sum,row)=>sum+Number(row.quantity||0),0),
-      gachaSalesQty:gachaSales.reduce((sum,row)=>sum+Number(row.quantity||0),0),
-      gachaRegistered:gacha.reduce((sum,row)=>sum+Number(row.taken_qty||0),0),
-      gachaUsed:gacha.reduce((sum,row)=>sum+Number(boothGachaUsedQty(row)||0),0),
-      start:normal.reduce((sum,row)=>sum+Number(row.taken_qty||0),0),
-      diffCount:(Array.isArray(diffRows)?diffRows:[]).filter(row=>calculateBoothItemDifference(row)!==0||!row.taken_registered).length
-    }
-  };
-}
-
 async function renderBoothEventReportPanelLegacyInitial(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
