@@ -668,7 +668,9 @@
       const remote=await searchProductsByName(keyword).catch(()=>[]);
       const merged=[...localRows,...(Array.isArray(remote)?remote:[])];
       const seen=new Set();
-      return merged.filter(row=>{const key=String(row?.barcode||row?.smaregi_product_id||row?.id||row?.name||"");if(!key||seen.has(key))return false;seen.add(key);return true;}).slice(0,80);
+      // products uses barcode as its primary key; never use a non-existent
+      // products.id fallback when de-duplicating search results.
+      return merged.filter(row=>{const key=String(row?.barcode||row?.smaregi_product_id||row?.name||"");if(!key||seen.has(key))return false;seen.add(key);return true;}).slice(0,80);
     }
     return localRows.slice(0,80);
   }
