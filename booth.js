@@ -4454,7 +4454,7 @@ async function applyBoothStorageOut(event,product,quantity,staff,memo){
   return true;
 }
 
-async function registerBoothCarryOut(){
+async function legacyRegisterBoothCarryOutV1(){
   const event=getBoothCurrentEvent();
   if(!event){
     boothShowError("持ち出し登録エラー","イベントを開いてから持ち出し登録してください。");
@@ -5463,7 +5463,7 @@ async function handleBoothScannedCode(code){
   else await previewBoothCarryOutProduct({popupOnError:false});
 }
 
-async function registerBoothCarryOut(){
+async function legacyRegisterBoothCarryOutV2(){
   const event=getBoothCurrentEvent();
   if(!event){
     boothShowError("持ち出し登録エラー","イベントを開いてから持ち出し登録してください。");
