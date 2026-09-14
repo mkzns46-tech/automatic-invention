@@ -463,19 +463,6 @@ async function createBoothEvent(){
   }
 }
 
-function openBoothEvent(eventId){
-  boothCurrentEventId=String(eventId||"");
-  const event=boothEvents.find(row=>String(row.id)===boothCurrentEventId);
-  renderBoothEvents(boothEvents);
-  const message=el("boothMessage");
-  if(message){
-    message.textContent=event
-      ? `イベントを開きました：${event.name}\n持ち出しスキャン、戻り棚卸、スマレジ在庫連携は次フェーズで実装します。`
-      : "イベントが見つかりません。";
-    message.className=event?"message ok":"message err";
-  }
-}
-
 function getBoothStatusLabel(status){
   const map={
     draft:"下書き",
