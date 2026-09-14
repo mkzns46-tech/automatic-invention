@@ -11708,6 +11708,8 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
   };
 
   confirmBoothEventClose=async function(event){
+    if(window.__aricoBoothEventCloseInFlight)return;
+    window.__aricoBoothEventCloseInFlight=true;
     const staff=String(event?.closed_by||event?.created_by||"\u30a4\u30d9\u30f3\u30c8\u7de0\u3081").trim()||"\u30a4\u30d9\u30f3\u30c8\u7de0\u3081";
     try{
       const latestRows=await sb("booth_events?select=*&id=eq."+encodeURIComponent(event.id)+"&limit=1");
@@ -11745,6 +11747,8 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
       await finalizeBoothEventClose(latestEvent,summary,staff);
     }catch(error){
       boothShowError("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u30a8\u30e9\u30fc",error.message||"\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002");
+    }finally{
+      window.__aricoBoothEventCloseInFlight=false;
     }
   };
 
