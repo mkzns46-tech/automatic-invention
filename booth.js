@@ -3066,6 +3066,8 @@ async function completeBoothDepartureCount(){
   if(!validateBoothStaffStore(staff,"担当者確認エラー","boothDepartureStaff"))return;
   const counts=Object.values(readBoothDepartureCounts(event.id)).filter(row=>Number(row.quantity||0)>0);
   if(!counts.length){boothShowError("持ち出し登録エラー","確定する商品がありません。");return;}
+  if(window.__aricoBoothDepartureSaving)return;
+  window.__aricoBoothDepartureSaving=true;
   const storeCode=getBoothCurrentStoreCode();
   const checked=[];
   try{
@@ -3085,7 +3087,6 @@ async function completeBoothDepartureCount(){
       ? await confirmAppAction("イベント持ち出し確定",[`変更商品：${checked.length}件`, `持ち出し合計：${total}個`,"通常棚 → 共通イベント棚","","確定すると在庫を移動します。"].join("\n"),{okText:"確定"})
       : true;
     if(!ok)return;
-    window.__aricoBoothDepartureSaving=true;
     // The database function performs the stock, event-item, and movement
     // writes in one transaction. Keep the client-side checks above for fast
     // feedback, but do not apply the individual REST mutations here.
