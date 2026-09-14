@@ -11681,18 +11681,21 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
     let snapshots=[];
     try{
       const finalSummary=await loadBoothCloseCommonStockSummary(event,await loadBoothCloseSummary(event));
-      await reflectBoothShelfReturnsOnClose(finalSummary,staff);
+      // Core close is executed in Postgres so stock, event rows, movements and
+      // logs commit or roll back together. The client only refreshes the
+      // resulting snapshot after the RPC succeeds.
+      await sb("rpc/confirm_booth_event_close",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({p_event_id:event.id,p_staff:staff})
+      });
       const snapshotSummary=await loadBoothCloseCommonStockSummary(event,await loadBoothCloseSummary(event));
       snapshots=await createBoothEventCloseSnapshots(event,snapshotSummary,staff,now).catch(error=>{
         console.warn("[booth close snapshot skipped]",error);
         return [];
       });
-      const updated=await sb("booth_events?id=eq."+encodeURIComponent(event.id),{
-        method:"PATCH",
-        headers:{Prefer:"return=representation"},
-        body:JSON.stringify({status:"closed",closed_at:now,closed_by:staff})
-      });
-      const closedEvent=Array.isArray(updated)&&updated[0]?updated[0]:{...event,status:"closed",closed_at:now,closed_by:staff};
+      const closedRows=await sb("booth_events?select=*&id=eq."+encodeURIComponent(event.id)+"&limit=1");
+      const closedEvent=Array.isArray(closedRows)&&closedRows[0]?closedRows[0]:{...event,status:"closed",closed_at:now,closed_by:staff};
       boothEvents=boothEvents.map(row=>String(row.id)===String(event.id)?closedEvent:row);
       boothCurrentEventId=String(event.id);
       renderBoothEvents(boothEvents);
