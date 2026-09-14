@@ -10597,16 +10597,21 @@ async function loadBoothCloseCommonStockSummary(event,summary){
     rows:rows.map(row=>{
       const barcode=getBoothCloseItemBarcode(row.barcode);
       const commonStock=byBarcode.get(barcode);
-      const current=commonStock
-        ? Number(commonStock.storage_qty||0)
-        : getBoothCommonShelfCurrentQtyFromEventItem(row);
       const counts=getBoothEventCloseEffectiveCounts(row);
       const taken=counts.taken;
       const sold=counts.sold;
       const returned=counts.returned;
-      const unreturned=Math.max(0,taken-sold-returned-counts.consumed);
+      // The event-specific shelf quantity is derived only from this event's
+      // confirmed item facts. event_storage_stocks is store-shared and may
+      // contain stock belonging to other events, so it is not a valid value
+      // for the event close table.
+      const current=Math.max(0,taken-sold-returned-counts.consumed);
+      const commonCurrent=commonStock
+        ? Number(commonStock.storage_qty||0)
+        : getBoothCommonShelfCurrentQtyFromEventItem(row);
+      const unreturned=current;
       const closeRemoval=returned+unreturned;
-      return {...row,event_shelf_current_qty:current,common_event_shelf_current_qty:current,event_shelf_store_code:storeCode,unreturned_qty:unreturned,event_storage_shortage_qty:Math.max(0,closeRemoval-current),event_shelf_planned_after_close:0};
+      return {...row,event_shelf_current_qty:current,common_event_shelf_current_qty:commonCurrent,event_shelf_store_code:storeCode,unreturned_qty:unreturned,event_storage_shortage_qty:Math.max(0,closeRemoval-commonCurrent),event_shelf_planned_after_close:0};
     }),
     commonShelfStocks:Array.isArray(stocks)?stocks:[],
     event_shelf_store_code:storeCode
