@@ -32,6 +32,9 @@ function showBoothManagement(){
   loadBoothEvents();
 }
 
+// Keep the entry point explicit for the menu bootstrap and browser-level integrations.
+window.showBoothManagement=showBoothManagement;
+
 function showBoothLocalMessage(text,type=""){
   const message=el("boothMessage");
   if(message){
