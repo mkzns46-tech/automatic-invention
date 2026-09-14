@@ -4086,6 +4086,7 @@ function parseInventoryCsv(text){
   const hasQuantityHeader=["数量","quantity"].includes(first[1]);
   const hasHeader=hasIdentityHeader&&hasQuantityHeader;
   if(hasIdentityHeader&&!hasQuantityHeader)throw new Error("CSVヘッダーの2列目は数量にしてください。");
+  if(!hasHeader&&first[0]&&first[1]!==undefined&&!/^\d+(?:\.\d+)?$/.test(first[0])&&!/^[+-]?\d+(?:\.\d+)?$/.test(first[1]))throw new Error("CSVヘッダーが不正です。商品コード,数量またはバーコード,数量を指定してください。");
   if(!hasHeader&&lines.length===1&&first[0]&&first[1]===undefined)throw new Error("CSVヘッダーまたは商品コード・数量の2列が必要です。");
   const start=hasHeader?1:0;
   return lines.slice(start).map((line,index)=>{const values=split(line);if(values.length!==2)throw new Error(`${start+index+1}行目：CSVは識別子と数量の2列で指定してください。`);return {line:start+index+1,identityType,identity:String(values[0]||"").trim(),productCode:String(values[0]||"").trim(),quantityText:String(values[1]??"").trim()};});
