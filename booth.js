@@ -11730,18 +11730,21 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
       const latestEvent=Array.isArray(latestRows)&&latestRows[0]?latestRows[0]:null;
       if(!latestEvent){boothShowError("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u30a8\u30e9\u30fc","\u30a4\u30d9\u30f3\u30c8\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3002");return;}
       if(isBoothEventClosed(latestEvent)){boothShowError("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u30a8\u30e9\u30fc","\u3053\u306e\u30a4\u30d9\u30f3\u30c8\u306f\u3059\u3067\u306b\u7de0\u3081\u6e08\u307f\u3067\u3059\u3002");return;}
-      const summary=await loadBoothCloseCommonStockSummary(latestEvent,await loadBoothCloseSummary(latestEvent));
+      let summary=await loadBoothCloseCommonStockSummary(latestEvent,await loadBoothCloseSummary(latestEvent));
       const normalRows=aricoCloseRowsNeedingReturn(summary);
       const noReturnSaved=aricoCloseHasNoReturnSaved(normalRows);
-      const unprocessedNormal=aricoCloseRowsWithoutDestination(normalRows);
       if(noReturnSaved){
         boothShowError("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u30a8\u30e9\u30fc","\u623b\u308a\u5b9f\u6570\u304c\u4fdd\u5b58\u3055\u308c\u3066\u3044\u307e\u305b\u3093\u3002\u623b\u308a\u5728\u5eab\u51e6\u7406\u3067\u5b9f\u6570\u3092\u4fdd\u5b58\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
         return;
       }
-      if(unprocessedNormal.length){
-        boothShowError("\u30a4\u30d9\u30f3\u30c8\u7de0\u3081\u30a8\u30e9\u30fc","\u623b\u308a\u5148\u304c\u672a\u78ba\u5b9a\u306e\u5546\u54c1\u304c\u3042\u308a\u307e\u3059\u3002\u30a4\u30d9\u30f3\u30c8\u30ec\u30dd\u30fc\u30c8\u3067\u623b\u308a\u5148\u3092\u78ba\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
-        return;
-      }
+      // The current workflow always returns counted quantities to the normal
+      // shelf at close. Older rows may not have a destination because the
+      // retired report-level destination UI was never used; they must not
+      // block the close operation. This is in-memory normalization only.
+      summary={...summary,rows:(summary.rows||[]).map(row=>({
+        ...row,
+        return_process_type:getBoothCloseReturnProcessType(row)||"shelf"
+      }))};
       const eventShelfQty=normalRows.reduce((sum,row)=>sum+Number(row.event_shelf_current_qty||0),0);
       const returnQty=normalRows.reduce((sum,row)=>sum+Number(row.returned_qty||0),0);
       const body=[
