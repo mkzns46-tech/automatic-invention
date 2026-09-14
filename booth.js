@@ -2674,7 +2674,7 @@ async function renderBoothDepartureCountList(eventId){
   </table></div>`;
 }
 
-async function completeBoothDepartureCount(){
+async function legacyCompleteBoothDepartureCount(){
   const event=getBoothCurrentEvent();
   if(!event)return;
   if(isBoothEventClosed(event)){
