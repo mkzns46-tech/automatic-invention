@@ -96,25 +96,6 @@ async function startInventoryApp(){
 
 startInventoryApp();
 
-// The booth bundle is optional during initial app bootstrap.  Some browsers
-// can finish the deferred bundle after the menu has already been rendered;
-// make sure the event-management entry point is available once the page is
-// ready, without loading the bundle twice when the normal script succeeded.
-function ensureBoothManagementBundle(){
-  if(typeof window.showBoothManagement==="function")return;
-  if(document.querySelector('script[data-booth-lazy-loader="1"]'))return;
-  const script=document.createElement("script");
-  script.src="./booth.js?v=2.93.92&lazy=1";
-  script.defer=false;
-  script.dataset.boothLazyLoader="1";
-  script.onload=()=>{
-    if(typeof window.showBoothManagement!=="function"&&typeof showMessage==="function")showMessage("イベント管理を読み込めませんでした。","err");
-  };
-  script.onerror=()=>typeof showMessage==="function"&&showMessage("イベント管理スクリプトの読み込みに失敗しました。","err");
-  document.head.appendChild(script);
-}
-window.addEventListener("DOMContentLoaded",ensureBoothManagementBundle,{once:true});
-window.addEventListener("load",ensureBoothManagementBundle,{once:true});
 /* v58 direct bind for product history csv */
 window.addEventListener("DOMContentLoaded",()=>{
   const btn=document.getElementById("productHistoryCsvBtn");

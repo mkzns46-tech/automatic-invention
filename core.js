@@ -358,11 +358,12 @@ function renderInventoryAppMenu(){
     }
     const existing=document.querySelector('script[data-booth-lazy-loader="1"]');
     if(existing){
-      showMessage("イベント管理を読み込み中です。少し待ってから再度お試しください。","err");
+      existing.addEventListener("load",()=>typeof window.showBoothManagement==="function"?window.showBoothManagement():showMessage("イベント管理を読み込めませんでした。","err"),{once:true});
+      existing.addEventListener("error",()=>showMessage("イベント管理スクリプトの読み込みに失敗しました。","err"),{once:true});
       return;
     }
     const script=document.createElement("script");
-    script.src="./booth.js?v=2.93.92&lazy=1";
+    script.src="./booth.js?v=2.93.93&lazy=1";
     script.defer=false;
     script.dataset.boothLazyLoader="1";
     script.onload=()=>typeof showBoothManagement==="function"?showBoothManagement():showMessage("イベント管理を読み込めませんでした。","err");
