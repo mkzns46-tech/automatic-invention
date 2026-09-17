@@ -964,6 +964,11 @@
     $("shelfLocationPrevColumnBtn")?.addEventListener("click",()=>{setColumn(Number($("shelfLocationColumn")?.value||1)-1); showShelfMessage(`登録先を${shelfCode()}に変更しました`,"ok");});
     $("shelfLocationNextColumnBtn")?.addEventListener("click",()=>{setColumn(Number($("shelfLocationColumn")?.value||1)+1); showShelfMessage(`登録先を${shelfCode()}に変更しました`,"ok");});
     $("shelfLocationBarcode")?.addEventListener("change",e=>handleBarcodeInput(e.target.value));
+    $("shelfLocationBarcode")?.addEventListener("keydown",e=>{
+      if(e.key!=="Enter")return;
+      e.preventDefault();
+      handleBarcodeInput(e.target.value);
+    });
     $("shelfLocationSearch")?.addEventListener("input",handleSearchInput);
     $("shelfLocationProductSearchSort")?.addEventListener("change",e=>{localStorage.setItem(STORAGE.sort,e.target.value); handleSearchInput();});
     $("shelfLocationRegisterBtn")?.addEventListener("click",registerShelfLocation);
