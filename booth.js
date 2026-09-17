@@ -65,7 +65,7 @@ async function loadBoothEvents(){
   try{
     showBoothLocalMessage("イベントを読み込み中...");
     const events=await sb("booth_events?select=*&order=created_at.desc&limit=200");
-    boothEvents=Array.isArray(events)?events:[];
+    boothEvents=(Array.isArray(events)?events:[]).filter(row=>String(row?.status||"").toLowerCase()!=="deleted");
     const savedEventId=String(localStorage.getItem(BOOTH_CURRENT_EVENT_STORAGE_KEY)||"").trim();
     if(savedEventId && boothEvents.some(row=>String(row.id)===savedEventId)){
       boothCurrentEventId=savedEventId;
@@ -8524,15 +8524,14 @@ async function deleteBoothEvent(eventId){
         return;
       }
       await rollbackBoothEventStocksBeforeDelete(eventId);
-      await sb(`event_storage_movements?event_id=eq.${encodeURIComponent(eventId)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}}).catch(()=>{});
-      await sb(`booth_stock_movements?event_id=eq.${encodeURIComponent(eventId)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}}).catch(()=>{});
-      await sb(`booth_event_items?event_id=eq.${encodeURIComponent(eventId)}`,{method:"DELETE",headers:{Prefer:"return=minimal"}}).catch(()=>{});
+      // Preserve event-linked history for audit; the event is archived below.
       await sb(`booth_events?id=eq.${encodeURIComponent(eventId)}`,{
-        method:"DELETE",
-        headers:{Prefer:"return=minimal"}
+        method:"PATCH",
+        headers:{Prefer:"return=minimal"},
+        body:JSON.stringify({status:"deleted",updated_at:new Date().toISOString()})
       });
       if(boothCurrentEventId===eventId)boothCurrentEventId="";
-      boothShowSuccess("\u30a4\u30d9\u30f3\u30c8\u524a\u9664\u5b8c\u4e86","\u30a4\u30d9\u30f3\u30c8\u3092\u524a\u9664\u3057\u307e\u3057\u305f\u3002\u30d4\u30c3\u30af\u6e08\u307f\u5728\u5eab\u306f\u623b\u3057\u307e\u3057\u305f\u3002");
+      boothShowSuccess("\u30a4\u30d9\u30f3\u30c8\u524a\u9664\u5b8c\u4e86","\u30a4\u30d9\u30f3\u30c8\u3092\u30a2\u30fc\u30ab\u30a4\u30d6\u3057\u307e\u3057\u305f\u3002\u5c65\u6b74\u306f\u76e3\u67fb\u7528\u306b\u4fdd\u6301\u3057\u3066\u3044\u307e\u3059\u3002\u30d4\u30c3\u30af\u6e08\u307f\u5728\u5eab\u306f\u623b\u3057\u307e\u3057\u305f\u3002");
       await loadBoothEvents();
     }catch(e){
       if(typeof showMessage==="function")showMessage("\u30a4\u30d9\u30f3\u30c8\u524a\u9664\u30a8\u30e9\u30fc\n"+e.message,"err");
@@ -8546,16 +8545,20 @@ async function rollbackBoothEventStocksBeforeDelete(eventId){
   const event=Array.isArray(events)&&events[0]?events[0]:boothEvents.find(row=>String(row.id)===String(eventId));
   if(isBoothEventClosed(event))throw new Error("\u7de0\u3081\u6e08\u307f\u30a4\u30d9\u30f3\u30c8\u306f\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
 
-  const items=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,normal_takeout_qty,storage_takeout_qty,event_storage_qty,sold_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
+  const items=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,event_storage_qty,sold_qty,returned_qty,consumed_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
   const rows=Array.isArray(items)?items:[];
   if(rows.some(row=>Number(row.sold_qty||0)>0))throw new Error("\u8ca9\u58f2\u53d6\u308a\u8fbc\u307f\u6e08\u307f\u306e\u5546\u54c1\u304c\u3042\u308b\u305f\u3081\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
-  if(rows.some(row=>String(row.item_type||"")==="gacha_prize"))throw new Error("\u30ac\u30c1\u30e3\u5c65\u6b74\u304c\u3042\u308b\u30a4\u30d9\u30f3\u30c8\u306f\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
+  const gachaRows=rows.filter(row=>String(row.item_type||"")==="gacha_prize");
+  const gachaActive=gachaRows.some(row=>{
+    const picked=Number(row.normal_takeout_qty||0)+Number(row.storage_takeout_qty||0)+Number(row.event_storage_qty||0);
+    const taken=Number(row.taken_qty||0)||picked;
+    return Math.max(0,taken-Number(row.sold_qty||0)-Number(row.returned_qty||0)-Number(row.consumed_qty||0))>0;
+  });
+  if(gachaActive)throw new Error("\u30ac\u30c1\u30e3\u6301\u3061\u51fa\u3057\u4e2d\u306e\u5546\u54c1\u304c\u6b8b\u3063\u3066\u3044\u308b\u305f\u3081\u524a\u9664\u3067\u304d\u307e\u305b\u3002\u5148\u306b\u30ac\u30c1\u30e3\u623b\u308a\u307e\u305f\u306f\u4f7f\u7528\u6570\u3092\u78ba\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
 
   const salesImports=await sb(`event_sales_imports?select=id&event_id=eq.${encodeURIComponent(eventId)}&import_status=in.(pending,confirmed)&limit=1`).catch(()=>[]);
   if(Array.isArray(salesImports)&&salesImports.length)throw new Error("\u8ca9\u58f2\u53d6\u308a\u8fbc\u307f\u5c65\u6b74\u304c\u3042\u308b\u305f\u3081\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
 
-  const gachaMovements=await sb(`booth_stock_movements?select=id&event_id=eq.${encodeURIComponent(eventId)}&movement_type=in.(gacha_pick,gacha_return)&limit=1`).catch(()=>[]);
-  if(Array.isArray(gachaMovements)&&gachaMovements.length)throw new Error("\u30ac\u30c1\u30e3\u5c65\u6b74\u304c\u3042\u308b\u30a4\u30d9\u30f3\u30c8\u306f\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
 
   const storeCode=typeof getBoothCurrentStoreCode==="function"?getBoothCurrentStoreCode():"tokyo";
   for(const item of rows.filter(row=>String(row.item_type||"normal")==="normal")){
