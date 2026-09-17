@@ -451,7 +451,7 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     const selectedEventStore=normalizeSmaregiStoreCodeForStorage(resolvedEvent?.store_code||"");
     const selectedEventIsValid=selectedEventId
       && selectedEventStore===storeCode
-      && !new Set(["closed","cancelled","canceled","deleted","invalid"]).has(String(selectedEvent?.status||"").trim().toLowerCase());
+      && !new Set(["closed","cancelled","canceled","deleted","invalid"]).has(String(resolvedEvent?.status||"").trim().toLowerCase());
     activeEventIds=selectedEventIsValid
       ? [selectedEventId]
       : storeEvents.filter(event=>{
