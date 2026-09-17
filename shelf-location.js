@@ -66,17 +66,30 @@
     const active=locations.filter(loc=>!loc.deleted_at);
     const current=String(product?.location||active.find(loc=>loc.is_primary)?.shelf_code||active[0]?.shelf_code||"").trim();
     if(current===code){showShelfMessage(`この商品はすでに${code}です` ,"ok");return false;}
-    const target=active.find(loc=>loc.is_primary)||active[0];
+    // Prefer the row that agrees with products.location. Older data can have
+    // more than one active row or a stale primary flag; changing an arbitrary
+    // first row leaves the product and its shelf history inconsistent.
+    const target=active.find(loc=>String(loc.shelf_code||"").trim()===current)
+      ||active.find(loc=>loc.is_primary)
+      ||active[0];
     if(target){
       await sb(`product_locations?id=eq.${encodeURIComponent(target.id)}`,{method:"PATCH",body:JSON.stringify({shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,updated_by:staff,updated_at:new Date().toISOString()})});
       for(const other of active.filter(loc=>String(loc.id)!==String(target.id))){
         await sb(`product_locations?id=eq.${encodeURIComponent(other.id)}`,{method:"PATCH",body:JSON.stringify({is_primary:false,deleted_at:new Date().toISOString(),updated_by:staff,updated_at:new Date().toISOString()})});
       }
     }else{
-      await sb("product_locations",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({product_id:product.barcode||null,barcode:product.barcode,shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,created_by:staff,updated_by:staff})});
+      // Reuse a soft-deleted legacy row when present. This avoids a unique-key
+      // failure and makes an existing product changeable again.
+      const historical=await sbAll(`product_locations?select=*&barcode=eq.${encodeURIComponent(product.barcode)}&limit=100`,1000,100).catch(()=>[]);
+      const reusable=historical.find(loc=>loc.deleted_at||!String(loc.shelf_code||"").trim());
+      if(reusable){
+        await sb(`product_locations?id=eq.${encodeURIComponent(reusable.id)}`,{method:"PATCH",body:JSON.stringify({product_id:product.barcode||null,barcode:product.barcode,shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,deleted_at:null,updated_by:staff,updated_at:new Date().toISOString()})});
+      }else{
+        await sb("product_locations",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({product_id:product.barcode||null,barcode:product.barcode,shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,created_by:staff,updated_by:staff})});
+      }
     }
     await patchProductLocation(product,code);
-    await insertLocationLog({product_id:product.barcode||null,barcode:product.barcode,product_name:product.name||"",action_type:"棚番追加",before_shelf_code:current,after_shelf_code:code,staff});
+    await insertLocationLog({product_id:product.barcode||null,barcode:product.barcode,product_name:product.name||"",action_type:current?"棚番変更":"棚番追加",before_shelf_code:current,after_shelf_code:code,staff});
     return true;
   }
   function canCancelLog(log){

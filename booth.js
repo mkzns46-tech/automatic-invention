@@ -2,6 +2,7 @@
 
 let boothEvents=[];
 let boothCurrentEventId="";
+const BOOTH_CURRENT_EVENT_STORAGE_KEY="arico_current_booth_event_id";
 let boothFilterFrom="";
 let boothFilterTo="";
 let boothCameraStream=null;
@@ -65,6 +66,12 @@ async function loadBoothEvents(){
     showBoothLocalMessage("イベントを読み込み中...");
     const events=await sb("booth_events?select=*&order=created_at.desc&limit=200");
     boothEvents=Array.isArray(events)?events:[];
+    const savedEventId=String(localStorage.getItem(BOOTH_CURRENT_EVENT_STORAGE_KEY)||"").trim();
+    if(savedEventId && boothEvents.some(row=>String(row.id)===savedEventId)){
+      boothCurrentEventId=savedEventId;
+    }else if(savedEventId){
+      localStorage.removeItem(BOOTH_CURRENT_EVENT_STORAGE_KEY);
+    }
     renderBoothEvents(boothEvents);
     showBoothLocalMessage(boothEvents.length?`イベント ${boothEvents.length}件を表示しています。`:"イベントはまだありません。","ok");
   }catch(e){
@@ -1419,6 +1426,8 @@ function registerBoothCarryOutDraft(){
 
 function openBoothEvent(eventId){
   boothCurrentEventId=String(eventId||"");
+  if(boothCurrentEventId)localStorage.setItem(BOOTH_CURRENT_EVENT_STORAGE_KEY,boothCurrentEventId);
+  else localStorage.removeItem(BOOTH_CURRENT_EVENT_STORAGE_KEY);
   const event=getBoothCurrentEvent();
   renderBoothEvents(boothEvents);
   renderBoothEventDetail(event);
@@ -1653,7 +1662,10 @@ async function deleteBoothEventLegacy(eventId){
         method:"DELETE",
         headers:{Prefer:"return=minimal"}
       });
-      if(boothCurrentEventId===eventId)boothCurrentEventId="";
+      if(boothCurrentEventId===eventId){
+        boothCurrentEventId="";
+        localStorage.removeItem(BOOTH_CURRENT_EVENT_STORAGE_KEY);
+      }
       boothShowSuccess("イベント削除完了","イベントを削除しました。");
       await loadBoothEvents();
     }catch(e){
