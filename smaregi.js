@@ -438,8 +438,17 @@ async function loadSmaregiEventInventoryCache(barcodes=[]){
     const events=await sbAll(`booth_events?select=id,event_start,event_end,status,store_code&store_code=eq.${encodeURIComponent(storeCode)}&limit=1000`,1000,5000);
     const storeEvents=(Array.isArray(events)?events:[]).filter(event=>String(event?.id||"").trim());
     const selectedEvent=typeof window.getBoothCurrentEvent==="function" ? window.getBoothCurrentEvent() : null;
-    const selectedEventId=String(selectedEvent?.id||"").trim();
-    const selectedEventStore=normalizeSmaregiStoreCodeForStorage(selectedEvent?.store_code||"");
+    // The event-management bundle is lazy-loaded.  On analytics navigation
+    // its in-memory selection can be unavailable for one tick even though the
+    // persisted selection is valid.  Resolve the persisted id against the
+    // already fetched store events before falling back to date discovery.
+    const savedEventId=String(localStorage.getItem("arico_current_booth_event_id")||"").trim();
+    const persistedEvent=(!selectedEvent&&savedEventId)
+      ? storeEvents.find(event=>String(event?.id||"").trim()===savedEventId)||null
+      : null;
+    const resolvedEvent=selectedEvent||persistedEvent;
+    const selectedEventId=String(resolvedEvent?.id||"").trim();
+    const selectedEventStore=normalizeSmaregiStoreCodeForStorage(resolvedEvent?.store_code||"");
     const selectedEventIsValid=selectedEventId
       && selectedEventStore===storeCode
       && !new Set(["closed","cancelled","canceled","deleted","invalid"]).has(String(selectedEvent?.status||"").trim().toLowerCase());
