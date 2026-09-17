@@ -363,7 +363,7 @@ function renderInventoryAppMenu(){
       return;
     }
     const script=document.createElement("script");
-    script.src="./booth.js?v=2.93.94&lazy=1";
+    script.src="./booth.js?v=2.93.95&lazy=1";
     script.defer=false;
     script.dataset.boothLazyLoader="1";
     script.onload=()=>typeof showBoothManagement==="function"?showBoothManagement():showMessage("イベント管理を読み込めませんでした。","err");
@@ -501,6 +501,9 @@ function showInventorySettingsSection(menuKey,targetId){
 function showInventoryAnalytics(){
   if(!unlockInventoryScreen("analytics"))return;
   showInventoryScreen("analytics","inventory-analytics");
+  // Refresh after an event is selected so analytics never keeps a cache
+  // created before the lazy event-management bundle restored the selection.
+  if(typeof loadLatestSmaregiSnapshot==="function")loadLatestSmaregiSnapshot();
   if(typeof refreshSmaregiAnalyticsPanels==="function")refreshSmaregiAnalyticsPanels();
   else{
     if(typeof loadSmaregiAccuracy==="function")loadSmaregiAccuracy();
