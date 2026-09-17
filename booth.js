@@ -65,7 +65,7 @@ async function loadBoothEvents(){
   try{
     showBoothLocalMessage("イベントを読み込み中...");
     const events=await sb("booth_events?select=*&order=created_at.desc&limit=200");
-    boothEvents=(Array.isArray(events)?events:[]).filter(row=>String(row?.status||"").toLowerCase()!=="deleted");
+    boothEvents=(Array.isArray(events)?events:[]).filter(row=>!new Set(["deleted","cancelled"]).has(String(row?.status||"").toLowerCase()));
     const savedEventId=String(localStorage.getItem(BOOTH_CURRENT_EVENT_STORAGE_KEY)||"").trim();
     if(savedEventId && boothEvents.some(row=>String(row.id)===savedEventId)){
       boothCurrentEventId=savedEventId;
@@ -348,7 +348,7 @@ async function loadBoothCurrentEventStorageRows(storeCode,options={}){
   const eventRows=await sb(`booth_events?select=id,store_code,status,created_at&store_code=eq.${encodeURIComponent(normalizedStore)}&order=created_at.desc&limit=5000`);
   const events=(Array.isArray(eventRows)?eventRows:[])
     .filter(event=>normalizeBoothStoreCode(event?.store_code)===normalizedStore)
-    .filter(event=>String(event?.status||"").toLowerCase()!=="deleted");
+    .filter(event=>!new Set(["deleted","cancelled"]).has(String(event?.status||"").toLowerCase()));
   const eventOrderIds=selectedEventId&&events.some(event=>String(event.id||"")===selectedEventId)
     ? [selectedEventId]
     : selectedEventId ? [] : events.map(event=>String(event.id||"").trim()).filter(Boolean);
@@ -8528,7 +8528,7 @@ async function deleteBoothEvent(eventId){
       await sb(`booth_events?id=eq.${encodeURIComponent(eventId)}`,{
         method:"PATCH",
         headers:{Prefer:"return=minimal"},
-        body:JSON.stringify({status:"deleted",updated_at:new Date().toISOString()})
+        body:JSON.stringify({status:"cancelled",memo:[event?.memo||"",`[イベント削除アーカイブ ${new Date().toISOString()}]`].filter(Boolean).join("\n"),updated_at:new Date().toISOString()})
       });
       if(boothCurrentEventId===eventId)boothCurrentEventId="";
       boothShowSuccess("\u30a4\u30d9\u30f3\u30c8\u524a\u9664\u5b8c\u4e86","\u30a4\u30d9\u30f3\u30c8\u3092\u30a2\u30fc\u30ab\u30a4\u30d6\u3057\u307e\u3057\u305f\u3002\u5c65\u6b74\u306f\u76e3\u67fb\u7528\u306b\u4fdd\u6301\u3057\u3066\u3044\u307e\u3059\u3002\u30d4\u30c3\u30af\u6e08\u307f\u5728\u5eab\u306f\u623b\u3057\u307e\u3057\u305f\u3002");
