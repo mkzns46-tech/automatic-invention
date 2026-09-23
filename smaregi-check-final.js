@@ -1876,7 +1876,7 @@
   function isEquipmentTransferTypeValue(value){
     const text=String(value||"").trim();
     if(text==="equipment_transfer_cancel" || text==="商品転用キャンセル")return false;
-    return text==="備品転用" || text==="equipment_transfer" || text.includes("蛯吝刀");
+    return text==="備品転用" || text==="商品転用" || text==="equipment_transfer" || text.includes("蛯吝刀");
   }
 
   function isEquipmentCancelLog(log){
