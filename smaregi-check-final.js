@@ -1905,7 +1905,6 @@
   window.equipmentCheckHtml=function(log){
     if(isEquipmentCancelLog(log))return '<span class="equipment-status-badge is-checked">キャンセル済</span>';
     if(!isEquipmentTransferTypeValue(log?.type))return "";
-    if(isEquipmentMobileView())return "";
     const rawLogId=String(log?.id||log?.log_id||"");
     if(rawLogId)setEquipmentCache(rawLogId,log);
     const hasAccess=typeof hasInventoryPrivilegedAccess==="function" && hasInventoryPrivilegedAccess();
