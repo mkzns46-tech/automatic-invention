@@ -22,7 +22,7 @@ function historyEquipmentCheckLog(log){
     : log;
 }
 function historyEquipmentCheckHtml(log){
-  if(inventoryTypeLabel(log?.type)!==="商品転用")return "";
+  if(inventoryTypeLabel(log?.type) !== "商品転用")return "";
   const rawLogId=String(log?.id||"");
   const checked=log?.equipment_checked===true
     || String(log?.equipment_checked||"").toLowerCase()==="true"
