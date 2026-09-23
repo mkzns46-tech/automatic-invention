@@ -15,6 +15,12 @@ function inventoryTypeLabel(type){
   };
   return labels[type]||String(type||"");
 }
+
+function historyEquipmentCheckLog(log){
+  return inventoryTypeLabel(log?.type)==="商品転用"
+    ? {...log,type:"備品転用"}
+    : log;
+}
 function isInventoryOutType(type){
   return type==="出荷"||type==="備品転用"||type==="equipment_transfer"||type==="event_pick"||type==="gacha_pick"||type==="イベント棚在庫修正";
 }
@@ -817,7 +823,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
       <td>${fixed.after}</td>
       <td>${fixed.event?`${fixed.before} → ${fixed.after}`:"-"}</td>
       <td>${memoCellHtml(r.log)}</td>
-      <td>${equipmentCheckHtml(r.log)}</td>
+      <td>${equipmentCheckHtml(historyEquipmentCheckLog(r.log))}</td>
     </tr>`;
   }).join("");
 }
@@ -885,7 +891,7 @@ function buildGlobalHistoryRows(sourceLogs=logs){
       <td>${fixed.after}</td>
       <td>${fixed.event?`${fixed.before} → ${fixed.after}`:"-"}</td>
       <td>${memoCellHtml(log)}</td>
-      <td>${equipmentCheckHtml(log)}</td>
+      <td>${equipmentCheckHtml(historyEquipmentCheckLog(log))}</td>
     </tr>`;
   }).join("");
 }
