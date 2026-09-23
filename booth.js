@@ -8543,9 +8543,14 @@ async function deleteBoothEvent(eventId){
 }
 
 async function rollbackBoothEventStocksBeforeDelete(eventId){
-  const events=await sb(`booth_events?select=id,status&id=eq.${encodeURIComponent(eventId)}&limit=1`).catch(()=>[]);
+  const events=await sb(`booth_events?select=id,status,closed_at,reopened_at&id=eq.${encodeURIComponent(eventId)}&limit=1`).catch(()=>[]);
   const event=Array.isArray(events)&&events[0]?events[0]:boothEvents.find(row=>String(row.id)===String(eventId));
-  if(isBoothEventClosed(event))throw new Error("\u7de0\u3081\u6e08\u307f\u30a4\u30d9\u30f3\u30c8\u306f\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002");
+  // A close/reopen cycle already applied the physical close transaction. Do
+  // not run the legacy delete rollback again, or normal stock is restored a
+  // second time. Keep the audit trail and archive the event instead.
+  if(isBoothEventClosed(event)||event?.closed_at||event?.reopened_at){
+    throw new Error("\u7de0\u3081\u307e\u305f\u306f\u7de0\u3081\u89e3\u9664\u6e08\u307f\u30a4\u30d9\u30f3\u30c8\u306f\u524a\u9664\u3067\u304d\u307e\u305b\u3093\u3002\u5c65\u6b74\u3092\u4fdd\u6301\u3057\u305f\u307e\u307e\u7ba1\u7406\u8005\u3067\u30a2\u30fc\u30ab\u30a4\u30d6\u3057\u3066\u304f\u3060\u3055\u3044\u3002");
+  }
 
   const items=await sb(`booth_event_items?select=id,event_id,barcode,product_name,item_type,taken_qty,normal_takeout_qty,storage_takeout_qty,event_storage_qty,sold_qty,returned_qty,consumed_qty&event_id=eq.${encodeURIComponent(eventId)}&order=product_name.asc`);
   const rows=Array.isArray(items)?items:[];
