@@ -473,8 +473,8 @@ async function upsertSmaregiProductRows(rows){
 }
 
 function getSmaregiExistingProductFilter(current){
-  const id=String(current?.id||"").trim();
-  if(id)return `id=eq.${encodeURIComponent(id)}`;
+  // products uses barcode as its primary key. Do not fall back to the
+  // non-existent products.id column when updating an existing master row.
   const barcode=String(current?.barcode||"").trim();
   if(barcode)return `barcode=eq.${encodeURIComponent(barcode)}`;
   throw new Error("既存商品の更新対象キーがありません。");
