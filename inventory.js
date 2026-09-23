@@ -1399,7 +1399,7 @@ function isEquipmentTransferChecked(log){
 
 function isManualSmaregiConfirmationType(log){
   const type=String(log?.type||"");
-  return type==="備品転用"||type==="equipment_transfer"||type==="gacha_pick"||type==="gacha_return";
+  return type==="備品転用"||type==="商品転用"||type==="equipment_transfer"||type==="gacha_pick"||type==="gacha_return";
 }
 
 function isGachaInventoryLog(log){
@@ -1607,7 +1607,7 @@ async function executeEquipmentTransferConfirmation({log,product=null,quantity,c
       const latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : null;
       if(!latestLog)throw new Error(`商品転用履歴が見つかりません。inventory_logs.id=${logId}`);
       if(isEquipmentTransferChecked(latestLog))throw new Error("この商品転用は確認済みです。");
-      if(latestLog.type!=="備品転用")throw new Error("商品転用の履歴ではありません。");
+      if(latestLog.type!=="備品転用"&&latestLog.type!=="商品転用")throw new Error("商品転用の履歴ではありません。");
 
       quantity=Number(latestLog.quantity||quantity||0);
       if(!Number.isInteger(quantity)||quantity<=0)throw new Error("数量は1以上で入力してください。");
@@ -1717,7 +1717,7 @@ async function confirmEquipmentTransfer(logId,button=null){
       });
       return;
     }
-    if(log.type!=="備品転用")throw new Error("商品転用の履歴ではありません。");
+    if(log.type!=="備品転用"&&log.type!=="商品転用")throw new Error("商品転用の履歴ではありません。");
 
     const quantity=Number(log.quantity||0);
     if(!Number.isInteger(quantity)||quantity<=0)throw new Error("数量は1以上で入力してください。");
