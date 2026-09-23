@@ -4577,7 +4577,9 @@ function switchBoothEventMenu(menu){
     return;
   }
   if(menu==="departure-list"){
-    renderBoothDepartureInventoryListPanel(event);
+    // Use the current event-scoped inventory data builder and renderer.
+    // The former duplicate entry-point was removed during consolidation.
+    renderBoothDepartureInventoryListPanelLegacyIntermediate(event);
     return;
   }
   if(menu==="sales"){
