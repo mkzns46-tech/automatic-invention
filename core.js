@@ -363,7 +363,7 @@ function renderInventoryAppMenu(){
       return;
     }
     const script=document.createElement("script");
-    script.src="./booth.js?v=2.93.100&lazy=1";
+    script.src="./booth.js?v=2.93.101&lazy=1";
     script.defer=false;
     script.dataset.boothLazyLoader="1";
     script.onload=()=>typeof showBoothManagement==="function"?showBoothManagement():showMessage("イベント管理を読み込めませんでした。","err");
@@ -489,7 +489,30 @@ function requireInventoryPrivilegedAccess(){
 function showInventorySettings(){
   if(!unlockInventoryScreen("settings"))return;
   showInventoryScreen("settings");
-  if(typeof bindBoothEventRegisterSettings==="function")bindBoothEventRegisterSettings();
+  if(typeof bindBoothEventRegisterSettings==="function"){
+    bindBoothEventRegisterSettings();
+    return;
+  }
+  // Settings contains the event-register form, which is implemented by the
+  // lazy booth bundle. Load that bundle on demand so opening Settings does not
+  // leave the form visible but unbound when Event Management was not opened.
+  const bindAfterLoad=()=>{
+    if(typeof bindBoothEventRegisterSettings==="function")bindBoothEventRegisterSettings();
+    else showMessage("イベントレジ設定を読み込めませんでした。","err");
+  };
+  const existing=document.querySelector('script[data-booth-lazy-loader="1"]');
+  if(existing){
+    existing.addEventListener("load",bindAfterLoad,{once:true});
+    existing.addEventListener("error",()=>showMessage("イベントレジ設定スクリプトの読み込みに失敗しました。","err"),{once:true});
+    return;
+  }
+  const script=document.createElement("script");
+  script.src="./booth.js?v=2.93.101&lazy=1";
+  script.defer=false;
+  script.dataset.boothLazyLoader="1";
+  script.onload=bindAfterLoad;
+  script.onerror=()=>showMessage("イベントレジ設定スクリプトの読み込みに失敗しました。","err");
+  document.head.appendChild(script);
 }
 
 function showInventorySettingsSection(menuKey,targetId){

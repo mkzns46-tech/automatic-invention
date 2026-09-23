@@ -3688,7 +3688,7 @@ function renderBoothDepartureGachaSection(rows){
   </section>`;
 }
 
-async function renderBoothDepartureInventoryListPanelLegacyIntermediate(event){
+async function renderBoothDepartureInventoryListPanel(event){
   const area=el("boothEventWorkArea");
   if(!area)return;
   area.innerHTML=`<section class="booth-work-card booth-departure-list-card">
@@ -4579,7 +4579,7 @@ function switchBoothEventMenu(menu){
   if(menu==="departure-list"){
     // Use the current event-scoped inventory data builder and renderer.
     // The former duplicate entry-point was removed during consolidation.
-    renderBoothDepartureInventoryListPanelLegacyIntermediate(event);
+    renderBoothDepartureInventoryListPanel(event);
     return;
   }
   if(menu==="sales"){
@@ -6468,15 +6468,15 @@ async function saveBoothEventRegisterSettings(event){
     {
       store_code:"tokyo",
       register_name:String(el("tokyoEventRegisterName")?.value||"東京イベントレジ").trim()||"東京イベントレジ",
-      register_id:String(el("tokyoEventRegisterId")?.value||"").trim(),
-      terminal_id:String(el("tokyoEventTerminalId")?.value||"").trim(),
+      register_id:String(el("tokyoEventRegisterId")?.value||"").trim()||null,
+      terminal_id:String(el("tokyoEventTerminalId")?.value||"").trim()||null,
       updated_at:now
     },
     {
       store_code:"aichi",
       register_name:String(el("aichiEventRegisterName")?.value||"愛知イベントレジ").trim()||"愛知イベントレジ",
-      register_id:String(el("aichiEventRegisterId")?.value||"").trim(),
-      terminal_id:String(el("aichiEventTerminalId")?.value||"").trim(),
+      register_id:String(el("aichiEventRegisterId")?.value||"").trim()||null,
+      terminal_id:String(el("aichiEventTerminalId")?.value||"").trim()||null,
       updated_at:now
     }
   ];
