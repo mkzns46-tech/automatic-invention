@@ -1686,11 +1686,24 @@ async function confirmEquipmentTransfer(logId,button=null){
     return;
   }
   try{
-    const log=equipmentTransferLogCache.get(logId)||null;
+    // The history table can outlive the cached row (another tab, a prior
+    // confirmation, or a delayed re-render). Refresh the exact inventory log
+    // before deciding whether to show the confirmation flow so a stale
+    // "未確認" button cannot produce a false "already confirmed" error.
+    const latestRows=await sb(`inventory_logs?select=*&id=eq.${encodeURIComponent(logId)}&limit=1`);
+    const latestLog=Array.isArray(latestRows)&&latestRows[0] ? latestRows[0] : null;
+    if(latestLog){
+      equipmentTransferLogCache.set(logId,latestLog);
+      logs=(logs||[]).some(item=>String(item.id)===String(logId))
+        ? logs.map(item=>String(item.id)===String(logId) ? latestLog : item)
+        : [latestLog,...(logs||[])];
+    }
+    const log=latestLog||equipmentTransferLogCache.get(logId)||null;
     if(!log)throw new Error("画面上の商品転用履歴を取得できません。再読み込みしてください。");
     if(isEquipmentTransferChecked(log)){
-      showMessage("この商品転用は確認済みです。","err");
       replaceEquipmentConfirmationDom(logId,log);
+      renderGlobalHistory();
+      if(selectedBarcode)await showProductHistoryForBarcode(selectedBarcode,log);
       return;
     }
     if(isGachaInventoryLog(log)){
