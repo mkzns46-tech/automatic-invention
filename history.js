@@ -33,6 +33,14 @@ function historyEquipmentCheckHtml(log){
   const hasAccess=typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess();
   return `<div class="equipment-check-cell" data-log-id="${esc(rawLogId)}"><span class="equipment-check-status is-unchecked">未確認</span><button type="button" class="equipment-confirm-btn" data-log-id="${esc(rawLogId)}"${hasAccess?"":" disabled title=\"管理者認証後に操作できます\""}>${hasAccess?"確認":"管理者認証が必要"}</button></div>`;
 }
+function historyEquipmentCheckCellHtml(log){
+  const html=historyEquipmentCheckHtml(log);
+  if(html)return html;
+  const isTransfer=String(log?.type||"").includes("転用")||String(log?.type||"")==="蛯吝刀霆｢逕ｨ"||inventoryTypeLabel(log?.type)==="商品転用";
+  if(!isTransfer)return "";
+  const checked=log?.equipment_checked===true||String(log?.equipment_checked||"").toLowerCase()==="true"||Boolean(log?.equipment_checked_at);
+  return checked ? `<div class="equipment-check-cell"><span class="equipment-check-status is-checked">確認済</span></div>` : `<div class="equipment-check-cell"><span class="equipment-check-status is-unchecked">未確認</span></div>`;
+}
 function isInventoryOutType(type){
   return type==="出荷"||type==="備品転用"||type==="equipment_transfer"||type==="event_pick"||type==="gacha_pick"||type==="イベント棚在庫修正";
 }
@@ -835,7 +843,7 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
       <td>${fixed.after}</td>
       <td>${fixed.event?`${fixed.before} → ${fixed.after}`:"-"}</td>
       <td>${memoCellHtml(r.log)}</td>
-      <td>${historyEquipmentCheckHtml(r.log)}</td>
+      <td>${historyEquipmentCheckCellHtml(r.log)}</td>
     </tr>`;
   }).join("");
 }
@@ -903,7 +911,7 @@ function buildGlobalHistoryRows(sourceLogs=logs){
       <td>${fixed.after}</td>
       <td>${fixed.event?`${fixed.before} → ${fixed.after}`:"-"}</td>
       <td>${memoCellHtml(log)}</td>
-      <td>${historyEquipmentCheckHtml(log)}</td>
+      <td>${historyEquipmentCheckCellHtml(log)}</td>
     </tr>`;
   }).join("");
 }
