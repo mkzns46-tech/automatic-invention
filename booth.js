@@ -11268,7 +11268,10 @@ function renderBoothReportReturnBatchSection(rows){
   const tableRows=list.map(row=>{
     const id=String(row.id||"");
     const returned=Number(row.returned_qty||0);
-    const saved=isBoothReturnReflected(row)||getBoothReturnProcessType(row);
+    // A shared return count is already persisted in returned_qty before the
+    // destination is finalized. Keep the report status aligned with the
+    // return-inventory screen instead of requiring the legacy destination flag.
+    const saved=Number(row.returned_qty||0)>0||isBoothReturnReflected(row)||getBoothReturnProcessType(row);
     return `<tr data-booth-report-return-row data-item-id="${esc(id)}" data-return-diff="${esc(row.return_difference)}">
       <td>${esc(row.product_name||"-")}</td><td>${esc(row.barcode||"-")}</td><td>${esc(row.taken_qty??0)}</td><td>${esc(row.sold_qty??0)}</td><td>${esc(row.consumed_qty??0)}</td><td>${esc(row.planned_return_qty)}</td>
       <td><input class="booth-history-qty-input" data-booth-report-return-input type="number" min="0" step="1" inputmode="numeric" data-item-id="${esc(id)}" data-product-name="${esc(row.product_name||"")}" data-barcode="${esc(row.barcode||"")}" data-saved-returned="${esc(returned)}" data-planned-returned="${esc(row.planned_return_qty)}" value="${esc(returned)}" aria-label="戻り実数"></td>
@@ -11277,7 +11280,7 @@ function renderBoothReportReturnBatchSection(rows){
   const cards=list.map(row=>{
     const id=String(row.id||"");
     const returned=Number(row.returned_qty||0);
-    const saved=isBoothReturnReflected(row)||getBoothReturnProcessType(row);
+    const saved=Number(row.returned_qty||0)>0||isBoothReturnReflected(row)||getBoothReturnProcessType(row);
     return `<article class="booth-history-card booth-report-return-card" data-booth-report-return-row data-item-id="${esc(id)}" data-return-diff="${esc(row.return_difference)}">
       <div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong><span>${esc(row.barcode||"-")}</span></div>
       <div class="booth-history-card-meta"><span>持ち出し数：${esc(row.taken_qty??0)}</span><span>販売数：${esc(row.sold_qty??0)}</span><span>ガチャ移動数：${esc(row.consumed_qty??0)}</span><span>戻り予定数：${esc(row.planned_return_qty)}</span><span>差異：<strong data-booth-report-return-difference>${esc(row.return_difference)}</strong></span></div>
