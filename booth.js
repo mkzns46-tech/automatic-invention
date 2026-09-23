@@ -11690,11 +11690,12 @@ async function getBoothEventStorageCurrentQty(storeCode,barcode){
         headers:{Prefer:"return=minimal"},
         body:JSON.stringify({event_storage_qty:0,updated_at:now})
       });
-      const snapshotSummary=await loadBoothCloseCommonStockSummary(event,await loadBoothCloseSummary(event));
-      snapshots=await createBoothEventCloseSnapshots(event,snapshotSummary,staff,now).catch(error=>{
-        console.warn("[booth close snapshot skipped]",error);
-        return [];
-      });
+      // The close RPC is the authoritative transactional audit writer. The
+      // legacy client-side snapshot insert used movement_type
+      // event_close_snapshot, which is not accepted by the production CHECK
+      // constraint and produced a misleading console error after a successful
+      // close. Keep the RPC result as the single close record.
+      snapshots=[];
       const closedRows=await sb("booth_events?select=*&id=eq."+encodeURIComponent(event.id)+"&limit=1");
       const closedEvent=Array.isArray(closedRows)&&closedRows[0]?closedRows[0]:{...event,status:"closed",closed_at:now,closed_by:staff};
       boothEvents=boothEvents.map(row=>String(row.id)===String(event.id)?closedEvent:row);
