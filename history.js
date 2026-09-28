@@ -313,15 +313,11 @@ function ensureHistoryEventShelfHeaders(){
     const body=el(bodyId);
     const table=body?.closest("table");
     const row=table?.querySelector("thead tr");
-    if(!row||row.querySelector("[data-history-event-shelf-header]"))return;
+    if(!row||row.dataset.historyEventShelfHeader)return;
+    // Must match the 11 cells built by buildGlobalHistoryRows / buildProductHistoryRowsFromLogs.
     const desired=["入力日時","区分","担当者","商品名","対象在庫","処理前","数量","処理後","イベント棚処理後","備考","商品転用確認"];
-    [...row.children].forEach((cell,index)=>{if(desired[index])cell.textContent=desired[index];});
-    const th=document.createElement("th");
-    th.textContent="イベント棚";
-    th.dataset.historyEventShelfHeader="true";
-    const cells=[...row.children];
-    const currentStockHeader=cells[7]||null;
-    row.insertBefore(th,currentStockHeader?.nextSibling||null);
+    row.innerHTML=desired.map(label=>`<th>${esc(label)}</th>`).join("");
+    row.dataset.historyEventShelfHeader="true";
   });
 }
 
