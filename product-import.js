@@ -113,7 +113,9 @@ function decodeCsvBuffer(buffer){
   return mojibakeScore(sjis) < mojibakeScore(utf8) ? sjis : utf8;
 }
 
-async function fetchProductsByBarcodes(barcodes){
+// options.strict: throw when a chunk cannot be loaded. The master import needs this,
+// otherwise an existing product that failed to load is treated as new.
+async function fetchProductsByBarcodes(barcodes,options={}){
   const unique=[...new Set((barcodes||[]).filter(Boolean).map(String))].filter(b=>!gp(b));
   if(!unique.length)return;
 
@@ -127,8 +129,19 @@ async function fetchProductsByBarcodes(barcodes){
           if(p && !gp(p.barcode))products.push(p);
         });
       }
-    }catch(_){}
+    }catch(error){
+      if(options.strict)throw new Error(`既存商品の読み込みに失敗したため取込を中止しました。\n${error?.message||error}`);
+    }
   }
+}
+
+// New products only: an existing barcode is left untouched (never reset base_stock to 0).
+async function insertNewProducts(rows){
+  await sb("products?on_conflict=barcode",{
+    method:"POST",
+    headers:{Prefer:"resolution=ignore-duplicates,return=minimal"},
+    body:JSON.stringify(rows)
+  });
 }
 
 async function enrichRecentLogProductNames(){
@@ -226,7 +239,7 @@ async function importCsvFile(file){
     const text=decodeCsvBuffer(buffer);
 
     const rows=csvToRows(text);
-    await fetchProductsByBarcodes(rows.map(row=>row.barcode));
+    await fetchProductsByBarcodes(rows.map(row=>row.barcode),{strict:true});
 
     const existingRows=[];
     const newRows=[];
@@ -246,10 +259,11 @@ async function importCsvFile(file){
       }
     });
 
-    for(const payloadRows of [existingRows,newRows]){
-      for(let i=0;i<payloadRows.length;i+=500){
-        await upsertProducts(payloadRows.slice(i,i+500));
-      }
+    for(let i=0;i<existingRows.length;i+=500){
+      await upsertProducts(existingRows.slice(i,i+500));
+    }
+    for(let i=0;i<newRows.length;i+=500){
+      await insertNewProducts(newRows.slice(i,i+500));
     }
 
     // 取り込み後、キャッシュを更新
@@ -454,20 +468,22 @@ function buildSmaregiProductPayload(row,current,isNew,supportedColumns=SMAREGI_P
   return payload;
 }
 
+// Inserts only: rows whose barcode already exists are skipped, so an existing
+// product (and its base_stock) is never overwritten from here.
 async function upsertSmaregiProductRows(rows){
   if(!rows.length)return;
   try{
-    await upsertProducts(rows);
+    await insertNewProducts(rows);
     return;
   }catch(firstError){
     // 古いDBに未追加の任意項目があっても、商品名・バーコード取込は継続する。
     const legacyKeys=["barcode","name","smaregi_product_id","price","category","genre","department","base_stock"];
     const legacyRows=rows.map(row=>Object.fromEntries(legacyKeys.filter(key=>Object.prototype.hasOwnProperty.call(row,key)).map(key=>[key,row[key]])));
     try{
-      await upsertProducts(legacyRows);
+      await insertNewProducts(legacyRows);
     }catch(secondError){
       const minimal=rows.map(row=>({barcode:row.barcode,name:row.name,...(row.base_stock===0?{base_stock:0}:{})}));
-      try{await upsertProducts(minimal);}catch(_){throw secondError||firstError;}
+      try{await insertNewProducts(minimal);}catch(_){throw secondError||firstError;}
     }
   }
 }
@@ -514,9 +530,12 @@ async function importSmaregiProducts(){
     if(!response.ok||data.ok===false)throw new Error(data.error||`APIエラー (${response.status})`);
     const rows=Array.isArray(data.products)?data.products:[];
     const existingRows=typeof sbAll==="function"
-      ?await sbAll("products?select=*",1000,50000)
-      :await sb("products?select=*&limit=50000");
+      ?await sbAll("products?select=*&order=barcode.asc",1000,50000)
+      :await sb("products?select=*&order=barcode.asc&limit=50000");
     const existing=Array.isArray(existingRows)?existingRows:[];
+    // A deterministic order keeps offset paging from skipping rows; at the cap we
+    // cannot tell existing from new products, so stop instead of guessing.
+    if(existing.length>=50000)throw new Error("既存商品が50000件以上あるため、取りこぼし防止のため取込を中止しました。");
     const supportedColumns=getSmaregiSupportedProductMasterColumns(existing);
     const byId=createSmaregiProductIndex(existing,"smaregi_product_id");
     const byBarcode=createSmaregiProductIndex(existing,"barcode");

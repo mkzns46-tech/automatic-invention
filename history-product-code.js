@@ -96,7 +96,9 @@ function buildProductHistoryRowsFromLogs(barcode,selectedLogs,allLogsForBarcode)
     const eventRange=getHistoryEventShelfRange(row.log);
     const displayBefore=eventRange?eventRange.before:row.beforeStock;
     const displayAfter=eventRange?eventRange.after:row.afterStock;
-    const displayQuantity=getHistorySignedDelta(row.log.type,Number(row.log.quantity||0));
+    // Use the same display type as the running balance (a cancel row adds stock back).
+    const rowDisplayType=String(row.log.memo||"").includes("備品転用キャンセル") ? "equipment_transfer_cancel" : row.log.type;
+    const displayQuantity=getHistorySignedDelta(rowDisplayType,Number(row.log.quantity||0));
     const target=eventRange?"イベント棚":"通常棚";
     return `<tr>
       <td>${fmt(row.log.created_at)}</td>

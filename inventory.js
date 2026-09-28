@@ -1114,7 +1114,26 @@ async function registerGachaFromInventory({action,event,product,barcode,qty,staf
   }
 }
 
+// One registration at a time: a double tap / double Enter used to run two
+// concurrent read-modify-write updates (2 history rows, 1 applied change).
+let inventoryRegisterBusy=false;
 async function registerBarcode(barcode){
+  if(inventoryRegisterBusy){
+    showMessage("登録処理中です。完了してから次を登録してください。","err");
+    return;
+  }
+  inventoryRegisterBusy=true;
+  const submitButtons=[...document.querySelectorAll('#manualForm button[type="submit"],#manualForm button:not([type])')];
+  submitButtons.forEach(button=>{button.disabled=true;});
+  try{
+    return await registerBarcodeUnguarded(barcode);
+  }finally{
+    inventoryRegisterBusy=false;
+    submitButtons.forEach(button=>{button.disabled=false;});
+  }
+}
+
+async function registerBarcodeUnguarded(barcode){
   let directStorageOutResult=null;
   let directStorageOutProduct=null;
   let directStorageOutQty=0;
@@ -1131,6 +1150,12 @@ async function registerBarcode(barcode){
     const isGachaReturn=type==="gacha_return";
     if(isGacha||isGachaReturn){
       showMessage("ガチャ数量は在庫変動登録から変更できません。イベント管理の戻りカウントだけで登録してください。","err");
+      return;
+    }
+    // Event picks must go through イベント管理 (rpc/confirm_booth_takeout): this
+    // legacy path skipped the common event shelf and the duplicate-pick check.
+    if(isEventPick){
+      showMessage("イベントの持ち出しは「イベント管理」の持ち出し画面から登録してください。在庫変動登録からは登録できません。","err");
       return;
     }
     const requiresEvent=isEventPick||isGacha||isGachaReturn;

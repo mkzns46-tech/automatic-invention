@@ -61,7 +61,23 @@
     return latest && String(latest.id)===String(log.id);
   }
 
+  // One save at a time (register button and priority-list Enter both come here),
+  // and surface failures instead of leaving an unhandled rejection.
+  let shelfSaveBusy=false;
   async function saveSingleShelfLocation(product,code,staff){
+    if(shelfSaveBusy){showShelfMessage("棚番登録を処理中です。完了までお待ちください","err");return false;}
+    shelfSaveBusy=true;
+    try{
+      return await saveSingleShelfLocationUnguarded(product,code,staff);
+    }catch(error){
+      showShelfMessage(`棚番登録に失敗しました：${error?.message||error}`,"err");
+      showPopup?.("棚番登録エラー",`棚番登録に失敗しました。\n${error?.message||error}`);
+      return false;
+    }finally{
+      shelfSaveBusy=false;
+    }
+  }
+  async function saveSingleShelfLocationUnguarded(product,code,staff){
     const locations=await loadProductLocations(product);
     const active=locations.filter(loc=>!loc.deleted_at);
     const current=String(product?.location||active.find(loc=>loc.is_primary)?.shelf_code||active[0]?.shelf_code||"").trim();
@@ -69,13 +85,20 @@
     // Prefer the row that agrees with products.location. Older data can have
     // more than one active row or a stale primary flag; changing an arbitrary
     // first row leaves the product and its shelf history inconsistent.
-    const target=active.find(loc=>String(loc.shelf_code||"").trim()===current)
+    // If a row with the new code already exists, promote it instead of renaming another
+    // row onto the same (barcode, shelf_code), which would hit the unique key.
+    const sameCodeRow=active.find(loc=>String(loc.shelf_code||"").trim()===code);
+    const target=sameCodeRow
+      ||active.find(loc=>String(loc.shelf_code||"").trim()===current)
       ||active.find(loc=>loc.is_primary)
       ||active[0];
     if(target){
       await sb(`product_locations?id=eq.${encodeURIComponent(target.id)}`,{method:"PATCH",body:JSON.stringify({shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,updated_by:staff,updated_at:new Date().toISOString()})});
-      for(const other of active.filter(loc=>String(loc.id)!==String(target.id))){
-        await sb(`product_locations?id=eq.${encodeURIComponent(other.id)}`,{method:"PATCH",body:JSON.stringify({is_primary:false,deleted_at:new Date().toISOString(),updated_by:staff,updated_at:new Date().toISOString()})});
+      // Production product_locations has no deleted_at column (writing it failed with
+      // 42703 and left the change half-applied). Only clear the primary flag on other rows;
+      // the current shelf is products.location + the primary row, history is in the logs.
+      for(const other of active.filter(loc=>String(loc.id)!==String(target.id)&&loc.is_primary)){
+        await sb(`product_locations?id=eq.${encodeURIComponent(other.id)}`,{method:"PATCH",body:JSON.stringify({is_primary:false,updated_by:staff,updated_at:new Date().toISOString()})});
       }
     }else{
       // Reuse a soft-deleted legacy row when present. This avoids a unique-key
@@ -83,7 +106,7 @@
       const historical=await sbAll(`product_locations?select=*&barcode=eq.${encodeURIComponent(product.barcode)}&limit=100`,1000,100).catch(()=>[]);
       const reusable=historical.find(loc=>loc.deleted_at||!String(loc.shelf_code||"").trim());
       if(reusable){
-        await sb(`product_locations?id=eq.${encodeURIComponent(reusable.id)}`,{method:"PATCH",body:JSON.stringify({product_id:product.barcode||null,barcode:product.barcode,shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,deleted_at:null,updated_by:staff,updated_at:new Date().toISOString()})});
+        await sb(`product_locations?id=eq.${encodeURIComponent(reusable.id)}`,{method:"PATCH",body:JSON.stringify({product_id:product.barcode||null,barcode:product.barcode,shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,updated_by:staff,updated_at:new Date().toISOString()})});
       }else{
         await sb("product_locations",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({product_id:product.barcode||null,barcode:product.barcode,shelf_code:code,shelf_group:code.split("-")[0],shelf_column:Number(code.split("-")[1]||1),is_primary:true,created_by:staff,updated_by:staff})});
       }

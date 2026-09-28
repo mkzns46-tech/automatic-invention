@@ -236,6 +236,7 @@ SQLを作成した場合：
 無条件 `DELETE`、全件UPDATE、破壊的DROP等を安易に実行しない。
 
 コード上の想像ではなくProduction実スキーマを正とする。過去に `inventory_count_items` で存在しない `before_stock`、`updated_at`、`reflected_at`、`reflected_by` を前提にした問題があった。新規カラム参照前に実在確認する。
+同様に `product_locations` には `deleted_at` が無い（2026-09-28 確認。書き込むと 42703 で棚番変更が途中失敗していた）。
 
 ## 13. RPC / Transaction
 

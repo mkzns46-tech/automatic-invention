@@ -433,10 +433,13 @@
       const smaregiStock=getCsvSmaregiStock(item);
       const smaregiCompareStock=Number(breakdown?.smaregiStockForComparison ?? getComparableCsvSmaregiStock(item));
       if(!Number.isFinite(actual)||!Number.isFinite(eventShelfStock)||!Number.isFinite(smaregiStock)||!Number.isFinite(smaregiCompareStock)||!Number.isFinite(comparisonStock))return null;
-      const difference=Number(breakdown?.difference);
-      if(breakdown?.isNoIssue===true)return null;
+      // difference is null when it cannot be judged (e.g. ongoing event sales could not
+      // be fetched). Number(null) is 0, which used to hide the row as "no difference".
+      const undetermined=!!breakdown&&(breakdown.difference===null||breakdown.difference===undefined||!Number.isFinite(Number(breakdown.difference)));
+      const difference=undetermined?null:Number(breakdown?.difference);
+      if(!undetermined&&breakdown?.isNoIssue===true)return null;
       if(difference===0)return null;
-      return {item,check,actual,eventShelfStock,comparisonStock,smaregiStock,smaregiCompareStock,difference};
+      return {item,check,actual,eventShelfStock,comparisonStock,smaregiStock,smaregiCompareStock,difference,undetermined};
     }).filter(Boolean);
   }
 
@@ -693,7 +696,8 @@
       const barcode=String(item?.barcode||"");
       const name=getItemName(item)||"商品名未設定";
       const checkedBy=typeof getSmaregiDisplayCheckedBy==="function" ? getSmaregiDisplayCheckedBy(check) : (check?.checked_by||"");
-      const differenceClass=difference<0 ? " is-negative" : " is-positive";
+      const differenceClass=difference===null ? " is-undetermined" : difference<0 ? " is-negative" : " is-positive";
+      const differenceLabel=difference===null ? "未確定" : difference;
       const checkedAt=check?.checked_at && typeof fmt==="function" ? safeText(fmt(check.checked_at)) : "未入力";
       const showExclude=hasInventoryAdminAccessSafe();
       return `<tr class="smaregi-diff-row" data-barcode="${safeText(barcode)}">
@@ -709,7 +713,7 @@
               <div><span>通常棚</span><strong>${displayNumber(actual)}</strong></div>
               <div><span>イベント棚在庫</span><strong>${displayNumber(eventShelfStock)}</strong></div>
               <div><span>比較用在庫</span><strong>${displayNumber(comparisonStock)}</strong></div>
-              <div class="smaregi-diff-mobile-difference"><span>差異</span><strong class="smaregi-difference${differenceClass}">${difference}</strong></div>
+              <div class="smaregi-diff-mobile-difference"><span>差異</span><strong class="smaregi-difference${differenceClass}">${differenceLabel}</strong></div>
               <div><span>最終更新日時</span><strong>${checkedAt}</strong></div>
             </div>
             ${getDiffRowActionsHtml(barcode,{includeExclude:showExclude,includeEquipment:true})}
@@ -719,7 +723,7 @@
         <td>${displayNumber(eventShelfStock)}</td>
         <td>${displayNumber(comparisonStock)}</td>
         <td>${displayNumber(smaregiStock)}</td>
-        <td><span class="smaregi-difference${differenceClass}">${difference}</span></td>
+        <td><span class="smaregi-difference${differenceClass}">${differenceLabel}</span></td>
         <td>${safeText(checkedBy||"担当者未設定")}</td>
         <td>${checkedAt}</td>
         <td>${getDiffRowActionsHtml(barcode,{includeExclude:showExclude,includeEquipment:true})}</td>
@@ -2022,7 +2026,9 @@
       if(alreadyChecked)throw new Error("この商品転用は確認済みです。");
       const rawQty=Number(latestLog.quantity ?? quantity ?? 1);
       const absQty=Math.abs(Number.isFinite(rawQty) && rawQty!==0 ? rawQty : 1);
-      product=product || await fetchProductByBarcode(latestLog.barcode);
+      // Read the current DB stock; the in-memory cache may be stale and an absolute
+      // write from it would overwrite changes made elsewhere.
+      product=(typeof fetchLatestInventoryProduct==="function" ? await fetchLatestInventoryProduct(latestLog.barcode) : null) || product || await fetchProductByBarcode(latestLog.barcode);
       if(!product)throw new Error("商品が見つかりません。");
       let nextStock=Number(product.base_stock||0);
       if(rawQty>0){
@@ -2030,6 +2036,10 @@
         await updateProductCurrentStock(latestLog.barcode,nextStock);
       }
       const refreshedLog=await markEquipmentTransferChecked(latestLog,checkedBy);
+      // Keep the global history cache in sync, or the next re-render shows 未確認 again.
+      try{
+        if(Array.isArray(logs))logs=logs.map(row=>String(row.id)===String(logId) ? {...row,...refreshedLog} : row);
+      }catch(_){}
       showMessage?.(`商品転用を確認しました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
       showPopup?.("商品転用確認完了",`商品名：${product.name||latestLog.product_name||""}\n棚番：${getProductShelfLabel(product)}\nバーコード：${latestLog.barcode}\n数量：${absQty}\n現在庫：${nextStock}`);
       return true;
@@ -2041,7 +2051,10 @@
   };
 
   window.confirmEquipmentTransfer=async function(logId,button){
-    if(isEquipmentMobileView())return;
+    if(isEquipmentMobileView()){
+      showMessage?.("商品転用の確認・キャンセルはPC画面で操作してください。","err");
+      return;
+    }
     if(typeof hasInventoryPrivilegedAccess==="function" && !hasInventoryPrivilegedAccess()){
       showMessage?.("商品転用確認は管理者認証後に実行できます。","err");
       return;
@@ -2061,7 +2074,10 @@
   };
 
   window.cancelEquipmentTransfer=async function(logId,button){
-    if(isEquipmentMobileView())return;
+    if(isEquipmentMobileView()){
+      showMessage?.("商品転用の確認・キャンセルはPC画面で操作してください。","err");
+      return;
+    }
     if(typeof hasInventoryPrivilegedAccess==="function" && !hasInventoryPrivilegedAccess()){
       showMessage?.("商品転用キャンセルは管理者認証後に実行できます。","err");
       return;
@@ -2088,18 +2104,24 @@
       if(!isEquipmentTransferTypeValue(latestLog.type))throw new Error("商品転用の履歴ではありません。");
       const alreadyChecked=typeof isEquipmentTransferChecked==="function" ? isEquipmentTransferChecked(latestLog) : (latestLog.equipment_checked===true || !!latestLog.equipment_checked_at);
       if(alreadyChecked)throw new Error("この商品転用はすでに確認終了済みです。再キャンセルはできません。");
-      const duplicate=await sbAll(`inventory_logs?select=id&barcode=eq.${encodeURIComponent(latestLog.barcode)}&memo=ilike.*${encodeURIComponent(logId)}*&limit=1`,1,10000).catch(()=>[]);
+      // Exact memo match: ilike *12* also matched 元履歴:123 and refused a valid cancel.
+      const duplicate=await sbAll(`inventory_logs?select=id&barcode=eq.${encodeURIComponent(latestLog.barcode)}&memo=eq.${encodeURIComponent(`備品転用キャンセル 元履歴:${logId}`)}&limit=1`,1,10000).catch(()=>[]);
       if(Array.isArray(duplicate)&&duplicate.length)throw new Error("この商品転用はすでにキャンセル済みです。");
-      const product=await fetchProductByBarcode(latestLog.barcode);
+      // Read the current DB stock instead of the possibly stale cache.
+      const product=(typeof fetchLatestInventoryProduct==="function" ? await fetchLatestInventoryProduct(latestLog.barcode) : null) || await fetchProductByBarcode(latestLog.barcode);
       if(!product)throw new Error("商品が見つかりません。");
       const absQty=Math.abs(Number(latestLog.quantity||1))||1;
-      const nextStock=Number(product.base_stock||0)+absQty;
+      // Current registrations deduct stock immediately and store a negative quantity.
+      // Legacy rows with a positive quantity were never deducted (they deduct on
+      // confirm), so cancelling them must not add stock back.
+      const restoreQty=Number(latestLog.quantity||0)<0 ? absQty : 0;
+      const nextStock=Number(product.base_stock||0)+restoreQty;
       const staff=typeof getSmaregiCheckerName==="function" ? getSmaregiCheckerName() : "";
       if(!staff){
         throw new Error("担当者を選択してください。");
       }
       checkedLog=await markEquipmentTransferChecked(latestLog,staff);
-      await updateProductCurrentStock(latestLog.barcode,nextStock);
+      if(restoreQty>0)await updateProductCurrentStock(latestLog.barcode,nextStock);
       const inserted=await sb("inventory_logs",{
         method:"POST",
         headers:{Prefer:"return=representation"},
@@ -2108,7 +2130,7 @@
           staff,
           barcode:latestLog.barcode,
           product_name:latestLog.product_name||product.name||"",
-          quantity:absQty,
+          quantity:restoreQty,
           memo:`備品転用キャンセル 元履歴:${logId}`,
           equipment_checked:true,
           equipment_checked_by:staff,
@@ -2116,15 +2138,16 @@
         })
       });
       const cancelLog=Array.isArray(inserted)&&inserted[0] ? inserted[0] : null;
-      await applyEquipmentCancelToCurrentSmaregiCheck(latestLog.barcode,absQty,staff);
+      if(restoreQty>0)await applyEquipmentCancelToCurrentSmaregiCheck(latestLog.barcode,restoreQty,staff);
       try{if(Array.isArray(logs)&&cancelLog)logs.unshift(cancelLog);}catch(_){}
       try{
         if(Array.isArray(logs)){
           logs=logs.map(row=>String(row.id)===String(logId) ? {...row,...checkedLog} : row);
         }
       }catch(_){}
-      showMessage?.(`商品転用をキャンセルしました：${product.name||latestLog.product_name||""} / 数量 ${absQty}`,"ok");
-      showPopup?.("商品転用キャンセル完了",`商品名：${product.name||latestLog.product_name||""}\n棚番：${getProductShelfLabel(product)}\nバーコード：${latestLog.barcode}\n戻し数量：${absQty}\n現在庫：${nextStock}`);
+      const restoreNote=restoreQty>0 ? "" : "\n（登録時に在庫を減らしていない旧形式の履歴のため、在庫は戻していません）";
+      showMessage?.(`商品転用をキャンセルしました：${product.name||latestLog.product_name||""} / 戻し数量 ${restoreQty}`,"ok");
+      showPopup?.("商品転用キャンセル完了",`商品名：${product.name||latestLog.product_name||""}\n棚番：${getProductShelfLabel(product)}\nバーコード：${latestLog.barcode}\n戻し数量：${restoreQty}\n現在庫：${nextStock}${restoreNote}`);
       if(typeof renderGlobalHistory==="function")renderGlobalHistory();
       if(typeof selectedBarcode!=="undefined" && selectedBarcode && typeof showProductHistoryForBarcode==="function")showProductHistoryForBarcode(selectedBarcode);
       refreshSmaregiAnalysisAfterEquipmentChange();

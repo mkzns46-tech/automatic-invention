@@ -343,8 +343,24 @@ module.exports = async function handler(req, res) {
       fields: "productId,productCode,productName"
     }, { apiStats }));
 
+    // Resolve the ARICO barcode through products.smaregi_product_id first. Smaregi's
+    // productCode can differ from ARICO's barcode (e.g. after a barcode change), and
+    // the productId is not a barcode at all.
+    const ariCoBarcodeBySmaregiId = new Map();
+    const smaregiIds = [...new Set(stockRows.map(stock => String(stock.productId || "").trim()).filter(Boolean))];
+    for (let i = 0; i < smaregiIds.length; i += 100) {
+      const chunk = smaregiIds.slice(i, i + 100).map(id => `"${id.replace(/"/g, '\\"')}"`).join(",");
+      const rows = await supabase(`products?select=barcode,smaregi_product_id&smaregi_product_id=in.(${encodeURIComponent(chunk)})`);
+      (Array.isArray(rows) ? rows : []).forEach(row => {
+        const id = String(row.smaregi_product_id || "").trim();
+        // Only use an unambiguous match; duplicated smaregi_product_id rows fall back below.
+        if (!id) return;
+        ariCoBarcodeBySmaregiId.set(id, ariCoBarcodeBySmaregiId.has(id) ? null : String(row.barcode || "").trim());
+      });
+    }
+
     const items = stockRows.map((stock, index) => ({
-      barcode: String(products[index]?.productCode || products[index]?.productId || stock.productId),
+      barcode: String(ariCoBarcodeBySmaregiId.get(String(stock.productId || "").trim()) || products[index]?.productCode || products[index]?.productId || stock.productId),
       product_name: String(products[index]?.productName || ""),
       smaregi_stock: Math.trunc(Number(stock.stockAmount || 0)),
       product_id: String(stock.productId),
