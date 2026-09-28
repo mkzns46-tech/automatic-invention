@@ -303,6 +303,7 @@ html body .badge{
   font-weight:600 !important;
 }
 html body .message{border-radius:10px !important}
+html body .message:empty{display:none !important}
 
 /* =====================================================================
    履歴テーブル（全体履歴 / 最近の登録 / 商品別履歴）
@@ -343,7 +344,7 @@ html body .history-qty-positive{color:var(--hub-brand) !important;font-weight:60
 /* 備考セル：テキスト＋小さな「修正」 */
 html body #historyBody td:nth-child(10),
 html body #recentRegistrationHistoryBody td:nth-child(10),
-html body #selectedHistoryBody td:nth-child(10){min-width:160px;max-width:240px;white-space:normal !important}
+html body #selectedHistoryBody td:nth-child(10){min-width:220px;max-width:280px;white-space:normal !important}
 html body .memo-cell{
   display:flex !important;
   align-items:center !important;
@@ -449,3 +450,7 @@ html body #globalHistoryCard .button-row button{min-height:38px !important;paddi
   html body #recentRegistrationHistoryBody td:nth-child(11),
   html body #selectedHistoryBody td:nth-child(11){min-width:90px}
 }
+
+/* ---------- イベント管理：狭い幅でのはみ出し対策（元からの崩れ） ---------- */
+html body .booth-filter-row{grid-template-columns:repeat(auto-fit,minmax(110px,1fr)) !important}
+html body .booth-event-title-row strong{min-width:0;overflow-wrap:anywhere;word-break:break-word}
