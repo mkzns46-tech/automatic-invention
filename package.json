@@ -1,7 +1,8 @@
 {
   "scripts": {
     "start": "vercel dev",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "test": "node tests/static-regression.mjs"
   },
   "devDependencies": {
     "vercel": "latest"

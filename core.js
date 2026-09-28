@@ -363,11 +363,12 @@ function renderInventoryAppMenu(){
       return;
     }
     const script=document.createElement("script");
-    script.src="./booth.js?v=2.93.117&lazy=1";
+    script.src="./booth.js?v=2.93.118&lazy=1";
     script.defer=false;
     script.dataset.boothLazyLoader="1";
     script.onload=()=>typeof showBoothManagement==="function"?showBoothManagement():showMessage("イベント管理を読み込めませんでした。","err");
-    script.onerror=()=>showMessage("イベント管理スクリプトの読み込みに失敗しました。","err");
+    // Remove the failed tag so the next click retries instead of waiting on a dead element.
+    script.onerror=()=>{script.remove();showMessage("イベント管理スクリプトの読み込みに失敗しました。もう一度開くと再読み込みします。","err");};
     document.head.appendChild(script);
   };
   const boothButton=menu.querySelector('[data-menu-action="booth"]');
@@ -507,11 +508,12 @@ function showInventorySettings(){
     return;
   }
   const script=document.createElement("script");
-  script.src="./booth.js?v=2.93.117&lazy=1";
+  script.src="./booth.js?v=2.93.118&lazy=1";
   script.defer=false;
   script.dataset.boothLazyLoader="1";
   script.onload=bindAfterLoad;
-  script.onerror=()=>showMessage("イベントレジ設定スクリプトの読み込みに失敗しました。","err");
+  // Remove the failed tag so the next open retries instead of waiting on a dead element.
+  script.onerror=()=>{script.remove();showMessage("イベントレジ設定スクリプトの読み込みに失敗しました。もう一度開くと再読み込みします。","err");};
   document.head.appendChild(script);
 }
 
@@ -658,24 +660,14 @@ function showMessage(text,type="",options={}){
   m.className="message "+type;
 }
 
+// /sounds/*.mp3 are not deployed, so every notification requested a 404 and then
+// fell back to this synthesized tone anyway. Play the tone directly.
 function playSuccessSound(){
-  try{
-    const audio=new Audio("/sounds/success.mp3");
-    audio.volume=0.6;
-    audio.play().catch(()=>playFallbackNotificationTone("success"));
-  }catch(_){
-    playFallbackNotificationTone("success");
-  }
+  playFallbackNotificationTone("success");
 }
 
 function playErrorSound(){
-  try{
-    const audio=new Audio("/sounds/error.mp3");
-    audio.volume=0.7;
-    audio.play().catch(()=>playFallbackNotificationTone("error"));
-  }catch(_){
-    playFallbackNotificationTone("error");
-  }
+  playFallbackNotificationTone("error");
 }
 
 function playFallbackNotificationTone(type){

@@ -139,6 +139,12 @@ function buildGlobalHistoryRows(sourceLogs=logs){
       beforeStock="-";
       afterStock=rawQuantity;
     }
+    // Prefer the stock recorded at the time of the operation. The values above are
+    // derived from today's stock and are only a fallback for old rows without them.
+    if(log.before_stock!=null&&log.after_stock!=null){
+      beforeStock=Number(log.before_stock);
+      afterStock=Number(log.after_stock);
+    }
 
     const eventRange=getHistoryEventShelfRange(log);
     const displayBefore=eventRange?eventRange.before:beforeStock;

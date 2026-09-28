@@ -1078,8 +1078,8 @@ function buildHistoryExportRows(sourceLogs){
           fixedDelta>0?`+${fixedDelta}`:fixedDelta,
           afterStock,
           fixed.event?`${fixed.before} → ${fixed.after}`:"-",
-          String(log.memo||"").replace(/蛯吝刀霆｢逕ｨ/g,"蝠・刀霆｢逕ｨ"),
-          (log.type==="蛯吝刀霆｢逕ｨ"||log.type==="equipment_transfer") ? (isEquipmentTransferChecked(log) ? "確認済み" : "未確認") : "",
+          String(log.memo||"").replace(/備品転用/g,"商品転用"),
+          (log.type==="備品転用"||log.type==="商品転用"||log.type==="equipment_transfer") ? (isEquipmentTransferChecked(log) ? "確認済み" : "未確認") : "",
           log.equipment_checked_by||"",
           log.equipment_checked_at ? fmt(log.equipment_checked_at) : ""
         ]

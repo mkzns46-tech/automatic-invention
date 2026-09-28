@@ -2282,7 +2282,10 @@ function boothEventItemCurrentQty(item){
 function boothGachaItemCurrentQty(item){
   const returned=boothGachaReturnActualQty(item);
   if(returned===null)return Math.max(0,Number(item?.taken_qty||0));
-  return Math.max(0,returned);
+  // After the return count the returned prizes are already back in base_stock and
+  // the rest were used, so nothing remains as gacha stock (showing `returned` here
+  // counted the same units twice).
+  return 0;
 }
 
 function isBoothGachaReturnCounted(item){
