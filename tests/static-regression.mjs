@@ -99,6 +99,18 @@ check("イベント持ち出しCSVはバーコード基準（テンプレート�
   return problems.join("; ");
 });
 
+check("認証の無いスマレジ書き込みAPIは停止したまま（在庫調整・売上登録/取消）", () => {
+  const problems = [];
+  for (const file of ["api/smaregi-stock-adjust.js"]) {
+    const src = read(file).replace(/^\s*\/\/.*$/gm, ""); // コメント行は判定しない
+    if (/\/stock\/|\/transactions|fetch\(/.test(src) || !/statusCode = 503/.test(src)) problems.push(`${file} がスマレジへ書き込める状態に戻っている`);
+  }
+  for (const file of ["api/smaregi-sales-register.js", "api/smaregi-sales-cancel.js"]) {
+    if (fs.existsSync(path.join(root, file))) problems.push(`${file} が復活している`);
+  }
+  return problems.join("; ");
+});
+
 check("event register settings: unset IDs stop the sales fetch", () => {
   const booth = read("booth.js");
   return /イベント販売用レジIDが未設定/.test(booth) ? "" : "unset-register guard message not found";
