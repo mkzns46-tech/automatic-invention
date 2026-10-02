@@ -2855,7 +2855,7 @@ async function renderBoothEventInventoryPanel(event){
     const file=inputEvent.target.files?.[0];if(!file)return;const preview=el("boothDepartureCsvPreview");
     try{
       // 持ち出しCSVはバーコードで指定する（ヘッダー無しの1列目もバーコード）。
-      const rows=parseInventoryCsv(await file.text(),{defaultIdentity:"barcode"});const products=await resolveInventoryCsvProducts(rows);const invalid=[];const counts=readBoothDepartureCounts(event.id);
+      const rows=parseInventoryCsv(await file.text(),{defaultIdentity:"barcode",forceIdentity:"barcode"});const products=await resolveInventoryCsvProducts(rows);const invalid=[];const counts=readBoothDepartureCounts(event.id);
       const missingBarcodes=rows.filter(row=>row.identityType==="barcode"&&!products.get(`barcode:${String(row.identity||"").trim()}`)).map(row=>row.identity);
       const leadingZeroHints=missingBarcodes.length?await findBoothLeadingZeroBarcodes(missingBarcodes):new Map();
       rows.forEach(row=>{const identity=String(row.identity||row.productCode||"").trim();const lookupKey=`${row.identityType==="barcode"?"barcode":"product_code"}:${identity}`;const product=products.get(lookupKey);if(!product){const hint=leadingZeroHints.get(identity);invalid.push(`${row.line}行目 ${identity||"(空欄)"}：${row.identityType==="barcode"?"バーコード":"商品コード"}に一致する商品がありません${hint?`（先頭の0が消えている可能性があります。正しくは ${hint}）`:""}`);return;}if(!/^\d+$/.test(row.quantityText)){invalid.push(`${row.line}行目 ${identity}：数量不正`);return;}const qty=Number(row.quantityText);if(qty<=0)return;const key=String(product.barcode||"").trim();const current=counts[key]||{barcode:key,product_name:product.name||"",quantity:0};current.quantity+=qty;counts[key]=current;});
@@ -4085,9 +4085,13 @@ function parseInventoryCsv(text,options={}){
   if(!lines.length)throw new Error("CSVが空です。");
   const split=line=>{const values=[];let value="",quoted=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){if(quoted&&line[i+1]==='"'){value+='"';i++;}else quoted=!quoted;}else if(ch===','&&!quoted){values.push(value.trim());value="";}else value+=ch;}values.push(value.trim());return values;};
   const first=split(lines[0]).map(value=>value.toLowerCase().replace(/\s+/g,""));
-  const identityType=first[0]==="バーコード"||first[0]==="barcode"
+  // options.forceIdentity: 見出しの文字に関係なく1列目をこの種類で読む
+  // （イベント持ち出しは常にバーコード。旧テンプレートの「商品コード」見出しにバーコードを入れたファイルも読める）。
+  const identityType=options.forceIdentity==="barcode"
     ?"barcode"
-    :(["商品コード","product_code","productcode"].includes(first[0])?"product_code":defaultIdentity);
+    :(first[0]==="バーコード"||first[0]==="barcode"
+      ?"barcode"
+      :(["商品コード","product_code","productcode"].includes(first[0])?"product_code":defaultIdentity));
   const hasIdentityHeader=["商品コード","product_code","productcode","バーコード","barcode"].includes(first[0]);
   const hasQuantityHeader=["数量","quantity"].includes(first[1]);
   const hasHeader=hasIdentityHeader&&hasQuantityHeader;

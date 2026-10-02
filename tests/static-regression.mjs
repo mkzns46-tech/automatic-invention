@@ -93,7 +93,7 @@ check("sales confirm only confirms applied rows", () => {
 check("イベント持ち出しCSVはバーコード基準（テンプレートも バーコード,数量）", () => {
   const booth = read("booth.js");
   const problems = [];
-  if (!/parseInventoryCsv\(await file\.text\(\),\{defaultIdentity:"barcode"\}\)/.test(booth)) problems.push("持ち出しCSVの取込がバーコード基準になっていない");
+  if (!/parseInventoryCsv\(await file\.text\(\),\{defaultIdentity:"barcode",forceIdentity:"barcode"\}\)/.test(booth)) problems.push("持ち出しCSVの取込が見出しに関係なくバーコード基準になっていない");
   if (!/boothDepartureCsvTemplateBtn"\)\?\.addEventListener\("click",downloadBoothDepartureCsvTemplate\)/.test(booth)) problems.push("持ち出しのテンプレートボタンが商品コード用テンプレートを使っている");
   if (!/\\uFEFFバーコード,数量/.test(booth)) problems.push("バーコード用テンプレートが無い");
   return problems.join("; ");
