@@ -123,6 +123,17 @@ check("戻り保存で反映済み記録・イベント共通棚分を消さな�
   return problems.join("; ");
 });
 
+check("商品マスター取込は数字13桁のバーコードだけ登録・更新する（CSV / スマレジAPI）", () => {
+  const src = read("product-import.js");
+  const problems = [];
+  if (!/function isValidMasterBarcode\(barcode\)\{\s*return \/\^\\d\{13\}\$\/\.test/.test(src)) problems.push("13桁チェック関数が無い");
+  const csv = src.slice(src.indexOf("function csvToRows"), src.indexOf("async function importCsvFile"));
+  if (!/isValidMasterBarcode/.test(csv)) problems.push("CSV取込で13桁チェックをしていない");
+  const api = src.slice(src.indexOf("const comparisonFields="), src.indexOf("const plannedBarcodes=new Map();"));
+  if (!/isValidMasterBarcode\(barcode\)/.test(api)) problems.push("スマレジAPI取込で13桁チェックをしていない");
+  return problems.join("; ");
+});
+
 check("event register settings: unset IDs stop the sales fetch", () => {
   const booth = read("booth.js");
   return /イベント販売用レジIDが未設定/.test(booth) ? "" : "unset-register guard message not found";

@@ -204,6 +204,12 @@ function getCsvValue(obj,keys){
   return "";
 }
 
+// 商品マスターに登録・更新できるバーコードは数字13桁だけ。
+// 先頭0の欠落（12桁）や Excel の指数表記などで壊れた番号を取り込まないため。
+function isValidMasterBarcode(barcode){
+  return /^\d{13}$/.test(String(barcode||"").trim());
+}
+
 function csvToRows(text){
   const parsed=parseCsv(text);
   if(parsed.length<2)throw new Error("CSVにデータ行がありません。");
@@ -221,11 +227,17 @@ function csvToRows(text){
     if(!barcode&&!name)continue;
     if(!barcode||!name)throw new Error(`${i+1}行目：バーコードまたは商品名が空です。`);
 
-    rows.push({barcode,name});
+    rows.push({barcode,name,line:i+1});
   }
 
   if(!rows.length)throw new Error("取り込み対象データがありません。");
-  return rows;
+  const invalid=rows.filter(row=>!isValidMasterBarcode(row.barcode));
+  if(invalid.length){
+    const lines=invalid.slice(0,20).map(row=>`${row.line}行目：${row.barcode}（${row.barcode.length}桁） ${row.name}`);
+    if(invalid.length>20)lines.push(`ほか ${invalid.length-20}件`);
+    throw new Error(`バーコードが数字13桁ではない行があるため、取込を中止しました（何も登録していません）。\n${lines.join("\n")}`);
+  }
+  return rows.map(({barcode,name})=>({barcode,name}));
 }
 
 async function importCsvFile(file){
@@ -553,6 +565,10 @@ async function importSmaregiProducts(){
       const barcode=String(row.barcode||"").trim();
       if(!barcode||!String(row.name||"").trim()){
         failures.push({name:row.name||"",id:row.smaregi_product_id||"",reason:"バーコードまたは商品名がありません"});
+        return;
+      }
+      if(!isValidMasterBarcode(barcode)){
+        failures.push({name:row.name||"",barcode,id:row.smaregi_product_id||"",reason:`バーコードが数字13桁ではないため登録・更新しません（${barcode} / ${barcode.length}桁）`});
         return;
       }
       const id=String(row.smaregi_product_id||"").trim();
