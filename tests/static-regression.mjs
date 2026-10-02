@@ -117,9 +117,13 @@ check("戻り保存で反映済み記録・イベント共通棚分を消さな�
   const active = booth.slice(booth.lastIndexOf("root.saveBoothReportReturnBatch=saveBoothReportReturnBatch=async function"));
   const body = active.slice(0, active.indexOf("};"));
   if (/return_reflected:false|event_storage_qty:0/.test(body)) problems.push("戻り実績の一括保存が反映済み記録または event_storage_qty を消している");
-  const sql = read("sql/rpc_booth_takeout_close_v2.sql");
-  if (!/event_storage_qty=coalesce\(event_item_row\.event_storage_qty,0\)\+v_qty/.test(sql)) problems.push("v2 の持ち出しRPCが event_storage_qty を加算していない");
-  if (!/v_return_apply:=v_returned-v_already/.test(sql)) problems.push("v2 の締めRPCに再締めの二重戻し防止が無い");
+  const sql = read("sql/rpc_booth_takeout_close_v3.sql");
+  if (!/event_storage_qty=coalesce\(event_item_row\.event_storage_qty,0\)\+v_qty/.test(sql)) problems.push("持ち出しRPCが event_storage_qty を加算していない");
+  if (!/v_return_apply:=v_returned-v_already/.test(sql)) problems.push("締めRPCに再締めの二重戻し防止が無い");
+  // 実在庫があれば持ち出せる（ARICOの通常棚在庫不足では止めない）
+  if (/normal stock shortage/.test(sql)) problems.push("持ち出しRPCが通常棚在庫不足で止めている");
+  const complete = booth.slice(booth.indexOf("async function completeBoothDepartureCount"), booth.indexOf("async function completeBoothDepartureCount") + 4000);
+  if (/の通常棚在庫が不足しています/.test(complete)) problems.push("持ち出し確定が通常棚在庫不足で止めている");
   return problems.join("; ");
 });
 

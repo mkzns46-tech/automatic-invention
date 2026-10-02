@@ -2915,20 +2915,52 @@ async function renderBoothDepartureCountList(eventId){
     list.innerHTML='<div class="booth-empty">バーコードを読み取ると、ここに持ち出し対象商品が追加されます。</div>';
     return;
   }
-  list.innerHTML=`<div class="booth-history-table-wrap booth-departure-draft-table-wrap"><table class="booth-history-table booth-departure-draft-table">
+  const searchText=row=>esc(`${row.product_name||""} ${row.barcode||""}`.toLowerCase());
+  list.innerHTML=`<div class="booth-departure-draft-toolbar">
+    <input id="boothDepartureDraftFilter" type="search" autocomplete="off" placeholder="下書きの中を商品名・バーコードで探す" value="${esc(window.__aricoBoothDepartureDraftFilter||"")}">
+    <span id="boothDepartureDraftFilterCount" class="booth-departure-draft-count"></span>
+    <button type="button" class="secondary booth-departure-clear-btn" id="boothDepartureDraftClearBtn">下書きをすべて削除</button>
+  </div>
+  <div class="booth-history-table-wrap booth-departure-draft-table-wrap"><table class="booth-history-table booth-departure-draft-table">
     <thead><tr><th>商品名</th><th>バーコード</th><th>持ち出し数</th><th>操作</th></tr></thead>
-    <tbody>${counts.map(row=>`<tr>
+    <tbody>${counts.map(row=>`<tr data-departure-search="${searchText(row)}">
       <td>${esc(row.product_name||"-")}</td>
       <td>${esc(row.barcode||"-")}</td>
       <td><div class="booth-qty-editor"><button type="button" class="secondary" data-departure-action="decrease" data-departure-barcode="${esc(row.barcode||"")}">－</button><input type="number" min="1" step="1" value="${esc(row.quantity||1)}" data-departure-qty="${esc(row.barcode||"")}"><button type="button" class="secondary" data-departure-action="increase" data-departure-barcode="${esc(row.barcode||"")}">＋</button></div></td>
       <td><button type="button" class="secondary" data-departure-action="remove" data-departure-barcode="${esc(row.barcode||"")}">削除</button></td>
     </tr>`).join("")}</tbody>
   </table></div>
-  <div class="booth-history-cards">${counts.map(row=>`<article class="booth-history-card">
+  <div class="booth-history-cards">${counts.map(row=>`<article class="booth-history-card" data-departure-search="${searchText(row)}">
     <div class="booth-history-card-top"><strong>${esc(row.product_name||"-")}</strong><button type="button" class="secondary" data-departure-action="remove" data-departure-barcode="${esc(row.barcode||"")}">削除</button></div>
     <div class="booth-history-card-meta"><span>バーコード：${esc(row.barcode||"-")}</span><label>持ち出し数<input type="number" min="1" step="1" value="${esc(row.quantity||1)}" data-departure-qty="${esc(row.barcode||"")}"></label></div>
     <div class="booth-qty-editor"><button type="button" class="secondary" data-departure-action="decrease" data-departure-barcode="${esc(row.barcode||"")}">－</button><button type="button" class="secondary" data-departure-action="increase" data-departure-barcode="${esc(row.barcode||"")}">＋</button></div>
   </article>`).join("")}</div>`;
+  // 下書きの絞り込み（再描画しても入力した文字は保つ）
+  const filterInput=el("boothDepartureDraftFilter");
+  const applyDepartureDraftFilter=()=>{
+    const keyword=String(filterInput?.value||"").trim().toLowerCase();
+    window.__aricoBoothDepartureDraftFilter=filterInput?.value||"";
+    let shown=0;
+    list.querySelectorAll("tbody tr[data-departure-search]").forEach(tr=>{
+      const hit=!keyword||tr.dataset.departureSearch.includes(keyword);
+      tr.hidden=!hit;
+      if(hit)shown++;
+    });
+    list.querySelectorAll(".booth-history-card[data-departure-search]").forEach(card=>{
+      card.hidden=!!keyword&&!card.dataset.departureSearch.includes(keyword);
+    });
+    const countLabel=el("boothDepartureDraftFilterCount");
+    if(countLabel)countLabel.textContent=keyword?`${shown} / ${counts.length}商品を表示`:`${counts.length}商品`;
+  };
+  filterInput?.addEventListener("input",applyDepartureDraftFilter);
+  applyDepartureDraftFilter();
+  el("boothDepartureDraftClearBtn")?.addEventListener("click",()=>{
+    showBoothConfirmPopup("下書きをすべて削除",`持ち出しの下書き ${counts.length}商品・${total}個をすべて削除します。\n（確定済みの持ち出しや在庫は変わりません）\nよろしいですか？`,async()=>{
+      writeBoothDepartureCounts(eventId,{});
+      window.__aricoBoothDepartureDraftFilter="";
+      await renderBoothDepartureCountList(eventId);
+    });
+  });
   list.querySelectorAll("[data-departure-action]").forEach(button=>button.addEventListener("click",async()=>{
     const barcode=String(button.dataset.departureBarcode||"");
     const action=button.dataset.departureAction;
@@ -3059,15 +3091,26 @@ async function completeBoothDepartureCount(){
   const storeCode=getBoothCurrentStoreCode();
   const checked=[];
   try{
+    // 商品と確定済みチェックは1件ずつではなくまとめて取得する（250商品で約500回の問い合わせになっていた）。
+    const productRows=[];
+    for(let offset=0;offset<counts.length;offset+=200){
+      productRows.push(...await fetchBoothProductsForItems(counts.slice(offset,offset+200)));
+    }
+    const productByBarcode=new Map(productRows.map(product=>[String(product.barcode||"").trim(),product]));
+    const confirmedBarcodes=new Set();
+    for(let offset=0;offset<counts.length;offset+=200){
+      const chunk=counts.slice(offset,offset+200).map(row=>String(row.barcode||"").trim());
+      const rows=await sb(`booth_stock_movements?select=barcode&event_id=eq.${encodeURIComponent(event.id)}&item_type=eq.normal&movement_type=in.(take_out,departure_count,event_transfer)&barcode=in.(${buildInFilter(chunk)})`);
+      (Array.isArray(rows)?rows:[]).forEach(row=>confirmedBarcodes.add(String(row.barcode||"").trim()));
+    }
     for(const row of counts){
       const quantity=Number(row.quantity||0);
-      const product=await findBoothProductByBarcode(String(row.barcode||""));
+      const product=productByBarcode.get(String(row.barcode||"").trim());
       if(!product)throw new Error(`商品マスター未登録：${row.barcode}`);
       if(isBoothDepartureGachaProduct(product))throw new Error(`${product.name||row.barcode} はガチャ商品です。ガチャ管理から登録してください。`);
-      const duplicate=await sb(`booth_stock_movements?select=id&event_id=eq.${encodeURIComponent(event.id)}&barcode=eq.${encodeURIComponent(product.barcode)}&item_type=eq.normal&movement_type=in.(take_out,departure_count,event_transfer)&limit=1`);
-      if(Array.isArray(duplicate)&&duplicate.length)throw new Error(`${product.name||product.barcode} はすでに持ち出し確定済みです。`);
+      if(confirmedBarcodes.has(String(product.barcode||"").trim()))throw new Error(`${product.name||product.barcode} はすでに持ち出し確定済みです。`);
+      // ARICOの通常棚在庫が足りなくても、実物があれば持ち出せる（在庫はマイナスになる）。
       const latestBase=Number(product.base_stock||0);
-      if(latestBase<quantity)throw new Error(`${product.name||product.barcode} の通常棚在庫が不足しています。現在庫 ${latestBase} / 持ち出し ${quantity}`);
       checked.push({row,product,quantity,latestBase});
     }
     const total=checked.reduce((sum,row)=>sum+row.quantity,0);

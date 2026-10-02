@@ -1,10 +1,11 @@
--- v2 (2026-10-02): イベント持ち出し / 締め RPC の修正
+-- v3 (2026-10-02): イベント持ち出し / 締め RPC の修正（v2 の内容＋在庫不足でも持ち出し可）
 -- 1. confirm_booth_takeout: 持ち出し数を booth_event_items.event_storage_qty にも加算する。
 --    以前は加算しておらず、締め時に共通イベント棚から1個も減らせず
 --    「イベント棚データ不足」になり、共通イベント棚が実物より多く残っていた。
 -- 2. confirm_booth_event_close: 通常棚へ戻すのは「戻り数 − 既に反映済みの数」だけにする。
 --    締め解除 → 再締めで戻り数を二重に通常棚へ戻していた。
 --    戻り数が反映済みより減っている場合は在庫を勝手に減らさず停止する。
+-- 3. confirm_booth_takeout: 通常棚在庫の不足では止めない（実在庫があれば持ち出せる。在庫はマイナスになりうる）。
 -- 再実行しても安全（CREATE OR REPLACE）。元に戻す場合は rpc_booth_takeout_close_v1_backup.sql を実行する。
 
 CREATE OR REPLACE FUNCTION public.confirm_booth_event_close(p_event_id uuid, p_staff text)
@@ -153,7 +154,7 @@ begin
     select * into product_row from public.products where barcode=v_barcode for update;
     if not found then raise exception 'product not found: %',v_barcode; end if;
     v_before:=coalesce(product_row.base_stock,0);
-    if v_before<v_qty then raise exception 'normal stock shortage: % (current % / takeout %)',v_barcode,v_before,v_qty; end if;
+    -- ARICO の通常棚在庫が足りなくても、実物があれば持ち出せる（在庫はマイナスになりうる）。
     select count(*) into v_duplicate from public.booth_stock_movements where event_id=p_event_id and barcode=v_barcode and item_type='normal' and movement_type in ('take_out','departure_count','event_transfer') and coalesce(cancelled,false)=false;
     if v_duplicate>0 then raise exception 'already confirmed: %',v_barcode; end if;
     v_after:=v_before-v_qty;
