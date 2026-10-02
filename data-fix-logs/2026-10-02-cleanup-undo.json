@@ -1,0 +1,3903 @@
+{
+ "deletedProducts": [
+  {
+   "barcode": "400100010013",
+   "name": "AXCEL KRYPTOS PRO バイブレーションダンプナー ダンパー ブラック",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4738",
+   "price": 26400
+  },
+  {
+   "barcode": "400100010037",
+   "name": "Bicaster Archery ポロ アッパーロッド",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4736",
+   "price": 2420
+  },
+  {
+   "barcode": "900100010025",
+   "name": "WIAWIS ARC カーボンクリッカー ソフトタイプ ブラック 6-32",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3782",
+   "price": 5940
+  },
+  {
+   "barcode": "900100010032",
+   "name": "WIAWIS ARC カーボンクリッカー ソフトタイプ ブルー 6-32",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3781",
+   "price": 5940
+  },
+  {
+   "barcode": "900100010049",
+   "name": "WIAWIS ARC カーボンクリッカー ソフトタイプ ゴールド 6-32",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3780",
+   "price": 5940
+  },
+  {
+   "barcode": "900100010056",
+   "name": "WIAWIS ARC カーボンクリッカー ソフトタイプ レッド 6-32",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3779",
+   "price": 5940
+  },
+  {
+   "barcode": "900100010063",
+   "name": "WIAWIS ARC カーボンクリッカー ソフトタイプ シルバー 6-32",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3778",
+   "price": 5940
+  },
+  {
+   "barcode": "900100010070",
+   "name": "Beiter マイクロクリッカー LH 63mm",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.186885+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4153",
+   "price": 19360
+  },
+  {
+   "barcode": "900100010087",
+   "name": "Beiter マイクロクリッカー LH 49mm",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.186885+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4152",
+   "price": 19360
+  },
+  {
+   "barcode": "900100010094",
+   "name": "Beiter マイクロクリッカー RH 63mm",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.186885+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4151",
+   "price": 19360
+  },
+  {
+   "barcode": "900100010100",
+   "name": "Beiter マイクロクリッカー RH 49mm",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.186885+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4150",
+   "price": 19360
+  },
+  {
+   "barcode": "900100010117",
+   "name": "Beiter クリッカーキャップ ロング ブラック",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.186885+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4336",
+   "price": 440
+  },
+  {
+   "barcode": "900100010124",
+   "name": "Beiter クリッカーキャップ ロング ホワイト",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.186885+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4335",
+   "price": 440
+  },
+  {
+   "barcode": "900100010131",
+   "name": "Beiter クリッカーキャップ ノーマル グリーン（ノーマルのみ）",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.186885+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4334",
+   "price": 440
+  },
+  {
+   "barcode": "900100010148",
+   "name": "Beiter クリッカーキャップ ノーマル レッド（ノーマルのみ）",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.186885+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4333",
+   "price": 440
+  },
+  {
+   "barcode": "900100010155",
+   "name": "Beiter クリッカーキャップ ノーマル ブラック",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.186885+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4332",
+   "price": 440
+  },
+  {
+   "barcode": "900100010162",
+   "name": "Beiter クリッカーキャップ ノーマル ホワイト",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.186885+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4331",
+   "price": 440
+  },
+  {
+   "barcode": "900100010179",
+   "name": "CARTEL クリッカー 6-32",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4704",
+   "price": 913
+  },
+  {
+   "barcode": "400100010044",
+   "name": "Bicaster Archery ポロ２ ダンパー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4735",
+   "price": 1210
+  },
+  {
+   "barcode": "400100010051",
+   "name": "LEVEN/DOINKER EXOドインカーダンパー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4734",
+   "price": 7040
+  },
+  {
+   "barcode": "500100010003",
+   "name": "CARTEL アッパーロッド",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4703",
+   "price": 2420
+  },
+  {
+   "barcode": "500100010010",
+   "name": "INFITEC アッパーロッド",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4733",
+   "price": 1760
+  },
+  {
+   "barcode": "500100010027",
+   "name": "CARTEL CX500 アッパーロッド ブルー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4732",
+   "price": 2420
+  },
+  {
+   "barcode": "500100010034",
+   "name": "CARTEL CX500 アッパーロッド レッド",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4731",
+   "price": 2420
+  },
+  {
+   "barcode": "500100010041",
+   "name": "CARTEL CX500 アッパーロッド ブラック",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4730",
+   "price": 2420
+  },
+  {
+   "barcode": "800000000006",
+   "name": "WIAWIS マイティプランジャー ブラック",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3704",
+   "price": 20240
+  },
+  {
+   "barcode": "800000000013",
+   "name": "WIAWIS マイティプランジャー シルバー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3703",
+   "price": 20240
+  },
+  {
+   "barcode": "800000000020",
+   "name": "WIAWIS マイティプランジャー ブルー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3702",
+   "price": 20240
+  },
+  {
+   "barcode": "800000000037",
+   "name": "WIAWIS マイティプランジャー ゴールド",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3701",
+   "price": 20240
+  },
+  {
+   "barcode": "800000000044",
+   "name": "WIAWIS マイティプランジャー レインボー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3700",
+   "price": 20240
+  },
+  {
+   "barcode": "900100010018",
+   "name": "GALAXY スリッカークリッカー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3783",
+   "price": 8800
+  },
+  {
+   "barcode": "400000000015",
+   "name": "WIAWIS ADTダンパー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.348057+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "6287",
+   "price": 6490
+  },
+  {
+   "barcode": "400000000022",
+   "name": "WIAWIS MACダンパー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.348057+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "6288",
+   "price": 5500
+  },
+  {
+   "barcode": "400100010006",
+   "name": "WIAWIS マルチダンパー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4739",
+   "price": 7150
+  },
+  {
+   "barcode": "400100010020",
+   "name": "Beiter V-BOXダンパー ベーシックキット",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.26533+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "4737",
+   "price": 8800
+  },
+  {
+   "barcode": "800000000068",
+   "name": "Beiter プランジャースプリング 0.6",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:24.222685+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "12762",
+   "price": 264
+  },
+  {
+   "barcode": "800000000075",
+   "name": "Beiter プランジャースプリング 0.45",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:24.222685+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "12761",
+   "price": 264
+  },
+  {
+   "barcode": "800000000082",
+   "name": "Beiter プランジャースプリングボール",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:24.39594+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "14450",
+   "price": 1760
+  },
+  {
+   "barcode": "900100010001",
+   "name": "AAE エクステンションクリッカー",
+   "base_stock": 0,
+   "location": "",
+   "created_at": "2026-05-16T07:32:23.104931+00:00",
+   "category": "",
+   "genre": "",
+   "department": "",
+   "smaregi_product_id": "3784",
+   "price": 9680
+  }
+ ],
+ "eventStorageStocksBefore": [
+  {
+   "id": "66e4c9ba-52fb-4551-bec5-77414eef093d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1500000001377",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個)   ラグーン",
+   "storage_qty": 25,
+   "updated_at": "2026-09-08T14:26:29.353+00:00"
+  },
+  {
+   "id": "44134f7c-470e-43cd-88aa-217ff63ccd1f",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293056",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) オレンジ",
+   "storage_qty": 25,
+   "updated_at": "2026-09-08T14:26:29.78+00:00"
+  },
+  {
+   "id": "312a226f-c906-4237-9c4c-81342bf67b9e",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3211000394069",
+   "product_name": "FIVICS FS004D フィンガースペーサー パープル",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:26:40.281+00:00"
+  },
+  {
+   "id": "9369f3b2-dc4a-46de-acad-e2a3ce490c2a",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2111000128019",
+   "product_name": "FIVICS TNV2300 アッパーロッド ブラック",
+   "storage_qty": 2,
+   "updated_at": "2026-09-08T14:27:30.839+00:00"
+  },
+  {
+   "id": "0795de95-b4c1-4853-8182-19fef5c2ad21",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000171021",
+   "product_name": "FIVICS TENFIX タブ コードバン RH M",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:27.699+00:00"
+  },
+  {
+   "id": "ee90ce77-0002-42ee-9b8a-39b9e7dee74d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000186074",
+   "product_name": "FIVICS ハーネスジェル アームガード パープル",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:36.897+00:00"
+  },
+  {
+   "id": "d0519c2e-55b9-44cd-82b6-fe50c90f4e4d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293179",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) キャンディピンク",
+   "storage_qty": 25,
+   "updated_at": "2026-09-08T14:26:30.212+00:00"
+  },
+  {
+   "id": "81fe0cfa-8a54-4513-a062-fb7662e7baf5",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293063",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) グリーン",
+   "storage_qty": 25,
+   "updated_at": "2026-09-08T14:26:30.635+00:00"
+  },
+  {
+   "id": "14e4c165-8290-47fe-ab45-974d796998da",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302097",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm RH ピンク",
+   "storage_qty": 20,
+   "updated_at": "2026-09-08T14:28:04.28+00:00"
+  },
+  {
+   "id": "3699b6a3-66f0-48f7-8fcd-55417fd76e91",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3313000189000",
+   "product_name": "WJ SPORTS リムプロテクター",
+   "storage_qty": 1,
+   "updated_at": "2026-09-08T14:28:08.611+00:00"
+  },
+  {
+   "id": "3ed06672-3752-41a9-9eb2-17cbf7dcda37",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293070",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) クリア",
+   "storage_qty": 25,
+   "updated_at": "2026-09-08T14:26:31.04+00:00"
+  },
+  {
+   "id": "b934fa51-9b0a-48a4-8ffa-783e50b32827",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293162",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) スカイブルー",
+   "storage_qty": 25,
+   "updated_at": "2026-09-08T14:26:31.463+00:00"
+  },
+  {
+   "id": "fda8e2ad-3ef8-4e8b-9bc1-6c08ee1001d0",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1500100010422",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) スモーク",
+   "storage_qty": 25,
+   "updated_at": "2026-09-08T14:26:31.863+00:00"
+  },
+  {
+   "id": "7bc9a638-09f4-4ad4-b1e8-20624df604cb",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293100",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) ダークグリーン",
+   "storage_qty": 25,
+   "updated_at": "2026-09-08T14:26:32.266+00:00"
+  },
+  {
+   "id": "af7ab571-0e48-4d52-bf29-8c0534924d16",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293094",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) ダークブルー",
+   "storage_qty": 25,
+   "updated_at": "2026-09-08T14:26:32.71+00:00"
+  },
+  {
+   "id": "9be3a576-87d2-41d0-b854-2feba16e4768",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302158",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm LH オレンジ",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:59.272+00:00"
+  },
+  {
+   "id": "51fc69b6-b334-430e-b59f-947a81b843be",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302141",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm LH ブラック",
+   "storage_qty": 2,
+   "updated_at": "2026-09-08T14:28:00.84+00:00"
+  },
+  {
+   "id": "34747518-d345-4397-8ada-0f7fb6901c46",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1600000000483",
+   "product_name": "KOREA ARCHERY JET6 S ベイン RH グリーン",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "56035fee-18db-4b12-bdd3-354e1bec25bf",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293087",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) パープル",
+   "storage_qty": 50,
+   "updated_at": "2026-09-08T14:26:34.288+00:00"
+  },
+  {
+   "id": "e6b37e6e-d8ec-419c-84d5-da43e8d8ea26",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293025",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) ブラック",
+   "storage_qty": 50,
+   "updated_at": "2026-09-08T14:26:34.735+00:00"
+  },
+  {
+   "id": "e2c7b198-c784-48ee-97f5-3562e554cde4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293032",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) ブルー",
+   "storage_qty": 50,
+   "updated_at": "2026-09-08T14:26:35.202+00:00"
+  },
+  {
+   "id": "a3313527-cf53-4805-b238-74b805ee8ed5",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293131",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) ヘビーオレンジ",
+   "storage_qty": 50,
+   "updated_at": "2026-09-08T14:26:35.633+00:00"
+  },
+  {
+   "id": "7b13f721-ffda-447b-9e39-c572e449a857",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293124",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) ヘビーグリーン",
+   "storage_qty": 50,
+   "updated_at": "2026-09-08T14:26:36.074+00:00"
+  },
+  {
+   "id": "a0c8cf6a-5be3-435c-bc80-cb8d320c05de",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293018",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) ホワイト",
+   "storage_qty": 50,
+   "updated_at": "2026-09-08T14:26:36.532+00:00"
+  },
+  {
+   "id": "7a0be23d-f4df-4041-87bc-fde5df23facc",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1500100010415",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) レーシングレッド",
+   "storage_qty": 50,
+   "updated_at": "2026-09-08T14:26:36.984+00:00"
+  },
+  {
+   "id": "98dbec03-020c-4aeb-9786-aa2c2c3f9fcc",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6115000293049",
+   "product_name": "Beiter アウトノック 4.5/1 X (1個) レッド",
+   "storage_qty": 74,
+   "updated_at": "2026-09-08T14:26:37.431+00:00"
+  },
+  {
+   "id": "4dc78272-8c36-44c3-a108-2b0dee0a8f9d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2315000151019",
+   "product_name": "Beiter クリッカー 0.25 6/32A",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:26:37.842+00:00"
+  },
+  {
+   "id": "3a4927ce-0ae7-45c0-b424-214f44f2b967",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2315000152016",
+   "product_name": "Beiter クリッカー ブラックブレード 0.25 6/32A",
+   "storage_qty": 2,
+   "updated_at": "2026-09-08T14:26:38.338+00:00"
+  },
+  {
+   "id": "5535e3ab-c764-478a-8a31-dc87ac7dcccb",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000172028",
+   "product_name": "FIVICS TENFIX タブ バックスキン M",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:28.923+00:00"
+  },
+  {
+   "id": "af79ca74-4c70-4803-a795-22b53617f9bb",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000185022",
+   "product_name": "FIVICS ORGANIC WEB アームガード ブルー",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:26:43.411+00:00"
+  },
+  {
+   "id": "48272983-7717-4231-afaa-85187f7631f4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302127",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm LH イエロー",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:58.886+00:00"
+  },
+  {
+   "id": "8c227d8c-1f1e-4ea8-8bda-a236c4d129ac",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302134",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm LH ブルー",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:28:01.289+00:00"
+  },
+  {
+   "id": "b8608600-0730-4298-be4f-52c36b87827e",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302059",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm RH ブラック",
+   "storage_qty": 20,
+   "updated_at": "2026-09-08T14:28:04.702+00:00"
+  },
+  {
+   "id": "19c99c11-6c9d-4796-9b08-4cd6ac29b16f",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302011",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm RH ホワイト",
+   "storage_qty": 18,
+   "updated_at": "2026-09-08T14:28:05.488+00:00"
+  },
+  {
+   "id": "03128868-85b1-4bb8-a1b6-7ed5d8aefd9a",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1600100011013",
+   "product_name": "RANGE-O-MATIC ラッピングテープ",
+   "storage_qty": 18,
+   "updated_at": "2026-09-08T14:28:06.298+00:00"
+  },
+  {
+   "id": "57a5d3ad-1883-490f-b525-2f3ee246284a",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "9413000424027",
+   "product_name": "WJ SPORTS ARCHER'S ハット M",
+   "storage_qty": 2,
+   "updated_at": "2026-09-08T14:28:07.137+00:00"
+  },
+  {
+   "id": "b3a492a3-184d-4ccf-88f9-7cb4f3d4db60",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2900000000117",
+   "product_name": "シューティングトレーナー（レッド）",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "92e4290a-6da4-45ba-a4d9-92044e981c5b",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3211000392003",
+   "product_name": "FIVICS FS007O プロスペーサー オーバル",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "0e42cd50-06dc-4b8b-bf6e-cbd91cfb84ef",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3211000393000",
+   "product_name": "FIVICS FS001P プラスチック フィンガースペーサー",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "8b85a6a4-7cb0-4464-8d47-6042f98d36d6",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3211000394014",
+   "product_name": "FIVICS FS004D フィンガースペーサー ブラック",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "96625aa7-1cea-4be2-9020-dce28747767e",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3211000394021",
+   "product_name": "FIVICS FS004D フィンガースペーサー ブルー",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "e1e0827d-c2f7-4589-8eaf-5b493f362d0e",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3211000394045",
+   "product_name": "FIVICS FS004D フィンガースペーサー イエロー",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "78455c6a-8a8b-4fde-bb00-f74937f9735d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3211000394052",
+   "product_name": "FIVICS FS004D フィンガースペーサー グリーン",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "6d428b5f-0508-418c-9ba1-5ccc8da59005",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3211000395004",
+   "product_name": "FIVICS FS004T フィンガースペーサー",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "a01e559a-9c2a-4285-9f09-87feaf72f191",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3323000635025",
+   "product_name": "KOREA ARCHERY Jet6 アームガード ブルー",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "8d6ef16b-fb8c-4076-a87b-888c62fd046c",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3323000635032",
+   "product_name": "KOREA ARCHERY Jet6 アームガード レッド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "ed5458bd-dec0-413a-b75c-997c3a654851",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-002",
+   "barcode": "9900002933002",
+   "product_name": "ARICO SYSTEM TEST 29339 #002",
+   "storage_qty": 10,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "2109cee2-fc6e-4630-b95f-3d4641098d2a",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-003",
+   "barcode": "9900002933003",
+   "product_name": "ARICO SYSTEM TEST 29339 #003",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "9bbb175c-1871-4e49-826b-bc207a717227",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-004",
+   "barcode": "9900002933004",
+   "product_name": "ARICO SYSTEM TEST 29339 #004",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "f7c97211-0a12-4e56-b2f0-d99bf59cd187",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-005",
+   "barcode": "9900002933005",
+   "product_name": "ARICO SYSTEM TEST 29339 #005",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "add9a9ef-e62d-43b9-a328-353f38ad06b0",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-006",
+   "barcode": "9900002933006",
+   "product_name": "ARICO SYSTEM TEST 29339 #006",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "c88f6508-553a-4647-853c-05fc8cfd5bb1",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-007",
+   "barcode": "9900002933007",
+   "product_name": "ARICO SYSTEM TEST 29339 #007",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "cc41b0bb-829a-463e-95d1-7dd6c8d143f0",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-008",
+   "barcode": "9900002933008",
+   "product_name": "ARICO SYSTEM TEST 29339 #008",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "fbb89787-8892-41c2-a525-b442f8ce873e",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-009",
+   "barcode": "9900002933009",
+   "product_name": "ARICO SYSTEM TEST 29339 #009",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "fd4a9687-9663-47b8-85a3-5b390ba0011f",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-010",
+   "barcode": "9900002933010",
+   "product_name": "ARICO SYSTEM TEST 29339 #010",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "3d8c4008-3921-4ce0-9829-6af38018301e",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-011",
+   "barcode": "9900002933011",
+   "product_name": "ARICO SYSTEM TEST 29339 #011",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "24a9e9bd-eb78-48e8-be1b-72b106e18188",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3323000635063",
+   "product_name": "KOREA ARCHERY Jet6 アームガード  パープル",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "4d933e41-d866-42c6-8d8c-c08fd2417dcf",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632065",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ RH オレンジ",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "089d08c7-d1d9-4d85-bd57-1dcacb879775",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-012",
+   "barcode": "9900002933012",
+   "product_name": "ARICO SYSTEM TEST 29339 #012",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "82b776d5-d75e-4b9e-b265-9c9490f83303",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1600000000490",
+   "product_name": "KOREA ARCHERY JET6 S ベイン RH イエロー",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "18b4b780-e794-4af2-aaea-fedb44c4d42e",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-063",
+   "barcode": "9900002933063",
+   "product_name": "ARICO SYSTEM TEST 29339 #063",
+   "storage_qty": 5,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "2f3c56b3-6ae9-430c-928f-1a373ff2e85e",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-064",
+   "barcode": "9900002933064",
+   "product_name": "ARICO SYSTEM TEST 29339 #064",
+   "storage_qty": 5,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "c3fd1f45-1a6a-4834-8f46-7f2cc6d185a0",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-068",
+   "barcode": "9900002933068",
+   "product_name": "ARICO SYSTEM TEST 29339 #068",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "5b1d82c4-626e-49a1-b941-453ab205f02f",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2511000123005",
+   "product_name": "FIVICS DC1500S ダンパー",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "09d5b6b1-9e49-4548-8ab1-261a8c1eb77a",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2900000000032",
+   "product_name": "MK ARCHERY ミニチュア キーリング ハンドル シルバー",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "a653b826-ea6d-401a-8331-dcbad08c7618",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632126",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ LH グリーン",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "946e1f1b-e83f-4062-81fa-91fc365be375",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632133",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ LH レッド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "54295ae0-1771-4f0e-80eb-d164664fe13a",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000633024",
+   "product_name": "KOREA ARCHERY JET6 ベイン 2 インチ RH ブルー",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "00011d7a-969d-45be-8b89-6aa59f81b393",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "5011000482012",
+   "product_name": "FIVICS HYPER トーナメントクイバー RH ブラック",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:42.583+00:00"
+  },
+  {
+   "id": "a9b39c10-fe67-47b9-b36a-09a96d8e8804",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000184025",
+   "product_name": "FIVICS ORGANIC X アームガード ブルー",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:26:45.295+00:00"
+  },
+  {
+   "id": "39673925-3cc7-41ac-8b60-fc0cd3107379",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000633130",
+   "product_name": "KOREA ARCHERY JET6 ベイン 2 インチ LH レッド",
+   "storage_qty": 8,
+   "updated_at": "2026-09-08T14:27:50.649+00:00"
+  },
+  {
+   "id": "6db0752b-1a14-4db8-af03-5a059e536f51",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302035",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm RH イエロー",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:28:02.594+00:00"
+  },
+  {
+   "id": "b013544e-ecd0-4141-8681-ba0f9c94361c",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302080",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm RH グリーン",
+   "storage_qty": 20,
+   "updated_at": "2026-09-08T14:28:03.459+00:00"
+  },
+  {
+   "id": "ef3cb375-002a-42a3-b0b1-bf4b9fa502f2",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302042",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm RH ブルー",
+   "storage_qty": 20,
+   "updated_at": "2026-09-08T14:28:05.095+00:00"
+  },
+  {
+   "id": "36ef47ac-ef8a-437f-b98c-05872828adca",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-013",
+   "barcode": "9900002933013",
+   "product_name": "ARICO SYSTEM TEST 29339 #013",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "02c680fb-77d5-4c91-a2dc-a16617962437",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2900000000377",
+   "product_name": "シューティングトレーナー（ブルー）",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "daff4e58-da7f-41bb-bd0a-1b95c4ba2bc4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3211000394038",
+   "product_name": "FIVICS FS004D フィンガースペーサー レッド",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "77128b2c-e4a2-4f03-bbc5-915352751069",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-014",
+   "barcode": "9900002933014",
+   "product_name": "ARICO SYSTEM TEST 29339 #014",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "22e03445-f4f1-462d-90be-99f589b2ea6e",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-016",
+   "barcode": "9900002933016",
+   "product_name": "ARICO SYSTEM TEST 29339 #016",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "1450fc5f-ebfd-40b2-a4ac-f63849c69367",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-017",
+   "barcode": "9900002933017",
+   "product_name": "ARICO SYSTEM TEST 29339 #017",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "1a91537d-87fa-4f02-be17-54665790d276",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "5300000000563",
+   "product_name": "KOREA ARCHERY Jet6 アームガード ホワイト",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "1bc27b2c-5d8a-4807-965e-0a59843ffae9",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632027",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ RH ブルー",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "5ed6661d-5151-4c0c-8c37-60a9b97e22f3",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632157",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ LH ピンク",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "dc89e0f5-13b5-4f61-a5e8-b6b3d1d6bdc3",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000633048",
+   "product_name": "KOREA ARCHERY JET6 ベイン 2 インチ RH グリーン",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "6ca910a6-1e64-4cb5-8614-d2befff217aa",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000633055",
+   "product_name": "KOREA ARCHERY JET6 ベイン 2 インチ RH レッド",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "37d4a5e3-f921-4ce6-b3bd-c96cc73e99d9",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000633086",
+   "product_name": "KOREA ARCHERY JET6 ベイン 2 インチ RH パープル",
+   "storage_qty": 4,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "1f6537d3-8898-433b-a6f3-5e43f0cabd34",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000633178",
+   "product_name": "KOREA ARCHERY JET6 ベイン 2 インチ RH ホワイト",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "06a55a40-8fed-4da2-ad77-58ea25c365f9",
+   "store_code": "tokyo",
+   "smaregi_product_id": "2701",
+   "barcode": "8011000406022",
+   "product_name": "ARICO フィンガースリング グリーン",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "93c8ea65-20b2-4a6a-9177-6899386171d1",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "8100000000047",
+   "product_name": "FIVICS SKADIタブ RH XS（パープル）",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "1b0a195d-7fc5-4c67-bb12-3378e9e598d6",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-018",
+   "barcode": "9900002933018",
+   "product_name": "ARICO SYSTEM TEST 29339 #018",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "b57291fe-ac51-456a-a227-46c9dc48fd24",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-019",
+   "barcode": "9900002933019",
+   "product_name": "ARICO SYSTEM TEST 29339 #019",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "178493dd-2f2b-4c25-b730-8d08d621c930",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-020",
+   "barcode": "9900002933020",
+   "product_name": "ARICO SYSTEM TEST 29339 #020",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "6e16102f-d803-40e0-862e-bdab4445347c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-021",
+   "barcode": "9900002933021",
+   "product_name": "ARICO SYSTEM TEST 29339 #021",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "4e1f222f-9bdc-4d0d-a392-9e42219187ca",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-022",
+   "barcode": "9900002933022",
+   "product_name": "ARICO SYSTEM TEST 29339 #022",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "9dcdcff2-e230-474f-b991-5900219c032e",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-023",
+   "barcode": "9900002933023",
+   "product_name": "ARICO SYSTEM TEST 29339 #023",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "65450c04-4eac-4b52-b0ad-986f02183312",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-024",
+   "barcode": "9900002933024",
+   "product_name": "ARICO SYSTEM TEST 29339 #024",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "fe64f59c-168e-457d-9460-05915ae7424c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-025",
+   "barcode": "9900002933025",
+   "product_name": "ARICO SYSTEM TEST 29339 #025",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "dc6a481e-1cef-48be-b857-bfcf590b5eab",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-026",
+   "barcode": "9900002933026",
+   "product_name": "ARICO SYSTEM TEST 29339 #026",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "4379f72f-e9d6-409b-837b-8a7859445c34",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-027",
+   "barcode": "9900002933027",
+   "product_name": "ARICO SYSTEM TEST 29339 #027",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "dac7edac-70c0-4dca-85f2-65fabf626a3c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-028",
+   "barcode": "9900002933028",
+   "product_name": "ARICO SYSTEM TEST 29339 #028",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "20851cf2-bfbd-4a22-a371-16653c3973ff",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-029",
+   "barcode": "9900002933029",
+   "product_name": "ARICO SYSTEM TEST 29339 #029",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "06a3222f-732c-43ea-bca4-f80dd3cdf5a9",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-040",
+   "barcode": "9900002933040",
+   "product_name": "ARICO SYSTEM TEST 29339 #040",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "db719849-9477-4e40-afb6-3295e109eb2c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-041",
+   "barcode": "9900002933041",
+   "product_name": "ARICO SYSTEM TEST 29339 #041",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "bf866bc7-7afb-43b0-9fde-1014e7ec3d23",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-042",
+   "barcode": "9900002933042",
+   "product_name": "ARICO SYSTEM TEST 29339 #042",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "54b53eb0-5929-4a22-967a-85d0ab5cad41",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-043",
+   "barcode": "9900002933043",
+   "product_name": "ARICO SYSTEM TEST 29339 #043",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "4968b71e-774f-4aeb-947d-f2d492b1b82f",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-044",
+   "barcode": "9900002933044",
+   "product_name": "ARICO SYSTEM TEST 29339 #044",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "d8e24d50-efb3-4026-9095-94361b3cea04",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-062",
+   "barcode": "9900002933062",
+   "product_name": "ARICO SYSTEM TEST 29339 #062",
+   "storage_qty": 5,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "dc9ebc17-6eb6-49fa-94e3-13924ee68cc3",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000185046",
+   "product_name": "FIVICS ORGANIC WEB アームガード グリーン",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:42.975+00:00"
+  },
+  {
+   "id": "a99799e3-8340-4c4b-8a00-fb8bfaf05d15",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000185039",
+   "product_name": "FIVICS ORGANIC WEB アームガード レッド",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:26:43.827+00:00"
+  },
+  {
+   "id": "c9ac3926-23fc-40f4-99c9-f3145454dd75",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000184018",
+   "product_name": "FIVICS ORGANIC X アームガード ブラック",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:26:44.883+00:00"
+  },
+  {
+   "id": "62f8d3b1-f882-4765-bf33-5da3e5f8cf4c",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302165",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm LH パープル",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:28:00.046+00:00"
+  },
+  {
+   "id": "eab207e0-1cfb-4ce8-9ee0-424bec29dd37",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302103",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm LH ホワイト",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:28:01.741+00:00"
+  },
+  {
+   "id": "f66ace24-79eb-4946-a3c7-cbab7605372f",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302028",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm RH レッド",
+   "storage_qty": 20,
+   "updated_at": "2026-09-08T14:28:05.905+00:00"
+  },
+  {
+   "id": "9b4e160b-160c-4083-8388-e228eae406e4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "9413000424010",
+   "product_name": "WJ SPORTS ARCHER'S ハット L",
+   "storage_qty": 1,
+   "updated_at": "2026-09-08T14:28:06.64+00:00"
+  },
+  {
+   "id": "68644326-49d4-4bbb-ab71-392dd6ff7475",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632171",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ RH ホワイト",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "b9ee09e3-0912-4760-986d-f6da7ae01cf4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000633031",
+   "product_name": "KOREA ARCHERY JET6 ベイン 2 インチ RH イエロー",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "3f2193ad-dc1d-4aba-9167-9e04715bd894",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000633079",
+   "product_name": "KOREA ARCHERY JET6 ベイン 2 インチ RH ピンク",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "64afc010-07fc-4831-9dd2-4f6ec177051b",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-052",
+   "barcode": "9900002933052",
+   "product_name": "ARICO SYSTEM TEST 29339 #052",
+   "storage_qty": 5,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "6324ca5c-2151-4540-b1df-6a469aa0688a",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-053",
+   "barcode": "9900002933053",
+   "product_name": "ARICO SYSTEM TEST 29339 #053",
+   "storage_qty": 5,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "119675e3-5c83-4e68-ba3a-757490b60552",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-054",
+   "barcode": "9900002933054",
+   "product_name": "ARICO SYSTEM TEST 29339 #054",
+   "storage_qty": 5,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "f4a6bcd3-a32a-4689-bed6-792ca4d1f6c4",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-051",
+   "barcode": "9900002933051",
+   "product_name": "ARICO SYSTEM TEST 29339 #051",
+   "storage_qty": 6,
+   "updated_at": "2026-09-14T12:09:34.84939+00:00"
+  },
+  {
+   "id": "3c9551d6-44d2-44ae-ae8d-879bd35abef6",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-030",
+   "barcode": "9900002933030",
+   "product_name": "ARICO SYSTEM TEST 29339 #030",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "914c56d8-a027-4f2e-b839-e19696b981f3",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-031",
+   "barcode": "9900002933031",
+   "product_name": "ARICO SYSTEM TEST 29339 #031",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "9c968d7e-920f-451e-a6db-521d3afe9ca1",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-032",
+   "barcode": "9900002933032",
+   "product_name": "ARICO SYSTEM TEST 29339 #032",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "de88a3fd-2f6a-4212-8ff6-2f3adb70c0f2",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-033",
+   "barcode": "9900002933033",
+   "product_name": "ARICO SYSTEM TEST 29339 #033",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "d093fd8c-6809-4282-82fa-44018829abba",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-055",
+   "barcode": "9900002933055",
+   "product_name": "ARICO SYSTEM TEST 29339 #055",
+   "storage_qty": 6,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "d44babed-a399-467a-89cf-28e01984023c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-056",
+   "barcode": "9900002933056",
+   "product_name": "ARICO SYSTEM TEST 29339 #056",
+   "storage_qty": 6,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "ab2c9bd0-f008-4432-a7d7-7f98ed422d1f",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-057",
+   "barcode": "9900002933057",
+   "product_name": "ARICO SYSTEM TEST 29339 #057",
+   "storage_qty": 6,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "4bbe7bab-c8bd-4b34-a5c4-fff89aedcb34",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-058",
+   "barcode": "9900002933058",
+   "product_name": "ARICO SYSTEM TEST 29339 #058",
+   "storage_qty": 6,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "f61b9065-eede-49bd-98a5-c82837aa29fe",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-059",
+   "barcode": "9900002933059",
+   "product_name": "ARICO SYSTEM TEST 29339 #059",
+   "storage_qty": 6,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "04fb4353-24fa-48dc-9913-189a883a5caa",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-060",
+   "barcode": "9900002933060",
+   "product_name": "ARICO SYSTEM TEST 29339 #060",
+   "storage_qty": 6,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "fb7463c4-73ab-4e8a-9317-521cad593c66",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-034",
+   "barcode": "9900002933034",
+   "product_name": "ARICO SYSTEM TEST 29339 #034",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "7cc21de9-8eb0-42d3-8620-170c226f4f2c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-035",
+   "barcode": "9900002933035",
+   "product_name": "ARICO SYSTEM TEST 29339 #035",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "8adf0bcf-dcf9-4799-9c39-f1e369646698",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-036",
+   "barcode": "9900002933036",
+   "product_name": "ARICO SYSTEM TEST 29339 #036",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "ae8798a6-6073-4a61-90cf-22d560fb3a03",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-037",
+   "barcode": "9900002933037",
+   "product_name": "ARICO SYSTEM TEST 29339 #037",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "d692d732-0fb2-4415-a330-e165ef823c20",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-038",
+   "barcode": "9900002933038",
+   "product_name": "ARICO SYSTEM TEST 29339 #038",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "63e4c342-0acb-4751-a784-8e5cba13d9c4",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-039",
+   "barcode": "9900002933039",
+   "product_name": "ARICO SYSTEM TEST 29339 #039",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "05a5e6af-6c60-495f-bf49-713370de1849",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632041",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ RH グリーン",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "15386573-87f1-4670-bf51-110cdd25d822",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632096",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ LH ブラック",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "4b9f0e4a-a884-4208-86de-776d3617fd6d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632119",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ LH イエロー",
+   "storage_qty": 4,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "c9af2305-f8d9-43b2-91a4-f14ae59da3f9",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000184049",
+   "product_name": "FIVICS ORGANIC X アームガード グリーン",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:26:44.496+00:00"
+  },
+  {
+   "id": "612a21e8-a73b-4417-b527-87c23c68048b",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000160066",
+   "product_name": "FIVICS SAKER 1 タブ LH L",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:46.215+00:00"
+  },
+  {
+   "id": "eabdde1b-f093-4463-8574-cc239bdc4f24",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-080",
+   "barcode": "9900002933080",
+   "product_name": "ARICO SYSTEM TEST 29339 #080",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "177f52c3-a68f-4600-a1b7-620095238ef2",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-081",
+   "barcode": "9900002933081",
+   "product_name": "ARICO SYSTEM TEST 29339 #081",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "48272852-df91-447a-820f-86a733e89403",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-082",
+   "barcode": "9900002933082",
+   "product_name": "ARICO SYSTEM TEST 29339 #082",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "74264242-f30f-4800-9b79-ed1767539c12",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-083",
+   "barcode": "9900002933083",
+   "product_name": "ARICO SYSTEM TEST 29339 #083",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "f213d74e-1b18-4c5b-95d1-0ef3a3fb7e87",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-084",
+   "barcode": "9900002933084",
+   "product_name": "ARICO SYSTEM TEST 29339 #084",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "6ba7ef95-32e7-404c-9e2d-ac5d4781c3d2",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-085",
+   "barcode": "9900002933085",
+   "product_name": "ARICO SYSTEM TEST 29339 #085",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "5a5c11bb-2dea-48e3-8609-09b65aa0fa06",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-086",
+   "barcode": "9900002933086",
+   "product_name": "ARICO SYSTEM TEST 29339 #086",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "19c444d6-6fe0-4f4e-8c72-76f5eef6bfc5",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-087",
+   "barcode": "9900002933087",
+   "product_name": "ARICO SYSTEM TEST 29339 #087",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "324a1599-adfc-443d-ba63-cfd97f4a07e0",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-088",
+   "barcode": "9900002933088",
+   "product_name": "ARICO SYSTEM TEST 29339 #088",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "f3514079-8a72-453b-aa65-6f45d6cb6cb5",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-089",
+   "barcode": "9900002933089",
+   "product_name": "ARICO SYSTEM TEST 29339 #089",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "3de66c28-e4bc-4260-9e6b-9678cbbc8801",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-090",
+   "barcode": "9900002933090",
+   "product_name": "ARICO SYSTEM TEST 29339 #090",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "f44b7134-8a12-426e-9915-b980083a2acf",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-091",
+   "barcode": "9900002933091",
+   "product_name": "ARICO SYSTEM TEST 29339 #091",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "398279a5-56ec-4d19-b1e2-315fe8dad642",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-092",
+   "barcode": "9900002933092",
+   "product_name": "ARICO SYSTEM TEST 29339 #092",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "2625c4b3-f5a0-45a3-9476-475c897cf868",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-093",
+   "barcode": "9900002933093",
+   "product_name": "ARICO SYSTEM TEST 29339 #093",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "246a641c-f027-4cdd-83a9-6a95c69fffcc",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-094",
+   "barcode": "9900002933094",
+   "product_name": "ARICO SYSTEM TEST 29339 #094",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "e4a1fe85-707e-4e2e-b901-4fc1b8b6a12f",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632089",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ RH パープル",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "33ec4d8a-7700-4d51-a1e5-a5440029d4ff",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632102",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ LH ブルー",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "b075efbe-753a-420f-bb65-fcabc08e946a",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632140",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ LH オレンジ",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "e1df2d4a-9d90-48cc-b10b-0630f1f7f243",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000633017",
+   "product_name": "KOREA ARCHERY JET6 ベイン 2 インチ RH ブラック",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "f5d54fc7-6c31-4279-b5a9-a8e6b10d722e",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000633062",
+   "product_name": "KOREA ARCHERY JET6 ベイン 2 インチ RH オレンジ",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "a7c3e238-cc70-4020-9233-a2df1bfab80e",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-095",
+   "barcode": "9900002933095",
+   "product_name": "ARICO SYSTEM TEST 29339 #095",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "31970a72-455e-4316-a321-7072fb1cf1d4",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-096",
+   "barcode": "9900002933096",
+   "product_name": "ARICO SYSTEM TEST 29339 #096",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "6b76f262-e32a-43b4-aeca-ce3aa7f342b9",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-097",
+   "barcode": "9900002933097",
+   "product_name": "ARICO SYSTEM TEST 29339 #097",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "010e3f55-b63c-47cf-ab63-344b34ed94e5",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-098",
+   "barcode": "9900002933098",
+   "product_name": "ARICO SYSTEM TEST 29339 #098",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "2f22244d-54cd-43fe-b4c4-297adfc0e7bc",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-099",
+   "barcode": "9900002933099",
+   "product_name": "ARICO SYSTEM TEST 29339 #099",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "2ddc4f8a-7ac2-4c17-83f3-b766553aa176",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-100",
+   "barcode": "9900002933100",
+   "product_name": "ARICO SYSTEM TEST 29339 #100",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "617405b0-5ed8-4b1c-9def-23164eaae0ce",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-077",
+   "barcode": "9900002933077",
+   "product_name": "ARICO SYSTEM TEST 29339 #077",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "135aafed-4def-489f-a841-72d84ac35648",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-078",
+   "barcode": "9900002933078",
+   "product_name": "ARICO SYSTEM TEST 29339 #078",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "d923db12-10ca-423c-a1f3-cb0bcb6c41ad",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-079",
+   "barcode": "9900002933079",
+   "product_name": "ARICO SYSTEM TEST 29339 #079",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "66ae00e8-c2e3-4c85-84a8-cd15f950fc97",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000184032",
+   "product_name": "FIVICS ORGANIC X アームガード レッド",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:26:45.789+00:00"
+  },
+  {
+   "id": "540a701f-9801-4fc3-b624-52b74de528d9",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000160073",
+   "product_name": "FIVICS SAKER 1 タブ LH M",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:46.646+00:00"
+  },
+  {
+   "id": "c81e3ba9-925c-4cbf-bc91-62b718566758",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000160080",
+   "product_name": "FIVICS SAKER 1 タブ LH S",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:47.06+00:00"
+  },
+  {
+   "id": "ae859317-aae5-4fe2-b2e4-27f98653c7bb",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000160097",
+   "product_name": "FIVICS SAKER 1 タブ LH XS",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:47.492+00:00"
+  },
+  {
+   "id": "42e38331-3ab5-44ee-8dac-5ba2a2c6bfb4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000160103",
+   "product_name": "FIVICS SAKER 1 タブ LH XXS",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:47.915+00:00"
+  },
+  {
+   "id": "5a2bed07-7a1c-4018-a3f6-25fbb39b5775",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000160011",
+   "product_name": "FIVICS SAKER 1 タブ RH L",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:26:48.356+00:00"
+  },
+  {
+   "id": "2481c5b8-e115-4647-bf2e-3293d147644b",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000160028",
+   "product_name": "FIVICS SAKER 1 タブ RH M",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:26:48.789+00:00"
+  },
+  {
+   "id": "e1c42df7-8710-42ab-884b-8f806ae8dee4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000160042",
+   "product_name": "FIVICS SAKER 1 タブ RH XS",
+   "storage_qty": 6,
+   "updated_at": "2026-09-11T16:41:36.03+00:00"
+  },
+  {
+   "id": "1fb19344-89ba-4d7f-a7c1-58f3e3e276f0",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000160059",
+   "product_name": "FIVICS SAKER 1 タブ RH XXS",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:26:49.836+00:00"
+  },
+  {
+   "id": "077451c8-cd6f-4c9f-9671-1e23a8d65ddb",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000175081",
+   "product_name": "FIVICS SAKER 1 タブ コードバン LH L",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:50.255+00:00"
+  },
+  {
+   "id": "167293a9-fbc8-4d75-8bcc-6d380daaab94",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000175098",
+   "product_name": "FIVICS SAKER 1 タブ コードバン LH M",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:50.704+00:00"
+  },
+  {
+   "id": "1c74c240-d8e3-41f2-a2a7-e2dfe1581cac",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000175104",
+   "product_name": "FIVICS SAKER 1 タブ コードバン LH S",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:51.092+00:00"
+  },
+  {
+   "id": "fafcf7b8-1a86-44c1-9129-1cffcb6ddf06",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000175111",
+   "product_name": "FIVICS SAKER 1 タブ コードバン LH XS",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:51.519+00:00"
+  },
+  {
+   "id": "e3e607ea-76fe-4f5f-a90c-4f797d8d4403",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000175128",
+   "product_name": "FIVICS SAKER 1 タブ コードバン LH XXS",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:26:51.963+00:00"
+  },
+  {
+   "id": "55a257fc-5495-4618-9deb-8490b7cf3554",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000176033",
+   "product_name": "FIVICS SAKER 1 タブ バックスキン M",
+   "storage_qty": 9,
+   "updated_at": "2026-09-08T14:26:59.211+00:00"
+  },
+  {
+   "id": "0e18fed6-a7f7-4a92-ab56-ceb1a0fb953f",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000163043",
+   "product_name": "FIVICS SAKER 3 タブ LH L",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:11.718+00:00"
+  },
+  {
+   "id": "3bc6702d-05b7-4504-8dcd-f9e29bef3032",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000176040",
+   "product_name": "FIVICS SAKER 1 タブ バックスキン S",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:26:59.6+00:00"
+  },
+  {
+   "id": "2c834533-1572-4db3-a6d9-1bf0226baba9",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000177047",
+   "product_name": "FIVICS SAKER 2 タブ コードバン RH S",
+   "storage_qty": 9,
+   "updated_at": "2026-09-08T14:27:08.651+00:00"
+  },
+  {
+   "id": "7263608b-f387-4dbc-b208-4ba488744a72",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000162039",
+   "product_name": "FIVICS SAKER 2 タブ RH S",
+   "storage_qty": 18,
+   "updated_at": "2026-09-08T14:27:05.666+00:00"
+  },
+  {
+   "id": "5d4f501b-aa83-4495-b746-5c23bc5f2cde",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000162046",
+   "product_name": "FIVICS SAKER 2 タブ RH XS",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:27:06.049+00:00"
+  },
+  {
+   "id": "be1e07f9-c913-4229-90a5-7ff60889343f",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000175029",
+   "product_name": "FIVICS SAKER 1 タブ コードバン RH L",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:26:55.698+00:00"
+  },
+  {
+   "id": "c1711eeb-33e6-4ae8-afa6-fca54581093a",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000175036",
+   "product_name": "FIVICS SAKER 1 タブ コードバン RH M",
+   "storage_qty": 9,
+   "updated_at": "2026-09-08T14:26:56.094+00:00"
+  },
+  {
+   "id": "48cff310-811e-496b-839b-8a3fbe6173b3",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000162053",
+   "product_name": "FIVICS SAKER 2 タブ RH XXS",
+   "storage_qty": 12,
+   "updated_at": "2026-09-08T14:27:06.429+00:00"
+  },
+  {
+   "id": "cc84444f-c241-4deb-a7c5-1a6424d3c4cd",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000175043",
+   "product_name": "FIVICS SAKER 1 タブ コードバン RH S",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:26:57.066+00:00"
+  },
+  {
+   "id": "1d7b0ffd-c2ca-4021-95ab-abff953bf17a",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000177085",
+   "product_name": "FIVICS SAKER 2 タブ コードバン LH L",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:06.622+00:00"
+  },
+  {
+   "id": "4f12e8da-5c69-41c6-9832-45d3341c4eec",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000175050",
+   "product_name": "FIVICS SAKER 1 タブ コードバン RH XS",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:26:57.978+00:00"
+  },
+  {
+   "id": "8bb09fcb-72b5-45f8-bdea-bf8102e75c4a",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000175067",
+   "product_name": "FIVICS SAKER 1 タブ コードバン RH XXS",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:26:58.391+00:00"
+  },
+  {
+   "id": "4031900d-6c4d-411c-9458-abd82e9309e9",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000163050",
+   "product_name": "FIVICS SAKER 3 タブ LH M",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:12.113+00:00"
+  },
+  {
+   "id": "f6cd1df8-dc11-40f4-a5e2-19cb13ace7e7",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000176026",
+   "product_name": "FIVICS SAKER 1 タブ バックスキン L",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:26:58.828+00:00"
+  },
+  {
+   "id": "9b88aee4-8c63-4479-a222-e23031f2b8ca",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000177092",
+   "product_name": "FIVICS SAKER 2 タブ コードバン LH M",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:06.815+00:00"
+  },
+  {
+   "id": "f9862c0e-3769-4a16-a6ea-05679826d58a",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000176057",
+   "product_name": "FIVICS SAKER 1 タブ バックスキン XS",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:26:59.989+00:00"
+  },
+  {
+   "id": "7bea7056-30ce-47c4-b2e2-472ff6c7f8d4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000176064",
+   "product_name": "FIVICS SAKER 1 タブ バックスキン XXS",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:27:00.354+00:00"
+  },
+  {
+   "id": "b2c05a8b-400b-43d5-b992-60649cd8df6b",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000162077",
+   "product_name": "FIVICS SAKER 2 タブ LH M",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:00.545+00:00"
+  },
+  {
+   "id": "b3c860a7-e8b9-40bf-a3a0-150ba0c3c107",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000177061",
+   "product_name": "FIVICS SAKER 2 タブ コードバン RH XXS",
+   "storage_qty": 12,
+   "updated_at": "2026-09-08T14:27:09.282+00:00"
+  },
+  {
+   "id": "daeca6a3-6932-4677-b09d-a7cbc97a4244",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000162084",
+   "product_name": "FIVICS SAKER 2 タブ LH S",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:00.937+00:00"
+  },
+  {
+   "id": "504985be-4de5-42b6-be9c-da9161e54c2d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000178020",
+   "product_name": "FIVICS SAKER 2 タブ バックスキン L",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:27:09.707+00:00"
+  },
+  {
+   "id": "55274e53-10cf-4710-92fe-7beeddd1d0eb",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000162091",
+   "product_name": "FIVICS SAKER 2 タブ LH XS",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:04.085+00:00"
+  },
+  {
+   "id": "af88ba44-b016-4c3d-b2a8-44ab0441aeab",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000178037",
+   "product_name": "FIVICS SAKER 2 タブ バックスキン M",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:27:10.072+00:00"
+  },
+  {
+   "id": "873eb28f-be13-4680-bacb-aef59cddb3d7",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000162107",
+   "product_name": "FIVICS SAKER 2 タブ LH XXS",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:04.486+00:00"
+  },
+  {
+   "id": "dda2bc29-3865-43d1-ada2-e01bf6dce5d8",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000162015",
+   "product_name": "FIVICS SAKER 2 タブ RH L",
+   "storage_qty": 12,
+   "updated_at": "2026-09-08T14:27:04.88+00:00"
+  },
+  {
+   "id": "ebd2a1eb-a961-4379-8367-8113233afa82",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000162022",
+   "product_name": "FIVICS SAKER 2 タブ RH M",
+   "storage_qty": 12,
+   "updated_at": "2026-09-08T14:27:05.276+00:00"
+  },
+  {
+   "id": "4884a7d4-e675-42fc-985b-728ddfb42e28",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000177108",
+   "product_name": "FIVICS SAKER 2 タブ コードバン LH S",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:07.001+00:00"
+  },
+  {
+   "id": "42567d6d-e814-4067-a82d-4123e2f9226f",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000177115",
+   "product_name": "FIVICS SAKER 2 タブ コードバン LH XS",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:07.296+00:00"
+  },
+  {
+   "id": "904ca98e-3957-4540-a3ec-1d8c17e5b23c",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000177122",
+   "product_name": "FIVICS SAKER 2 タブ コードバン LH XXS",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:07.503+00:00"
+  },
+  {
+   "id": "28eafadc-045e-4a54-a0f8-45cfde71f948",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "8100000000078",
+   "product_name": "FIVICS SKADIタブ RH L（ブルー）",
+   "storage_qty": 4,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "f1702133-59ee-450c-92c1-3b73c2838197",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000177023",
+   "product_name": "FIVICS SAKER 2 タブ コードバン RH L",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:07.886+00:00"
+  },
+  {
+   "id": "bda1fe03-c4cc-4a18-90a5-93892695b286",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000177030",
+   "product_name": "FIVICS SAKER 2 タブ コードバン RH M",
+   "storage_qty": 15,
+   "updated_at": "2026-09-08T14:27:08.251+00:00"
+  },
+  {
+   "id": "f1b560e4-40db-4829-a657-86c8fa3c76dc",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000178051",
+   "product_name": "FIVICS SAKER 2 タブ バックスキン XS",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:10.892+00:00"
+  },
+  {
+   "id": "fb3a402c-0f71-47e8-b8bd-fe7f69a51455",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000178068",
+   "product_name": "FIVICS SAKER 2 タブ バックスキン XXS",
+   "storage_qty": 8,
+   "updated_at": "2026-09-08T14:27:11.311+00:00"
+  },
+  {
+   "id": "1e708302-9e93-4d5c-a1f5-a83f7fa29e2c",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000163067",
+   "product_name": "FIVICS SAKER 3 タブ LH S",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:12.501+00:00"
+  },
+  {
+   "id": "70ffe2e7-a60f-45b9-8312-9e7ac158062c",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000163012",
+   "product_name": "FIVICS SAKER 3 タブ RH L",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:12.917+00:00"
+  },
+  {
+   "id": "6ad62fbc-bee1-4b20-a1a3-1ad66ffffb25",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000163029",
+   "product_name": "FIVICS SAKER 3 タブ RH M",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:13.374+00:00"
+  },
+  {
+   "id": "c5bf2352-20f5-4c60-a907-8b81ef17b2fc",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000163036",
+   "product_name": "FIVICS SAKER 3 タブ RH S",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:13.792+00:00"
+  },
+  {
+   "id": "cd2596e2-e65e-4860-9205-c79cdd108685",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000179041",
+   "product_name": "FIVICS SAKER 3 タブ コードバン LH L",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:14.203+00:00"
+  },
+  {
+   "id": "bb6d4ab4-60b9-4de3-879e-e883ab802194",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000179058",
+   "product_name": "FIVICS SAKER 3 タブ コードバン LH M",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:14.671+00:00"
+  },
+  {
+   "id": "33c51e50-da34-46ee-9e6b-311a58f20886",
+   "store_code": "tokyo",
+   "smaregi_product_id": "1643",
+   "barcode": "3111000178044",
+   "product_name": "FIVICS SAKER 2 タブ バックスキン S",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T16:55:22.367+00:00"
+  },
+  {
+   "id": "63091e76-550f-4e44-9f93-da4814b36148",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000179065",
+   "product_name": "FIVICS SAKER 3 タブ コードバン LH S",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:15.179+00:00"
+  },
+  {
+   "id": "0ef1d561-0eb8-4259-824d-fbbd2feb9c79",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000179010",
+   "product_name": "FIVICS SAKER 3 タブ コードバン RH L",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:15.598+00:00"
+  },
+  {
+   "id": "3295530f-ca92-4359-93fe-b7095dcaa1e7",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000179027",
+   "product_name": "FIVICS SAKER 3 タブ コードバン RH M",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:16.022+00:00"
+  },
+  {
+   "id": "beace34a-4bb4-4639-bd06-76473bef6931",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000179034",
+   "product_name": "FIVICS SAKER 3 タブ コードバン RH S",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:16.48+00:00"
+  },
+  {
+   "id": "4a6649fe-923e-4ecf-b1ef-e9dddb3e9c2b",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000180016",
+   "product_name": "FIVICS SAKER 3 タブ バックスキン L",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:16.988+00:00"
+  },
+  {
+   "id": "71ca9418-2578-40b0-8fa4-ec283e1ea9c8",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000180023",
+   "product_name": "FIVICS SAKER 3 タブ バックスキン M",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:17.474+00:00"
+  },
+  {
+   "id": "8eed6222-15c8-4d53-acab-e32619522d76",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000158025",
+   "product_name": "FIVICS SAKER PLUS タブ RH M",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:18.596+00:00"
+  },
+  {
+   "id": "ef7a7a4c-0a85-4f03-b759-d8330fb0141e",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000158032",
+   "product_name": "FIVICS SAKER PLUS タブ RH S",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:19.071+00:00"
+  },
+  {
+   "id": "2bd30f3f-4fae-49b4-a3ae-dd79e67eb2cc",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000173032",
+   "product_name": "FIVICS SAKER PLUS タブ コードバン RH S",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:20.386+00:00"
+  },
+  {
+   "id": "8009a1e1-d7e8-47e2-84ac-db0c65a88a99",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000180030",
+   "product_name": "FIVICS SAKER 3 タブ バックスキン S",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:17.915+00:00"
+  },
+  {
+   "id": "e5c9cca6-87d2-48be-9555-2c2a55f49c62",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000157028",
+   "product_name": "FIVICS TENFIX タブ RH M",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:24.835+00:00"
+  },
+  {
+   "id": "93e443b8-67f0-4436-9066-a6a1b8253ecc",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000172011",
+   "product_name": "FIVICS TENFIX タブ バックスキン L",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:28.492+00:00"
+  },
+  {
+   "id": "0dc207e6-cbce-41b0-9860-657b73b8dfc0",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2111000129054",
+   "product_name": "FIVICS TNS100AL アッパーロッド グリーン",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:29.985+00:00"
+  },
+  {
+   "id": "82fded74-0cb2-4a42-b81a-5a6d3e88bddc",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "5111000316000",
+   "product_name": "FIVICS アロープラー",
+   "storage_qty": 2,
+   "updated_at": "2026-09-08T14:27:34.964+00:00"
+  },
+  {
+   "id": "0775039b-e5c0-4a6d-ba33-3a90540b39a5",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000186012",
+   "product_name": "FIVICS ハーネスジェル アームガード ブルー",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:37.677+00:00"
+  },
+  {
+   "id": "8fa78447-aa0e-41d8-94f3-0f91af9d0f34",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000186029",
+   "product_name": "FIVICS ハーネスジェル アームガード レッド",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:38.382+00:00"
+  },
+  {
+   "id": "1212ef24-6c1e-4b55-835c-dae93ec6a57f",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302172",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm LH グリーン",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:59.634+00:00"
+  },
+  {
+   "id": "75aa110b-8597-4c0a-b171-4c99cdfef2d8",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302189",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm LH ピンク",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:28:00.448+00:00"
+  },
+  {
+   "id": "df1effdb-af77-49e1-abea-5c55d23dad9d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302110",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm LH レッド",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:28:02.134+00:00"
+  },
+  {
+   "id": "321e19c8-f20d-4025-8a5c-ad586166b486",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302066",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm RH オレンジ",
+   "storage_qty": 20,
+   "updated_at": "2026-09-08T14:28:02.995+00:00"
+  },
+  {
+   "id": "c43134f9-5801-413c-9f88-8450405b09eb",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6117000302073",
+   "product_name": "RANGE-O-MATIC スピンウィングベイン 45mm RH パープル",
+   "storage_qty": 20,
+   "updated_at": "2026-09-08T14:28:03.862+00:00"
+  },
+  {
+   "id": "f7c53248-81dc-4bbe-ad2d-885fd282b882",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-071",
+   "barcode": "9900002933071",
+   "product_name": "ARICO SYSTEM TEST 29339 #071",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "754b1dcd-1cb2-421d-b406-a3bb0528235f",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-072",
+   "barcode": "9900002933072",
+   "product_name": "ARICO SYSTEM TEST 29339 #072",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "83423123-eee1-4650-a571-8ef5977311c2",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-073",
+   "barcode": "9900002933073",
+   "product_name": "ARICO SYSTEM TEST 29339 #073",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "12225830-8b14-4119-a7ed-7b0f9b8d08e5",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-074",
+   "barcode": "9900002933074",
+   "product_name": "ARICO SYSTEM TEST 29339 #074",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "66209a01-d494-45be-84d5-48f6a66f3628",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-075",
+   "barcode": "9900002933075",
+   "product_name": "ARICO SYSTEM TEST 29339 #075",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "0b618f45-859c-43d6-b91a-0c6ef005d19c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-076",
+   "barcode": "9900002933076",
+   "product_name": "ARICO SYSTEM TEST 29339 #076",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "59d7d698-3759-45d2-a3d8-3cd11b4ab171",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-015",
+   "barcode": "9900002933015",
+   "product_name": "ARICO SYSTEM TEST 29339 #015",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "472ab035-cd37-41ce-9f32-778b01ae3a87",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-045",
+   "barcode": "9900002933045",
+   "product_name": "ARICO SYSTEM TEST 29339 #045",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "2ef3ab28-632d-474b-94ca-4a8e6caee5f2",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-046",
+   "barcode": "9900002933046",
+   "product_name": "ARICO SYSTEM TEST 29339 #046",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "28e70809-b3a0-423a-ac6f-1c7e76226ffe",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-047",
+   "barcode": "9900002933047",
+   "product_name": "ARICO SYSTEM TEST 29339 #047",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "019090a9-455a-439f-bd9c-e90385e60895",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-048",
+   "barcode": "9900002933048",
+   "product_name": "ARICO SYSTEM TEST 29339 #048",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "dd503ab0-636d-4b36-9e28-01c677c61513",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-049",
+   "barcode": "9900002933049",
+   "product_name": "ARICO SYSTEM TEST 29339 #049",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "5b32f98f-9c1a-41f8-a6a4-cb706f0a65fb",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-050",
+   "barcode": "9900002933050",
+   "product_name": "ARICO SYSTEM TEST 29339 #050",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "d2fe2872-4450-47c8-bd1e-ac84aa848961",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1600000000469",
+   "product_name": "KOREA ARCHERY JET6 S ベイン RH オレンジ",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "cae4a473-18d9-465b-963f-af2faf9936d2",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2511000124002",
+   "product_name": "FIVICS VZERO ダンパー",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "174e6bb6-be22-4cc2-818b-5904c54b7109",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6111000287019",
+   "product_name": "FIVICS ピンノック(S) オブリックピンク",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "b43fc23f-a76c-4643-a5b4-41c98f64bab3",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632010",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ RH ブラック",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "82f99a69-6d5f-475c-9872-e0ee2f39591e",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632034",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ RH イエロー",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "8888e672-83f9-415b-91cf-44714a38cd21",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6123000632164",
+   "product_name": "KOREA ARCHERY JET6 ベイン1.75 インチ LH パープル",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "a9d13887-dd70-41cd-ae5e-bbb8490b23d9",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-069",
+   "barcode": "9900002933069",
+   "product_name": "ARICO SYSTEM TEST 29339 #069",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "7e065322-456c-4096-b60d-130de037d7cf",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-070",
+   "barcode": "9900002933070",
+   "product_name": "ARICO SYSTEM TEST 29339 #070",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "72e22f5c-50cd-478a-bd1c-96659863862d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000173025",
+   "product_name": "FIVICS SAKER PLUS タブ コードバン RH M",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:19.914+00:00"
+  },
+  {
+   "id": "c9000cb8-3f01-4981-8533-89d32af0d628",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000174015",
+   "product_name": "FIVICS SAKER PLUS タブ バックスキン L",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:20.978+00:00"
+  },
+  {
+   "id": "0a69eb26-d2ab-40fe-9f70-11180112d9ab",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000174039",
+   "product_name": "FIVICS SAKER PLUS タブ バックスキン S",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:21.823+00:00"
+  },
+  {
+   "id": "bb9cb060-fb59-4271-ab77-7587e01a408c",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000157059",
+   "product_name": "FIVICS TENFIX タブ LH M",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:23.581+00:00"
+  },
+  {
+   "id": "e2fe3d95-7e9f-4ff2-8e75-2dad59528a80",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000157073",
+   "product_name": "FIVICS TENFIX タブ RH XS",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:25.589+00:00"
+  },
+  {
+   "id": "cf92dab9-68e0-4378-8117-b62c1c9e0a2e",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000172035",
+   "product_name": "FIVICS TENFIX タブ バックスキン S",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:29.297+00:00"
+  },
+  {
+   "id": "00a5bc2a-272a-43d8-8ede-f868fa4dc6bc",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2111000128040",
+   "product_name": "FIVICS TNV2300 アッパーロッド イエロー",
+   "storage_qty": 8,
+   "updated_at": "2026-09-08T14:27:30.61+00:00"
+  },
+  {
+   "id": "ed533747-75ef-4e8f-8c1e-0f6bfcdc23d4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000183103",
+   "product_name": "FIVICS WIND チェストガード(RH) L ホワイト",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:32.54+00:00"
+  },
+  {
+   "id": "dc8748b5-bf3b-4e04-b7ae-7c98ef3b53f4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000183097",
+   "product_name": "FIVICS WIND チェストガード(RH) S レッド",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:34.744+00:00"
+  },
+  {
+   "id": "5718c479-3974-465f-9071-965549df22c7",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1500000001551",
+   "product_name": "FIVICS ピンノック(S) クリアピンク",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "07747cba-ccbe-453a-9000-28ff2682ce66",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1600000000506",
+   "product_name": "KOREA ARCHERY JET6 S ベイン RH レッド",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "375a1b85-35d2-496c-b57a-4e7f40036f2a",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-061",
+   "barcode": "9900002933061",
+   "product_name": "ARICO SYSTEM TEST 29339 #061",
+   "storage_qty": 6,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "3de3e231-e0c9-4904-844b-f4d3ccb872d8",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2111000129047",
+   "product_name": "FIVICS TNS100AL アッパーロッド イエロー",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "8e063707-61b2-4448-bbe2-11a5b79031c4",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-065",
+   "barcode": "9900002933065",
+   "product_name": "ARICO SYSTEM TEST 29339 #065",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "b3ccf65f-098d-4ff7-9301-2ad80588fd29",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-066",
+   "barcode": "9900002933066",
+   "product_name": "ARICO SYSTEM TEST 29339 #066",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "e7fdcdb2-be38-43e2-bbfe-8e23e6c089af",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-067",
+   "barcode": "9900002933067",
+   "product_name": "ARICO SYSTEM TEST 29339 #067",
+   "storage_qty": 4,
+   "updated_at": "2026-09-14T11:51:43.957612+00:00"
+  },
+  {
+   "id": "3073e0bf-1bbc-4a17-ba8a-56d455a8950d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2511000125009",
+   "product_name": "FIVICS VZERO MINI ダンパー",
+   "storage_qty": 4,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "ab59b1ab-b16a-4166-b775-8ed67e32c962",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6111000287071",
+   "product_name": "FIVICS ピンノック(S) クリアブルー",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "074d3a60-244f-4d1f-ac5e-6a59de2962f4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "8100000000054",
+   "product_name": "FIVICS SKADIタブ RH S（イエロー）",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "bcf7a881-bbe0-4f9e-8f65-0f98d55f465b",
+   "store_code": "tokyo",
+   "smaregi_product_id": "3698",
+   "barcode": "1000000000047",
+   "product_name": "HOYT ハンターレスト RH",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "c70b1143-28f8-4a6f-9fe5-db22972a4141",
+   "store_code": "tokyo",
+   "smaregi_product_id": "4123",
+   "barcode": "1000001000145",
+   "product_name": "SHIBUYA SR-3 オフセットレストピン",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "21019f23-9c70-4b90-b2c8-2190c1d2bb82",
+   "store_code": "tokyo",
+   "smaregi_product_id": "4705",
+   "barcode": "1000001000169",
+   "product_name": "CARTEL スーパープラスチックレスト RH",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "b190d260-6d3f-4f1a-93dd-6f3d50e1c5f3",
+   "store_code": "tokyo",
+   "smaregi_product_id": "103",
+   "barcode": "1011000001064",
+   "product_name": "FIVICS  ARGON X ハンドル 25\" RH パープル",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "57207bef-9e27-4877-8a05-bdce4a24d580",
+   "store_code": "tokyo",
+   "smaregi_product_id": "207",
+   "barcode": "1012000009135",
+   "product_name": "【廃版】MK MKS ハンドル LH ブルー",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "f28fa1ac-7c49-4aee-96fe-74f535e94140",
+   "store_code": "tokyo",
+   "smaregi_product_id": "264",
+   "barcode": "1020000017043",
+   "product_name": "WIN&WIN ATF-X ハンドル RH ソニックレッド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "9ab062c5-79aa-4d8e-bde1-716fb0f44577",
+   "store_code": "tokyo",
+   "smaregi_product_id": "266",
+   "barcode": "1020000017067",
+   "product_name": "WIN&WIN ATF-X ハンドル RH ターキーグリーン",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "6f29b041-c8c9-4b72-9d01-1cf723a83d70",
+   "store_code": "tokyo",
+   "smaregi_product_id": "11835",
+   "barcode": "1040000000005",
+   "product_name": "HOYT X3インナーカムスクリュー トルクスネジ",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "3e74ed14-7039-414f-a792-732ebbe10af4",
+   "store_code": "tokyo",
+   "smaregi_product_id": "4260",
+   "barcode": "1100100010509",
+   "product_name": "FIVICS XENIA リム(フォームコア )  M 24ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "ede608ef-07e3-42f7-9514-1f2f6dc9c03c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "4233",
+   "barcode": "1100100010004",
+   "product_name": "MK MX＋リム(FORMULA) L 46ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "e421e86a-00d2-4d46-bd23-9d88606629d3",
+   "store_code": "tokyo",
+   "smaregi_product_id": "4258",
+   "barcode": "1100100010523",
+   "product_name": "FIVICS XENIA リム(フォームコア )  M 20ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "a3a7ea33-e027-4e15-99d6-42acce2b9f51",
+   "store_code": "tokyo",
+   "smaregi_product_id": "4242",
+   "barcode": "1100100010684",
+   "product_name": "FIVICS XENIA リム(ウッドコア)  L 24ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "a461e10b-c5f1-45eb-9a46-dc93e9a24c51",
+   "store_code": "tokyo",
+   "smaregi_product_id": "7111",
+   "barcode": "1070000000125",
+   "product_name": "T.R.U.BALL ブレードプロフレックス  M  シルバー",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "10dd0af4-683d-4519-9e6f-e497567a065e",
+   "store_code": "tokyo",
+   "smaregi_product_id": "404",
+   "barcode": "1111000027092",
+   "product_name": "FIVICS  ARGON X リム(ウッドコア)  S 48ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "d36957cc-0612-4344-93dc-ba8bd0abdd5b",
+   "store_code": "tokyo",
+   "smaregi_product_id": "413",
+   "barcode": "1111000028075",
+   "product_name": "FIVICS  ARGON X リム(ウッドコア)  M 44ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "13e9effc-9900-4128-899e-a6c40e61538d",
+   "store_code": "tokyo",
+   "smaregi_product_id": "415",
+   "barcode": "1111000028099",
+   "product_name": "FIVICS  ARGON X リム(ウッドコア)  M 48ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "5d6badfe-0285-47e7-8906-e6231bfdff78",
+   "store_code": "tokyo",
+   "smaregi_product_id": "421",
+   "barcode": "1111000029041",
+   "product_name": "FIVICS  ARGON X リム(ウッドコア)  L 38ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "57dd20a6-d060-44e9-886a-9408f331832c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "502",
+   "barcode": "1111000039071",
+   "product_name": "【廃版】FIVICS TITAN EX リム(ウッドコア)  S 44ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "b8118927-4637-4e2a-b422-8d46570b7a33",
+   "store_code": "tokyo",
+   "smaregi_product_id": "504",
+   "barcode": "1111000039095",
+   "product_name": "【廃版】FIVICS TITAN EX リム(ウッドコア)  S 48ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "49883c30-3841-4e0d-8cc4-f982dc35fa3f",
+   "store_code": "tokyo",
+   "smaregi_product_id": "505",
+   "barcode": "1111000039101",
+   "product_name": "【廃版】FIVICS TITAN EX リム(ウッドコア)  S 50ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "028384bd-3e7d-468b-9375-7af538999e66",
+   "store_code": "tokyo",
+   "smaregi_product_id": "506",
+   "barcode": "1111000039118",
+   "product_name": "【廃版】FIVICS TITAN EX リム(ウッドコア)  S 52ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "5b9d0d2f-edd2-48b8-9508-ebce8343257a",
+   "store_code": "tokyo",
+   "smaregi_product_id": "513",
+   "barcode": "1111000040077",
+   "product_name": "【廃版】FIVICS TITAN EX リム(ウッドコア)  M 44ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "099ab21c-705c-47ef-aa01-9c80cca01f9c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "523",
+   "barcode": "1111000041067",
+   "product_name": "【廃版】FIVICS TITAN EX リム(ウッドコア)  L 42ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "8aee98de-b19e-422d-9b15-e8acfa4e80ec",
+   "store_code": "tokyo",
+   "smaregi_product_id": "524",
+   "barcode": "1111000041074",
+   "product_name": "【廃版】FIVICS TITAN EX リム(ウッドコア)  L 44ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "6fac88a6-13f3-4d3c-8c49-7c57ea725494",
+   "store_code": "tokyo",
+   "smaregi_product_id": "531",
+   "barcode": "1111000042033",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   S 26ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "91f38ef3-b5c6-411b-8116-ba91ebb565ac",
+   "store_code": "tokyo",
+   "smaregi_product_id": "12763",
+   "barcode": "0800000000051",
+   "product_name": "Beiter プランジャースプリング 0.7",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T07:20:54.124+00:00"
+  },
+  {
+   "id": "20cebe62-d3eb-4099-9995-a69ea1d8ac44",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000173018",
+   "product_name": "FIVICS SAKER PLUS タブ コードバン RH L",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:19.518+00:00"
+  },
+  {
+   "id": "77e5dd15-88c2-4a65-a87d-3da21ebc51ca",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000174022",
+   "product_name": "FIVICS SAKER PLUS タブ バックスキン M",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:21.392+00:00"
+  },
+  {
+   "id": "3dd9216f-d1c0-4f2e-bc41-cde35c9d70e9",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000157035",
+   "product_name": "FIVICS TENFIX タブ RH S",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:25.216+00:00"
+  },
+  {
+   "id": "ec9ebca3-5dd0-4bbc-9012-19d5667e7871",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "5200000000177",
+   "product_name": "FIVICS TENFIX タブ コードバン RH XS",
+   "storage_qty": 2,
+   "updated_at": "2026-09-08T14:27:28.107+00:00"
+  },
+  {
+   "id": "7a465a15-513c-4f3f-8f7d-69ac694d0de1",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000183042",
+   "product_name": "FIVICS WIND チェストガード(RH) L ブルー",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:32.128+00:00"
+  },
+  {
+   "id": "189aa4cf-1e59-4b05-b3f4-5e645e8d76fa",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2211000142005",
+   "product_name": "FIVICS　サイトダンパー",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:35.428+00:00"
+  },
+  {
+   "id": "d8446dac-87c6-4af2-a574-5806b6f85f89",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000186043",
+   "product_name": "FIVICS ハーネスジェル アームガード ピンク",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:37.293+00:00"
+  },
+  {
+   "id": "fa008f49-76c6-42fa-8664-5bd58ff8c537",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "7600000000111",
+   "product_name": "FIVICS　バケットハット S",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:38.877+00:00"
+  },
+  {
+   "id": "5d709d1d-8344-4d5a-ba50-031acccc4c8b",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2716000153001",
+   "product_name": "HOYT スーパーレスト RH",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:44.733+00:00"
+  },
+  {
+   "id": "1a73860f-a59c-4e2b-9239-ee03b3f7ec0c",
+   "store_code": "tokyo",
+   "smaregi_product_id": "532",
+   "barcode": "1111000042040",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   S 28ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "9093fdeb-e86d-4170-a24c-89530e1fe15d",
+   "store_code": "tokyo",
+   "smaregi_product_id": "533",
+   "barcode": "1111000042057",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   S 30ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "7eb802f3-e9c8-4436-aaba-baced42c3862",
+   "store_code": "tokyo",
+   "smaregi_product_id": "534",
+   "barcode": "1111000042064",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   S 32ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "875a3019-837d-4f8f-916f-a27cb23d8c23",
+   "store_code": "tokyo",
+   "smaregi_product_id": "539",
+   "barcode": "1111000043023",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   M 24ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "4b8b2a48-4005-4b4c-8d0e-ed401645f986",
+   "store_code": "tokyo",
+   "smaregi_product_id": "540",
+   "barcode": "1111000043030",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   M 26ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "54f17d4d-d4df-4aa4-a316-a6a5561937b9",
+   "store_code": "tokyo",
+   "smaregi_product_id": "541",
+   "barcode": "1111000043047",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   M 28ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "77b6be0a-81e3-4d2c-9cff-e74bc749b112",
+   "store_code": "tokyo",
+   "smaregi_product_id": "542",
+   "barcode": "1111000043054",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   M 30ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "429e5fa6-0137-4177-bfd7-840f483d9818",
+   "store_code": "tokyo",
+   "smaregi_product_id": "543",
+   "barcode": "1111000043061",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   M 32ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "b7f73ba7-9030-4976-a396-a52e742a6ebe",
+   "store_code": "tokyo",
+   "smaregi_product_id": "549",
+   "barcode": "1111000044037",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   L 26ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "9ebe94eb-304d-4ab5-9923-635f0a3eb7aa",
+   "store_code": "tokyo",
+   "smaregi_product_id": "550",
+   "barcode": "1111000044044",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   L 28ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "c9d5cfc6-c7ce-467a-aef3-b75d60d7470d",
+   "store_code": "tokyo",
+   "smaregi_product_id": "554",
+   "barcode": "1111000044082",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   L 36ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "a8b55e0c-fb52-4fd8-867b-ff48e082d17f",
+   "store_code": "tokyo",
+   "smaregi_product_id": "565",
+   "barcode": "1111000046048",
+   "product_name": "FIVICS  XENIA リム(ウッドコア)  M 18ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "b233b6bc-8c6b-4417-9748-3de23b59ec04",
+   "store_code": "tokyo",
+   "smaregi_product_id": "566",
+   "barcode": "1111000046055",
+   "product_name": "FIVICS  XENIA リム(ウッドコア)  M 20ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "39bd0621-8a64-440e-a180-d458e3c8acb5",
+   "store_code": "tokyo",
+   "smaregi_product_id": "571",
+   "barcode": "1111000047045",
+   "product_name": "FIVICS  XENIA リム(ウッドコア)  L 18ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "d0ac235f-5bae-474a-b4e6-c1ad9531f7a7",
+   "store_code": "tokyo",
+   "smaregi_product_id": "572",
+   "barcode": "1111000047052",
+   "product_name": "FIVICS  XENIA リム(ウッドコア)  L 20ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "c9a2739b-cddb-4758-a803-b6916b345f06",
+   "store_code": "tokyo",
+   "smaregi_product_id": "573",
+   "barcode": "1111000047069",
+   "product_name": "FIVICS  XENIA リム(ウッドコア)  L 22ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "3479d699-6e6e-4621-9dc7-a33d4fe6252a",
+   "store_code": "tokyo",
+   "smaregi_product_id": "953",
+   "barcode": "1111000458117",
+   "product_name": "FIVICS  SKADI-TX リム(ウッドコア)  S 52ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "a62274c2-ce8a-4eb0-9096-c239f68f06b9",
+   "store_code": "tokyo",
+   "smaregi_product_id": "957",
+   "barcode": "1111000459046",
+   "product_name": "FIVICS  SKADI-TX リム(ウッドコア)  M 38ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "8589aaa9-8cf3-4b08-9354-388acb7228e1",
+   "store_code": "tokyo",
+   "smaregi_product_id": "958",
+   "barcode": "1111000459053",
+   "product_name": "FIVICS  SKADI-TX リム(ウッドコア)  M 40ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "20538ca9-0f9b-4c6f-a6a7-c28c55570486",
+   "store_code": "tokyo",
+   "smaregi_product_id": "978",
+   "barcode": "1111000461032",
+   "product_name": "FIVICS  VELLATOR V2 リム(フォームコア)   S 26ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "07347ae0-630c-40bf-99c6-05fc76f7f820",
+   "store_code": "tokyo",
+   "smaregi_product_id": "979",
+   "barcode": "1111000461049",
+   "product_name": "FIVICS  VELLATOR V2 リム(フォームコア)   S 28ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "e361d059-b9de-4755-b4d6-74591ef3e14e",
+   "store_code": "tokyo",
+   "smaregi_product_id": "553",
+   "barcode": "1111000044075",
+   "product_name": "FIVICS  VELLATOR V2 リム(ウッドコア)   L 34ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "848e709e-f4ec-4d31-b688-81aeef3dd257",
+   "store_code": "tokyo",
+   "smaregi_product_id": "403",
+   "barcode": "1111000027085",
+   "product_name": "FIVICS  ARGON X リム(ウッドコア)  S 46ポンド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "979f4b4d-6077-4a9b-8f05-bdd8ca8105f7",
+   "store_code": "tokyo",
+   "smaregi_product_id": "3699",
+   "barcode": "1000000000030",
+   "product_name": "SHIBUYA SR-5 レスト用両面テープ",
+   "storage_qty": 1,
+   "updated_at": "2026-09-14T06:35:42.294481+00:00"
+  },
+  {
+   "id": "4ce5065a-3d30-4921-a1c7-d714b33fdbe5",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1600000000520",
+   "product_name": "KOREA ARCHERY JET6 S ベイン RH ブラック",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "f14eff05-97a6-41b5-a6ae-5c575c213c77",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000188047",
+   "product_name": "FIVICS リムプロテクター ピンク",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "9b398eed-901a-4d71-8789-d656998b4ca1",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "8100000000061",
+   "product_name": "FIVICS SKADIタブ RH M（レッド）",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "5ab22375-3522-494b-a0df-fea6dd6e1f18",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000157042",
+   "product_name": "FIVICS TENFIX タブ LH L",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:23.074+00:00"
+  },
+  {
+   "id": "86258cba-65f6-4fc0-98b7-1112407e1c12",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000157066",
+   "product_name": "FIVICS TENFIX タブ LH S",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:23.994+00:00"
+  },
+  {
+   "id": "0beb3c0b-e4ee-4aa6-9fe8-b62df9c7dc0e",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000171045",
+   "product_name": "FIVICS TENFIX タブ コードバン LH L",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:26.032+00:00"
+  },
+  {
+   "id": "e86cf92f-fe94-44a3-acb4-553d3db3b2b4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000171069",
+   "product_name": "FIVICS TENFIX タブ コードバン LH S",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:26.839+00:00"
+  },
+  {
+   "id": "cca05a8f-adfa-4a98-815c-b7521c9a0527",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000171038",
+   "product_name": "FIVICS TENFIX タブ コードバン RH S",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:27.91+00:00"
+  },
+  {
+   "id": "492ce4e3-6e35-4e45-b8cf-ebecd738c5f4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2111000128026",
+   "product_name": "FIVICS TNV2300 アッパーロッド ブルー",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:31.029+00:00"
+  },
+  {
+   "id": "43b5d911-0480-48ff-b906-6372fc211d04",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000183073",
+   "product_name": "FIVICS WIND チェストガード(RH) L レッド",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:32.93+00:00"
+  },
+  {
+   "id": "25247898-046a-4869-9f50-fb4ce6711282",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000183080",
+   "product_name": "FIVICS WIND チェストガード(RH) M レッド",
+   "storage_qty": 2,
+   "updated_at": "2026-09-08T14:27:33.59+00:00"
+  },
+  {
+   "id": "5da5badd-b0d8-44b5-911a-5a9aba733845",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000183066",
+   "product_name": "FIVICS WIND チェストガード(RH) S ブルー",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:34.371+00:00"
+  },
+  {
+   "id": "755174a4-3e04-41f2-9821-3385997dd874",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000186050",
+   "product_name": "FIVICS ハーネスジェル アームガード イエロー",
+   "storage_qty": 2,
+   "updated_at": "2026-09-08T14:27:36.072+00:00"
+  },
+  {
+   "id": "22c70c4d-433e-4210-af5d-bb5694515d88",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "7600000000128",
+   "product_name": "FIVICS　バケットハット M",
+   "storage_qty": 2,
+   "updated_at": "2026-09-08T14:27:38.581+00:00"
+  },
+  {
+   "id": "2efba131-413e-4752-8489-e768904feb72",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6111000287040",
+   "product_name": "FIVICS ピンノック(S) クリアレッド",
+   "storage_qty": 20,
+   "updated_at": "2026-09-08T14:27:43.365+00:00"
+  },
+  {
+   "id": "a58dc36a-d924-40e1-8515-6edaa7da02e0",
+   "store_code": "tokyo",
+   "smaregi_product_id": "TEST29339-001",
+   "barcode": "9900002933001",
+   "product_name": "ARICO SYSTEM TEST 29339 #001",
+   "storage_qty": 9,
+   "updated_at": "2026-09-23T05:42:08.170304+00:00"
+  },
+  {
+   "id": "6ef3feb9-6310-41d4-bae8-85764d4c00de",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1600000000452",
+   "product_name": "KOREA ARCHERY JET6 S ベイン RH パープル",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "45fca08c-2e17-4525-8f9f-ffd4531e012c",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2111000129061",
+   "product_name": "FIVICS TNS100AL アッパーロッド パープル",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "b0782862-c233-4322-89ff-3c8748e8efc8",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2211000143002",
+   "product_name": "FIVICS　サイトウエイト",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "d68a19ce-3730-4c84-a318-e7adf2072817",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000188023",
+   "product_name": "FIVICS リムプロテクター イエロー",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "b0640f87-512f-4694-b2cd-1ab5f7ca2da0",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3323000635070",
+   "product_name": "KOREA ARCHERY Jet6 アームガード  オレンジ",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "78f37690-e6ff-45ab-8ce3-87055b0aa52b",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6111000287057",
+   "product_name": "FIVICS ピンノック(S) クリアオレンジ",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "66b6c39e-6d87-4ac4-af66-ca927e7d052e",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3011000157011",
+   "product_name": "FIVICS TENFIX タブ RH L",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:24.39+00:00"
+  },
+  {
+   "id": "201adc00-a1c9-4977-b2c6-c385b2586878",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000171052",
+   "product_name": "FIVICS TENFIX タブ コードバン LH M",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:26.417+00:00"
+  },
+  {
+   "id": "88111854-0214-450e-8f70-22871c89bca4",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3111000171014",
+   "product_name": "FIVICS TENFIX タブ コードバン RH L",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:27.262+00:00"
+  },
+  {
+   "id": "21c43470-f255-4544-b2ff-9ce74d270697",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2111000129030",
+   "product_name": "FIVICS TNS100AL アッパーロッド レッド",
+   "storage_qty": 4,
+   "updated_at": "2026-09-08T14:27:30.406+00:00"
+  },
+  {
+   "id": "462f5a26-0998-4d0e-a3d1-f432cc857d87",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000183035",
+   "product_name": "FIVICS WIND チェストガード(RH) S ブラック",
+   "storage_qty": 2,
+   "updated_at": "2026-09-08T14:27:33.98+00:00"
+  },
+  {
+   "id": "3b44b28e-4014-4047-adba-0748370801f0",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000186067",
+   "product_name": "FIVICS ハーネスジェル アームガード グリーン",
+   "storage_qty": 6,
+   "updated_at": "2026-09-08T14:27:36.46+00:00"
+  },
+  {
+   "id": "e54d3455-635b-4a5b-94e2-5add00fef3df",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6111000287088",
+   "product_name": "FIVICS ピンノック(S) クリアパープル",
+   "storage_qty": 10,
+   "updated_at": "2026-09-08T14:27:42.723+00:00"
+  },
+  {
+   "id": "4bf26875-23fa-4235-8859-e43f3e062c4b",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "1600000000513",
+   "product_name": "KOREA ARCHERY JET6 S ベイン RH ブルー",
+   "storage_qty": 7,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "bda4d9df-d1c5-487b-b1b3-ef6eeb747d19",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2111000128033",
+   "product_name": "FIVICS TNV2300 アッパーロッド レッド",
+   "storage_qty": 1,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "a4617fe7-48c5-4d5f-abc3-b13ac0258e5d",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "2211000144009",
+   "product_name": "FIVICS　サイトピン(丸型)",
+   "storage_qty": 3,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "2576435b-dce6-4c4e-ac46-a332021056a2",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "3311000188016",
+   "product_name": "FIVICS リムプロテクター ブラック",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  },
+  {
+   "id": "c1dc181f-90df-480a-8105-f648eb7c6f83",
+   "store_code": "tokyo",
+   "smaregi_product_id": null,
+   "barcode": "6111000287026",
+   "product_name": "FIVICS ピンノック(S) オブリックイエロー",
+   "storage_qty": 5,
+   "updated_at": "2026-09-23T05:44:56.666108+00:00"
+  }
+ ]
+}
