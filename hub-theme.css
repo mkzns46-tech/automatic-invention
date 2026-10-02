@@ -251,12 +251,12 @@ html body button{
   font-weight:600 !important;
   box-shadow:none !important;
 }
-html body .card button:not(.secondary):not(.danger):not(.equipment-confirm-btn):not(.equipment-cancel-btn):not(.memo-edit-btn):not([disabled]){
+html body .card button:not(.secondary):not(.danger):not(.equipment-confirm-btn):not(.equipment-cancel-btn):not(.memo-edit-btn):not(.staff-picker-toggle):not(.staff-picker-option):not(.booth-event-menu-btn):not([disabled]){
   background:var(--hub-brand) !important;
   border-color:var(--hub-brand) !important;
   color:#fff !important;
 }
-html body .card button:not(.secondary):not(.danger):not(.equipment-confirm-btn):not(.equipment-cancel-btn):not(.memo-edit-btn):not([disabled]):hover{
+html body .card button:not(.secondary):not(.danger):not(.equipment-confirm-btn):not(.equipment-cancel-btn):not(.memo-edit-btn):not(.staff-picker-toggle):not(.staff-picker-option):not(.booth-event-menu-btn):not([disabled]):hover{
   background:var(--hub-brand-dark) !important;
 }
 html body button.secondary{
@@ -654,3 +654,8 @@ html body .booth-event-menu .booth-event-menu-btn.is-active{
 @media(max-width:800px){
   html body .booth-event-menu .booth-event-menu-btn{flex:1 1 calc(50% - 4px) !important}
 }
+
+/* 担当者の選択肢一覧 */
+html body .staff-picker-list{border:1px solid var(--hub-border) !important;border-radius:10px !important;background:var(--hub-surface) !important;box-shadow:0 8px 24px rgba(15,23,42,.08) !important;padding:6px !important}
+html body .staff-picker-option{background:transparent !important;color:var(--hub-text) !important;border:0 !important;border-radius:6px !important;min-height:34px !important;font-size:13px !important;font-weight:500 !important;text-align:left !important;justify-content:flex-start !important}
+html body .staff-picker-option:hover,html body .staff-picker-option.is-selected,html body .staff-picker-option[aria-selected="true"]{background:var(--hub-brand-tint) !important;color:var(--hub-brand-dark) !important}
