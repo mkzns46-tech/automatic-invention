@@ -433,13 +433,23 @@ function getSmaregiImportMatchInfo(row,existingById,existingByBarcode,existingBy
     };
   }
 
-  // バーコードが変わった商品は、IDが一致していても自動更新しない。
-  // 履歴や外部参照を壊さず、商品紐付け競合として確認対象にする。
-  if(idMatches.length){
+  // スマレジ側でバーコードが変わった商品（IDは1件だけ一致、変更先バーコードは未使用）は、
+  // スマレジを正として ARICO のバーコードを付け替える（後優先）。付け替えは関連データごと
+  // rpc/change_product_barcode で1トランザクションで行う。
+  // IDが複数のARICO商品に一致する場合は、どれを変えるか決められないので確認対象にする。
+  if(idMatches.length===1){
+    return {
+      idMatches,barcodeMatches,codeMatches,matches:idMatches,
+      current:null,conflict:false,
+      barcodeChange:{from:idMatches[0],to:barcode},
+      reason:"barcode_change"
+    };
+  }
+  if(idMatches.length>1){
     return {
       idMatches,barcodeMatches,codeMatches,matches:idMatches,
       current:null,conflict:true,
-      reason:"スマレジ商品IDは一致しますがバーコードが異なります"
+      reason:"スマレジ商品IDが複数のARICO商品にあるため、バーコードを自動変更しません"
     };
   }
 
@@ -559,6 +569,7 @@ async function importSmaregiProducts(){
     let unchanged=0;
     const failures=[];
     const conflicts=[];
+    const barcodeChanges=[];
     const comparisonFields=["barcode","name",...SMAREGI_PRODUCT_MASTER_API_FIELDS]
       .filter((key,index,array)=>array.indexOf(key)===index&&supportedColumns.has(key));
     rows.forEach(row=>{
@@ -591,6 +602,10 @@ async function importSmaregiProducts(){
         conflicts.push({name:row.name||"",barcode,id,reason:matchInfo.reason||"product matching conflict",arico_identifiers:matchInfo.matches.map(item=>item.barcode).filter(Boolean)});
         return;
       }
+      if(matchInfo.barcodeChange){
+        barcodeChanges.push({from:matchInfo.barcodeChange.from,to:barcode,row});
+        return;
+      }
       const current=matchInfo.current;
       const payload=buildSmaregiProductPayload(row,current,!current,supportedColumns);
       const fieldsToCompare=comparisonFields.filter(key=>Object.prototype.hasOwnProperty.call(payload,key));
@@ -621,12 +636,36 @@ async function importSmaregiProducts(){
     const updates=validPlans.filter(plan=>plan.current).map(plan=>({current:plan.current,payload:plan.payload}));
     const inserts=validPlans.filter(plan=>!plan.current).map(plan=>plan.payload);
     const ok=typeof confirmAppAction==="function"
-      ?await confirmAppAction("商品マスター更新確認",`新規 ${inserts.length}件 / 更新 ${updates.length}件 / 変更なし ${unchanged}件 / 要確認 ${failures.length}件`,{okText:"保存"})
+      ?await confirmAppAction("商品マスター更新確認",`新規 ${inserts.length}件 / 更新 ${updates.length}件 / バーコード変更 ${barcodeChanges.length}件 / 変更なし ${unchanged}件 / 要確認 ${failures.length}件`,{okText:"保存"})
       :true;
     if(!ok)return;
     const writeFailures=[];
     let updatedCount=0;
     let insertedCount=0;
+    // バーコード変更（スマレジ優先）：関連データごと付け替えてから、商品情報を更新する。
+    let barcodeChangedCount=0;
+    const changeStaff=(typeof getSmaregiCheckerName==="function"&&getSmaregiCheckerName())
+      ||window.currentStaffName
+      ||localStorage.getItem("arico_current_staff_name")
+      ||"商品マスター取込";
+    for(const change of barcodeChanges){
+      try{
+        await sb("rpc/change_product_barcode",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({p_old:change.from.barcode,p_new:change.to,p_staff:changeStaff})
+        });
+        barcodeChangedCount++;
+        const current={...change.from,barcode:change.to};
+        updates.push({current,payload:buildSmaregiProductPayload(change.row,current,false,supportedColumns)});
+      }catch(error){
+        const message=String(error?.message||error);
+        const reason=/change_product_barcode/.test(message)&&/(Could not find|does not exist|PGRST202)/i.test(message)
+          ?"バーコード変更用のSQL（change_product_barcode）がまだDBに適用されていません"
+          :message;
+        writeFailures.push({name:change.row.name||"",barcode:change.to,id:change.row.smaregi_product_id||"",reason:`バーコード変更失敗（${change.from.barcode} → ${change.to}）：${reason}`});
+      }
+    }
     for(let i=0;i<updates.length;i+=100){
       const batch=updates.slice(i,i+100);
       try{
@@ -676,7 +715,7 @@ async function importSmaregiProducts(){
     if(typeof loadProducts==="function")await loadProducts();
     else if(typeof render==="function")render();
 
-    showMessage(`商品マスター取込結果: 更新${updatedCount}件 / 新規${insertedCount}件 / 変更なし${unchanged}件 / 競合${conflicts.length}件 / 失敗${failureCount}件`,warningCount?"err":"ok");
+    showMessage(`商品マスター取込結果: 更新${updatedCount}件 / 新規${insertedCount}件 / バーコード変更${barcodeChangedCount}件 / 変更なし${unchanged}件 / 競合${conflicts.length}件 / 失敗${failureCount}件`,warningCount?"err":"ok");
     if(conflicts.length)failures.push(...conflicts);
     if(warningCount&&typeof showPopup==="function"){
       const details=warningsToHistory(failures,data.warnings||[]).slice(0,20).map(item=>`${item.name||item.id||"商品"}：${item.reason}`).join("\n");

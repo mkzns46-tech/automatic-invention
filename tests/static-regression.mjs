@@ -138,6 +138,18 @@ check("商品マスター取込は数字13桁のバーコードだけ登録・�
   return problems.join("; ");
 });
 
+check("バーコード変更は products だけを書き換えず、RPCで関連データごと付け替える", () => {
+  const src = read("product-import.js");
+  const problems = [];
+  if (!/rpc\/change_product_barcode/.test(src)) problems.push("取込がバーコード変更RPCを使っていない");
+  // products.barcode を直接 PATCH で書き換えていない（barcode を含む payload で barcode=eq.旧 を更新しない）
+  if (/products\?barcode=eq\.[^`"']*`?,\{method:"PATCH"[^}]*barcode:/.test(src)) problems.push("products.barcode を直接書き換えている");
+  const sql = read("sql/rpc_change_product_barcode_v1.sql");
+  if (!/exists\(select 1 from public\.products where barcode=v_new\)/.test(sql)) problems.push("RPCが変更先バーコードの衝突を確認していない");
+  if (!/a\.attname='barcode'/.test(sql)) problems.push("RPCが関連テーブルの barcode を付け替えていない");
+  return problems.join("; ");
+});
+
 check("event register settings: unset IDs stop the sales fetch", () => {
   const booth = read("booth.js");
   return /イベント販売用レジIDが未設定/.test(booth) ? "" : "unset-register guard message not found";
