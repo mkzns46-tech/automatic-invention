@@ -504,3 +504,153 @@ html body .booth-carry-out-card .booth-return-apply-btn{height:44px !important;m
   html body .booth-carry-out-card .booth-departure-entry-row button{grid-column:1/-1}
   html body .booth-carry-out-card .booth-departure-tools > *{flex:1 1 calc(50% - 4px) !important}
 }
+
+/* =====================================================================
+   全画面共通：ボタンとツールバー（arico-hub と同じ密度に）
+   - 既定の最低48pxをやめて38pxに
+   - ツールバー内のボタンは横いっぱいに伸ばさず、左から内容幅で並べる
+   - 決定ボタン（フォーム送信・登録）は横幅いっぱい・44pxで目立たせる
+   ===================================================================== */
+html body main.grid button,
+html body main.grid .file-button,
+html body main.grid .booth-file-button{
+  min-height:38px !important;
+  font-size:13px !important;
+  line-height:1.35 !important;
+}
+
+/* ツールバー：横一列（折り返しあり）、ボタンは内容幅 */
+html body main.grid .button-row,
+html body main.grid .inventory-list-actions,
+html body main.grid .inventory-list-bulk-toolbar,
+html body main.grid .history-camera-row,
+html body main.grid .app-count-toolbar,
+html body main.grid .smaregi-toolbar,
+html body main.grid .shelf-priority-controls,
+html body main.grid .smaregi-reset-panel,
+html body main.grid .booth-event-actions{
+  display:flex !important;
+  flex-direction:row !important;
+  flex-wrap:wrap !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:8px !important;
+}
+html body main.grid :is(.button-row,.inventory-list-actions,.inventory-list-bulk-toolbar,.history-camera-row,.app-count-toolbar,.smaregi-toolbar,.shelf-priority-controls,.smaregi-reset-panel,.booth-event-actions) > :is(button,.file-button,.booth-file-button,a.button){
+  flex:0 0 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+  max-width:none !important;
+  min-height:38px !important;
+  height:auto !important;
+  margin:0 !important;
+  padding:7px 16px !important;
+  white-space:nowrap;
+}
+/* ツールバーの中のラベル付き部品（カメラズームなど）は高さだけ合わせる */
+html body main.grid .button-row > :is(div,label):not(.file-button){flex:0 1 auto !important;width:auto !important;min-height:38px !important;margin:0 !important}
+
+/* 見出しとボタンが並ぶ行は左右に振り分け */
+html body main.grid .section-title,
+html body main.grid .booth-list-header{display:flex !important;align-items:center !important;justify-content:space-between !important;gap:12px !important;flex-wrap:wrap}
+html body main.grid :is(.section-title,.booth-list-header) > button{flex:0 0 auto !important;width:auto !important;min-width:0 !important;margin:0 !important;padding:7px 14px !important}
+
+/* イベント一覧の絞り込みボタン */
+html body main.grid .booth-filter-row > button{width:auto !important;min-width:0 !important;margin:0 !important;padding:7px 14px !important}
+
+/* 決定ボタン：横幅いっぱい・44px */
+html body main.grid form > button[type="submit"],
+html body main.grid #shelfLocationRegisterBtn,
+html body main.grid #saveAppInventoryCountBtn,
+html body main.grid .booth-return-apply-btn{
+  width:100% !important;
+  min-height:44px !important;
+  font-size:15px !important;
+  font-weight:700 !important;
+}
+/* ツールバーの中の主操作は緑で目立たせる */
+html body main.grid #inventoryListInlineSaveBtn,
+html body main.grid #completeSmaregiStockCheckBtn{
+  background:var(--hub-brand) !important;
+  border-color:var(--hub-brand) !important;
+  color:#fff !important;
+}
+
+/* 担当者の選択：緑の大ボタン → 普通の選択欄の見た目 */
+html body .staff-picker-toggle{
+  width:100% !important;
+  min-height:40px !important;
+  margin:0 !important;
+  padding:8px 36px 8px 12px !important;
+  text-align:left !important;
+  justify-content:flex-start !important;
+  background:var(--hub-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 12px center !important;
+  border:1px solid var(--hub-border-strong) !important;
+  color:var(--hub-text) !important;
+  font-size:14px !important;
+  font-weight:500 !important;
+  box-shadow:none !important;
+}
+html body .staff-picker-toggle:hover{border-color:var(--hub-brand) !important}
+
+/* 緑の囲み → arico-hub と同じ薄いグレーの囲み */
+html body .history-search-box,
+html body .inventory-list-bulk-toolbar,
+html body .check-panel{
+  background:#f8fafc !important;
+  border:1px solid var(--hub-border) !important;
+  border-radius:10px !important;
+}
+
+@media(max-width:800px){
+  /* スマホではツールバーのボタンを2列で */
+  html body main.grid :is(.button-row,.inventory-list-actions,.inventory-list-bulk-toolbar,.history-camera-row,.app-count-toolbar,.smaregi-toolbar,.shelf-priority-controls,.smaregi-reset-panel) > :is(button,.file-button,.booth-file-button,a.button){
+    flex:1 1 calc(50% - 4px) !important;
+  }
+}
+
+/* ID 指定で大きくされていたボタン／カード直下に置かれたボタン */
+html body main.grid #productHistoryCsvBtn,
+html body main.grid #showAllSelectedHistoryBtn,
+html body main.grid #historyCameraBtn{flex:0 0 auto !important;width:auto !important;min-width:0 !important;min-height:38px !important;padding:7px 16px !important;margin:0 !important}
+html body main.grid #inventoryListMoreBtn{display:block !important;width:auto !important;min-width:240px !important;min-height:38px !important;margin:14px auto 0 !important;padding:7px 20px !important}
+html body main.grid #productImportCard > :is(#importSmaregiProductsBtn,#importProductsCsvBtn,#syncSmaregiStockBtn){display:inline-flex !important;align-items:center;width:auto !important;min-width:0 !important;min-height:38px !important;margin:10px 8px 0 0 !important;padding:7px 16px !important}
+html body main.grid #importSmaregiProductsBtn{background:var(--hub-brand) !important;border-color:var(--hub-brand) !important;color:#fff !important}
+
+/* イベント詳細の作業メニュー：緑の大ボタン2段 → タブ風の1段 */
+html body .booth-work-menu-title{color:var(--hub-subtle) !important;font-size:12px !important;font-weight:600 !important;margin:14px 0 6px !important}
+html body .booth-event-menu{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  gap:4px !important;
+  padding:4px !important;
+  background:#f3f4f6 !important;
+  border:1px solid var(--hub-border) !important;
+  border-radius:10px !important;
+  grid-template-columns:none !important;
+}
+html body .booth-event-menu .booth-event-menu-btn{
+  flex:1 1 auto !important;
+  width:auto !important;
+  min-width:0 !important;
+  min-height:34px !important;
+  margin:0 !important;
+  padding:6px 12px !important;
+  border:0 !important;
+  border-radius:7px !important;
+  background:transparent !important;
+  color:#4b5563 !important;
+  font-size:13px !important;
+  font-weight:600 !important;
+  box-shadow:none !important;
+  white-space:nowrap;
+}
+html body .booth-event-menu .booth-event-menu-btn:hover{background:#e5e7eb !important;color:var(--hub-text) !important}
+html body .booth-event-menu .booth-event-menu-btn.is-active{
+  background:var(--hub-surface) !important;
+  color:var(--hub-brand-dark) !important;
+  box-shadow:0 1px 2px rgba(15,23,42,.1) !important;
+}
+@media(max-width:800px){
+  html body .booth-event-menu .booth-event-menu-btn{flex:1 1 calc(50% - 4px) !important}
+}
