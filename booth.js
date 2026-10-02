@@ -9379,6 +9379,8 @@ async function saveBoothDepartureCorrectionUnguarded(itemId,button){
     storage_takeout_qty:0,
     normal_takeout_qty:newTotal,
     taken_qty:newTotal,
+    // 共通棚へ移した数と同じだけ、このイベントの共通棚分も増減させる（締めで共通棚から減らす数）。
+    event_storage_qty:Math.max(0,Number(item.event_storage_qty||0)+totalDelta),
     difference_qty:calculateBoothItemDifference({...item,storage_takeout_qty:0,normal_takeout_qty:newTotal,taken_qty:newTotal})
   };
   if(totalDelta>0){
@@ -12111,7 +12113,10 @@ async function assertBoothEventOpenForEdit(eventId){
       const found=await sb(`booth_event_items?select=*&event_id=eq.${encodeURIComponent(event.id)}&id=eq.${encodeURIComponent(entry.id)}&item_type=eq.normal&limit=1`);
       const item=Array.isArray(found)&&found[0]?found[0]:null;if(!item)throw new Error("対象の戻り商品が見つかりません。");
       const next=Number(entry.value);if(next>calculateBoothReturnPlannedQty(item))throw new Error(`${item.product_name||item.barcode}: 戻り数が戻り予定数を超えています。`);
-      await patchBoothEventItem(item,{returned_qty:next,difference_qty:calculateBoothDifference({...item,returned_qty:next}),return_process_type:"shelf",return_reflected:false,return_reflected_qty:0,return_reflected_at:null,return_reflected_by:null,shelf_return_qty:0,event_storage_qty:0,shelf_return_reflected:false,shelf_return_reflected_qty:0,shelf_return_reflected_at:null,shelf_return_reflected_by:null});
+      // 戻り数だけを保存する。反映済みの記録（return_reflected*）と、このイベントの
+      // 共通棚分（event_storage_qty）は締めRPCが使うので消さない（消すと再締めで
+      // 通常棚へ二重に戻り、共通棚からは減らなくなる）。
+      await patchBoothEventItem(item,{returned_qty:next,difference_qty:calculateBoothDifference({...item,returned_qty:next}),return_process_type:"shelf"});
     }await refreshBoothEventRelatedViews(event.id);await loadBoothEventReport(event.id);boothShowSuccess("戻り実績を保存しました","在庫移動はイベント締め時に通常棚へ反映します。");}
     catch(error){boothShowError("戻り実績保存エラー",error.message||"戻り実績の保存に失敗しました。");}finally{window.__aricoBoothReportReturnBatchSaving=false;}
   };

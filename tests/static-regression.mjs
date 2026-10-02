@@ -111,6 +111,18 @@ check("認証の無いスマレジ書き込みAPIは停止したまま（在庫�
   return problems.join("; ");
 });
 
+check("戻り保存で反映済み記録・イベント共通棚分を消さない／持ち出しRPC(v2)は event_storage_qty を加算", () => {
+  const booth = read("booth.js");
+  const problems = [];
+  const active = booth.slice(booth.lastIndexOf("root.saveBoothReportReturnBatch=saveBoothReportReturnBatch=async function"));
+  const body = active.slice(0, active.indexOf("};"));
+  if (/return_reflected:false|event_storage_qty:0/.test(body)) problems.push("戻り実績の一括保存が反映済み記録または event_storage_qty を消している");
+  const sql = read("sql/rpc_booth_takeout_close_v2.sql");
+  if (!/event_storage_qty=coalesce\(event_item_row\.event_storage_qty,0\)\+v_qty/.test(sql)) problems.push("v2 の持ち出しRPCが event_storage_qty を加算していない");
+  if (!/v_return_apply:=v_returned-v_already/.test(sql)) problems.push("v2 の締めRPCに再締めの二重戻し防止が無い");
+  return problems.join("; ");
+});
+
 check("event register settings: unset IDs stop the sales fetch", () => {
   const booth = read("booth.js");
   return /イベント販売用レジIDが未設定/.test(booth) ? "" : "unset-register guard message not found";
