@@ -71,7 +71,8 @@ function calculateInventoryDifference({aricoStock,eventNormalStock,smaregiStock}
   // The common event shelf is part of the ARICO stock being compared.
   // Compare normal stock plus the current common event-shelf stock.
   const comparisonStock=normalizedAricoStock+normalizedEventNormalStock;
-  const difference=comparisonStock-normalizedSmaregiStock;
+  // スマレジ在庫がマイナスの時は 0 として差異を計算する（表示用の smaregiStock は実際の値のまま）。
+  const difference=comparisonStock-Math.max(0,normalizedSmaregiStock);
   const nonPositiveNoIssue=comparisonStock<=0&&normalizedSmaregiStock<=0;
   return {
     aricoStock:normalizedAricoStock,

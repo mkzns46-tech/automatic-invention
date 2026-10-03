@@ -161,6 +161,11 @@ check("スマレジ差異の保存で difference を null にしない（NOT NUL
   return problems.join("; ");
 });
 
+check("スマレジ在庫がマイナスの時は0として差異を計算する", () => {
+  const sm = read("smaregi.js");
+  return /const difference=comparisonStock-Math\.max\(0,normalizedSmaregiStock\);/.test(sm) ? "" : "calculateInventoryDifference がマイナスのスマレジ在庫をそのまま引いている";
+});
+
 check("event register settings: unset IDs stop the sales fetch", () => {
   const booth = read("booth.js");
   return /イベント販売用レジIDが未設定/.test(booth) ? "" : "unset-register guard message not found";

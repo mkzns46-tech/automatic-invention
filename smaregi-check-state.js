@@ -345,7 +345,7 @@ function renderSmaregiStockChecks(){
       : getSmaregiInventoryBreakdown(item,check);
     const diff=actualNumber===null||!Number.isFinite(actualNumber)
       ? "-"
-      : (Number.isFinite(Number(breakdown?.difference)) ? Number(breakdown.difference) : actualNumber-smaregiStock);
+      : (Number.isFinite(Number(breakdown?.difference)) ? Number(breakdown.difference) : actualNumber-Math.max(0,Number(smaregiStock)||0));
     const status=excluded ? "除外済み" : (checked ? "チェック済み" : "未チェック");
     const confirmDisabled=checked ? "disabled" : "";
     const excludeButton=(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())
@@ -883,7 +883,7 @@ function renderSmaregiStockChecks(){
     const movementAmount=Number(change.amount||0);
     const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||change.stock_amount||0);
     const actualNumber=actual===""||actual===null||typeof actual==="undefined" ? null : Number(actual);
-    const diff=actualNumber===null||!Number.isFinite(actualNumber) ? "-" : actualNumber-smaregiStock;
+    const diff=actualNumber===null||!Number.isFinite(actualNumber) ? "-" : actualNumber-Math.max(0,Number(smaregiStock)||0);
     const status=excluded ? "除外済み" : (checked ? "チェック済み" : "未チェック");
     const confirmDisabled=checked ? "disabled" : "";
     const excludeButton=(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())
@@ -1256,7 +1256,7 @@ function renderSmaregiStockChecks(){
     const movementAmount=Number(change.amount||0);
     const smaregiStock=typeof getSavedSmaregiStockNumber==="function" ? getSavedSmaregiStockNumber(item,0) : Number(item.smaregi_stock||change.stock_amount||0);
     const actualNumber=actual===""||actual===null||typeof actual==="undefined" ? null : Number(actual);
-    const diff=actualNumber===null||!Number.isFinite(actualNumber) ? "-" : actualNumber-smaregiStock;
+    const diff=actualNumber===null||!Number.isFinite(actualNumber) ? "-" : actualNumber-Math.max(0,Number(smaregiStock)||0);
     const status=excluded ? "除外済み" : (checked ? "チェック済み" : "未チェック");
     const confirmDisabled=checked ? "disabled" : "";
     const excludeButton=(typeof hasInventoryPrivilegedAccess==="function"&&hasInventoryPrivilegedAccess())
