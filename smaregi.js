@@ -175,7 +175,61 @@ async function persistSmaregiCheckRecord({snapshotId,barcode,payload}={}){
   }
 }
 
+// 同じチェック作業の前スナップショットから「引き継いで表示しているだけ」のチェック
+// （__carried）は、今のスナップショットに行が無い。PATCH が空振りしないよう、
+// 書き換える前に引き継いだ内容で今のスナップショットに1行作る。前の行には触れない。
+async function ensureSmaregiCheckRowForSnapshot(snapshotId,barcode){
+  const list=typeof smaregiStockChecks!=="undefined"&&Array.isArray(smaregiStockChecks)?smaregiStockChecks:[];
+  const carried=list.find(row=>String(row?.barcode||"")===String(barcode||"")&&row?.__carried);
+  if(!carried||!snapshotId)return;
+  const existing=await sb(`smaregi_stock_checks?select=id&snapshot_id=eq.${encodeURIComponent(snapshotId)}&barcode=eq.${encodeURIComponent(barcode)}&limit=1`).catch(()=>null);
+  if(!Array.isArray(existing)||existing.length===0){
+    const copy={...carried,snapshot_id:snapshotId};
+    delete copy.id;
+    delete copy.__carried;
+    delete copy.carried_from_snapshot_id;
+    try{
+      await sb("smaregi_stock_checks",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify([copy])});
+    }catch(error){
+      if(!isMissingSmaregiSnapshotColumnError(error))throw error;
+      await sb("smaregi_stock_checks",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify([removeSmaregiSnapshotFields(copy)])});
+    }
+  }
+  delete carried.__carried;
+  carried.snapshot_id=snapshotId;
+}
+window.ensureSmaregiCheckRowForSnapshot=ensureSmaregiCheckRowForSnapshot;
+
+// 作業途中で「スマレジ在庫変動API取得」をやり直すと新しいスナップショットができ、
+// それまでに保存したチェックが見えなくなっていた。同じチェック作業（range_from が同じ＝
+// 前回の「今回のチェックを完了」以降）の前スナップショットで保存したチェックを、
+// まだチェックしていない商品に限り「引き継ぎ」として表示する（DBには書かない）。
+async function loadCarriedSmaregiChecks(snapshot,currentChecks,items){
+  if(!snapshot?.id||!snapshot?.range_from||!snapshot?.imported_at)return [];
+  const storeCode=String(snapshot.note||"").match(/store_code:([^/\s]+)/)?.[1]||"";
+  if(!storeCode)return [];
+  const previous=await sb(`smaregi_stock_snapshots?select=id,imported_at&source=eq.api&note=ilike.${encodeURIComponent(`*store_code:${storeCode}*`)}&range_from=eq.${encodeURIComponent(snapshot.range_from)}&imported_at=lt.${encodeURIComponent(snapshot.imported_at)}&order=imported_at.desc&limit=20`).catch(()=>[]);
+  const ids=(Array.isArray(previous)?previous:[]).map(row=>row.id).filter(id=>id&&id!==snapshot.id);
+  if(!ids.length)return [];
+  const checked=new Set((currentChecks||[]).map(row=>String(row?.barcode||"")));
+  const targets=new Set((items||[]).map(item=>String(item?.barcode||"")));
+  const rows=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=in.(${ids.map(id=>encodeURIComponent(id)).join(",")})&order=checked_at.desc`,1000,20000).catch(()=>[]);
+  // 何日も前の数え直し前の数字は引き継がない（取得し直す前の同じ作業中＝12時間以内だけ）
+  const carryFrom=new Date(snapshot.imported_at).getTime()-12*60*60*1000;
+  const carried=new Map();
+  (Array.isArray(rows)?rows:[]).forEach(row=>{
+    const barcode=String(row?.barcode||"");
+    if(!barcode||checked.has(barcode)||!targets.has(barcode)||carried.has(barcode))return;
+    if(!(new Date(row.checked_at||0).getTime()>=carryFrom))return;
+    if(row.actual_stock===null||row.actual_stock===undefined||String(row.actual_stock)==="")return;
+    carried.set(barcode,{...row,__carried:true,carried_from_snapshot_id:row.snapshot_id,snapshot_id:snapshot.id});
+  });
+  return [...carried.values()];
+}
+window.loadCarriedSmaregiChecks=loadCarriedSmaregiChecks;
+
 async function patchSmaregiCheckRecord({snapshotId,barcode,payload}={}){
+  await ensureSmaregiCheckRowForSnapshot(snapshotId,barcode);
   const endpoint=`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(snapshotId)}&barcode=eq.${encodeURIComponent(barcode)}`;
   try{
     return await sb(endpoint,{
@@ -888,6 +942,7 @@ async function markSmaregiDifferenceNoIssue(barcode,button=null){
     try{
      const manualNoIssuePayload={no_issue:true,no_issue_by:checkedBy,no_issue_at,no_issue_reason:"",is_manual_no_issue:true};
      try{
+       if(typeof ensureSmaregiCheckRowForSnapshot==="function")await ensureSmaregiCheckRowForSnapshot(smaregiSnapshot.id,barcode);
        await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
          method:"PATCH",
          headers:{Prefer:"return=minimal"},
@@ -895,6 +950,7 @@ async function markSmaregiDifferenceNoIssue(barcode,button=null){
        });
      }catch(error){
        if(!isMissingSmaregiSnapshotColumnError(error))throw error;
+       if(typeof ensureSmaregiCheckRowForSnapshot==="function")await ensureSmaregiCheckRowForSnapshot(smaregiSnapshot.id,barcode);
        await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
          method:"PATCH",
          headers:{Prefer:"return=minimal"},
@@ -1373,6 +1429,7 @@ async function clearSmaregiStockCheck(barcode){
     const hasActualStock=old?.actual_stock!==null&&old?.actual_stock!==undefined&&String(old.actual_stock)!=="";
     if(hasActualStock){
       const checked_by=getSmaregiDisplayCheckedBy(old);
+      if(typeof ensureSmaregiCheckRowForSnapshot==="function")await ensureSmaregiCheckRowForSnapshot(smaregiSnapshot.id,barcode);
       await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
         method:"PATCH",
         headers:{Prefer:"return=minimal"},

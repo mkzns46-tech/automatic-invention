@@ -174,6 +174,25 @@ check("棚卸差異率は数量ベース：Σ|帳簿在庫−実在庫|÷Σ帳�
   return problems.join("; ");
 });
 
+check("API取得し直しても同じ作業のチェックを引き継ぎ、引き継いだ行への書き換えは空振りしない", () => {
+  const sm = read("smaregi.js");
+  const fin = read("smaregi-check-final.js");
+  const problems = [];
+  if (!/async function loadCarriedSmaregiChecks\(/.test(sm)) problems.push("引き継ぎ読み込みが無い");
+  if ((fin.match(/loadCarriedSmaregiChecks\(smaregiSnapshot,smaregiStockChecks,smaregiStockItems\)/g) || []).length < 2) problems.push("読み込み／裏更新の両方で引き継いでいない");
+  if (!/async function patchSmaregiCheckRecord\(\{snapshotId,barcode,payload\}=\{\}\)\{\s*await ensureSmaregiCheckRowForSnapshot/.test(sm)) problems.push("共通の書き換えが引き継ぎ行を作らない");
+  // 生の PATCH の直前に ensure があること
+  for (const [name, src] of [["smaregi.js", sm], ["analytics.js", read("analytics.js")]]) {
+    const re = /await sb\(`smaregi_stock_checks\?snapshot_id=eq\.\$\{encodeURIComponent\(smaregiSnapshot\.id\)\}&barcode=eq\.\$\{encodeURIComponent\(barcode\)\}`,\{\s*method:"PATCH"/g;
+    let m;
+    while ((m = re.exec(src))) {
+      const before = src.slice(Math.max(0, m.index - 200), m.index);
+      if (!/ensureSmaregiCheckRowForSnapshot\(smaregiSnapshot\.id,barcode\);\s*$/.test(before)) problems.push(`${name} に ensure の無い PATCH がある`);
+    }
+  }
+  return problems.join("; ");
+});
+
 check("event register settings: unset IDs stop the sales fetch", () => {
   const booth = read("booth.js");
   return /イベント販売用レジIDが未設定/.test(booth) ? "" : "unset-register guard message not found";

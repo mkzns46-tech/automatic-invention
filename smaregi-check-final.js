@@ -329,6 +329,7 @@
       const snapshotId=smaregiSnapshot.id;
       const latestChecks=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=eq.${encodeURIComponent(snapshotId)}&order=checked_at.desc`,1000,20000);
       smaregiStockChecks=Array.isArray(latestChecks) ? latestChecks : [];
+      if(typeof loadCarriedSmaregiChecks==="function")smaregiStockChecks=[...smaregiStockChecks,...await loadCarriedSmaregiChecks(smaregiSnapshot,smaregiStockChecks,smaregiStockItems)];
       updateSmaregiProgressOnly();
       renderSmaregiDiffOnlyPanel();
     }catch(error){
@@ -2287,6 +2288,8 @@ async function loadLatestSmaregiSnapshot(){
       const itemStoreFilter=storeId ? `&store_id=eq.${encodeURIComponent(storeId)}` : "";
       smaregiStockItems=await sbAll(`smaregi_stock_items?select=*&snapshot_id=eq.${snapshotId}${itemStoreFilter}&order=product_name.asc`,1000,20000);
       smaregiStockChecks=await sbAll(`smaregi_stock_checks?select=*&snapshot_id=eq.${snapshotId}&order=checked_at.desc`,1000,20000);
+      // 同じチェック作業の前スナップショットで保存したチェックを引き継いで表示する（DBには書かない）
+      if(typeof loadCarriedSmaregiChecks==="function")smaregiStockChecks=[...smaregiStockChecks,...await loadCarriedSmaregiChecks(smaregiSnapshot,smaregiStockChecks,smaregiStockItems)];
       const changeStoreFilter=storeId ? `&store_id=eq.${encodeURIComponent(storeId)}` : "";
       const latestChanges=await sbAll(`smaregi_stock_changes?select=*&snapshot_id=eq.${snapshotId}${changeStoreFilter}&order=changed_at.desc`,1000,50000).catch(()=>[]);
       smaregiLatestChangeByBarcode=latestSmaregiChangesByBarcode(latestChanges);

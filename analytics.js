@@ -150,6 +150,7 @@ async function saveSmaregiDifferenceReason(barcode,button=null){
   await runWithSmaregiAutoRefreshPaused(async()=>{
     const difference_reason_at=new Date().toISOString();
     try{
+      if(typeof ensureSmaregiCheckRowForSnapshot==="function")await ensureSmaregiCheckRowForSnapshot(smaregiSnapshot.id,barcode);
       await sb(`smaregi_stock_checks?snapshot_id=eq.${encodeURIComponent(smaregiSnapshot.id)}&barcode=eq.${encodeURIComponent(barcode)}`,{
         method:"PATCH",
         headers:{Prefer:"return=minimal"},
