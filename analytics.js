@@ -267,10 +267,16 @@ function calculateSmaregiAccuracy(historical,range){
   const rows=latestRows.filter(({check,calculation,snapshotValues})=>!isSmaregiExcludedCheck(check)&&snapshotValues?.isReliable!==false&&calculation&&Number.isFinite(Number(calculation.difference)));
   const legacyExcludedCount=latestRows.filter(({snapshotValues})=>snapshotValues?.isReliable===false).length;
   const checkedCount=rows.length;
-  const differenceCount=rows.filter(({check,calculation,snapshotValues})=>!isSmaregiNoIssueCheck(check)&&snapshotValues?.isAutoNoIssue!==true&&calculation.isNoIssue!==true&&Number(calculation.difference)!==0).length;
-  const differenceRate=checkedCount?differenceCount/checkedCount*100:0;
-  const accuracy=checkedCount?(checkedCount-differenceCount)/checkedCount*100:0;
-  return {checkedCount,differenceCount,differenceRate,accuracy,legacyExcludedCount};
+  const isDifferenceRow=({check,calculation,snapshotValues})=>!isSmaregiNoIssueCheck(check)&&snapshotValues?.isAutoNoIssue!==true&&calculation.isNoIssue!==true&&Number(calculation.difference)!==0;
+  const differenceCount=rows.filter(isDifferenceRow).length;
+  // 棚卸差異率 =（帳簿在庫 − 実在庫）÷ 帳簿在庫 × 100（数量ベース）
+  //   帳簿在庫 = スマレジ在庫（マイナスは0）、実在庫 = 比較用在庫（通常棚＋イベント棚）
+  //   商品ごとの差は大きさ（絶対値）で合計する。「問題なし」にした商品の差は数えない。
+  const bookQty=rows.reduce((sum,{calculation})=>sum+Math.max(0,Number(calculation.smaregiStock)||0),0);
+  const differenceQty=rows.filter(isDifferenceRow).reduce((sum,{calculation})=>sum+Math.abs(Math.max(0,Number(calculation.smaregiStock)||0)-(Number(calculation.comparisonStock)||0)),0);
+  const differenceRate=bookQty>0?differenceQty/bookQty*100:(differenceQty>0?100:0);
+  const accuracy=checkedCount?Math.max(0,100-differenceRate):0;
+  return {checkedCount,differenceCount,differenceRate,accuracy,legacyExcludedCount,bookQty,differenceQty};
 }
 
 function formatPercent(value,digits=1){
@@ -336,7 +342,7 @@ async function loadSmaregiAccuracy(historical=null){
       changeEl.textContent=`${change>=0?"+":""}${change.toFixed(1)}%`;
       changeEl.className=change>=0?"is-improved":"is-worse";
     }
-    if(message)message.textContent=`指定期間 ${formatPercent(current.accuracy)} / 比較期間 ${formatPercent(previous.accuracy)}${current.legacyExcludedCount?` / イベント棚在庫未保存で除外: ${current.legacyExcludedCount}件`:""}`;
+    if(message)message.textContent=`指定期間 ${formatPercent(current.accuracy)} / 比較期間 ${formatPercent(previous.accuracy)} / 差異数量 ${current.differenceQty}個 ÷ 帳簿在庫 ${current.bookQty}個${current.legacyExcludedCount?` / イベント棚在庫未保存で除外: ${current.legacyExcludedCount}件`:""}`;
   }catch(e){
     if(message)message.textContent="棚卸精度集計エラー。\n"+e.message;
   }

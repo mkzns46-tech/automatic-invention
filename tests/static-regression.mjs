@@ -166,6 +166,14 @@ check("スマレジ在庫がマイナスの時は0として差異を計算する
   return /const difference=comparisonStock-Math\.max\(0,normalizedSmaregiStock\);/.test(sm) ? "" : "calculateInventoryDifference がマイナスのスマレジ在庫をそのまま引いている";
 });
 
+check("棚卸差異率は数量ベース：Σ|帳簿在庫−実在庫|÷Σ帳簿在庫×100", () => {
+  const src = read("analytics.js");
+  const problems = [];
+  if (!/const differenceRate=bookQty>0\?differenceQty\/bookQty\*100/.test(src)) problems.push("差異率が数量ベースの式になっていない");
+  if (!/Math\.abs\(Math\.max\(0,Number\(calculation\.smaregiStock\)\|\|0\)-\(Number\(calculation\.comparisonStock\)\|\|0\)\)/.test(src)) problems.push("差の大きさ（絶対値）で合計していない");
+  return problems.join("; ");
+});
+
 check("event register settings: unset IDs stop the sales fetch", () => {
   const booth = read("booth.js");
   return /イベント販売用レジIDが未設定/.test(booth) ? "" : "unset-register guard message not found";
