@@ -347,6 +347,13 @@ function getSmaregiInventoryBreakdown(item,check=getSmaregiCheck(item?.barcode))
     eventNormalStock:eventShelfStock,
     smaregiStock:smaregiStockForComparison
   });
+  // 開催中イベントの売上が取れていない時の「売上を差し引く前」の仮の差異。
+  // 画面は未確定のまま、保存（difference は NOT NULL）だけに使う。
+  const provisionalCalculation=calculation||(actualStock===null||smaregiStockForComparison===null ? null : calculateInventoryDifference({
+    aricoStock:actualStock,
+    eventNormalStock:eventShelfStock,
+    smaregiStock:smaregiStockForComparison
+  }));
   return {
     actualStock,
     currentEventStock,
@@ -359,6 +366,7 @@ function getSmaregiInventoryBreakdown(item,check=getSmaregiCheck(item?.barcode))
     smaregiStock,
     smaregiStockForComparison,
     difference:calculation?.difference??null,
+    provisionalDifference:provisionalCalculation?.difference??null,
     isNoIssue:calculation?.isNoIssue===true,
     calculation
   };
@@ -541,8 +549,19 @@ function getSmaregiAppStock(barcode){
   return Number(product.base_stock||0)+getSmaregiEventShelfStock(barcode);
 }
 
+// チェック担当者。選択欄は「スマレジ変動商品チェック」画面にしか無いため、
+// 棚卸分析だけを使う端末（スマホ等）では空になり保存できなかった。
+// 空なら、この端末で前回選んだ担当者 → 画面上部の担当者 の順で使う。
 function getSmaregiCheckerName(){
-  return String(el("smaregiCheckerName")?.value||"").trim();
+  const select=el("smaregiCheckerName");
+  const selected=String(select?.value||"").trim();
+  if(selected)return selected;
+  const fallback=String(localStorage.getItem("arico_smaregi_checker")||window.currentStaffName||localStorage.getItem("arico_current_staff_name")||"").trim();
+  if(fallback&&select&&[...select.options].some(option=>option.value===fallback)){
+    select.value=fallback;
+    try{localStorage.setItem("arico_smaregi_checker",fallback);}catch(_){}
+  }
+  return fallback;
 }
 
 function getSmaregiItemGroup(item){

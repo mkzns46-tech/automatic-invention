@@ -683,6 +683,23 @@
     const keyword=getDiffProductSearchText();
     const rows=sortDiffRowsForDisplay(keyword ? allRows.filter(row=>getDiffProductHaystack(row).includes(keyword)) : allRows);
     if(summary)summary.textContent=`差異：${allRows.length}件 / 表示：${rows.length}件 / チェック済み：${stats.completed||0}件 / 未チェック：${stats.unchecked||0}件 / 除外：${stats.excluded||0}件`;
+    // 開催中イベントの売上が取れていない時は、差異が「未確定」になる理由を一覧の上に出す。
+    const salesState=window.__smaregiOngoingSalesState;
+    let salesWarning=document.getElementById("smaregiOngoingSalesWarning");
+    if(salesState?.hasOngoingEvent===true&&salesState?.ok===false){
+      if(!salesWarning&&summary){
+        salesWarning=document.createElement("div");
+        salesWarning.id="smaregiOngoingSalesWarning";
+        salesWarning.className="message err";
+        summary.insertAdjacentElement("afterend",salesWarning);
+      }
+      if(salesWarning){
+        salesWarning.hidden=false;
+        salesWarning.textContent=`開催中イベントの売上を取得できていないため、差異は「未確定」と表示しています（実在庫の保存はできます）。\n理由：${salesState.error||"不明"}\n画面を再読み込みすると、売上を差し引かない差異で表示します。`;
+      }
+    }else if(salesWarning){
+      salesWarning.hidden=true;
+    }
     const hasMovementData=getAllMovementItems().length>0;
     if(!hasMovementData){
       body.innerHTML='<tr><td colspan="9" class="smaregi-empty">スマレジ変動API未取得です。</td></tr>';
@@ -892,7 +909,7 @@
         snapshot_id:smaregiSnapshot.id,
         barcode,
         actual_stock:actualStock,
-        difference:Number.isFinite(Number(calculation?.difference)) ? Number(calculation.difference) : null,
+        difference:Number.isFinite(Number(calculation?.difference)) ? Number(calculation.difference) : (Number.isFinite(Number(eventBreakdown?.provisionalDifference))&&eventBreakdown?.provisionalDifference!==null ? Number(eventBreakdown.provisionalDifference) : 0), // NOT NULL：売上未取得時は仮の差異
         checked_by:checkedBy,
         checked_at:checkedAt,
         excluded:false,
@@ -1966,7 +1983,7 @@
     const calculation=eventBreakdown?.calculation||null;
     const payload={
       actual_stock:nextActualStock,
-      difference:Number.isFinite(Number(calculation?.difference)) ? Number(calculation.difference) : null,
+      difference:Number.isFinite(Number(calculation?.difference)) ? Number(calculation.difference) : (Number.isFinite(Number(eventBreakdown?.provisionalDifference))&&eventBreakdown?.provisionalDifference!==null ? Number(eventBreakdown.provisionalDifference) : 0), // NOT NULL：売上未取得時は仮の差異
       checked_by:checkedBy||check.checked_by||"",
       checked_at:checkedAt,
       excluded:false,

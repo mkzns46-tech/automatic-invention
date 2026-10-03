@@ -150,6 +150,17 @@ check("バーコード変更は products だけを書き換えず、RPCで関連
   return problems.join("; ");
 });
 
+check("スマレジ差異の保存で difference を null にしない（NOT NULL制約）／担当者が空でも補う", () => {
+  const fin = read("smaregi-check-final.js");
+  const sm = read("smaregi.js");
+  const problems = [];
+  if (/difference:Number\.isFinite\(Number\(calculation\?\.difference\)\) \? Number\(calculation\.difference\) : null,/.test(fin)) problems.push("保存時に difference が null になりうる");
+  if (!/provisionalDifference:/.test(sm)) problems.push("仮の差異（provisionalDifference）が無い");
+  const checker = sm.slice(sm.indexOf("function getSmaregiCheckerName"), sm.indexOf("function getSmaregiCheckerName") + 700);
+  if (!/arico_smaregi_checker/.test(checker) || !/currentStaffName/.test(checker)) problems.push("チェック担当者が空の時の補完が無い");
+  return problems.join("; ");
+});
+
 check("event register settings: unset IDs stop the sales fetch", () => {
   const booth = read("booth.js");
   return /イベント販売用レジIDが未設定/.test(booth) ? "" : "unset-register guard message not found";
